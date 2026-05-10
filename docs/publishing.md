@@ -32,18 +32,15 @@ patches.
 
 ## Tag Policy
 
-Use release tags only when you intentionally want to advance the production channel:
-
-```bash
-git tag toss-mtls-client-proxy-v0.1.0
-git push origin toss-mtls-client-proxy-v0.1.0
-```
-
-The workflow validates that the tag version matches
-`services/toss-mtls-client-proxy/package.json`.
+The proxy image workflow reads `services/toss-mtls-client-proxy/package.json`. When a Sampo release
+commit bumps that private npm package version on `main`, the workflow creates the matching
+`toss-mtls-client-proxy-vX.Y.Z` tag if it does not already exist and publishes the release image
+tags. Manual `toss-mtls-client-proxy-vX.Y.Z` tag pushes are still supported; the workflow validates
+that the tag version matches the proxy package version.
 
 - `edge`: latest successful `main` or scheduled build.
-- `sha-<shortsha>`: immutable build tag for audit and rollback.
+- `sha-<shortsha>`: source commit tag for audit and rollback. Scheduled rebuilds can repush
+  this tag when the base image changes.
 - `latest`: latest intentional release.
 - `0.1.0`, `0.1`, `0`: SemVer release aliases.
 
@@ -52,11 +49,11 @@ when you deliberately want to track every main-branch image build.
 
 ## Versioning
 
-Sampo is initialized for Rust WASM crate version and changelog management. Add a changeset for
-user-facing Rust helper changes, run `sampo release`, then push the resulting release commit. The
-Rust helper crates are configured as a fixed version group. The proxy package stays private and its
-GHCR tags move from the proxy `package.json` version plus an intentional release tag, so image
-releases do not force a Rust crate bump.
+Sampo is initialized for Rust WASM crate and private proxy package version/changelog management. Add
+a changeset for user-facing Rust helper changes or proxy changes, run `sampo release`, then push the
+resulting release commit. The Rust helper crates are configured as a fixed version group. The proxy
+package stays private and is not published to npm; its GHCR tags move from the proxy `package.json`
+version.
 
 The image is safe to make public because certificates and tokens are only provided at runtime. The
 running proxy instance should remain private on the application network.

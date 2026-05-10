@@ -23,11 +23,19 @@ pub fn toss_user_key_hmac(secret: &str, toss_user_key: &str) -> CommonResult<Str
 }
 
 pub fn seal_toss_user_key(encryption_key: &str, toss_user_key: &str) -> CommonResult<String> {
+    let mut nonce = [0u8; 12];
+    get_random_bytes(&mut nonce);
+    seal_toss_user_key_with_nonce(encryption_key, toss_user_key, nonce)
+}
+
+fn seal_toss_user_key_with_nonce(
+    encryption_key: &str,
+    toss_user_key: &str,
+    nonce: [u8; 12],
+) -> CommonResult<String> {
     let key_bytes = decode_32_byte_secret(encryption_key)?;
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
         .map_err(|err| format!("invalid Toss encryption key: {err}"))?;
-    let mut nonce = [0u8; 12];
-    get_random_bytes(&mut nonce);
     let ciphertext = cipher
         .encrypt(Nonce::from_slice(&nonce), toss_user_key.as_bytes())
         .map_err(|err| format!("Toss userKey sealing failed: {err}"))?;
@@ -71,4 +79,68 @@ pub fn hmac_and_seal(
         hmac: toss_user_key_hmac(&secrets.hmac_secret, toss_user_key)?,
         sealed: seal_toss_user_key(&secrets.encryption_key, toss_user_key)?,
     })
+}
+
+#[cfg(test)]
+fn hmac_and_seal_with_nonce(
+    secrets: &TossIdentitySecrets,
+    toss_user_key: &str,
+    nonce: [u8; 12],
+) -> CommonResult<SealedTossUserKey> {
+    Ok(SealedTossUserKey {
+        hmac: toss_user_key_hmac(&secrets.hmac_secret, toss_user_key)?,
+        sealed: seal_toss_user_key_with_nonce(&secrets.encryption_key, toss_user_key, nonce)?,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const KEY: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+    const OTHER_KEY: &str = "1111111111111111111111111111111111111111111111111111111111111111";
+
+    #[test]
+    fn hmac_and_seal_round_trips_toss_user_key() {
+        let secrets = TossIdentitySecrets {
+            hmac_secret: "hmac-secret".to_string(),
+            encryption_key: KEY.to_string(),
+        };
+
+        let sealed = hmac_and_seal_with_nonce(&secrets, "toss-user-key", [3u8; 12]).unwrap();
+
+        assert_eq!(
+            sealed.hmac,
+            toss_user_key_hmac(&secrets.hmac_secret, "toss-user-key").unwrap()
+        );
+        assert_ne!(sealed.sealed, "toss-user-key");
+        assert_eq!(
+            unseal_toss_user_key(&secrets.encryption_key, &sealed.sealed).unwrap(),
+            "toss-user-key"
+        );
+    }
+
+    #[test]
+    fn unseal_rejects_wrong_key() {
+        let sealed = seal_toss_user_key_with_nonce(KEY, "toss-user-key", [3u8; 12]).unwrap();
+        let error = unseal_toss_user_key(OTHER_KEY, &sealed).unwrap_err();
+
+        assert!(error.contains("Toss userKey unsealing failed"));
+    }
+
+    #[test]
+    fn unseal_rejects_malformed_payloads() {
+        assert_eq!(
+            unseal_toss_user_key(KEY, "not-v1").unwrap_err(),
+            "unsupported sealed Toss userKey format"
+        );
+        assert_eq!(
+            unseal_toss_user_key(KEY, "v1.only-one-part").unwrap_err(),
+            "invalid sealed Toss userKey format"
+        );
+        assert_eq!(
+            unseal_toss_user_key(KEY, "v1.AQID.AQID").unwrap_err(),
+            "sealed Toss nonce must be 12 bytes"
+        );
+    }
 }

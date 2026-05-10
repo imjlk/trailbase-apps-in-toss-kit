@@ -13,3 +13,7 @@ Follow this when migrating an existing TrailBase-backed AppsInToss project to th
    - `TOSS_LOGIN_ME_PATH`
 5. Rename service references from `toss-mtls-proxy` to `toss-mtls-client-proxy`.
 6. Run proxy stub smoke, TrailBase Toss smoke, and production release checks.
+
+Copied templates are not live-linked to the submodule. After updating this kit,
+compare `templates/trailbase` against the consumer app's copied SQL, Compose,
+env, and smoke files and commit any consumer-side changes explicitly.

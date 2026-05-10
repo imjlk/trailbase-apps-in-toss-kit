@@ -2,6 +2,7 @@
 .github
 target
 **/node_modules
+**/bun.lock
 **/bun.lockb
 .env
 .env.*

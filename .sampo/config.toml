@@ -16,8 +16,9 @@ show_acknowledgments = true
 
 [packages]
 # Options for package discovery and filtering.
+# Keep false so the private Bun proxy package can be versioned without npm publishing.
 ignore_unpublished = false
-# ignore = ["internal-*", "examples/*"]
+ignore = ["npm/trailbase-apps-in-toss-kit"]
 fixed = [
   [
     "cargo/trailbase-guest-common",

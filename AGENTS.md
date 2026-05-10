@@ -16,14 +16,14 @@ Consumer apps should import Rust crates through path dependencies from the
 submodule. SQL migrations and Compose files should be copied into the consumer
 app and owned there, because runtime schema and deployment shape are app-specific.
 
-## Current Consumers
+## Consumer Notes
 
-- Primary active consumer: `/Users/imjlk/repos/_ait/light-on-off`
-- Planned follow-up consumer: `/Users/imjlk/repos/_ait/zero-three-three`
+Keep local consumer paths in `.local-consumers.md`. That file is ignored
+because consumer checkout paths are workstation-specific.
 
 When editing this repo from a consumer app, make changes in the real repo at
-`/Users/imjlk/repos/_ait/trailbase-apps-in-toss-kit`, commit them there, then
-update the consumer app's submodule pointer.
+the kit checkout, commit them there, then update the consumer app's submodule
+pointer.
 
 ## Safety Rules
 
@@ -75,6 +75,9 @@ overridden, and feature-specific secrets that truly vary by deployment.
 From this repository root:
 
 ```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 cargo check --workspace --target wasm32-wasip2
 bun test services/toss-mtls-client-proxy
 docker build -f services/toss-mtls-client-proxy/Dockerfile -t toss-mtls-client-proxy:local .
@@ -97,6 +100,10 @@ MTLS_CLIENT_KEY_PATH=/run/mtls/client-key.pem
 MTLS_CA_CERT_PATH=/run/mtls/ca-cert.pem
 ```
 
+Forward mode refuses to start without a non-empty `MTLS_PROXY_TOKEN`.
+Optional request/response guards are `MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES`,
+`MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES`, and `MTLS_PROXY_UPSTREAM_TIMEOUT_MS`.
+
 ## Versioning And Releases
 
 Sampo is used for Rust WASM crate versioning and changelogs. The local CLI
@@ -111,16 +118,23 @@ git push origin main
 ```
 
 The two Rust crates are configured as a fixed group and should move together.
-The Bun proxy is private and not Sampo-managed as an npm package. Its container
-release version comes from `services/toss-mtls-client-proxy/package.json`.
+The Bun proxy is a private npm package tracked by Sampo for version/changelog
+management only. It is not published to npm. Its container release version
+comes from `services/toss-mtls-client-proxy/package.json`.
 
-Proxy image release flow:
+Proxy changeset example:
 
-```bash
-version="$(node -p "require('./services/toss-mtls-client-proxy/package.json').version")"
-git tag "toss-mtls-client-proxy-v${version}"
-git push origin "toss-mtls-client-proxy-v${version}"
+```md
+---
+npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy: patch
+---
+
+Describe the proxy change.
 ```
+
+When `sampo release` bumps that package version and the release commit lands on
+`main`, the image workflow creates `toss-mtls-client-proxy-vX.Y.Z` if needed and
+publishes the GHCR release tags.
 
 GHCR image:
 
@@ -131,7 +145,8 @@ ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 Image tag policy:
 
 - `edge`: latest successful main or scheduled build.
-- `sha-<shortsha>`: immutable build tag for audit and rollback.
+- `sha-<shortsha>`: source commit tag for audit and rollback. Scheduled
+  rebuilds can repush this tag when the base image changes.
 - `latest`, `0.1.0`, `0.1`, `0`: intentional SemVer image release tags.
 
 Prefer exact SemVer or minor tags for production. Use `edge` only when a
@@ -146,8 +161,9 @@ Dependabot runs monthly for:
 - Cargo
 - Bun/npm for the proxy package
 
-The proxy image workflow publishes to GHCR on source changes, manual dispatch,
-scheduled rebuilds, and release tags.
+The Rust helper workflow runs format, Clippy, tests, and the `wasm32-wasip2`
+check on crate changes. The proxy image workflow publishes to GHCR on source
+changes, manual dispatch, scheduled rebuilds, and release tags.
 
 ## Consumer Integration Notes
 
@@ -156,9 +172,12 @@ For a TrailBase consumer app:
 1. Add this repo as `vendor/trailbase-apps-in-toss-kit`.
 2. Reference Rust crates via path dependencies.
 3. Copy SQL/Compose/env templates into the app repo before editing.
-4. Keep production proxy private and route only the TrailBase service publicly.
-5. Validate that no raw Toss identifiers or secrets appear in logs or public API.
-6. After changing this kit, commit/push this repo first, then update the
+4. When this kit changes, reconcile copied SQL/Compose/env/smoke templates in
+   each consumer app manually; submodule pointer updates do not update files
+   that were copied out of `templates/`.
+5. Keep production proxy private and route only the TrailBase service publicly.
+6. Validate that no raw Toss identifiers or secrets appear in logs or public API.
+7. After changing this kit, commit/push this repo first, then update the
    consumer app's submodule pointer and commit that pointer change.
 
 For `light-on-off`, local TrailBase/proxy scripts live in the consumer app, not

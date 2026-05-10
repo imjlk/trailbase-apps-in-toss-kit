@@ -84,3 +84,69 @@ pub fn read_string_path(value: &JsonValue, paths: &[&str]) -> Option<String> {
     }
     None
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64::engine::general_purpose::STANDARD;
+    use serde_json::json;
+
+    #[test]
+    fn hmac_sha256_hex_matches_known_vector() {
+        let digest = hmac_sha256_hex("key", "The quick brown fox jumps over the lazy dog").unwrap();
+        assert_eq!(
+            digest,
+            "f7bc83f430538424b13298e6aa6fb143ef4d59a14946175997479dbc2d1a3cd8"
+        );
+    }
+
+    #[test]
+    fn decode_32_byte_secret_accepts_hex_and_base64() {
+        let bytes = [7u8; 32];
+        let hex = hex::encode(bytes);
+        let standard_base64 = STANDARD.encode(bytes);
+        let url_safe_base64 = URL_SAFE_NO_PAD.encode(bytes);
+
+        assert_eq!(decode_32_byte_secret(&hex).unwrap(), bytes);
+        assert_eq!(decode_32_byte_secret(&standard_base64).unwrap(), bytes);
+        assert_eq!(decode_32_byte_secret(&url_safe_base64).unwrap(), bytes);
+    }
+
+    #[test]
+    fn decode_32_byte_secret_rejects_wrong_length() {
+        let error = decode_32_byte_secret(&STANDARD.encode([1u8; 31])).unwrap_err();
+        assert_eq!(error, "secret must decode to exactly 32 bytes");
+    }
+
+    #[test]
+    fn join_url_normalizes_slashes() {
+        assert_eq!(
+            join_url("https://example.com/", "/path"),
+            "https://example.com/path"
+        );
+    }
+
+    #[test]
+    fn read_string_path_reads_nested_scalars() {
+        let value = json!({
+            "success": {
+                "userKey": "abc",
+                "count": 3,
+                "active": true
+            }
+        });
+
+        assert_eq!(
+            read_string_path(&value, &["missing", "success.userKey"]),
+            Some("abc".to_string())
+        );
+        assert_eq!(
+            read_string_path(&value, &["success.count"]),
+            Some("3".to_string())
+        );
+        assert_eq!(
+            read_string_path(&value, &["success.active"]),
+            Some("true".to_string())
+        );
+    }
+}

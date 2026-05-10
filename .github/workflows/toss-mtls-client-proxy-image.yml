@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
@@ -41,6 +41,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -76,9 +78,18 @@ jobs:
           set -euo pipefail
 
           is_release=false
+          create_tag=false
           version=""
           major=""
           major_minor=""
+          tag_name=""
+
+          package_version="$(node -p "require('./services/toss-mtls-client-proxy/package.json').version")"
+
+          if [[ ! "${package_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Unsupported package version: ${package_version}" >&2
+            exit 1
+          fi
 
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             tag="${GITHUB_REF_NAME}"
@@ -90,23 +101,45 @@ jobs:
               exit 1
             fi
 
-            package_version="$(node -p "require('./services/toss-mtls-client-proxy/package.json').version")"
             if [[ "${version}" != "${package_version}" ]]; then
               echo "Tag version ${version} does not match package.json version ${package_version}" >&2
               exit 1
             fi
 
+            is_release=true
+            tag_name="${tag}"
+          elif [[ "${GITHUB_EVENT_NAME}" == "push" && "${GITHUB_REF_TYPE}" == "branch" && "${GITHUB_REF_NAME}" == "main" ]]; then
+            version="${package_version}"
+            tag_name="toss-mtls-client-proxy-v${version}"
+            if ! git rev-parse -q --verify "refs/tags/${tag_name}" >/dev/null; then
+              is_release=true
+              create_tag=true
+            fi
+          fi
+
+          if [[ "${is_release}" == "true" ]]; then
             IFS='.' read -r major minor _ <<< "${version}"
             major_minor="${major}.${minor}"
-            is_release=true
           fi
 
           {
             echo "is_release=${is_release}"
+            echo "create_tag=${create_tag}"
             echo "version=${version}"
             echo "major=${major}"
             echo "major_minor=${major_minor}"
+            echo "tag_name=${tag_name}"
           } >> "${GITHUB_OUTPUT}"
+
+      - name: Create proxy release tag
+        if: steps.release.outputs.create_tag == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.release.outputs.tag_name }}" -m "Release toss-mtls-client-proxy ${{ steps.release.outputs.version }}"
+          git push origin "refs/tags/${{ steps.release.outputs.tag_name }}"
 
       - name: Docker metadata
         id: meta

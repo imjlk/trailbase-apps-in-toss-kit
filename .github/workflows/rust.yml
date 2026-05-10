@@ -1,0 +1,48 @@
+name: rust helpers
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/rust.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/rust.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-helpers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test Rust helpers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Add WASI target
+        run: rustup target add wasm32-wasip2
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Check WASI build
+        run: cargo check --workspace --target wasm32-wasip2

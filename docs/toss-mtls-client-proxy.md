@@ -19,12 +19,23 @@ MTLS_PROXY_TOKEN=...
 MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im
 ```
 
+`MTLS_PROXY_TOKEN` is required in `forward` mode. Stub mode can run without a token for local smoke
+tests, but production deployments should always set one.
+
 Certificates default to:
 
 ```text
 /run/mtls/client-cert.pem
 /run/mtls/client-key.pem
 /run/mtls/ca-cert.pem
+```
+
+Optional safety limits:
+
+```text
+MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES=1048576
+MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES=2097152
+MTLS_PROXY_UPSTREAM_TIMEOUT_MS=15000
 ```
 
 ## API

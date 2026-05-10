@@ -50,18 +50,19 @@ scheduled rebuild so patched base images are picked up even when source code is 
 Image tag policy:
 
 - `edge`: latest successful `main` build.
-- `sha-<shortsha>`: immutable build tag for every pushed image.
-- `latest`, `0.1.0`, `0.1`, `0`: release tags only, created from `v0.1.0` or
-  `toss-mtls-client-proxy-v0.1.0` when that tag matches the proxy `package.json` version.
+- `sha-<shortsha>`: source commit tag for audit and rollback. Scheduled rebuilds can repush
+  this tag when the base image changes.
+- `latest`, `0.1.0`, `0.1`, `0`: release tags created when a Sampo release bumps the proxy
+  package version on `main`, or from a matching manual `toss-mtls-client-proxy-v0.1.0` tag.
 
 Dependabot runs monthly for GitHub Actions, Docker, Cargo, and Bun/npm dependencies.
 
 ## Versioning
 
-Sampo is initialized for changeset-driven Rust WASM crate version and changelog management. The Rust
-helper crates are configured as a fixed group so `trailbase-guest-common` and
-`trailbase-toss-identity` move together. The Bun proxy remains a private package; its GHCR image
-release uses `services/toss-mtls-client-proxy/package.json` plus an intentional release tag.
+Sampo is initialized for changeset-driven version and changelog management. The Rust helper crates
+are configured as a fixed group so `trailbase-guest-common` and `trailbase-toss-identity` move
+together. The Bun proxy is tracked as a private npm package for versioning only; it is not published
+to npm.
 
 Typical flow:
 
@@ -71,12 +72,8 @@ sampo release
 git push origin main
 ```
 
-Proxy image release flow:
-
-```bash
-version="$(node -p "require('./services/toss-mtls-client-proxy/package.json').version")"
-git tag "toss-mtls-client-proxy-v${version}"
-git push origin "toss-mtls-client-proxy-v${version}"
-```
+When `sampo release` bumps the proxy package version and the release commit lands on `main`, the
+image workflow creates the matching `toss-mtls-client-proxy-vX.Y.Z` git tag if needed and publishes
+the GHCR release tags.
 
 See `docs/versioning.md` for the detailed release and image tag policy.

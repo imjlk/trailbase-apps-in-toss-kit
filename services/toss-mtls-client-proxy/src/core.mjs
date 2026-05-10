@@ -5,6 +5,9 @@ import { existsSync, readFileSync } from "node:fs";
 
 export const DEFAULT_PORT = 8787;
 export const DEFAULT_CERT_DIR = "/run/mtls";
+export const DEFAULT_REQUEST_BODY_LIMIT_BYTES = 1_048_576;
+export const DEFAULT_UPSTREAM_BODY_LIMIT_BYTES = 2_097_152;
+export const DEFAULT_UPSTREAM_TIMEOUT_MS = 15_000;
 export const TOSS_ENDPOINTS = Object.freeze({
   loginGenerateToken: "/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
   loginMe: "/api-partner/v1/apps-in-toss/user/oauth2/login-me",
@@ -37,10 +40,12 @@ const HOP_BY_HOP_HEADERS = new Set([
   "content-length",
 ]);
 
+const VALID_MODES = new Set(["stub", "forward"]);
+
 export function createConfig(env = process.env) {
   return {
     port: parsePositiveInteger(env.PORT, DEFAULT_PORT),
-    mode: env.MTLS_PROXY_MODE || env.TOSS_PROXY_MODE || "stub",
+    mode: String(env.MTLS_PROXY_MODE || env.TOSS_PROXY_MODE || "stub").trim().toLowerCase(),
     internalToken: env.MTLS_PROXY_TOKEN || env.TOSS_PROXY_INTERNAL_TOKEN || "",
     upstreamBaseUrl: env.MTLS_UPSTREAM_BASE_URL || env.TOSS_API_BASE_URL || "",
     clientCertPath: env.MTLS_CLIENT_CERT_PATH || `${DEFAULT_CERT_DIR}/client-cert.pem`,
@@ -48,21 +53,51 @@ export function createConfig(env = process.env) {
     caCertPath: env.MTLS_CA_CERT_PATH || `${DEFAULT_CERT_DIR}/ca-cert.pem`,
     tossPromotionCode: env.TOSS_PROMOTION_CODE || "",
     tossPromotionAmount: parsePositiveInteger(env.TOSS_PROMOTION_AMOUNT, 50),
+    requestBodyLimitBytes: parsePositiveInteger(env.MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES, DEFAULT_REQUEST_BODY_LIMIT_BYTES),
+    upstreamBodyLimitBytes: parsePositiveInteger(env.MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES, DEFAULT_UPSTREAM_BODY_LIMIT_BYTES),
+    upstreamTimeoutMs: parsePositiveInteger(env.MTLS_PROXY_UPSTREAM_TIMEOUT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS),
   };
 }
 
 export function createProxyServer(config = createConfig()) {
+  validateConfig(config);
   return http.createServer((req, res) => {
     handleRequest(req, config)
       .then(({ status, body }) => writeJson(res, status, body))
-      .catch((error) =>
-        writeJson(res, 500, {
+      .catch((error) => {
+        const safeError = publicError(error);
+        writeJson(res, safeError.status, {
           ok: false,
-          error: "PROXY_ERROR",
-          message: error instanceof Error ? error.message : String(error),
-        }),
-      );
+          error: safeError.code,
+          message: safeError.message,
+        });
+      });
   });
+}
+
+export function validateConfig(config) {
+  const mode = String(config.mode || "").trim().toLowerCase();
+  if (!VALID_MODES.has(mode)) {
+    throw configError("INVALID_MTLS_PROXY_MODE", "MTLS_PROXY_MODE must be stub or forward");
+  }
+  if (mode !== "forward") {
+    return;
+  }
+  if (!stringOrUndefined(config.internalToken)) {
+    throw configError("MISSING_MTLS_PROXY_TOKEN", "MTLS_PROXY_TOKEN is required in forward mode");
+  }
+  if (!stringOrUndefined(config.upstreamBaseUrl)) {
+    throw configError("MISSING_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL is required in forward mode");
+  }
+  let upstream;
+  try {
+    upstream = new URL(config.upstreamBaseUrl);
+  } catch (error) {
+    throw configError("INVALID_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL must be a valid URL", error);
+  }
+  if (!["http:", "https:"].includes(upstream.protocol)) {
+    throw configError("INVALID_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL must use http or https");
+  }
 }
 
 export async function handleRequest(req, config = createConfig()) {
@@ -77,22 +112,22 @@ export async function handleRequest(req, config = createConfig()) {
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.genericMtlRequest) {
-    const body = await readJson(req);
+    const body = await readJson(req, requestBodyLimitBytes(config));
     return response(200, await handleGenericMtlRequest(body, config));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.tossLoginComplete) {
-    const body = await readJson(req);
+    const body = await readJson(req, requestBodyLimitBytes(config));
     return response(200, config.mode === "forward" ? await completeTossLogin(body, config) : stubLoginResponse(body));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.iapOrderStatus) {
-    const body = await readJson(req);
+    const body = await readJson(req, requestBodyLimitBytes(config));
     return response(200, config.mode === "forward" ? await getIapOrderStatus(body, config) : stubIapOrderStatus(body));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {
-    const body = await readJson(req);
+    const body = await readJson(req, requestBodyLimitBytes(config));
     return response(
       200,
       config.mode === "forward"
@@ -108,7 +143,7 @@ export async function handleRequest(req, config = createConfig()) {
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageSend) {
-    const body = await readJson(req);
+    const body = await readJson(req, requestBodyLimitBytes(config));
     if (config.mode !== "forward") {
       return response(200, {
         ok: true,
@@ -146,11 +181,11 @@ export async function handleGenericMtlRequest(body, config = createConfig()) {
 function normalizeGenericRequest(body) {
   const method = String(body?.method || "POST").trim().toUpperCase();
   if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-    throw new Error("Unsupported method");
+    throw clientError("UNSUPPORTED_METHOD", "Unsupported method");
   }
   const path = String(body?.path || "").trim();
   if (!path.startsWith("/") || path.startsWith("//") || /^https?:\/\//i.test(path)) {
-    throw new Error("path must be a relative absolute path");
+    throw clientError("INVALID_PROXY_PATH", "path must be a relative absolute path");
   }
   return {
     method,
@@ -338,10 +373,13 @@ async function grantPromotionReward(request, config) {
 
 async function forwardJson(request, config) {
   if (!config.upstreamBaseUrl) {
-    throw new Error("MTLS_UPSTREAM_BASE_URL is required in forward mode");
+    throw configError("MISSING_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL is required in forward mode");
   }
   const target = new URL(request.path, config.upstreamBaseUrl);
   const payload = request.body === undefined ? undefined : Buffer.from(JSON.stringify(request.body));
+  if (payload && payload.length > requestBodyLimitBytes(config)) {
+    throw clientError("REQUEST_BODY_TOO_LARGE", "Request body is too large", 413);
+  }
   const headers = {
     accept: "application/json",
     ...sanitizeHeaders(request.headers),
@@ -373,19 +411,49 @@ async function forwardJson(request, config) {
 
   const transport = target.protocol === "https:" ? https : http;
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      fn(value);
+    };
     const upstream = transport.request(options, (upstreamRes) => {
       const chunks = [];
-      upstreamRes.on("data", (chunk) => chunks.push(chunk));
+      let receivedBytes = 0;
+      upstreamRes.on("data", (chunk) => {
+        receivedBytes += byteLength(chunk);
+        if (receivedBytes > upstreamBodyLimitBytes(config)) {
+          settle(
+            reject,
+            upstreamError("UPSTREAM_RESPONSE_TOO_LARGE", "Upstream response was too large", 502),
+          );
+          upstream.destroy();
+        } else {
+          chunks.push(chunk);
+        }
+      });
       upstreamRes.on("end", () => {
+        if (settled) return;
         const raw = Buffer.concat(chunks).toString("utf8");
-        resolve({
+        settle(resolve, {
           status: upstreamRes.statusCode || 500,
           headers: sanitizeResponseHeaders(upstreamRes.headers),
           body: parseMaybeJson(raw),
         });
       });
     });
-    upstream.on("error", reject);
+    upstream.setTimeout(upstreamTimeoutMs(config), () => {
+      settle(reject, upstreamError("UPSTREAM_TIMEOUT", "Upstream request timed out", 504));
+      upstream.destroy();
+    });
+    upstream.on("error", (error) => {
+      settle(
+        reject,
+        error instanceof ProxyHttpError
+          ? error
+          : upstreamError("UPSTREAM_REQUEST_FAILED", "Upstream request failed", 502, error),
+      );
+    });
     if (payload) upstream.write(payload);
     upstream.end();
   });
@@ -396,20 +464,37 @@ function isAuthorized(req, config) {
   return req.headers.authorization === `Bearer ${config.internalToken}`;
 }
 
-function readJson(req) {
+function readJson(req, limitBytes = requestBodyLimitBytes()) {
   return new Promise((resolve, reject) => {
     const chunks = [];
-    req.on("data", (chunk) => chunks.push(chunk));
-    req.on("end", () => {
-      const raw = Buffer.concat(chunks).toString("utf8");
-      if (!raw) return resolve({});
-      try {
-        resolve(JSON.parse(raw));
-      } catch (error) {
-        reject(new Error(`Invalid JSON: ${error.message}`));
+    let receivedBytes = 0;
+    let settled = false;
+    const settle = (fn, value) => {
+      if (settled) return;
+      settled = true;
+      fn(value);
+    };
+    req.on("data", (chunk) => {
+      receivedBytes += byteLength(chunk);
+      if (receivedBytes > limitBytes) {
+        settle(reject, clientError("REQUEST_BODY_TOO_LARGE", "Request body is too large", 413));
+      } else {
+        chunks.push(chunk);
       }
     });
-    req.on("error", reject);
+    req.on("end", () => {
+      if (settled) return;
+      const raw = Buffer.concat(chunks).toString("utf8");
+      if (!raw) return settle(resolve, {});
+      try {
+        settle(resolve, JSON.parse(raw));
+      } catch (error) {
+        settle(reject, clientError("INVALID_JSON", "Invalid JSON", 400, error));
+      }
+    });
+    req.on("error", (error) => {
+      settle(reject, error);
+    });
   });
 }
 
@@ -449,8 +534,14 @@ function sanitizeResponseHeaders(headers) {
 }
 
 function readRequiredFile(path, name) {
-  if (!path) throw new Error(`${name} is required for HTTPS forward mode`);
-  return readFileSync(path);
+  if (!path) {
+    throw configError(`MISSING_${name}`, `${name} is required for HTTPS forward mode`);
+  }
+  try {
+    return readFileSync(path);
+  } catch (error) {
+    throw configError(`${name}_UNREADABLE`, `${name} is missing or unreadable`, error);
+  }
 }
 
 function parseMaybeJson(raw) {
@@ -634,6 +725,22 @@ function parsePositiveInteger(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function requestBodyLimitBytes(config = {}) {
+  return parsePositiveInteger(config.requestBodyLimitBytes, DEFAULT_REQUEST_BODY_LIMIT_BYTES);
+}
+
+function upstreamBodyLimitBytes(config = {}) {
+  return parsePositiveInteger(config.upstreamBodyLimitBytes, DEFAULT_UPSTREAM_BODY_LIMIT_BYTES);
+}
+
+function upstreamTimeoutMs(config = {}) {
+  return parsePositiveInteger(config.upstreamTimeoutMs, DEFAULT_UPSTREAM_TIMEOUT_MS);
+}
+
+function byteLength(chunk) {
+  return Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+}
+
 function numberOrUndefined(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -642,4 +749,42 @@ function numberOrUndefined(value) {
 function stringOrUndefined(value) {
   const trimmed = String(value ?? "").trim();
   return trimmed ? trimmed : undefined;
+}
+
+class ProxyHttpError extends Error {
+  constructor(status, code, publicMessage, cause = undefined) {
+    super(publicMessage);
+    this.name = "ProxyHttpError";
+    this.status = status;
+    this.code = code;
+    this.publicMessage = publicMessage;
+    this.cause = cause;
+  }
+}
+
+function clientError(code, publicMessage, status = 400, cause = undefined) {
+  return new ProxyHttpError(status, code, publicMessage, cause);
+}
+
+function configError(code, publicMessage, cause = undefined) {
+  return new ProxyHttpError(500, code, publicMessage, cause);
+}
+
+function upstreamError(code, publicMessage, status = 502, cause = undefined) {
+  return new ProxyHttpError(status, code, publicMessage, cause);
+}
+
+function publicError(error) {
+  if (error instanceof ProxyHttpError) {
+    return {
+      status: error.status,
+      code: error.code,
+      message: error.publicMessage,
+    };
+  }
+  return {
+    status: 500,
+    code: "PROXY_ERROR",
+    message: "Proxy request failed",
+  };
 }
