@@ -1,0 +1,14 @@
+.git
+.github
+target
+**/node_modules
+**/bun.lockb
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+mtls
+certs

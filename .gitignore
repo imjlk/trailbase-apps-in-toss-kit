@@ -2,3 +2,15 @@
 /.DS_Store
 /services/*/node_modules/
 /services/*/bun.lockb
+
+# Runtime secrets and mTLS material must never be committed.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+/mtls/
+/certs/

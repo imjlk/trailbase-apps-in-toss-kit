@@ -1,6 +1,6 @@
-# zero-three-three Migration Guide
+# Consumer Migration Guide
 
-Follow this after `light-on-off` proves the shared kit.
+Follow this when migrating an existing TrailBase-backed AppsInToss project to the shared kit.
 
 1. Add `vendor/trailbase-apps-in-toss-kit` as a submodule.
 2. Replace `apps/toss-mtls-proxy` with the shared `toss-mtls-client-proxy` service.
