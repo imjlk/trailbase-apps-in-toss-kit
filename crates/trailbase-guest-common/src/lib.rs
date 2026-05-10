@@ -1,6 +1,6 @@
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use serde_json::Value as JsonValue;
 use sha2::Sha256;
 use trailbase_wasm::fetch;
