@@ -1,0 +1,57 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  - package-ecosystem: "docker"
+    directory: "/services/toss-mtls-client-proxy"
+    schedule:
+      interval: "monthly"
+      time: "09:10"
+      timezone: "Asia/Seoul"
+    groups:
+      docker:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      time: "09:20"
+      timezone: "Asia/Seoul"
+    groups:
+      cargo:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "rust"
+
+  - package-ecosystem: "npm"
+    directory: "/services/toss-mtls-client-proxy"
+    schedule:
+      interval: "monthly"
+      time: "09:30"
+      timezone: "Asia/Seoul"
+    groups:
+      npm:
+        patterns:
+          - "*"
+    labels:
+      - "dependencies"
+      - "bun"

@@ -1,0 +1,26 @@
+# Sampo configuration
+version = 1
+
+[git]
+default_branch = "main"
+
+[github]
+# By default, Sampo tries to infer the repository from the git remote.
+# You can override or clarify it here if needed.
+repository = "imjlk/trailbase-apps-in-toss-kit"
+
+[changelog]
+# Options for release notes generation.
+show_commit_hash = true
+show_acknowledgments = true
+
+[packages]
+# Options for package discovery and filtering.
+ignore_unpublished = false
+# ignore = ["internal-*", "examples/*"]
+fixed = [
+  [
+    "cargo/trailbase-guest-common",
+    "cargo/trailbase-toss-identity",
+  ],
+]

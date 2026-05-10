@@ -10,9 +10,13 @@ on:
       - main
     tags:
       - "v*.*.*"
+      - "toss-mtls-client-proxy-v*.*.*"
     paths:
       - ".github/workflows/toss-mtls-client-proxy-image.yml"
       - "services/toss-mtls-client-proxy/**"
+  schedule:
+    # Twice-monthly rebuild to pick up patched base images even when proxy source is unchanged.
+    - cron: "17 18 1,15 * *"
   workflow_dispatch:
 
 permissions:
@@ -65,16 +69,57 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve release version
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          is_release=false
+          version=""
+          major=""
+          major_minor=""
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+            version="${tag#toss-mtls-client-proxy-v}"
+            version="${version#v}"
+
+            if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+              echo "Unsupported release tag: ${tag}" >&2
+              exit 1
+            fi
+
+            package_version="$(node -p "require('./services/toss-mtls-client-proxy/package.json').version")"
+            if [[ "${version}" != "${package_version}" ]]; then
+              echo "Tag version ${version} does not match package.json version ${package_version}" >&2
+              exit 1
+            fi
+
+            IFS='.' read -r major minor _ <<< "${version}"
+            major_minor="${major}.${minor}"
+            is_release=true
+          fi
+
+          {
+            echo "is_release=${is_release}"
+            echo "version=${version}"
+            echo "major=${major}"
+            echo "major_minor=${major_minor}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
+            type=raw,value=edge,enable={{is_default_branch}}
             type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ steps.release.outputs.is_release == 'true' }}
+            type=raw,value=${{ steps.release.outputs.version }},enable=${{ steps.release.outputs.is_release == 'true' }}
+            type=raw,value=${{ steps.release.outputs.major_minor }},enable=${{ steps.release.outputs.is_release == 'true' }}
+            type=raw,value=${{ steps.release.outputs.major }},enable=${{ steps.release.outputs.is_release == 'true' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -82,6 +127,8 @@ jobs:
           context: .
           file: services/toss-mtls-client-proxy/Dockerfile
           push: true
+          pull: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

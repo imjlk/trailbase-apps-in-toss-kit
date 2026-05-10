@@ -1,9 +1,6 @@
 services:
   toss-mtls-client-proxy:
-    build:
-      context: ./vendor/trailbase-apps-in-toss-kit
-      dockerfile: services/toss-mtls-client-proxy/Dockerfile
-    image: trailbase-apps-in-toss-kit/toss-mtls-client-proxy:${TRAILBASE_APPS_IN_TOSS_KIT_IMAGE_TAG:-local}
+    image: ${TOSS_MTLS_CLIENT_PROXY_IMAGE:-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:latest}
     profiles:
       - toss-proxy
     expose:
