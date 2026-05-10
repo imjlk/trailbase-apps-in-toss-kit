@@ -1,0 +1,22 @@
+services:
+  toss-mtls-client-proxy:
+    build:
+      context: ./vendor/trailbase-apps-in-toss-kit
+      dockerfile: services/toss-mtls-client-proxy/Dockerfile
+    image: trailbase-apps-in-toss-kit/toss-mtls-client-proxy:${TRAILBASE_APPS_IN_TOSS_KIT_IMAGE_TAG:-local}
+    profiles:
+      - toss-proxy
+    expose:
+      - "8787"
+    environment:
+      MTLS_PROXY_MODE: ${MTLS_PROXY_MODE:-stub}
+      MTLS_PROXY_TOKEN: ${MTLS_PROXY_TOKEN:-}
+      MTLS_UPSTREAM_BASE_URL: ${MTLS_UPSTREAM_BASE_URL:-}
+      TOSS_PROMOTION_CODE: ${TOSS_PROMOTION_CODE:-}
+      TOSS_PROMOTION_AMOUNT: ${TOSS_PROMOTION_AMOUNT:-50}
+    volumes:
+      - mtls_client_certs:/run/mtls:ro
+    restart: unless-stopped
+
+volumes:
+  mtls_client_certs:

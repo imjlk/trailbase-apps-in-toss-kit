@@ -1,0 +1,4 @@
+/target/
+/.DS_Store
+/services/*/node_modules/
+/services/*/bun.lockb
