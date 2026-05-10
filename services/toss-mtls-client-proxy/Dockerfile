@@ -1,4 +1,4 @@
-FROM oven/bun:1.2.21-alpine
+FROM oven/bun:1.3.13-alpine
 
 WORKDIR /app
 COPY services/toss-mtls-client-proxy/package.json ./package.json
