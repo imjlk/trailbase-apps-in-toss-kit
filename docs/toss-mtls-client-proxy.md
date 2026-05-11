@@ -10,6 +10,8 @@ Responses return on the same outbound request, so the proxy does not need public
 - Instance should be internal-only.
 - Certificate files are mounted into the proxy container only.
 - TrailBase receives only `MTLS_PROXY_URL` and `MTLS_PROXY_TOKEN`.
+- Production deployments should pin the image to an exact SemVer or minor tag, not `latest` or
+  `edge`, unless moving tags are intentional.
 
 ## Minimal Environment
 

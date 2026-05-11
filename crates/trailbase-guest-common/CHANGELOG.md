@@ -1,5 +1,11 @@
 # trailbase-guest-common
 
+## 0.1.3 — 2026-05-11
+
+### Patch changes
+
+- Add shared AppsInToss proxy adapter helpers for promotion rewards and smart messages.
+
 ## 0.1.2 — 2026-05-11
 
 ### Patch changes

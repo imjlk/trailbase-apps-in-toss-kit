@@ -26,3 +26,9 @@ node scripts/compare-consumer-templates.mjs /path/to/consumer
 
 The command exits successfully by default and prints candidate diffs. Use
 `--strict` when you want missing candidates or template drift to fail a check.
+
+Use the submodule checker to catch a checkout that was updated without staging the consumer gitlink:
+
+```bash
+node scripts/check-consumer-submodule.mjs /path/to/consumer --strict
+```

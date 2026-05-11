@@ -4,6 +4,8 @@ use crate::{CommonResult, join_url, post_json_with_optional_bearer, read_string_
 
 pub const TOSS_LOGIN_COMPLETE_PATH: &str = "/internal/apps-in-toss/toss-login/complete";
 pub const IAP_ORDER_STATUS_PATH: &str = "/internal/apps-in-toss/iap/order/status";
+pub const PROMOTION_REWARD_GRANT_PATH: &str = "/internal/apps-in-toss/promotion/reward/grant";
+pub const SMART_MESSAGE_SEND_PATH: &str = "/internal/apps-in-toss/smart-message/send";
 
 pub async fn toss_login_complete(
     proxy_url: &str,
@@ -36,6 +38,32 @@ pub async fn iap_order_status(
           "sku": sku,
           "tossUserKey": toss_user_key,
         }),
+        bearer_token,
+    )
+    .await
+}
+
+pub async fn promotion_reward_grant(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    payload: JsonValue,
+) -> CommonResult<JsonValue> {
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, PROMOTION_REWARD_GRANT_PATH),
+        payload,
+        bearer_token,
+    )
+    .await
+}
+
+pub async fn smart_message_send(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    payload: JsonValue,
+) -> CommonResult<JsonValue> {
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, SMART_MESSAGE_SEND_PATH),
+        payload,
         bearer_token,
     )
     .await
@@ -78,6 +106,18 @@ mod tests {
         assert_eq!(
             proxy_failure_message(&json!({ "ok": false }), "fallback"),
             "fallback"
+        );
+    }
+
+    #[test]
+    fn adapter_paths_use_internal_apps_in_toss_routes() {
+        assert_eq!(
+            PROMOTION_REWARD_GRANT_PATH,
+            "/internal/apps-in-toss/promotion/reward/grant"
+        );
+        assert_eq!(
+            SMART_MESSAGE_SEND_PATH,
+            "/internal/apps-in-toss/smart-message/send"
         );
     }
 }
