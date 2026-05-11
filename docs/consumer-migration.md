@@ -17,3 +17,12 @@ Follow this when migrating an existing TrailBase-backed AppsInToss project to th
 Copied templates are not live-linked to the submodule. After updating this kit,
 compare `templates/trailbase` against the consumer app's copied SQL, Compose,
 env, and smoke files and commit any consumer-side changes explicitly.
+
+Use the advisory drift checker from this repo when updating a consumer:
+
+```bash
+node scripts/compare-consumer-templates.mjs /path/to/consumer
+```
+
+The command exits successfully by default and prints candidate diffs. Use
+`--strict` when you want missing candidates or template drift to fail a check.
