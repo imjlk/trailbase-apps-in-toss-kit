@@ -7,12 +7,11 @@ import { fileURLToPath } from 'node:url';
 const MAX_DIFF_LINES = 120;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const strict = args.includes('--strict');
-const consumerArg = args.find((arg) => arg !== '--strict');
+const { consumerArg, mappingArg, strict } = parseArgs(args);
 
 if (!consumerArg) {
   console.error(
-    'Usage: node scripts/compare-consumer-templates.mjs <consumer-repo-path> [--strict]',
+    'Usage: node scripts/compare-consumer-templates.mjs <consumer-repo-path> [--strict] [--mapping <file>]',
   );
   process.exit(2);
 }
@@ -26,46 +25,17 @@ if (!existsSync(consumerRoot)) {
 const consumerTrailbase = join(consumerRoot, 'apps/trailbase');
 const searchRoot = existsSync(consumerTrailbase) ? consumerTrailbase : consumerRoot;
 
-const checks = [
-  {
-    name: 'SQL toss identities',
-    template: 'templates/trailbase/sql/toss_identities.sql',
-    candidates: findFiles(searchRoot, (file, text) => {
-      return file.endsWith('.sql') && /toss_identities|toss_user_key_hmac/.test(text);
-    }),
-  },
-  {
-    name: 'Compose toss mTLS proxy',
-    template: 'templates/trailbase/compose/toss-mtls-client-proxy.yml',
-    candidates: findFiles(searchRoot, (file, text) => {
-      return /docker-compose.*\.ya?ml$|toss.*proxy.*\.ya?ml$/i.test(file)
-        && /toss-mtls-client-proxy|MTLS_PROXY/.test(text);
-    }),
-  },
-  {
-    name: 'Proxy env example',
-    template: 'templates/trailbase/env/toss-mtls-client-proxy.env.example',
-    candidates: findFiles(searchRoot, (file, text) => {
-      return /(^|\/)\.env.*example$|\.env\.example$/i.test(file)
-        && /MTLS_PROXY|TOSS_LOGIN|TOSS_USER_KEY/.test(text);
-    }),
-  },
-  {
-    name: 'Proxy smoke script',
-    template: 'templates/trailbase/scripts/toss-proxy-smoke.sh',
-    candidates: findFiles(searchRoot, (file, text) => {
-      return /toss.*proxy.*smoke.*\.sh$/i.test(file) || (
-        file.endsWith('.sh') && /\/internal\/apps-in-toss\//.test(text)
-      );
-    }),
-  },
-];
+const checks = mappingArg ? mappingChecks(mappingArg) : discoveredChecks();
 
 let hasDrift = false;
 let hasMissing = false;
 
 console.log(`Comparing kit templates against consumer: ${consumerRoot}`);
-console.log(`Mode: ${strict ? 'strict' : 'advisory'}\n`);
+console.log(`Mode: ${strict ? 'strict' : 'advisory'}`);
+if (mappingArg) {
+  console.log(`Mapping: ${relative(consumerRoot, resolve(consumerRoot, mappingArg))}`);
+}
+console.log('');
 
 for (const check of checks) {
   const templatePath = join(repoRoot, check.template);
@@ -82,6 +52,14 @@ for (const check of checks) {
 
   for (const candidatePath of candidates) {
     const relCandidate = relative(consumerRoot, candidatePath);
+    if (!existsSync(candidatePath)) {
+      hasMissing = true;
+      console.log(`candidate: ${relCandidate}`);
+      console.log('status: missing');
+      console.log('');
+      continue;
+    }
+
     const diff = spawnSync(
       'git',
       ['diff', '--no-index', '--color=never', '--', templatePath, candidatePath],
@@ -104,6 +82,114 @@ for (const check of checks) {
 
 if (strict && (hasDrift || hasMissing)) {
   process.exit(1);
+}
+
+function parseArgs(values) {
+  let foundConsumerArg = '';
+  let foundMappingArg = '';
+  let foundStrict = false;
+  for (let index = 0; index < values.length; index += 1) {
+    const arg = values[index];
+    if (arg === '--strict') {
+      foundStrict = true;
+      continue;
+    }
+    if (arg === '--mapping') {
+      foundMappingArg = values[index + 1] || '';
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith('--mapping=')) {
+      foundMappingArg = arg.slice('--mapping='.length);
+      continue;
+    }
+    if (arg.startsWith('--')) {
+      console.error(`Unknown option: ${arg}`);
+      process.exit(2);
+    }
+    if (!foundConsumerArg) {
+      foundConsumerArg = arg;
+    }
+  }
+  return { consumerArg: foundConsumerArg, mappingArg: foundMappingArg, strict: foundStrict };
+}
+
+function discoveredChecks() {
+  return [
+    {
+      name: 'SQL toss identities',
+      template: 'templates/trailbase/sql/toss_identities.sql',
+      candidates: findFiles(searchRoot, (file, text) => {
+        return file.endsWith('.sql') && /toss_identities|toss_user_key_hmac/.test(text);
+      }),
+    },
+    {
+      name: 'Compose toss mTLS proxy',
+      template: 'templates/trailbase/compose/toss-mtls-client-proxy.yml',
+      candidates: findFiles(searchRoot, (file, text) => {
+        return /docker-compose.*\.ya?ml$|toss.*proxy.*\.ya?ml$/i.test(file)
+          && /toss-mtls-client-proxy|MTLS_PROXY/.test(text);
+      }),
+    },
+    {
+      name: 'Proxy env example',
+      template: 'templates/trailbase/env/toss-mtls-client-proxy.env.example',
+      candidates: findFiles(searchRoot, (file, text) => {
+        return /(^|\/)\.env.*example$|\.env\.example$/i.test(file)
+          && /MTLS_PROXY|TOSS_LOGIN|TOSS_USER_KEY/.test(text);
+      }),
+    },
+    {
+      name: 'Proxy smoke script',
+      template: 'templates/trailbase/scripts/toss-proxy-smoke.sh',
+      candidates: findFiles(searchRoot, (file, text) => {
+        return /toss.*proxy.*smoke.*\.sh$/i.test(file) || (
+          file.endsWith('.sh') && /\/internal\/apps-in-toss\//.test(text)
+        );
+      }),
+    },
+  ];
+}
+
+function mappingChecks(mappingPath) {
+  const resolved = resolve(consumerRoot, mappingPath);
+  let mapping;
+  try {
+    mapping = JSON.parse(readFileSync(resolved, 'utf8'));
+  } catch (error) {
+    console.error(`Failed to read mapping file ${resolved}: ${error.message}`);
+    process.exit(2);
+  }
+
+  if (!Array.isArray(mapping.checks)) {
+    console.error(`Mapping file must contain a checks array: ${resolved}`);
+    process.exit(2);
+  }
+
+  return mapping.checks.map((entry, index) => {
+    const template = stringField(entry, 'template', index);
+    const name = entry.name || template;
+    const consumer = entry.consumer ?? entry.candidate;
+    const consumers = entry.consumers ?? entry.candidates ?? (consumer ? [consumer] : []);
+    if (!Array.isArray(consumers) || consumers.length === 0) {
+      console.error(`Mapping check ${index + 1} must include consumer or consumers`);
+      process.exit(2);
+    }
+    return {
+      name,
+      template,
+      candidates: consumers.map((candidate) => resolve(consumerRoot, String(candidate))),
+    };
+  });
+}
+
+function stringField(entry, field, index) {
+  const value = entry?.[field];
+  if (typeof value !== 'string' || value.trim() === '') {
+    console.error(`Mapping check ${index + 1} must include ${field}`);
+    process.exit(2);
+  }
+  return value;
 }
 
 function printDiff(raw) {

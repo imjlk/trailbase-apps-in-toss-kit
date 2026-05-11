@@ -27,6 +27,26 @@ node scripts/compare-consumer-templates.mjs /path/to/consumer
 The command exits successfully by default and prints candidate diffs. Use
 `--strict` when you want missing candidates or template drift to fail a check.
 
+For app-specific copies, provide an explicit mapping file to avoid noisy candidate discovery:
+
+```bash
+node scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json
+```
+
+Mapping files use this shape:
+
+```json
+{
+  "checks": [
+    {
+      "name": "Proxy env example",
+      "template": "templates/trailbase/env/toss-mtls-client-proxy.env.example",
+      "consumer": "apps/trailbase/.env.production.example"
+    }
+  ]
+}
+```
+
 Use the submodule checker to catch a checkout that was updated without staging the consumer gitlink:
 
 ```bash
