@@ -1,5 +1,12 @@
 # trailbase-toss-identity
 
+## 0.1.2 — 2026-05-11
+
+### Patch changes
+
+- Add shared AppsInToss proxy helpers for Toss login, IAP order status, and proxy failure messages.
+- Updated dependencies: trailbase-guest-common (Cargo)@0.1.2
+
 ## 0.1.1 — 2026-05-11
 
 ### Patch changes

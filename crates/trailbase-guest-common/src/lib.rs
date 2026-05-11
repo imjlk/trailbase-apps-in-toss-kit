@@ -6,6 +6,7 @@ use sha2::Sha256;
 use trailbase_wasm::fetch;
 use trailbase_wasm::http::IntoBody;
 
+pub mod apps_in_toss_proxy;
 pub mod db;
 pub mod responses;
 pub mod session;
