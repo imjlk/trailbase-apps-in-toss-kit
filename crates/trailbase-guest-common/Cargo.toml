@@ -1,6 +1,6 @@
 [package]
 name = "trailbase-guest-common"
-version = "0.1.0"
+version = "0.1.1"
 edition.workspace = true
 license.workspace = true
 publish.workspace = true
@@ -9,6 +9,7 @@ publish.workspace = true
 base64.workspace = true
 hex.workspace = true
 hmac.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 trailbase-wasm.workspace = true
