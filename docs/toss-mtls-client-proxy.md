@@ -1,15 +1,19 @@
 # Toss mTLS Client Proxy
 
 `toss-mtls-client-proxy` is an internal client proxy. It is not a public callback server. TrailBase
-calls it over the Compose internal network, and the proxy opens outbound mTLS connections to Toss.
+can call it over the Compose internal network, and the proxy opens outbound mTLS connections to Toss.
 Responses return on the same outbound request, so the proxy does not need public ingress.
+
+The container is reusable outside TrailBase. A Node, Rails, Spring, Go, FastAPI, or other backend can
+run it on the same private network, send authenticated HTTP requests to the proxy, and keep mTLS
+certificates out of the application container.
 
 ## Runtime Model
 
 - Image may be public.
 - Instance should be internal-only.
 - Certificate files are mounted into the proxy container only.
-- TrailBase receives only `MTLS_PROXY_URL` and `MTLS_PROXY_TOKEN`.
+- Application services receive only the internal proxy URL and `MTLS_PROXY_TOKEN`.
 - Production deployments should pin the image to an exact SemVer or minor tag, not `latest` or
   `edge`, unless moving tags are intentional.
 
@@ -48,3 +52,25 @@ MTLS_PROXY_UPSTREAM_TIMEOUT_MS=15000
 - `POST /internal/apps-in-toss/promotion/reward/grant`: promotion reward adapter.
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
+
+The generic relay accepts a JSON body shaped like:
+
+```json
+{
+  "method": "POST",
+  "path": "/relative/upstream/path",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {},
+  "tossUserKey": "optional-user-key-header-value"
+}
+```
+
+`path` must be a relative absolute path, not a full URL. In forward mode, the proxy joins it with
+`MTLS_UPSTREAM_BASE_URL`, opens the outbound mTLS request with the mounted certificate files, and
+returns `{ "ok": boolean, "status": number, "headers": object, "body": unknown }`.
+
+Use the AppsInToss adapter endpoints when their request and response shape fits the app. Use the
+generic relay for other Toss mTLS APIs, or add a small adapter when an API needs repeated
+normalization or multi-step flow handling.

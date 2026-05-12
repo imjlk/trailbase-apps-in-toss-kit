@@ -1,6 +1,8 @@
 # TrailBase Apps in Toss Kit
 
-Reusable building blocks for AppsInToss services backed by TrailBase.
+Reusable building blocks for AppsInToss services, with TrailBase-focused
+templates plus a standalone Toss mTLS client proxy that can be used by other
+server stacks.
 
 This repository intentionally keeps three kinds of assets together:
 
@@ -29,8 +31,14 @@ Use Rust crates through a path dependency from the submodule. Copy SQL and Compo
 the app repository before editing them, because database migrations should be owned by the app that
 runs them.
 
+The mTLS proxy is not TrailBase-specific. TrailBase WASM guests can call it through the helper
+crates, but any backend that can make an authenticated HTTP request on a private network can use the
+same container. Keep certificates mounted only into the proxy, give the application service only the
+internal proxy URL and bearer token, and call either the generic mTLS relay or the AppsInToss adapter
+endpoints.
+
 The mTLS proxy image is safe to publish as long as certificates and tokens are only provided at
-runtime. The proxy instance should stay private on the Compose internal network.
+runtime. The running proxy instance should stay private on the Compose or platform-internal network.
 
 ## Container Image
 

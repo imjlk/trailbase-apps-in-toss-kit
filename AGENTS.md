@@ -45,9 +45,9 @@ pointer.
 ## mTLS Proxy Design
 
 `toss-mtls-client-proxy` is an internal client proxy, not a public callback
-server. TrailBase calls it over the internal network; the proxy opens outbound
-mTLS requests to Toss and returns the upstream response on the same request.
-It does not need public ingress.
+server. TrailBase and other backend stacks can call it over a private network;
+the proxy opens outbound mTLS requests to Toss and returns the upstream response
+on the same request. It does not need public ingress.
 
 The proxy has a generic endpoint:
 
@@ -64,6 +64,10 @@ It also has AppsInToss adapter endpoints:
 Current implemented areas are Toss Login, in-app purchase order status,
 promotion reward grant, and smart message send. Toss Pay can be added as another
 adapter on top of the generic mTLS relay when the app needs it.
+
+The proxy container is reusable outside TrailBase as long as the caller can send
+authenticated HTTP requests on the internal network. Keep app containers away
+from certificate files; only the proxy should mount `/run/mtls`.
 
 Keep Toss API paths and certificate default paths as code constants where
 possible. Avoid turning stable constants into environment variables. Runtime env
