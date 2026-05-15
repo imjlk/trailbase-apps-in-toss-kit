@@ -112,6 +112,14 @@ mod tests {
     #[test]
     fn adapter_paths_use_internal_apps_in_toss_routes() {
         assert_eq!(
+            TOSS_LOGIN_COMPLETE_PATH,
+            "/internal/apps-in-toss/toss-login/complete"
+        );
+        assert_eq!(
+            IAP_ORDER_STATUS_PATH,
+            "/internal/apps-in-toss/iap/order/status"
+        );
+        assert_eq!(
             PROMOTION_REWARD_GRANT_PATH,
             "/internal/apps-in-toss/promotion/reward/grant"
         );
