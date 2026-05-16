@@ -28,13 +28,26 @@ MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im
 `MTLS_PROXY_TOKEN` is required in `forward` mode. Stub mode can run without a token for local smoke
 tests, but production deployments should always set one.
 
-Certificates default to:
+Certificates are resolved in this order:
+
+1. A single Toss Console file pair under `MTLS_CERT_DIR`:
+   `*_public.crt` and `*_private.key`.
+2. Explicit fallback paths from `MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`.
+3. Generic fallback names under `MTLS_CERT_DIR`.
 
 ```text
+/run/mtls/*_public.crt
+/run/mtls/*_private.key
 /run/mtls/client-cert.pem
 /run/mtls/client-key.pem
 /run/mtls/ca-cert.pem
 ```
+
+`MTLS_CERT_DIR` defaults to `/run/mtls`. In the normal Coolify setup, copy the Toss Console
+`*_public.crt` and `*_private.key` files into the `mtls_client_certs` volume and no per-file path env
+is needed. If the volume does not contain exactly one complete pair, the proxy falls back to
+`MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`. `MTLS_CA_CERT_PATH` is optional and is loaded only
+when the file exists.
 
 Optional safety limits:
 

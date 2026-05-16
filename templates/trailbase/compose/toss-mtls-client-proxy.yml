@@ -1,6 +1,6 @@
 services:
   toss-mtls-client-proxy:
-    image: ${TOSS_MTLS_CLIENT_PROXY_IMAGE:-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.1}
+    image: ${TOSS_MTLS_CLIENT_PROXY_IMAGE:-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.2}
     profiles:
       - toss-proxy
     expose:
@@ -9,6 +9,10 @@ services:
       MTLS_PROXY_MODE: ${MTLS_PROXY_MODE:-stub}
       MTLS_PROXY_TOKEN: ${MTLS_PROXY_TOKEN:-}
       MTLS_UPSTREAM_BASE_URL: ${MTLS_UPSTREAM_BASE_URL:-}
+      MTLS_CERT_DIR: ${MTLS_CERT_DIR:-/run/mtls}
+      MTLS_CLIENT_CERT_PATH: ${MTLS_CLIENT_CERT_PATH:-}
+      MTLS_CLIENT_KEY_PATH: ${MTLS_CLIENT_KEY_PATH:-}
+      MTLS_CA_CERT_PATH: ${MTLS_CA_CERT_PATH:-}
       MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES: ${MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES:-1048576}
       MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES: ${MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES:-2097152}
       MTLS_PROXY_UPSTREAM_TIMEOUT_MS: ${MTLS_PROXY_UPSTREAM_TIMEOUT_MS:-15000}

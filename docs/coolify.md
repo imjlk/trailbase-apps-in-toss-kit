@@ -14,4 +14,7 @@ Set a non-empty `MTLS_PROXY_TOKEN` before enabling `MTLS_PROXY_MODE=forward`; th
 start in forward mode without it.
 
 Copy certificate files into the persistent `mtls_client_certs` volume. Keep them readable only by
-the proxy container user and never bake them into Docker images.
+the proxy container user and never bake them into Docker images. The proxy first auto-detects a
+single Toss Console pair named `*_public.crt` and `*_private.key` under `/run/mtls`, so the normal
+setup does not need per-file path env vars. If there is no complete pair, it falls back to
+`MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`.

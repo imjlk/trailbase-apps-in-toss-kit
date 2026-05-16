@@ -107,8 +107,11 @@ Forward mode requires upstream URL and mounted cert files:
 MTLS_PROXY_MODE=forward
 MTLS_PROXY_TOKEN=...
 MTLS_UPSTREAM_BASE_URL=https://...
-MTLS_CLIENT_CERT_PATH=/run/mtls/client-cert.pem
-MTLS_CLIENT_KEY_PATH=/run/mtls/client-key.pem
+# Normal setup: copy one Toss Console pair into /run/mtls:
+#   *_public.crt and *_private.key
+# Optional fallback when no complete pair is available:
+# MTLS_CLIENT_CERT_PATH=/run/mtls/client-cert.pem
+# MTLS_CLIENT_KEY_PATH=/run/mtls/client-key.pem
 MTLS_CA_CERT_PATH=/run/mtls/ca-cert.pem
 ```
 
