@@ -2,7 +2,16 @@
   "name": "trailbase-apps-in-toss-kit",
   "private": true,
   "version": "0.0.0",
+  "packageManager": "bun@1.3.13",
   "workspaces": [
     "services/*"
-  ]
+  ],
+  "scripts": {
+    "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
+    "skills:sync:copy": "bun scripts/sync-agent-skills.mjs --target codex --all --mode copy",
+    "skills:sync:cline": "bun scripts/sync-agent-skills.mjs --target cline --all --mode link",
+    "skills:sync:claude": "bun scripts/sync-agent-skills.mjs --target claude-code --all --mode link",
+    "skills:sync:agent": "bun scripts/sync-agent-skills.mjs",
+    "skills:validate": "bun scripts/validate-agent-skills.mjs"
+  }
 }

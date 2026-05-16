@@ -9,6 +9,7 @@ It is intended to be consumed as a git submodule, usually at
 - `crates/trailbase-guest-common`: small Rust helpers for TrailBase WASM guests.
 - `crates/trailbase-toss-identity`: Toss identity HMAC/AES-GCM helpers.
 - `services/toss-mtls-client-proxy`: Bun-based internal mTLS client proxy.
+- `skills`: repo-tracked agent skills with adapters for Codex/OpenAI and other assistants.
 - `templates/trailbase`: copy-in SQL, Compose, env, smoke, and integration snippets.
 - `docs`: integration, publishing, Coolify, identity, proxy, and versioning notes.
 
@@ -20,6 +21,13 @@ app and owned there, because runtime schema and deployment shape are app-specifi
 
 Keep local consumer paths in `.local-consumers.md`. That file is ignored
 because consumer checkout paths are workstation-specific.
+
+For TrailBase migrations, Record API ACL, WASM guest, Coolify deployment,
+fresh-start, or mTLS proxy work, use `$trailbase-ops` after syncing the repo
+skills with `bun run skills:sync` or the relevant adapter command in
+`docs/skills.md`. If the skill is not installed in the current session, read
+`skills/trailbase-ops/SKILL.md` and
+`skills/trailbase-ops/references/trailbase-ops.md` directly.
 
 When editing this repo from a consumer app, make changes in the real repo at
 the kit checkout, commit them there, then update the consumer app's submodule

@@ -1,0 +1,17 @@
+---
+description: TrailBase AppsInToss migration, WASM, deployment, and mTLS proxy guardrails
+globs: "AGENTS.md,apps/trailbase/**,vendor/trailbase-apps-in-toss-kit/**,skills/trailbase-ops/**"
+alwaysApply: false
+---
+
+# TrailBase Ops
+
+Use `skills/trailbase-ops/SKILL.md` as the canonical guide. Load
+`skills/trailbase-ops/references/trailbase-ops.md` for detailed migration,
+Record API, deployment, and mTLS proxy guardrails.
+
+- Do not rewrite baseline SQL when production-like data may exist.
+- Prefer additive, forward-only TrailBase migrations.
+- Verify `config.textproto` changes alongside schema changes.
+- Check Rust WASM with the repo's `wasm32-wasip2` command.
+- Keep mTLS certificates in the proxy container only.

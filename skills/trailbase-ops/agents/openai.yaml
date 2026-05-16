@@ -1,0 +1,4 @@
+interface:
+  display_name: "TrailBase Ops"
+  short_description: "TrailBase migrations and ops guardrails"
+  default_prompt: "Use $trailbase-ops to plan a safe TrailBase migration, WASM change, production check, or mTLS proxy operation."
