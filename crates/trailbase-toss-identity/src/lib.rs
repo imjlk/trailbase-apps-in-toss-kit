@@ -1,7 +1,7 @@
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
 use trailbase_guest_common::{CommonResult, decode_32_byte_secret, hmac_sha256_hex};
 use trailbase_wasm::rand::get_random_bytes;
@@ -18,8 +18,67 @@ pub struct SealedTossUserKey {
     pub sealed: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TossLoginUnlinkCallbackRequest {
+    #[serde(default, alias = "user_key")]
+    pub user_key: Option<String>,
+    #[serde(default)]
+    pub referrer: Option<String>,
+}
+
 pub fn toss_user_key_hmac(secret: &str, toss_user_key: &str) -> CommonResult<String> {
     hmac_sha256_hex(secret, toss_user_key)
+}
+
+pub fn validate_toss_login_unlink_user_key(user_key: &str) -> CommonResult<()> {
+    if user_key.trim().is_empty() || user_key.len() > 512 {
+        return Err("Invalid userKey".to_string());
+    }
+    Ok(())
+}
+
+pub fn normalize_toss_login_unlink_referrer(referrer: Option<&str>) -> String {
+    match referrer.unwrap_or("").trim().to_ascii_uppercase().as_str() {
+        "UNLINK" => "UNLINK".to_string(),
+        "WITHDRAWAL_TERMS" => "WITHDRAWAL_TERMS".to_string(),
+        "WITHDRAWAL_TOSS" => "WITHDRAWAL_TOSS".to_string(),
+        other if !other.is_empty() => other.to_string(),
+        _ => "UNLINK".to_string(),
+    }
+}
+
+pub fn verify_toss_login_unlink_basic_auth(
+    expected: &str,
+    authorization_header: Option<&str>,
+) -> CommonResult<()> {
+    let expected = expected.trim();
+    if expected.is_empty() {
+        return Err("Toss login unlink Basic Auth is not configured".to_string());
+    }
+
+    let header = authorization_header.unwrap_or("").trim();
+    if expected.starts_with("Basic ") && header == expected {
+        return Ok(());
+    }
+
+    let Some((scheme, encoded)) = header.split_once(' ') else {
+        return Err("Missing Basic Auth".to_string());
+    };
+    if !scheme.eq_ignore_ascii_case("Basic") || encoded.trim().is_empty() {
+        return Err("Missing Basic Auth".to_string());
+    }
+
+    let decoded = STANDARD
+        .decode(encoded.trim())
+        .ok()
+        .and_then(|bytes| String::from_utf8(bytes).ok())
+        .ok_or_else(|| "Invalid Basic Auth".to_string())?;
+    if decoded == expected {
+        Ok(())
+    } else {
+        Err("Invalid Basic Auth".to_string())
+    }
 }
 
 pub fn seal_toss_user_key(encryption_key: &str, toss_user_key: &str) -> CommonResult<String> {
@@ -142,5 +201,47 @@ mod tests {
             unseal_toss_user_key(KEY, "v1.AQID.AQID").unwrap_err(),
             "sealed Toss nonce must be 12 bytes"
         );
+    }
+
+    #[test]
+    fn verifies_toss_login_unlink_basic_auth_from_console_value() {
+        let header = format!("Basic {}", STANDARD.encode("user:password"));
+
+        assert!(verify_toss_login_unlink_basic_auth("user:password", Some(&header)).is_ok());
+        assert_eq!(
+            verify_toss_login_unlink_basic_auth("user:password", Some("Bearer nope")).unwrap_err(),
+            "Missing Basic Auth"
+        );
+        assert_eq!(
+            verify_toss_login_unlink_basic_auth("user:password", Some("Basic nope")).unwrap_err(),
+            "Invalid Basic Auth"
+        );
+    }
+
+    #[test]
+    fn accepts_preencoded_basic_auth_expected_value() {
+        let header = format!("Basic {}", STANDARD.encode("user:password"));
+
+        assert!(verify_toss_login_unlink_basic_auth(&header, Some(&header)).is_ok());
+    }
+
+    #[test]
+    fn normalizes_toss_login_unlink_referrers() {
+        assert_eq!(
+            normalize_toss_login_unlink_referrer(Some("withdrawal_terms")),
+            "WITHDRAWAL_TERMS"
+        );
+        assert_eq!(
+            normalize_toss_login_unlink_referrer(Some("custom")),
+            "CUSTOM"
+        );
+        assert_eq!(normalize_toss_login_unlink_referrer(None), "UNLINK");
+    }
+
+    #[test]
+    fn validates_toss_login_unlink_user_key_shape() {
+        assert!(validate_toss_login_unlink_user_key("user-key").is_ok());
+        assert!(validate_toss_login_unlink_user_key("").is_err());
+        assert!(validate_toss_login_unlink_user_key(&"x".repeat(513)).is_err());
     }
 }

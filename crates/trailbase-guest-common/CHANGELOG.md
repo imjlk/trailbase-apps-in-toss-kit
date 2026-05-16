@@ -1,5 +1,11 @@
 # trailbase-guest-common
 
+## 0.1.4 — 2026-05-16
+
+### Patch changes
+
+- Versioned with the shared Toss identity helper crate.
+
 ## 0.1.3 — 2026-05-11
 
 ### Patch changes
@@ -17,4 +23,3 @@
 ### Patch changes
 
 - Add shared TrailBase guest helpers for API responses, settings, database access, and session handling.
-
