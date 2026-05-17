@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.3 — 2026-05-18
+
+### Patch changes
+
+- [91cd21b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/91cd21b40d12fc12c0b65776eb9494079e011c72) Retry transient Apps in Toss IAP order-status responses and preserve the requested SKU when Toss omits it. — Thanks @imjlk!
+
 ## 0.1.2 — 2026-05-16
 
 ### Patch changes
