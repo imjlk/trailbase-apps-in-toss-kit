@@ -55,7 +55,14 @@ Optional safety limits:
 MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES=1048576
 MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES=2097152
 MTLS_PROXY_UPSTREAM_TIMEOUT_MS=15000
+MTLS_PROXY_IAP_ORDER_STATUS_MAX_ATTEMPTS=6
+MTLS_PROXY_IAP_ORDER_STATUS_RETRY_DELAY_MS=350
+MTLS_PROXY_DEBUG=false
 ```
+
+The IAP order-status adapter retries transient provider states such as `ORDER_IN_PROGRESS`,
+`PAYMENT_PENDING`, and `NOT_FOUND`. This gives Toss a short window to make a just-created sandbox
+order visible before the application decides whether to grant or defer the purchase.
 
 ## API
 

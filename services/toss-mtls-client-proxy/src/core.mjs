@@ -8,6 +8,8 @@ export const DEFAULT_CERT_DIR = "/run/mtls";
 export const DEFAULT_REQUEST_BODY_LIMIT_BYTES = 1_048_576;
 export const DEFAULT_UPSTREAM_BODY_LIMIT_BYTES = 2_097_152;
 export const DEFAULT_UPSTREAM_TIMEOUT_MS = 15_000;
+export const DEFAULT_IAP_ORDER_STATUS_MAX_ATTEMPTS = 6;
+export const DEFAULT_IAP_ORDER_STATUS_RETRY_DELAY_MS = 350;
 export const TOSS_ENDPOINTS = Object.freeze({
   loginGenerateToken: "/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
   loginMe: "/api-partner/v1/apps-in-toss/user/oauth2/login-me",
@@ -43,6 +45,13 @@ const HOP_BY_HOP_HEADERS = new Set([
 const VALID_MODES = new Set(["stub", "forward"]);
 const TOSS_CERT_FILE_SUFFIX = "_public.crt";
 const TOSS_KEY_FILE_SUFFIX = "_private.key";
+const RETRYABLE_IAP_ORDER_STATUSES = new Set([
+  "NOT_FOUND",
+  "ORDER_IN_PROGRESS",
+  "PAYMENT_PENDING",
+  "PENDING",
+  "PROCESSING",
+]);
 
 export function createConfig(env = process.env) {
   const certDir = env.MTLS_CERT_DIR || DEFAULT_CERT_DIR;
@@ -67,6 +76,15 @@ export function createConfig(env = process.env) {
     requestBodyLimitBytes: parsePositiveInteger(env.MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES, DEFAULT_REQUEST_BODY_LIMIT_BYTES),
     upstreamBodyLimitBytes: parsePositiveInteger(env.MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES, DEFAULT_UPSTREAM_BODY_LIMIT_BYTES),
     upstreamTimeoutMs: parsePositiveInteger(env.MTLS_PROXY_UPSTREAM_TIMEOUT_MS, DEFAULT_UPSTREAM_TIMEOUT_MS),
+    iapOrderStatusMaxAttempts: parsePositiveInteger(
+      env.MTLS_PROXY_IAP_ORDER_STATUS_MAX_ATTEMPTS,
+      DEFAULT_IAP_ORDER_STATUS_MAX_ATTEMPTS,
+    ),
+    iapOrderStatusRetryDelayMs: parseNonNegativeInteger(
+      env.MTLS_PROXY_IAP_ORDER_STATUS_RETRY_DELAY_MS,
+      DEFAULT_IAP_ORDER_STATUS_RETRY_DELAY_MS,
+    ),
+    debug: parseBoolean(env.MTLS_PROXY_DEBUG || env.TOSS_PROXY_DEBUG),
   };
 }
 
@@ -329,16 +347,33 @@ async function getIapOrderStatus(request, config) {
     return { ok: false, error: "MISSING_TOSS_USER_KEY", providerStatus: "ERROR" };
   }
 
-  const upstream = await forwardJson(
-    {
-      method: "POST",
-      path: TOSS_ENDPOINTS.iapOrderStatus,
-      body: { orderId },
-      tossUserKey,
-    },
-    config,
-  );
-  return normalizeIapOrderStatusResponse(request, upstream.body);
+  const maxAttempts = iapOrderStatusMaxAttempts(config);
+  const retryDelayMs = iapOrderStatusRetryDelayMs(config);
+  let normalized;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const upstream = await forwardJson(
+      {
+        method: "POST",
+        path: TOSS_ENDPOINTS.iapOrderStatus,
+        body: { orderId },
+        tossUserKey,
+      },
+      config,
+    );
+    normalized = normalizeIapOrderStatusResponse(request, upstream.body);
+    if (!isRetryableIapOrderStatus(normalized) || attempt >= maxAttempts) {
+      return attempt > 1 ? { ...normalized, attempts: attempt } : normalized;
+    }
+    debugLog(config, "retrying transient iap order status", {
+      orderId,
+      providerStatus: normalized.providerStatus,
+      attempt,
+    });
+    if (retryDelayMs > 0) {
+      await delay(retryDelayMs);
+    }
+  }
+  return normalized;
 }
 
 async function grantPromotionReward(request, config) {
@@ -707,7 +742,7 @@ function normalizeIapOrderStatusResponse(request, upstream) {
   return {
     ok: true,
     orderId: readPathString(order, ["orderId", "success.orderId", "data.orderId"]) ?? request?.orderId,
-    sku: readPathString(order, ["sku", "success.sku", "data.sku"]),
+    sku: readPathString(order, ["sku", "success.sku", "data.sku"]) ?? stringOrUndefined(request?.sku),
     providerStatus,
     statusDeterminedAt: readPathString(order, [
       "statusDeterminedAt",
@@ -773,6 +808,15 @@ function parsePositiveInteger(value, fallback) {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function parseNonNegativeInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function parseBoolean(value) {
+  return ["1", "true", "yes", "on"].includes(String(value || "").trim().toLowerCase());
+}
+
 function requestBodyLimitBytes(config = {}) {
   return parsePositiveInteger(config.requestBodyLimitBytes, DEFAULT_REQUEST_BODY_LIMIT_BYTES);
 }
@@ -783,6 +827,28 @@ function upstreamBodyLimitBytes(config = {}) {
 
 function upstreamTimeoutMs(config = {}) {
   return parsePositiveInteger(config.upstreamTimeoutMs, DEFAULT_UPSTREAM_TIMEOUT_MS);
+}
+
+function iapOrderStatusMaxAttempts(config = {}) {
+  return parsePositiveInteger(config.iapOrderStatusMaxAttempts, DEFAULT_IAP_ORDER_STATUS_MAX_ATTEMPTS);
+}
+
+function iapOrderStatusRetryDelayMs(config = {}) {
+  return parseNonNegativeInteger(config.iapOrderStatusRetryDelayMs, DEFAULT_IAP_ORDER_STATUS_RETRY_DELAY_MS);
+}
+
+function isRetryableIapOrderStatus(result) {
+  if (!result?.ok) return false;
+  return RETRYABLE_IAP_ORDER_STATUSES.has(String(result.providerStatus || "").trim().toUpperCase());
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function debugLog(config, message, fields = {}) {
+  if (!config?.debug) return;
+  console.info(`[toss-mtls-client-proxy] ${message}`, fields);
 }
 
 function byteLength(chunk) {

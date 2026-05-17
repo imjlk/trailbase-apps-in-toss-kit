@@ -32,11 +32,17 @@ describe("toss-mtls-client-proxy", () => {
       MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES: "123",
       MTLS_PROXY_UPSTREAM_BODY_LIMIT_BYTES: "456",
       MTLS_PROXY_UPSTREAM_TIMEOUT_MS: "789",
+      MTLS_PROXY_IAP_ORDER_STATUS_MAX_ATTEMPTS: "2",
+      MTLS_PROXY_IAP_ORDER_STATUS_RETRY_DELAY_MS: "0",
+      MTLS_PROXY_DEBUG: "true",
     });
     expect(config.mode).toBe("forward");
     expect(config.requestBodyLimitBytes).toBe(123);
     expect(config.upstreamBodyLimitBytes).toBe(456);
     expect(config.upstreamTimeoutMs).toBe(789);
+    expect(config.iapOrderStatusMaxAttempts).toBe(2);
+    expect(config.iapOrderStatusRetryDelayMs).toBe(0);
+    expect(config.debug).toBe(true);
   });
 
   test("detects Toss console certificate filenames from the mounted cert directory", () => {
@@ -223,6 +229,85 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.orderId).toBe("order-1");
     expect(res.body.sku).toBe("loo.credits.50");
     expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
+  });
+
+  test("forward iap order status falls back to requested sku when Toss omits sku", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          success: {
+            orderId: "order-1",
+            status: "PAYMENT_COMPLETED",
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.iapOrderStatus,
+        {
+          orderId: "order-1",
+          sku: "loo.credits.50",
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(true);
+      expect(res.body.orderId).toBe("order-1");
+      expect(res.body.sku).toBe("loo.credits.50");
+      expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
+    });
+  });
+
+  test("forward iap order status retries transient provider statuses", async () => {
+    let hitCount = 0;
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      hitCount += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          success: {
+            orderId: "order-1",
+            status: hitCount === 1 ? "ORDER_IN_PROGRESS" : "PAYMENT_COMPLETED",
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.iapOrderStatus,
+        {
+          orderId: "order-1",
+          sku: "loo.credits.50",
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+        iapOrderStatusMaxAttempts: 2,
+        iapOrderStatusRetryDelayMs: 0,
+      });
+      expect(hitCount).toBe(2);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.sku).toBe("loo.credits.50");
+      expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
+      expect(res.body.attempts).toBe(2);
+    });
   });
 
   test("message adapter targets the Toss messenger API", () => {
