@@ -109,11 +109,12 @@ pub fn toss_login_error_reason(response: &JsonValue, fallback: &str) -> String {
     .unwrap_or_else(|| fallback.to_string())
 }
 
-pub fn normalize_login_referrer(referrer: &str) -> &'static str {
-    if referrer.trim().eq_ignore_ascii_case("sandbox") {
-        "sandbox"
+pub fn normalize_login_referrer(referrer: &str) -> String {
+    let trimmed = referrer.trim();
+    if trimmed.eq_ignore_ascii_case("sandbox") {
+        trimmed.to_string()
     } else {
-        "DEFAULT"
+        "DEFAULT".to_string()
     }
 }
 
@@ -135,11 +136,11 @@ mod tests {
     use serde_json::json;
 
     #[test]
-    fn normalize_login_referrer_keeps_sandbox_lowercase() {
-        assert_eq!(normalize_login_referrer("sandbox"), "sandbox");
-        assert_eq!(normalize_login_referrer(" SANDBOX "), "sandbox");
-        assert_eq!(normalize_login_referrer("DEFAULT"), "DEFAULT");
-        assert_eq!(normalize_login_referrer(""), "DEFAULT");
+    fn normalize_login_referrer_preserves_sdk_sandbox_case() {
+        assert_eq!(normalize_login_referrer("sandbox"), "sandbox".to_string());
+        assert_eq!(normalize_login_referrer(" SANDBOX "), "SANDBOX".to_string());
+        assert_eq!(normalize_login_referrer("DEFAULT"), "DEFAULT".to_string());
+        assert_eq!(normalize_login_referrer(""), "DEFAULT".to_string());
     }
 
     #[test]

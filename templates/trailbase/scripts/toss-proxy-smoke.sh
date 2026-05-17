@@ -16,7 +16,7 @@ printf '\n'
 
 curl_proxy \
   -H 'content-type: application/json' \
-  -d '{"authorizationCode":"smoke-authorization-code","referrer":"sandbox"}' \
+  -d '{"authorizationCode":"smoke-authorization-code","referrer":"SANDBOX"}' \
   "${BASE_URL%/}/internal/apps-in-toss/toss-login/complete"
 printf '\n'
 

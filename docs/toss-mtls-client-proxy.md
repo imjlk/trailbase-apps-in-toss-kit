@@ -73,6 +73,10 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
 
+The Toss Login adapter expects the `authorizationCode` and `referrer` returned by `appLogin()`.
+Forward the SDK `referrer` value as-is. In sandbox RN builds this can be `SANDBOX`, and changing the
+casing can make Toss reject the one-time authorization code as `invalid_grant`.
+
 The generic relay accepts a JSON body shaped like:
 
 ```json

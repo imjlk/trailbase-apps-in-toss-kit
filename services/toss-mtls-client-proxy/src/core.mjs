@@ -278,6 +278,11 @@ async function completeTossLogin(body, config) {
     config,
   );
   if (isUpstreamFailure(tokenResponse.body)) {
+    debugLog(config, "toss login token exchange failed", {
+      status: tokenResponse.status,
+      errorCode: readPathString(tokenResponse.body, ["error.errorCode", "errorCode"]),
+      failureReason: upstreamFailureReason(tokenResponse.body),
+    });
     return {
       ok: false,
       error: "TOKEN_EXCHANGE_FAILED",
@@ -306,6 +311,11 @@ async function completeTossLogin(body, config) {
     config,
   );
   if (isUpstreamFailure(userResponse.body)) {
+    debugLog(config, "toss login user lookup failed", {
+      status: userResponse.status,
+      errorCode: readPathString(userResponse.body, ["error.errorCode", "errorCode"]),
+      failureReason: upstreamFailureReason(userResponse.body),
+    });
     return {
       ok: false,
       error: "LOGIN_ME_FAILED",
@@ -666,8 +676,9 @@ function withoutTossUserKey(body) {
 }
 
 function normalizeLoginReferrer(value) {
-  if (String(value || "").trim().toLowerCase() === "sandbox") {
-    return "sandbox";
+  const referrer = String(value || "").trim();
+  if (referrer.toLowerCase() === "sandbox") {
+    return referrer;
   }
   return "DEFAULT";
 }
@@ -795,9 +806,14 @@ function upstreamFailureReason(value) {
       "failureReason",
       "errorMessage",
       "message",
+      "error.reason",
+      "error.errorMessage",
+      "error.errorCode",
       "error.message",
       "error",
       "success.message",
+      "success.reason",
+      "data.reason",
       "data.message",
     ]) || "unknown upstream failure"
   );

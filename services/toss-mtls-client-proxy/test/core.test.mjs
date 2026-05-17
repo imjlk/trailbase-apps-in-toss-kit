@@ -114,6 +114,50 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.referrer).toBe("sandbox");
   });
 
+  test("preserves SDK sandbox referrer casing", async () => {
+    const req = request("POST", PROXY_ENDPOINTS.tossLoginComplete, {
+      authorizationCode: "code",
+      referrer: "SANDBOX",
+    });
+    const res = await handleRequest(req, { mode: "stub", internalToken: "" });
+    expect(res.body.referrer).toBe("SANDBOX");
+  });
+
+  test("forward login failure reads Toss error reason instead of object text", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "FAIL",
+          error: {
+            errorCode: "OAUTH_ISSUE_TOKEN_ERROR",
+            reason: "invalid_grant from Toss",
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.tossLoginComplete,
+        {
+          authorizationCode: "code",
+          referrer: "sandbox",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(false);
+      expect(res.body.error).toBe("TOKEN_EXCHANGE_FAILED");
+      expect(res.body.failureReason).toBe("invalid_grant from Toss");
+    });
+  });
+
   test("validates generic proxy path is relative", async () => {
     const req = request("POST", "/internal/mtls/request", {
       method: "POST",
