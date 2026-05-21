@@ -1,4 +1,9 @@
-import { createSseParser, normalizeTrailBaseUrl } from "./index";
+import {
+  TrailBaseHttpError,
+  createSseParser,
+  normalizeTrailBaseError,
+  normalizeTrailBaseUrl,
+} from "./index";
 
 export type RecordId = string | number;
 
@@ -17,6 +22,8 @@ export interface XhrSseRecordApiOptions<Row> {
   apiBaseUrl: string;
   apiName: string;
   fallbackRecordApi: TrailbaseRecordApi<Row>;
+  headers?: Record<string, string>;
+  getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   XMLHttpRequestImpl?: typeof XMLHttpRequest;
 }
 
@@ -24,6 +31,8 @@ export function createTrailbaseRecordApiWithXhrSse<Row>({
   apiBaseUrl,
   apiName,
   fallbackRecordApi,
+  headers,
+  getHeaders,
   XMLHttpRequestImpl = globalThis.XMLHttpRequest,
 }: XhrSseRecordApiOptions<Row>): TrailbaseRecordApi<Row> {
   return new Proxy(fallbackRecordApi, {
@@ -34,6 +43,8 @@ export function createTrailbaseRecordApiWithXhrSse<Row>({
             apiBaseUrl,
             apiName,
             id,
+            headers,
+            getHeaders,
             XMLHttpRequestImpl,
             fallback: () => target.subscribe(id),
           });
@@ -46,6 +57,8 @@ export function createTrailbaseRecordApiWithXhrSse<Row>({
                 apiBaseUrl,
                 apiName,
                 id: "*",
+                headers,
+                getHeaders,
                 XMLHttpRequestImpl,
                 fallback: () => target.subscribeAll?.(opts) ?? target.subscribe("*"),
               });
@@ -226,12 +239,16 @@ export async function subscribeRecordEvents<Row>({
   apiBaseUrl,
   apiName,
   id,
+  headers,
+  getHeaders,
   fallback,
   XMLHttpRequestImpl = globalThis.XMLHttpRequest,
 }: {
   apiBaseUrl: string;
   apiName: string;
   id: RecordId | "*";
+  headers?: Record<string, string>;
+  getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   fallback: () => Promise<ReadableStream<TrailbaseEvent<Row>>>;
   XMLHttpRequestImpl?: typeof XMLHttpRequest;
 }) {
@@ -241,16 +258,22 @@ export async function subscribeRecordEvents<Row>({
 
   return createTrailbaseXhrSseStream<TrailbaseEvent<Row>>({
     url: `${normalizeTrailBaseUrl(apiBaseUrl)}/api/records/v1/${apiName}/subscribe/${encodeRecordId(id)}`,
+    headers,
+    getHeaders,
     XMLHttpRequestImpl,
   });
 }
 
 export function createTrailbaseXhrSseStream<T>({
   url,
+  headers = {},
+  getHeaders,
   XMLHttpRequestImpl = globalThis.XMLHttpRequest,
   errorMessage = "TrailBase SSE subscription failed",
 }: {
   url: string;
+  headers?: Record<string, string>;
+  getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   XMLHttpRequestImpl?: typeof XMLHttpRequest;
   errorMessage?: string;
 }) {
@@ -258,9 +281,20 @@ export function createTrailbaseXhrSseStream<T>({
   let closed = false;
 
   return new ReadableStream<T>({
-    start(controller) {
+    async start(controller) {
       if (!XMLHttpRequestImpl) {
         controller.error(new Error("XMLHttpRequest is required for XHR SSE streams"));
+        return;
+      }
+
+      let resolvedHeaders: Record<string, string>;
+      try {
+        resolvedHeaders = {
+          ...headers,
+          ...(getHeaders ? await getHeaders() : {}),
+        };
+      } catch (error) {
+        controller.error(error);
         return;
       }
 
@@ -284,6 +318,12 @@ export function createTrailbaseXhrSseStream<T>({
           controller.close();
         }
       };
+      const fail = (error: Error) => {
+        if (!closed) {
+          closed = true;
+          controller.error(error);
+        }
+      };
 
       xhr.onreadystatechange = () => {
         if (!xhr) {
@@ -298,17 +338,22 @@ export function createTrailbaseXhrSseStream<T>({
           const chunk = xhr.responseText.slice(responseOffset);
           responseOffset = xhr.responseText.length;
           parser.push(chunk);
+          if (xhr.status >= 400) {
+            fail(createXhrHttpError(xhr, errorMessage));
+            return;
+          }
           close();
         }
       };
       xhr.onerror = () => {
-        if (!closed) {
-          controller.error(new Error(errorMessage));
-        }
+        fail(new Error(errorMessage));
       };
       xhr.onabort = close;
       xhr.open("GET", url, true);
       xhr.setRequestHeader("Accept", "text/event-stream");
+      for (const [key, value] of Object.entries(resolvedHeaders)) {
+        xhr.setRequestHeader(key, value);
+      }
       xhr.send();
     },
     cancel() {
@@ -317,6 +362,26 @@ export function createTrailbaseXhrSseStream<T>({
       xhr = undefined;
     },
   });
+}
+
+function createXhrHttpError(xhr: XMLHttpRequest, fallback: string) {
+  const payload = parseJsonPayload(xhr.responseText);
+  return new TrailBaseHttpError(normalizeTrailBaseError(payload, fallback), {
+    status: xhr.status,
+    statusText: xhr.statusText,
+    payload,
+  });
+}
+
+function parseJsonPayload(text: string) {
+  if (!text.trim()) {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
 }
 
 export function encodeRecordId(id: RecordId | "*") {

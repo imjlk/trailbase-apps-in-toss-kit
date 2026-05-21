@@ -93,4 +93,23 @@ describe("dev runner helpers", () => {
     });
     expect(result.status).toBe(0);
   });
+
+  test("shell URL normalization preserves explicit ports", () => {
+    const result = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && trailbase_runtime_normalize_public_url "http://127.0.0.1:4011/path?x=1" development && printf "\\n" && trailbase_runtime_normalize_public_url "http://example.com:4000/path" production',
+      ],
+      {
+        cwd: new URL("../../..", import.meta.url).pathname,
+        encoding: "utf8",
+      },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout.trim().split("\n")).toEqual([
+      "http://127.0.0.1:4011",
+      "https://example.com:4000",
+    ]);
+  });
 });

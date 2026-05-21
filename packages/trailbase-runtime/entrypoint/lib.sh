@@ -26,7 +26,7 @@ trailbase_runtime_normalize_public_url() {
     *) value="https://$value" ;;
   esac
 
-  normalized="$(printf '%s' "$value" | sed -E 's#^(https?://[^/:]+)(:[0-9]+)?(/.*)?$#\1#')"
+  normalized="$(printf '%s' "$value" | sed -E 's#^(https?://[^/?#]+).*$#\1#')"
   if [ "$app_env" = "production" ]; then
     normalized="$(printf '%s' "$normalized" | sed -E 's#^http://#https://#')"
   fi

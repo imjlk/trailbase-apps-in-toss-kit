@@ -10,6 +10,7 @@ Shared client utilities include:
 
 - base URL normalization
 - JSON request and response parsing
+- automatic JSON serialization for plain request bodies
 - TrailBase error normalization
 - anonymous hash resolution through a storage adapter
 - SSE parsing
@@ -24,6 +25,10 @@ The TanStack DB adapter is intentionally thin. It helps build TrailBase Record
 API collections with a React Native friendly SSE bridge, snapshot loading, and
 reconnect hooks while leaving table names, query filters, and record models in
 the consumer app.
+
+XHR-backed SSE subscriptions support caller-provided headers for authenticated
+Record APIs and surface HTTP failures as `TrailBaseHttpError` instead of silently
+closing the stream.
 
 `@tanstack/react-db`, `@tanstack/react-query`, and `trailbase` are peer
 dependencies. Consumers already using those packages can opt in to the adapter

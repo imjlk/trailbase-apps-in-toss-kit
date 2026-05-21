@@ -53,10 +53,11 @@ export async function requestJson<T = JsonValue>(
     body,
     ...requestInit
   } = init;
+  const preparedBody = prepareRequestBody(body);
   const response = await fetchImpl(url, {
     ...requestInit,
     headers: buildJsonHeaders(headers, body),
-    body,
+    body: preparedBody,
   } as RequestInit);
   const text = await response.text();
   const payload = parseJsonText(text, parseEmptyAsNull);
@@ -289,13 +290,44 @@ function buildJsonHeaders(
   body: unknown,
 ) {
   const next = new Headers(headers);
-  if (body !== undefined && body !== null && !next.has("Content-Type")) {
+  if (body !== undefined && body !== null && shouldUseJsonContentType(body) && !next.has("Content-Type")) {
     next.set("Content-Type", "application/json");
   }
   if (!next.has("Accept")) {
     next.set("Accept", "application/json");
   }
   return next;
+}
+
+function prepareRequestBody(body: unknown): BodyInit | null | undefined {
+  if (body === undefined || body === null) {
+    return body;
+  }
+  if (isNativeBody(body)) {
+    return body as BodyInit;
+  }
+  return JSON.stringify(body);
+}
+
+function shouldUseJsonContentType(body: unknown) {
+  return !isNativeBody(body) || typeof body === "string";
+}
+
+function isNativeBody(body: unknown) {
+  return (
+    typeof body === "string" ||
+    isInstanceOfGlobal(body, "FormData") ||
+    isInstanceOfGlobal(body, "URLSearchParams") ||
+    isInstanceOfGlobal(body, "Blob") ||
+    isInstanceOfGlobal(body, "ReadableStream") ||
+    isInstanceOfGlobal(body, "ArrayBuffer") ||
+    ArrayBuffer.isView(body)
+  );
+}
+
+function isInstanceOfGlobal(value: unknown, name: string) {
+  const ctor = (globalThis as unknown as Record<string, unknown>)[name];
+  return typeof ctor === "function" && value instanceof ctor;
 }
 
 function parseJsonText(text: string, parseEmptyAsNull: boolean): unknown {
