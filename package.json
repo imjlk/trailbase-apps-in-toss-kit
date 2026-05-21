@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "packageManager": "bun@1.3.13",
   "workspaces": [
+    "packages/*",
     "services/*"
   ],
   "scripts": {
+    "runtime:test": "bun test packages/trailbase-runtime",
     "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
     "skills:sync:copy": "bun scripts/sync-agent-skills.mjs --target codex --all --mode copy",
     "skills:sync:cline": "bun scripts/sync-agent-skills.mjs --target cline --all --mode link",

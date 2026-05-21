@@ -1,0 +1,17 @@
+{
+  "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared TrailBase runtime helpers for AppsInToss consumer services.",
+  "exports": {
+    "./production-env": "./src/production-env.mjs",
+    "./dev-runner": "./src/dev-runner.mjs"
+  },
+  "bin": {
+    "trailbase-prod-env-validate": "./bin/validate-production-env.mjs"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
