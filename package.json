@@ -8,7 +8,9 @@
     "services/*"
   ],
   "scripts": {
+    "packages:test": "bun test packages/trailbase-runtime packages/trailbase-client",
     "runtime:test": "bun test packages/trailbase-runtime",
+    "client:test": "bun test packages/trailbase-client",
     "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
     "skills:sync:copy": "bun scripts/sync-agent-skills.mjs --target codex --all --mode copy",
     "skills:sync:cline": "bun scripts/sync-agent-skills.mjs --target cline --all --mode link",
