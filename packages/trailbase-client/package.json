@@ -7,7 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./tanstack-db": "./src/tanstack-db.ts",
-    "./react-query": "./src/react-query.ts"
+    "./tanstack-query": "./src/tanstack-query.ts"
   },
   "peerDependencies": {
     "@tanstack/react-db": ">=0.1.0",

@@ -29,9 +29,9 @@ the consumer app.
 dependencies. Consumers already using those packages can opt in to the adapter
 without pulling them into apps that do not need them.
 
-## React Query
+## TanStack Query
 
-The React Query subpath provides small defaults and option helpers. It avoids
+The TanStack Query subpath provides small defaults and option helpers. It avoids
 wrapping application queries because query keys, stale times, and mutation
 behavior should remain app-owned.
 

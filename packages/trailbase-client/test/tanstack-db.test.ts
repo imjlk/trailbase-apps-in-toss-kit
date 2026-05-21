@@ -6,7 +6,7 @@ import {
   encodeRecordId,
   trailbaseRecordCollectionOptions,
 } from "../src/tanstack-db";
-import { createTrailbaseQueryClientOptions } from "../src/react-query";
+import { createTrailbaseQueryClientOptions } from "../src/tanstack-query";
 
 describe("TanStack TrailBase adapters", () => {
   test("encodes record ids", () => {
@@ -76,7 +76,7 @@ describe("TanStack TrailBase adapters", () => {
     ).toHaveProperty("sync");
   });
 
-  test("builds React Query defaults", () => {
+  test("builds TanStack Query defaults", () => {
     expect(
       createTrailbaseQueryClientOptions({
         defaultOptions: { queries: { staleTime: 10_000 } },
