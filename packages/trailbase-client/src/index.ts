@@ -6,9 +6,12 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
-export interface RequestJsonOptions extends RequestInit {
+export interface RequestJsonOptions {
   fetchImpl?: typeof fetch;
   parseEmptyAsNull?: boolean;
+  body?: unknown;
+  headers?: Headers | Record<string, string> | [string, string][];
+  [key: string]: unknown;
 }
 
 export class TrailBaseHttpError extends Error {
@@ -54,7 +57,7 @@ export async function requestJson<T = JsonValue>(
     ...requestInit,
     headers: buildJsonHeaders(headers, body),
     body,
-  });
+  } as RequestInit);
   const text = await response.text();
   const payload = parseJsonText(text, parseEmptyAsNull);
   if (!response.ok) {
@@ -126,7 +129,7 @@ export function createAnonymousHash({
   random = globalThis.crypto,
 }: {
   prefix?: string;
-  random?: Pick<Crypto, "getRandomValues">;
+  random?: { getRandomValues?: (array: Uint8Array) => Uint8Array };
 } = {}): string {
   const bytes = new Uint8Array(16);
   if (random?.getRandomValues) {
@@ -281,7 +284,10 @@ export function createXhrSseStream({
   };
 }
 
-function buildJsonHeaders(headers: HeadersInit | undefined, body: BodyInit | null | undefined): HeadersInit {
+function buildJsonHeaders(
+  headers: Headers | Record<string, string> | [string, string][] | undefined,
+  body: unknown,
+) {
   const next = new Headers(headers);
   if (body !== undefined && body !== null && !next.has("Content-Type")) {
     next.set("Content-Type", "application/json");
