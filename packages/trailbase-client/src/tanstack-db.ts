@@ -56,8 +56,8 @@ export function createTrailbaseRecordApiWithXhrSse<Row>({
   });
 }
 
-export interface RecordCollectionOptions<Row, Key> {
-  createCollection: (options: unknown) => unknown;
+export interface RecordCollectionOptions<Row, Key, Collection, Config> {
+  createCollection: (options: Config) => Collection;
   id: string;
   recordApi: TrailbaseRecordApi<Row>;
   getKey: (row: Row) => Key;
@@ -69,11 +69,16 @@ export interface RecordCollectionOptions<Row, Key> {
   onSubscriptionError?: (error: unknown) => void;
 }
 
-export function createTrailbaseRecordCollection<Row, Key extends string | number>({
+export function createTrailbaseRecordCollection<
+  Row,
+  Key extends string | number,
+  Collection,
+  Config = unknown,
+>({
   createCollection,
   ...options
-}: RecordCollectionOptions<Row, Key>) {
-  return createCollection(trailbaseRecordCollectionOptions(options));
+}: RecordCollectionOptions<Row, Key, Collection, Config>): Collection {
+  return createCollection(trailbaseRecordCollectionOptions(options) as Config);
 }
 
 export function trailbaseRecordCollectionOptions<Row, Key extends string | number>({
@@ -86,7 +91,7 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
   gcTime = Number.POSITIVE_INFINITY,
   rowUpdateMode = "full",
   onSubscriptionError,
-}: Omit<RecordCollectionOptions<Row, Key>, "createCollection">) {
+}: Omit<RecordCollectionOptions<Row, Key, unknown, unknown>, "createCollection">) {
   let cancelReader: (() => void) | undefined;
   let applySnapshotFromSync: ((rows: Row | Row[] | null | undefined) => void) | undefined;
 
