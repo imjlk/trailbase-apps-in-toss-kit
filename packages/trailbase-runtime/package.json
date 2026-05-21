@@ -1,6 +1,6 @@
 {
   "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Shared TrailBase runtime helpers for AppsInToss consumer services.",

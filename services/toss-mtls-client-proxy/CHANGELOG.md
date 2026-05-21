@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.4 — 2026-05-22
+
+### Patch changes
+
+- Allow AppsInToss promotion reward requests to provide per-request campaign
+  codes and amounts, and surface provider error codes so consumers can pause or
+  exhaust DB-backed campaigns safely.
+
 ## 0.1.3 — 2026-05-18
 
 ### Patch changes
