@@ -41,28 +41,14 @@ public Record API views, audit metadata, logs, or user-visible responses.
 
 ## Promotion Campaigns
 
-Use `templates/trailbase/sql/promotion_campaigns.sql` when a consumer app wants
-TrailBase to own Toss promotion campaign state instead of relying only on proxy
-env vars. The table stores provider promotion code, reward amount, active
-window, local budget limit, grant count limit, and operator status.
+Promotion campaign configuration is generic and can support missions, sharing,
+referrals, seasonal events, game rewards, or any other app feature. Keep the
+shared `promotion_campaigns` table separate from app-specific eligibility and
+grant ledgers, and make claim handlers idempotent before calling the mTLS proxy.
 
-The campaign table is intentionally separate from app-specific reward ledgers.
-Each app should keep its own eligibility and grant table for flows such as
-attendance, sharing, or game rewards. Link that ledger to `promotion_campaigns`
-with a nullable `campaign_id`, store the proxy's `providerErrorCode` as
-`provider_error_code`, and pass the campaign's `provider_promotion_code` plus
-`reward_amount` to the mTLS proxy per request.
-
-If any DB campaign row exists for a feature key, prefer DB campaign state for
-that feature and ignore env fallback for that feature. If no campaign row
-exists, legacy env fallback remains useful for old deployments and local smoke
-tests.
-
-Provider error codes should update local operator state conservatively:
-
-- `4112`, `4116`: mark the campaign `EXHAUSTED`.
-- `4104`, `4105`, `4108`, `4109`: pause the campaign.
-- `4114`: treat as misconfiguration and pause or escalate before retrying.
+See [promotion-campaigns.md](promotion-campaigns.md) for the full model,
+including feature keys, env fallback, ledger ownership, claim idempotency,
+request shape, and provider error signals.
 
 ## Template Drift
 

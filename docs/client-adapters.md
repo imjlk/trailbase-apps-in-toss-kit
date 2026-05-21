@@ -42,7 +42,7 @@ behavior should remain app-owned.
 
 ## Compatibility
 
-The first version follows the patterns already used by `zero-three-three`.
-`light-on-off` does not currently use TanStack DB, and `tatatata-cattower` has
-the dependency but no live adapter code yet, so those consumers should only use
-the runtime helpers until they have repeated client code to migrate.
+Consumer apps can adopt the subpaths independently. Use the core utilities first
+when an app only needs request/error/storage helpers, add the TanStack Query
+helpers when shared query defaults become useful, and add the TanStack DB adapter
+only after the app has repeated Record API snapshot and realtime collection code.

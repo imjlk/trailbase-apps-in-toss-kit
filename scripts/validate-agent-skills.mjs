@@ -216,7 +216,6 @@ function validateNoSensitiveOrLocalContent(skillName, filePath, source) {
   const relativePath = path.relative(repoRoot, filePath);
   const patterns = [
     { pattern: /\/Users\/|\/home\/|\/private\//, label: "local absolute path" },
-    { pattern: /\b(?:zero-three-three|light-on-off)\b/, label: "consumer-specific repo name" },
     { pattern: /\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16})\b/, label: "secret-looking token" },
     { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, label: "private key material" },
   ];

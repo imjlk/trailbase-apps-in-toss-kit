@@ -19,8 +19,9 @@ app and owned there, because runtime schema and deployment shape are app-specifi
 
 ## Consumer Notes
 
-Keep local consumer paths in `.local-consumers.md`. That file is ignored
-because consumer checkout paths are workstation-specific.
+If you keep workstation-specific consumer checkout paths for local testing, put
+them in `.local-consumers.md`. That file is ignored and must not become a source
+of truth for repo behavior.
 
 For TrailBase migrations, Record API ACL, WASM guest, Coolify deployment,
 fresh-start, or mTLS proxy work, use `$trailbase-ops` after syncing the repo
@@ -197,5 +198,5 @@ For a TrailBase consumer app:
 7. After changing this kit, commit/push this repo first, then update the
    consumer app's submodule pointer and commit that pointer change.
 
-For `light-on-off`, local TrailBase/proxy scripts live in the consumer app, not
-in this kit. Do not make this repo depend on a specific consumer app path.
+Consumer-local TrailBase/proxy scripts live in the consuming app, not in this
+kit. Do not make this repo depend on any particular consumer checkout path.
