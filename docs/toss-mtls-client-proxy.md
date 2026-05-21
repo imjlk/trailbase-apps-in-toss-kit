@@ -73,6 +73,17 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
 
+The promotion reward adapter accepts `promotionCode` and `amount` in the request body. When those
+fields are omitted, it falls back to `TOSS_PROMOTION_CODE` and `TOSS_PROMOTION_AMOUNT` for existing
+env-only consumers. Apps with their own campaign database should pass campaign values per request and
+use the proxy only as the private mTLS boundary. Upstream promotion error codes are normalized into
+`providerErrorCode` when Toss returns codes such as `4109`, `4112`, `4114`, or `4116`.
+
+For DB-backed campaigns, copy `templates/trailbase/sql/promotion_campaigns.sql` into the consumer
+app's migration set, keep eligibility and reward ledgers app-specific, and store proxy
+`providerErrorCode` values on those ledgers so operators can pause or exhaust campaigns without
+hard-coding promotion configuration in env files.
+
 The Toss Login adapter expects the `authorizationCode` and `referrer` returned by `appLogin()`.
 Forward the SDK `referrer` value as-is. In sandbox RN builds this can be `SANDBOX`, and changing the
 casing can make Toss reject the one-time authorization code as `invalid_grant`.

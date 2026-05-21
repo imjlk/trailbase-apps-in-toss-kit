@@ -263,6 +263,100 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.providerRequestId).toBe("smoke");
   });
 
+  test("forward promotion rewards can use request-level campaign values", async () => {
+    const calls = [];
+    const upstreamServer = http.createServer((req, res) => {
+      readRequestJson(req).then((body) => {
+        calls.push({
+          body,
+          path: req.url,
+          tossUserKey: req.headers["x-toss-user-key"],
+        });
+        res.writeHead(200, { "content-type": "application/json" });
+        if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
+          res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
+          return;
+        }
+        if (req.url === TOSS_ENDPOINTS.promotionExecute) {
+          res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
+          return;
+        }
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+      });
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.promotionRewardGrant,
+        {
+          amount: 50,
+          promotionCode: "campaign-from-db",
+          providerRequestId: "attendance-1",
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.providerStatus).toBe("GRANTED");
+      expect(calls.map((call) => call.path)).toEqual([
+        TOSS_ENDPOINTS.promotionGetKey,
+        TOSS_ENDPOINTS.promotionExecute,
+        TOSS_ENDPOINTS.promotionResult,
+      ]);
+      expect(calls[1].body).toEqual({
+        amount: 50,
+        key: "promotion-key",
+        promotionCode: "campaign-from-db",
+      });
+      expect(calls.every((call) => call.tossUserKey === "toss-user-1")).toBe(true);
+    });
+  });
+
+  test("forward promotion execute failures include provider error codes", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
+        return;
+      }
+      res.end(
+        JSON.stringify({
+          error: {
+            errorCode: "4112",
+            message: "프로모션 머니가 부족해요",
+          },
+          resultType: "FAIL",
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.promotionRewardGrant,
+        {
+          amount: 50,
+          promotionCode: "campaign-from-db",
+          providerRequestId: "attendance-1",
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.providerStatus).toBe("PROMOTION_EXECUTE_FAILED");
+      expect(res.body.providerErrorCode).toBe("4112");
+      expect(res.body.failureReason).toBe("4112");
+    });
+  });
+
   test("stub iap order status returns payable status", async () => {
     const req = request("POST", PROXY_ENDPOINTS.iapOrderStatus, {
       orderId: "order-1",
@@ -372,6 +466,21 @@ function request(method, url, body = undefined, headers = {}) {
   stream.url = url;
   stream.headers = headers;
   return stream;
+}
+
+function readRequestJson(req) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    req.on("error", reject);
+  });
 }
 
 async function withServer(server, fn) {

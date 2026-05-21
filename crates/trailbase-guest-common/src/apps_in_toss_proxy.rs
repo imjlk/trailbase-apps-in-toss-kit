@@ -78,6 +78,34 @@ pub fn proxy_failure_message(response: &JsonValue, fallback: &str) -> String {
         .unwrap_or_else(|| fallback.to_string())
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PromotionProviderSignal {
+    Paused,
+    Exhausted,
+    Misconfigured,
+}
+
+pub fn promotion_provider_signal(
+    provider_error_code: Option<&str>,
+) -> Option<PromotionProviderSignal> {
+    match provider_error_code.map(str::trim) {
+        Some("4112" | "4116") => Some(PromotionProviderSignal::Exhausted),
+        Some("4104" | "4105" | "4108" | "4109") => Some(PromotionProviderSignal::Paused),
+        Some("4114") => Some(PromotionProviderSignal::Misconfigured),
+        _ => None,
+    }
+}
+
+pub fn promotion_provider_signal_from_response(
+    response: &JsonValue,
+) -> Option<PromotionProviderSignal> {
+    let provider_error_code = read_string_path(
+        response,
+        &["providerErrorCode", "errorCode", "code", "error.code"],
+    );
+    promotion_provider_signal(provider_error_code.as_deref())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,6 +134,40 @@ mod tests {
         assert_eq!(
             proxy_failure_message(&json!({ "ok": false }), "fallback"),
             "fallback"
+        );
+    }
+
+    #[test]
+    fn promotion_provider_signal_classifies_operational_codes() {
+        assert_eq!(
+            promotion_provider_signal(Some("4112")),
+            Some(PromotionProviderSignal::Exhausted)
+        );
+        assert_eq!(
+            promotion_provider_signal(Some("4116")),
+            Some(PromotionProviderSignal::Exhausted)
+        );
+        assert_eq!(
+            promotion_provider_signal(Some("4109")),
+            Some(PromotionProviderSignal::Paused)
+        );
+        assert_eq!(
+            promotion_provider_signal(Some("4114")),
+            Some(PromotionProviderSignal::Misconfigured)
+        );
+        assert_eq!(promotion_provider_signal(Some("9999")), None);
+        assert_eq!(promotion_provider_signal(None), None);
+    }
+
+    #[test]
+    fn promotion_provider_signal_reads_proxy_response_codes() {
+        assert_eq!(
+            promotion_provider_signal_from_response(&json!({ "providerErrorCode": "4116" })),
+            Some(PromotionProviderSignal::Exhausted)
+        );
+        assert_eq!(
+            promotion_provider_signal_from_response(&json!({ "error": { "code": 4109 } })),
+            Some(PromotionProviderSignal::Paused)
         );
     }
 
