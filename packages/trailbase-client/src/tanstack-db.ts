@@ -9,8 +9,8 @@ export type TrailbaseEvent<Row> =
 
 export interface TrailbaseRecordApi<Row> {
   list: (opts?: any) => Promise<{ records: Row[] }>;
-  subscribe: (id: any) => Promise<ReadableStream<TrailbaseEvent<Row>>>;
-  subscribeAll?: (opts?: any) => Promise<ReadableStream<TrailbaseEvent<Row>>>;
+  subscribe: (id: any) => Promise<ReadableStream<any>>;
+  subscribeAll?: (opts?: any) => Promise<ReadableStream<any>>;
   [key: string]: unknown;
 }
 
