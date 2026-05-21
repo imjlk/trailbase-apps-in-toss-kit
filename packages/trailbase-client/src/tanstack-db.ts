@@ -11,7 +11,6 @@ export interface TrailbaseRecordApi<Row> {
   list: (opts?: any) => Promise<{ records: Row[] }>;
   subscribe: (id: any) => Promise<ReadableStream<any>>;
   subscribeAll?: (opts?: any) => Promise<ReadableStream<any>>;
-  [key: string]: unknown;
 }
 
 export interface XhrSseRecordApiOptions<Row> {
