@@ -48,8 +48,8 @@ describe("toss-mtls-client-proxy", () => {
   test("detects Toss console certificate filenames from the mounted cert directory", () => {
     const certDir = mkdtempSync(path.join(tmpdir(), "toss-mtls-"));
     try {
-      writeFileSync(path.join(certDir, "light-on-off_public.crt"), "cert");
-      writeFileSync(path.join(certDir, "light-on-off_private.key"), "key");
+      writeFileSync(path.join(certDir, "sample-service_public.crt"), "cert");
+      writeFileSync(path.join(certDir, "sample-service_private.key"), "key");
 
       const config = createConfig({
         MTLS_PROXY_MODE: "FORWARD",
@@ -58,8 +58,8 @@ describe("toss-mtls-client-proxy", () => {
         MTLS_CERT_DIR: certDir,
       });
 
-      expect(config.clientCertPath).toBe(path.join(certDir, "light-on-off_public.crt"));
-      expect(config.clientKeyPath).toBe(path.join(certDir, "light-on-off_private.key"));
+      expect(config.clientCertPath).toBe(path.join(certDir, "sample-service_public.crt"));
+      expect(config.clientKeyPath).toBe(path.join(certDir, "sample-service_private.key"));
     } finally {
       rmSync(certDir, { recursive: true, force: true });
     }
@@ -68,8 +68,8 @@ describe("toss-mtls-client-proxy", () => {
   test("prefers a complete Toss certificate pair over explicit fallback paths", () => {
     const certDir = mkdtempSync(path.join(tmpdir(), "toss-mtls-"));
     try {
-      writeFileSync(path.join(certDir, "light-on-off_public.crt"), "cert");
-      writeFileSync(path.join(certDir, "light-on-off_private.key"), "key");
+      writeFileSync(path.join(certDir, "sample-service_public.crt"), "cert");
+      writeFileSync(path.join(certDir, "sample-service_private.key"), "key");
 
       const config = createConfig({
         MTLS_CERT_DIR: certDir,
@@ -77,8 +77,8 @@ describe("toss-mtls-client-proxy", () => {
         MTLS_CLIENT_KEY_PATH: "/custom/client.key",
       });
 
-      expect(config.clientCertPath).toBe(path.join(certDir, "light-on-off_public.crt"));
-      expect(config.clientKeyPath).toBe(path.join(certDir, "light-on-off_private.key"));
+      expect(config.clientCertPath).toBe(path.join(certDir, "sample-service_public.crt"));
+      expect(config.clientKeyPath).toBe(path.join(certDir, "sample-service_private.key"));
     } finally {
       rmSync(certDir, { recursive: true, force: true });
     }
@@ -87,7 +87,7 @@ describe("toss-mtls-client-proxy", () => {
   test("uses explicit certificate paths when no complete Toss pair is available", () => {
     const certDir = mkdtempSync(path.join(tmpdir(), "toss-mtls-"));
     try {
-      writeFileSync(path.join(certDir, "light-on-off_public.crt"), "cert");
+      writeFileSync(path.join(certDir, "sample-service_public.crt"), "cert");
 
       const config = createConfig({
         MTLS_CERT_DIR: certDir,
