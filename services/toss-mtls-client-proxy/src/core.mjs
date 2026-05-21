@@ -390,11 +390,16 @@ async function grantPromotionReward(request, config) {
   const providerRequestId = stringOrUndefined(request?.providerRequestId);
   const requestedAt = numberOrUndefined(request?.requestedAt) ?? Date.now();
   const tossUserKey = stringOrUndefined(request?.tossUserKey);
+  const promotionCode = stringOrUndefined(request?.promotionCode) || config.tossPromotionCode;
+  const promotionAmount =
+    positiveIntegerOrUndefined(request?.amount) ||
+    positiveIntegerOrUndefined(request?.promotionAmount) ||
+    config.tossPromotionAmount;
   if (!tossUserKey) {
     return rewardFailure(request, "MISSING_TOSS_USER_KEY", "tossUserKey is required for promotion grant");
   }
-  if (!config.tossPromotionCode) {
-    return rewardFailure(request, "MISSING_TOSS_PROMOTION_CODE", "TOSS_PROMOTION_CODE is required");
+  if (!promotionCode) {
+    return rewardFailure(request, "MISSING_TOSS_PROMOTION_CODE", "promotionCode or TOSS_PROMOTION_CODE is required");
   }
 
   let providerTransactionKey = stringOrUndefined(request?.providerTransactionKey);
@@ -416,20 +421,22 @@ async function grantPromotionReward(request, config) {
         method: "POST",
         path: TOSS_ENDPOINTS.promotionExecute,
         body: {
-          promotionCode: config.tossPromotionCode,
+          promotionCode,
           key: providerTransactionKey,
-          amount: config.tossPromotionAmount,
+          amount: promotionAmount,
         },
         tossUserKey,
       },
       config,
     );
+    const executeErrorCode = upstreamFailureCode(executeResponse.body);
     if (isUpstreamFailure(executeResponse.body)) {
       return rewardFailure(
         request,
         "PROMOTION_EXECUTE_FAILED",
         upstreamFailureReason(executeResponse.body),
         providerTransactionKey,
+        executeErrorCode,
       );
     }
   }
@@ -438,7 +445,7 @@ async function grantPromotionReward(request, config) {
     {
       method: "POST",
       path: TOSS_ENDPOINTS.promotionResult,
-      body: { promotionCode: config.tossPromotionCode, key: providerTransactionKey },
+      body: { promotionCode, key: providerTransactionKey },
       tossUserKey,
     },
     config,
@@ -768,12 +775,19 @@ function objectOrSelf(value, fallback) {
   return value && typeof value === "object" && !Array.isArray(value) ? value : fallback;
 }
 
-function rewardFailure(request, providerStatus, failureReason, providerTransactionKey = undefined) {
+function rewardFailure(
+  request,
+  providerStatus,
+  failureReason,
+  providerTransactionKey = undefined,
+  providerErrorCode = undefined,
+) {
   return {
     ok: true,
     providerRequestId: request?.providerRequestId,
     providerStatus,
     providerTransactionKey,
+    providerErrorCode,
     failureReason,
   };
 }
@@ -819,9 +833,27 @@ function upstreamFailureReason(value) {
   );
 }
 
+function upstreamFailureCode(value) {
+  return readPathString(value, [
+    "providerErrorCode",
+    "errorCode",
+    "code",
+    "error.errorCode",
+    "error.code",
+    "success.errorCode",
+    "data.errorCode",
+    "data.code",
+  ]);
+}
+
 function parsePositiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function positiveIntegerOrUndefined(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 function parseNonNegativeInteger(value, fallback) {

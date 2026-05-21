@@ -48,7 +48,8 @@ tag when it does not match the proxy package version.
 - `sha-<shortsha>`: source commit tag for audit and rollback. Scheduled rebuilds can repush
   this tag when the base image changes.
 - `latest`: latest intentional proxy image release.
-- `0.1.0`, `0.1`, `0`: SemVer release aliases.
+- `0.1.4`, `0.1`, `0`: SemVer release aliases.
 
-Production deployments should use `latest`, `0.1`, or an exact SemVer tag. Use `edge` only when a
-consumer app deliberately wants to track every main-branch image build.
+Production deployments should prefer an exact SemVer tag such as `0.1.4`, or a minor tag such as
+`0.1` when intentional. Use `latest` or `edge` only when a consumer app deliberately wants to track
+moving image builds.
