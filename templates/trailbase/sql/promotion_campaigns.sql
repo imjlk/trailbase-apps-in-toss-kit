@@ -12,7 +12,15 @@ CREATE TABLE IF NOT EXISTS promotion_campaigns (
   notes TEXT,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  CHECK (starts_at IS NULL OR ends_at IS NULL OR starts_at < ends_at)
+  CHECK (starts_at IS NULL OR ends_at IS NULL OR starts_at < ends_at),
+  CHECK (
+    status <> 'ACTIVE'
+    OR (
+      starts_at IS NOT NULL
+      AND ends_at IS NOT NULL
+      AND budget_limit_amount IS NOT NULL
+    )
+  )
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_promotion_campaigns_active_feature

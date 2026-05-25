@@ -6,6 +6,8 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+type PortableBodyInit = NonNullable<RequestInit["body"]>;
+
 export interface RequestJsonOptions {
   fetchImpl?: typeof fetch;
   parseEmptyAsNull?: boolean;
@@ -107,6 +109,218 @@ export interface KeyValueStorage {
   setItem(key: string, value: string): void | Promise<void>;
 }
 
+export type AppsInTossReferrer = "DEFAULT" | "SANDBOX" | string;
+
+export interface AppsInTossLoginResult {
+  authorizationCode: string;
+  referrer: AppsInTossReferrer;
+}
+
+export interface StoredAppSession<TUser = unknown> {
+  authProvider: "anonymous" | "toss";
+  sessionToken: string;
+  user: TUser;
+}
+
+export interface AppSessionManagerResponse<TUser = unknown> {
+  sessionToken: string;
+  user: TUser;
+  [key: string]: unknown;
+}
+
+export interface AppsInTossSessionManagerOptions<TUser = unknown> {
+  storage: KeyValueStorage;
+  appLogin: () => Promise<unknown>;
+  getIsTossLoginIntegratedService?: () => Promise<unknown>;
+  loadSession: (input: { sessionToken: string }) => Promise<AppSessionManagerResponse<TUser>>;
+  bootstrap: (anonymousHash: string) => Promise<AppSessionManagerResponse<TUser>>;
+  completeTossLogin: (input: {
+    anonymousHash: string;
+    authorizationCode: string;
+    referrer: AppsInTossReferrer;
+  }) => Promise<AppSessionManagerResponse<TUser>>;
+  createAnonymousHash?: () => string;
+  anonymousHashStorageKey?: string;
+  tossSessionStorageKey?: string;
+  appSessionStorageKey?: string;
+}
+
+export class AppsInTossLoginError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AppsInTossLoginError";
+  }
+}
+
+export function normalizeAppsInTossLoginResult(value: unknown): AppsInTossLoginResult {
+  if (!value || typeof value !== "object") {
+    throw new AppsInTossLoginError("토스 로그인을 완료하지 못했어요.");
+  }
+  const record = value as Record<string, unknown>;
+  const authorizationCode = stringCandidate(record.authorizationCode, record.authorization_code);
+  if (!authorizationCode) {
+    throw new AppsInTossLoginError("토스 로그인 응답을 확인하지 못했어요.");
+  }
+  return {
+    authorizationCode,
+    referrer: normalizeAppsInTossReferrer(stringCandidate(record.referrer)),
+  };
+}
+
+export function normalizeAppsInTossReferrer(value: unknown): AppsInTossReferrer {
+  if (typeof value !== "string" || !value.trim()) {
+    return "DEFAULT";
+  }
+  const trimmed = value.trim();
+  if (trimmed.toUpperCase() === "SANDBOX") {
+    return "SANDBOX";
+  }
+  if (trimmed.toUpperCase() === "DEFAULT") {
+    return "DEFAULT";
+  }
+  return trimmed;
+}
+
+export function normalizeAppsInTossErrorMessage(
+  error: unknown,
+  fallback = "요청을 완료하지 못했어요.",
+): string {
+  const message = readableErrorMessage(error);
+  if (!message || message === "[object Object]" || message === "undefined") {
+    return fallback;
+  }
+  return message
+    .replace(/\bTrailBase\b/gi, "서비스")
+    .replace(/\bXMLHttpRequest\b/g, "요청")
+    .replace(/\bfetch\b/gi, "요청")
+    .trim();
+}
+
+export async function requestAppsInTossLogin({
+  appLogin,
+  getIsTossLoginIntegratedService,
+}: {
+  appLogin: () => Promise<unknown>;
+  getIsTossLoginIntegratedService?: () => Promise<unknown>;
+}): Promise<AppsInTossLoginResult> {
+  if (getIsTossLoginIntegratedService) {
+    try {
+      const integrated = await getIsTossLoginIntegratedService();
+      if (integrated === false) {
+        throw new AppsInTossLoginError("토스 로그인이 아직 준비되지 않았어요.");
+      }
+    } catch (error) {
+      if (error instanceof AppsInTossLoginError) {
+        throw error;
+      }
+      throw new AppsInTossLoginError(
+        normalizeAppsInTossErrorMessage(error, "토스 로그인 상태를 확인하지 못했어요."),
+      );
+    }
+  }
+
+  try {
+    return normalizeAppsInTossLoginResult(await appLogin());
+  } catch (error) {
+    if (error instanceof AppsInTossLoginError) {
+      throw error;
+    }
+    throw new AppsInTossLoginError(
+      normalizeAppsInTossErrorMessage(error, "토스 로그인을 완료하지 못했어요."),
+    );
+  }
+}
+
+export function createAppsInTossSessionManager<TUser = unknown>({
+  storage,
+  appLogin,
+  getIsTossLoginIntegratedService,
+  loadSession,
+  bootstrap,
+  completeTossLogin,
+  createAnonymousHash: createHash = createAnonymousHash,
+  anonymousHashStorageKey = "trailbase.anonymousHash",
+  tossSessionStorageKey = "trailbase.tossSession",
+  appSessionStorageKey = "trailbase.appSession",
+}: AppsInTossSessionManagerOptions<TUser>) {
+  async function restoreStoredTossSession() {
+    const storedSession = await readStoredSession<TUser>(storage, tossSessionStorageKey);
+    if (!storedSession) {
+      return null;
+    }
+    try {
+      const response = await loadSession({ sessionToken: storedSession.sessionToken });
+      await writeSession(storage, tossSessionStorageKey, response, "toss");
+      await writeSession(storage, appSessionStorageKey, response, "toss");
+      return withAuthProvider(response, "toss");
+    } catch {
+      await storage.setItem(tossSessionStorageKey, "");
+      return null;
+    }
+  }
+
+  async function restoreStoredAppSession() {
+    const storedSession = await readStoredSession<TUser>(storage, appSessionStorageKey);
+    if (!storedSession) {
+      return await restoreStoredTossSession();
+    }
+    try {
+      const response = await loadSession({ sessionToken: storedSession.sessionToken });
+      await writeSession(storage, appSessionStorageKey, response, storedSession.authProvider);
+      return withAuthProvider(response, storedSession.authProvider);
+    } catch {
+      await storage.setItem(appSessionStorageKey, "");
+      if (storedSession.authProvider === "toss") {
+        await storage.setItem(tossSessionStorageKey, "");
+      }
+      return null;
+    }
+  }
+
+  async function bootstrapAnonymousSession() {
+    const anonymousHash = await resolveAnonymousHash({
+      storage,
+      storageKey: anonymousHashStorageKey,
+      create: createHash,
+    });
+    const response = await bootstrap(anonymousHash);
+    await writeSession(storage, appSessionStorageKey, response, "anonymous");
+    return withAuthProvider(response, "anonymous");
+  }
+
+  async function getOrCreateAppSession() {
+    return (await restoreStoredAppSession()) ?? (await bootstrapAnonymousSession());
+  }
+
+  async function signInWithToss() {
+    const [anonymousHash, loginResult] = await Promise.all([
+      resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash }),
+      requestAppsInTossLogin({ appLogin, getIsTossLoginIntegratedService }),
+    ]);
+    const response = await completeTossLogin({
+      anonymousHash,
+      authorizationCode: loginResult.authorizationCode,
+      referrer: loginResult.referrer,
+    });
+    await writeSession(storage, tossSessionStorageKey, response, "toss");
+    await writeSession(storage, appSessionStorageKey, response, "toss");
+    return withAuthProvider(response, "toss");
+  }
+
+  async function getOrSignInWithToss() {
+    return (await restoreStoredTossSession()) ?? (await signInWithToss());
+  }
+
+  return {
+    restoreStoredTossSession,
+    restoreStoredAppSession,
+    bootstrapAnonymousSession,
+    getOrCreateAppSession,
+    signInWithToss,
+    getOrSignInWithToss,
+  };
+}
+
 export async function resolveAnonymousHash({
   storage,
   storageKey = "trailbase.anonymousHash",
@@ -142,6 +356,107 @@ export function createAnonymousHash({
   }
   const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
   return `${prefix}_${hex}`;
+}
+
+function withAuthProvider<TUser>(
+  response: AppSessionManagerResponse<TUser>,
+  authProvider: "anonymous" | "toss",
+) {
+  return {
+    ...response,
+    authProvider,
+  };
+}
+
+async function readStoredSession<TUser>(
+  storage: KeyValueStorage,
+  key: string,
+): Promise<StoredAppSession<TUser> | null> {
+  try {
+    const raw = await storage.getItem(key);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+    const record = parsed as Record<string, unknown>;
+    if (record.authProvider !== "anonymous" && record.authProvider !== "toss") {
+      return null;
+    }
+    const sessionToken = stringCandidate(record.sessionToken);
+    if (!sessionToken || !record.user) {
+      return null;
+    }
+    return {
+      authProvider: record.authProvider,
+      sessionToken,
+      user: record.user as TUser,
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function writeSession<TUser>(
+  storage: KeyValueStorage,
+  key: string,
+  response: AppSessionManagerResponse<TUser>,
+  authProvider: "anonymous" | "toss",
+) {
+  await storage.setItem(
+    key,
+    JSON.stringify({
+      authProvider,
+      sessionToken: response.sessionToken,
+      user: response.user,
+    }),
+  );
+}
+
+function stringCandidate(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+}
+
+function readableErrorMessage(error: unknown): string | undefined {
+  if (!error) {
+    return undefined;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (typeof error === "number" || typeof error === "boolean") {
+    return String(error);
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  if (typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const candidates = [
+      record.message,
+      record.error,
+      record.failureReason,
+      record.reason,
+      record.detail,
+      record.cause,
+      record.data,
+      record.response,
+    ];
+    for (const candidate of candidates) {
+      const message = readableErrorMessage(candidate);
+      if (message) {
+        return message;
+      }
+    }
+  }
+  return String(error);
 }
 
 export interface SseEvent {
@@ -299,12 +614,12 @@ function buildJsonHeaders(
   return next;
 }
 
-function prepareRequestBody(body: unknown): BodyInit | null | undefined {
+function prepareRequestBody(body: unknown): PortableBodyInit | null | undefined {
   if (body === undefined || body === null) {
     return body;
   }
   if (isNativeBody(body)) {
-    return body as BodyInit;
+    return body as PortableBodyInit;
   }
   return JSON.stringify(body);
 }

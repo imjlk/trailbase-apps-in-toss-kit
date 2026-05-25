@@ -804,6 +804,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "trailbase-wasm",
+ "url",
 ]
 
 [[package]]
