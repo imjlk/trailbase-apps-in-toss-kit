@@ -43,7 +43,17 @@ existing apps.
 Keep public user data out of `_user`. Store display names, app avatars, character choices, and other
 product fields in `profiles`, `profile_view`, or app domain tables keyed by `_user(id)`. Use
 TrailBase `_user_avatar` for auth avatar uploads, not as the only place for app-specific avatar
-selection.
+selection. The kit's minimal `profiles` template is optional but recommended; it keeps
+`anonymous_hash_hmac` and `auth_state` beside the app-owned profile row so apps do not overload
+`_user.verified` with product meaning.
+
+If a Toss identity collision promotes an existing Toss-linked `_user` to canonical, store the old
+anonymous hash in `anonymous_user_links`. Bootstrap handlers can then map the abandoned anonymous
+hash to the canonical `_user` before issuing fresh TrailBase auth tokens.
+
+For public bootstrap endpoints, add a coarse app-side guard with `anonymous_bootstrap_attempts` and
+`enforce_anonymous_bootstrap_attempt_limit_tx`. This does not replace platform rate limiting, but it
+prevents unbounded anonymous `_user` creation when a route is called repeatedly.
 
 ## Toss Identity
 

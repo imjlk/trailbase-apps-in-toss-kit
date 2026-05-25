@@ -34,6 +34,11 @@ TrailBase credential을 만드세요.
 - 합성 `_user.email`: `anon+...@users.local.invalid` 형태의 안정적인 내부 이메일.
 - 서비스 관리 비밀번호: 별도 secret에서 파생한 서버 전용 credential.
 
+합성 이메일은 TrailBase auth identifier이지 연락처가 아닙니다. 이 주소로 메일을 보내거나
+사용자에게 표시하지 말고, `_user.verified = true`를 실제 사람 이메일이 검증되었다는 의미로
+해석하지 마세요. 이 플래그는 서비스 관리 credential이 TrailBase의 일반 로그인 흐름을 사용할
+수 있다는 기술적 표시입니다.
+
 이 credential은 TrailBase 공식 auth flow를 사용하기 위한 것입니다. 서비스 관리 비밀번호를
 클라이언트로 보내지 말고, 앱 코드에서 TrailBase JWT 서명이나 `_session` write를 직접
 재구현하지 마세요.
@@ -41,7 +46,15 @@ TrailBase credential을 만드세요.
 `_user` upsert가 commit된 뒤에는 서비스 관리 credential로 TrailBase 공식 auth login endpoint를
 호출합니다. `trailbase-guest-common`은 이 handoff를 위해 `login_auth_user`와
 `trailbase_auth_tokens_from_response` 헬퍼를 제공합니다. 이 헬퍼는 auth, refresh, CSRF token
-응답을 파싱할 뿐 token을 직접 mint하지 않습니다.
+응답을 파싱할 뿐 token을 직접 mint하지 않습니다. credential rotation이 필요하면
+`TRAILBASE_AUTH_PASSWORD_SECRET_PREVIOUS`와 함께
+`login_anonymous_auth_user_with_password_rotation`을 사용하세요. 새 current secret과 previous
+secret을 같이 배포하고, 활성 사용자가 재로그인하며 rehash된 뒤 다음 배포에서 previous를
+제거합니다.
+
+부트스트랩 엔드포인트는 익명 생성 남용도 방어해야 합니다. 앱 내부의 coarse guard로는
+`anonymous_bootstrap_attempts`와 `enforce_anonymous_bootstrap_attempt_limit_tx`를 쓰고,
+운영 공개 경로에는 플랫폼 또는 프록시 레벨 rate limit도 추가하세요.
 
 클라이언트에서는 서비스 관리 비밀번호로 `client.login()`을 호출하지 말고, 서버가 반환한
 token으로 공식 `trailbase` JavaScript SDK를 초기화하세요. `trailbase-client`는 이를 위해
@@ -56,7 +69,13 @@ Toss Login의 `email` 필드는 이 kit에서 `_user.email`의 source of truth�
 공개 프로필 데이터는 `_user` 밖에 두세요. `_user(id)`를 key로 하는 `profiles` 테이블을 만들고
 필요하면 안전한 `profile_view`를 Record API에 노출합니다. TrailBase의 `_user_avatar`는 auth
 avatar 업로드용입니다. 앱별 캐릭터 선택, 고양이 아바타, 표시용 정체성은 `profiles`나 도메인
-테이블에 두세요.
+테이블에 두세요. 최소 profile 패턴은 `auth_state`를 `_user.verified`와 분리해 추적합니다:
+`anonymous`, `toss_linked`, `email_linked`, `disabled`.
+
+Toss Login 중 같은 Toss identity가 이미 다른 `_user`에 연결되어 있으면 그 Toss-linked row를
+canonical로 유지하고 `anonymous_user_links`를 기록하세요. 이후 기존 anonymous hash로
+bootstrap이 다시 들어오면 버려진 anonymous row를 되살리지 않고 alias를 통해 canonical user의
+새 TrailBase token을 반환해야 합니다.
 
 ## Toss Login 연결 해제 콜백
 

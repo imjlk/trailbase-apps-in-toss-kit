@@ -8,10 +8,12 @@ alwaysApply: false
 
 Use `skills/trailbase-ops/SKILL.md` as the canonical guide. Load
 `skills/trailbase-ops/references/trailbase-ops.md` for detailed migration,
-Record API, deployment, and mTLS proxy guardrails.
+auth principal, Record API, deployment, and mTLS proxy guardrails.
 
 - Do not rewrite baseline SQL when production-like data may exist.
 - Prefer additive, forward-only TrailBase migrations.
+- Keep anonymous AppsInToss sessions on TrailBase `_user` and enforce disabled
+  app auth states in WASM endpoints.
 - Verify `config.textproto` changes alongside schema changes.
 - Check Rust WASM with the repo's `wasm32-wasip2` command.
 - Keep mTLS certificates in the proxy container only.

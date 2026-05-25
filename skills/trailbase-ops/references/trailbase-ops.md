@@ -27,6 +27,29 @@
   Record API or user-visible responses.
 - Run the repo's ACL check when available after changing `config.textproto`.
 
+## TrailBase Auth Principal Pattern
+
+- New AppsInToss integrations should map the anonymous AppsInToss identity into TrailBase `_user`
+  during bootstrap. Return TrailBase auth, refresh, and CSRF tokens from the official auth flow;
+  never recreate TrailBase JWT signing or insert `_session` rows manually.
+- Synthetic `_user.email` values are service-managed implementation details. Keep Toss email or later
+  OAuth/OIDC email claims in provider-specific profile/identity metadata until they are verified and
+  intentionally promoted.
+- `profiles` is an app-owned pattern, not a kit runtime requirement. When an app uses it, store public
+  profile fields there and keep private fields such as `anonymous_hash_hmac` out of public views.
+- Track application auth state separately from `_user.verified`, for example `anonymous`,
+  `toss_linked`, `email_linked`, or `disabled`. Custom WASM endpoints must reject disabled app users
+  even if TrailBase still accepts an old auth token until the client bootstraps again.
+- When a provider identity collision makes another `_user` canonical, write an alias such as
+  `anonymous_user_links` before returning tokens for the canonical user. Bootstrap handlers should
+  check aliases before creating or resurrecting app rows.
+- Store provider identities with a deterministic lookup key and, only when needed, a sealed reversible
+  value. For Toss this is `toss_user_key_hmac` plus `toss_user_key_sealed`; future OAuth/OIDC
+  integrations should use a provider plus subject mapping to the canonical `_user`.
+- Support service-managed password rotation with a current and previous password secret, then rehash
+  the `_user` password to the current secret after a successful previous-secret login.
+- Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
+
 ## WASM And Runtime Settings
 
 - Run `cargo check --manifest-path apps/trailbase/wasm/Cargo.toml --workspace --target wasm32-wasip2`

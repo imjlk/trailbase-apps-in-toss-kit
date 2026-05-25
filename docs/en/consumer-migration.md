@@ -44,6 +44,16 @@ Legacy AppsInToss consumers often have an app-owned `users` table plus
 5. Use TrailBase's official auth flow to return auth, refresh, and CSRF tokens.
 6. Link Toss Login by adding `toss_identities` to the existing anonymous `_user`.
 
+When adding the new auth path, also add the hardening tables that match your migration strategy:
+`profiles.minimal.sql` for new/reset apps, and `anonymous_user_links.sql` plus
+`anonymous_bootstrap_attempts.sql` for both reset and additive migrations. Keep `auth_state` in the
+app profile/domain row, not in `_user`.
+
+If you rotate `TRAILBASE_AUTH_PASSWORD_SECRET`, deploy
+`TRAILBASE_AUTH_PASSWORD_SECRET_PREVIOUS` alongside the new current value first. The helper can log
+in with the previous derived password once and then rehash `_user.password_hash` with the current
+secret.
+
 If production data exists, add forward migrations. Do not rewrite baseline SQL. A `light-on-off`
 style migration should keep the existing domain `users` table while adding a `_user` mapping column
 or companion profile table, then move Record API ACLs to `_USER_.id` incrementally.

@@ -71,6 +71,10 @@ pub fn conflict(code: &'static str, message: impl ToString) -> ApiError {
     ApiError::new(StatusCode::CONFLICT, code, message)
 }
 
+pub fn too_many_requests(code: &'static str, message: impl ToString) -> ApiError {
+    ApiError::new(StatusCode::TOO_MANY_REQUESTS, code, message)
+}
+
 pub fn internal(message: impl ToString) -> ApiError {
     ApiError::new(StatusCode::INTERNAL_SERVER_ERROR, "INTERNAL", message)
 }

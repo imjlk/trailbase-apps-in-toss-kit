@@ -42,7 +42,18 @@ SQL)을 다시 쓰지 마세요. 대신 앞으로만 진행되는 새 마이그�
 공개 사용자 데이터는 `_user`에 두지 마세요. 표시 이름, 앱별 아바타, 캐릭터 선택, 제품
 도메인 필드는 `_user(id)`를 key로 하는 `profiles`, `profile_view`, 앱별 도메인 테이블에
 저장합니다. TrailBase `_user_avatar`는 auth avatar 업로드용이며, 앱별 avatar selection의
-유일한 저장소로 쓰지 않습니다.
+유일한 저장소로 쓰지 않습니다. kit의 최소 `profiles` 템플릿은 필수는 아니지만 권장됩니다.
+`anonymous_hash_hmac`과 `auth_state`를 앱 profile row 옆에 두어 `_user.verified`에 제품 의미를
+덧씌우지 않게 합니다.
+
+Toss identity 충돌로 기존 Toss-linked `_user`가 canonical이 되면 기존 anonymous hash를
+`anonymous_user_links`에 저장하세요. Bootstrap handler는 이 alias를 먼저 확인한 뒤 canonical
+`_user` 기준으로 새 TrailBase auth token을 발급할 수 있습니다.
+
+공개 bootstrap endpoint에는 `anonymous_bootstrap_attempts`와
+`enforce_anonymous_bootstrap_attempt_limit_tx`를 이용한 앱 내부 coarse guard를 추가하세요.
+이것이 플랫폼 rate limit을 대체하지는 않지만, 반복 호출로 익명 `_user`가 무제한 생성되는
+상황을 줄입니다.
 
 ## Toss 식별자
 

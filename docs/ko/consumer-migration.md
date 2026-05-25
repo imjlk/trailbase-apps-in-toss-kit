@@ -43,6 +43,16 @@
 5. TrailBase 공식 auth flow로 auth, refresh, CSRF token을 반환합니다.
 6. Toss Login은 기존 익명 `_user`에 `toss_identities`를 추가하는 방식으로 연결합니다.
 
+새 auth path를 추가할 때는 마이그레이션 전략에 맞는 hardening table도 같이 추가하세요. 새로
+초기화하는 앱은 `profiles.minimal.sql`을 참고하고, reset/additive 양쪽 모두
+`anonymous_user_links.sql`과 `anonymous_bootstrap_attempts.sql`를 추가합니다. `auth_state`는
+`_user`가 아니라 앱 profile 또는 도메인 row에 둡니다.
+
+`TRAILBASE_AUTH_PASSWORD_SECRET`을 교체해야 한다면 먼저 새 current 값과 함께
+`TRAILBASE_AUTH_PASSWORD_SECRET_PREVIOUS`를 배포하세요. helper는 이전 secret으로 파생한
+비밀번호로 한 번 로그인한 뒤 current secret 기준으로 `_user.password_hash`를 다시 저장할 수
+있습니다.
+
 운영 데이터가 있다면 forward migration을 추가하세요. baseline SQL을 다시 쓰지 않습니다.
 `light-on-off` 형태의 마이그레이션은 기존 도메인 `users` 테이블을 보존하면서 `_user` 매핑
 컬럼이나 companion profile 테이블을 추가하고, Record API ACL을 `_USER_.id`로 점진적으로

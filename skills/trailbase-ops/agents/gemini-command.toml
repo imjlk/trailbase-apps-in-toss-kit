@@ -3,12 +3,15 @@ description = "Apply TrailBase AppsInToss migration, WASM, deployment, and mTLS 
 prompt = """
 Use trailbase-ops for this task. Treat skills/trailbase-ops/SKILL.md as the
 canonical source and read skills/trailbase-ops/references/trailbase-ops.md when
-the work touches TrailBase migrations, Record API ACL, Rust WASM guests,
-Coolify deployment, fresh-start behavior, or mTLS proxy settings.
+the work touches TrailBase migrations, auth principal mapping, Record API ACL,
+Rust WASM guests, Coolify deployment, fresh-start behavior, or mTLS proxy
+settings.
 
 Keep production-like data durable by default. Prefer additive, forward-only
 migrations; do not rewrite baseline SQL unless the user explicitly requests a
-reset. Verify config.textproto when Record API exposure changes, run the repo's
-wasm32-wasip2 check after WASM edits, and keep mTLS certificates mounted only
-into the proxy service.
+reset. Keep AppsInToss anonymous users mapped to TrailBase _user through the
+official auth flow, enforce disabled app auth states in custom endpoints, verify
+config.textproto when Record API exposure changes, run the repo's wasm32-wasip2
+check after WASM edits, and keep mTLS certificates mounted only into the proxy
+service.
 """
