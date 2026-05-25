@@ -3,6 +3,10 @@
 `trailbase-client` 패키지는 공식 TrailBase SDK를 대체하지 않습니다. 여러 AppsInToss
 React Native 앱에서 반복되는 연결 코드만 모아 둔 얇은 보조 패키지입니다.
 
+인증 상태, token refresh, Record API 접근은 공식 `trailbase` JavaScript SDK를 사용하세요.
+kit는 AppsInToss bootstrap endpoint가 반환한 token payload를 정규화하고 SDK가 기대하는
+`{ auth_token, refresh_token, csrf_token }` 형태로 바꾸는 헬퍼만 제공합니다.
+
 요청 처리, TrailBase 오류 정리, 익명 사용자 해시 저장, React Native에서의 SSE 연결 코드가
 앱마다 반복될 때 사용하세요. 제품별 API 함수와 데이터 모델은 앱 안에 두는 것이 좋습니다.
 
@@ -15,6 +19,7 @@ React Native 앱에서 반복되는 연결 코드만 모아 둔 얇은 보조 �
 - 일반 객체 요청 본문의 자동 JSON 직렬화
 - TrailBase 오류 정리
 - 저장소 어댑터를 통한 익명 사용자 해시 확인
+- TrailBase auth token 정규화와 `trailbase` SDK token option 헬퍼
 - SSE 파싱
 - React Native 런타임을 위한 `XMLHttpRequest` 기반 스트림 헬퍼
 
@@ -30,9 +35,11 @@ TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에
 XHR 기반 SSE 구독은 인증이 필요한 Record API를 위해 호출자가 넘긴 헤더를 사용할 수
 있습니다. HTTP 실패는 조용히 스트림을 닫지 않고 `TrailBaseHttpError`로 전달합니다.
 
-`@tanstack/react-db`, `@tanstack/react-query`, `trailbase`는 peer dependency입니다. 이미 이
-패키지들을 쓰는 앱은 선택적으로 어댑터를 도입할 수 있고, 필요 없는 앱에는 의존성을
-강제로 끌어들이지 않습니다.
+`@tanstack/react-db`, `@tanstack/react-query`, `trailbase`는 peer dependency입니다. 지원하는
+`trailbase` peer 범위는 `0.12.1`부터 시작합니다. 이 버전은 `client.login()`,
+`client.tokens()`, `client.headers()` 동작을 확인한 현재 SDK 버전입니다. 이미 이 패키지들을
+쓰는 앱은 선택적으로 어댑터를 도입할 수 있고, 필요 없는 앱에는 의존성을 강제로 끌어들이지
+않습니다.
 
 ## TanStack Query
 

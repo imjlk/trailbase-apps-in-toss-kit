@@ -124,6 +124,12 @@ export interface TrailBaseAuthTokens {
   csrfToken?: string | null;
 }
 
+export interface TrailBaseSdkTokens {
+  auth_token: string;
+  refresh_token?: string | null;
+  csrf_token?: string | null;
+}
+
 export interface StoredAppSession<TUser = unknown> {
   authProvider: AppAuthProvider;
   sessionToken?: string;
@@ -223,16 +229,36 @@ export function normalizeTrailBaseAuthTokens(value: unknown): TrailBaseAuthToken
 }
 
 export function createTrailBaseAuthHeaders(
-  tokens: TrailBaseAuthTokens | null | undefined,
+  tokens: TrailBaseAuthTokens | TrailBaseSdkTokens | null | undefined,
 ): Record<string, string> {
-  if (!tokens?.authToken) {
+  const normalizedTokens = normalizeTrailBaseAuthTokens(tokens);
+  if (!normalizedTokens?.authToken) {
     return {};
   }
   return {
-    Authorization: `Bearer ${tokens.authToken}`,
-    ...(tokens.refreshToken ? { "Refresh-Token": tokens.refreshToken } : {}),
-    ...(tokens.csrfToken ? { "CSRF-Token": tokens.csrfToken } : {}),
+    Authorization: `Bearer ${normalizedTokens.authToken}`,
+    ...(normalizedTokens.refreshToken ? { "Refresh-Token": normalizedTokens.refreshToken } : {}),
+    ...(normalizedTokens.csrfToken ? { "CSRF-Token": normalizedTokens.csrfToken } : {}),
   };
+}
+
+export function toTrailBaseSdkTokens(value: unknown): TrailBaseSdkTokens | null {
+  const tokens = normalizeTrailBaseAuthTokens(value);
+  if (!tokens) {
+    return null;
+  }
+  return {
+    auth_token: tokens.authToken,
+    refresh_token: tokens.refreshToken ?? null,
+    csrf_token: tokens.csrfToken ?? null,
+  };
+}
+
+export function createTrailBaseClientAuthOptions(
+  value: unknown,
+): { tokens: TrailBaseSdkTokens } | Record<string, never> {
+  const tokens = toTrailBaseSdkTokens(value);
+  return tokens ? { tokens } : {};
 }
 
 export function normalizeAppsInTossErrorMessage(

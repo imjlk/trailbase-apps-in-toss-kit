@@ -38,6 +38,15 @@ TrailBase credential을 만드세요.
 클라이언트로 보내지 말고, 앱 코드에서 TrailBase JWT 서명이나 `_session` write를 직접
 재구현하지 마세요.
 
+`_user` upsert가 commit된 뒤에는 서비스 관리 credential로 TrailBase 공식 auth login endpoint를
+호출합니다. `trailbase-guest-common`은 이 handoff를 위해 `login_auth_user`와
+`trailbase_auth_tokens_from_response` 헬퍼를 제공합니다. 이 헬퍼는 auth, refresh, CSRF token
+응답을 파싱할 뿐 token을 직접 mint하지 않습니다.
+
+클라이언트에서는 서비스 관리 비밀번호로 `client.login()`을 호출하지 말고, 서버가 반환한
+token으로 공식 `trailbase` JavaScript SDK를 초기화하세요. `trailbase-client`는 이를 위해
+`toTrailBaseSdkTokens`와 `createTrailBaseClientAuthOptions` 변환 헬퍼를 제공합니다.
+
 Toss Login의 `email` 필드는 이 kit에서 `_user.email`의 source of truth가 아닙니다. null일 수
 있고, 암호화되어 있으며, 점유 인증 여부와 scope가 앱마다 다를 수 있습니다. 이후 별도의
 검증된 이메일 마이그레이션 정책이 생기기 전까지 합성 이메일을 유지하세요.

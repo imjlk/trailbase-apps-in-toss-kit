@@ -36,6 +36,15 @@ The credential exists to drive TrailBase's official auth flow. Do not send the s
 password to the client, and do not reimplement TrailBase JWT signing or `_session` writes in app
 code.
 
+After the `_user` upsert commits, call TrailBase's official auth login endpoint with the
+service-managed credential. `trailbase-guest-common` exposes `login_auth_user` and
+`trailbase_auth_tokens_from_response` helpers for this handoff; they parse the auth, refresh, and
+CSRF token response without minting tokens themselves.
+
+On the client, hydrate the official `trailbase` JavaScript SDK with the returned tokens instead of
+calling `client.login()` with the service-managed password. `trailbase-client` exposes
+`toTrailBaseSdkTokens` and `createTrailBaseClientAuthOptions` for that conversion.
+
 Toss Login's `email` field is not the `_user.email` source of truth for this kit. It may be null,
 encrypted, unverified, or scoped differently. Keep the synthetic email unless a future app has a
 separate, verified email migration policy.

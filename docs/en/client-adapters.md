@@ -4,6 +4,11 @@ The `trailbase-client` package is not a replacement for the official TrailBase
 SDK. It contains AppsInToss and React Native glue that repeats across consumer
 apps.
 
+Use the official `trailbase` JavaScript SDK for auth state, token refresh, and
+Record API access. The kit only normalizes token payloads returned by
+AppsInToss bootstrap endpoints and can convert them into the SDK's
+`{ auth_token, refresh_token, csrf_token }` shape.
+
 Use it when consumer apps are repeating request handling, TrailBase error
 normalization, anonymous hash storage, or React Native SSE bridging. Keep
 product-specific API methods in the app.
@@ -17,6 +22,7 @@ Shared client utilities include:
 - automatic JSON serialization for plain request bodies
 - TrailBase error normalization
 - anonymous hash resolution through a storage adapter
+- TrailBase auth token normalization and `trailbase` SDK token option helpers
 - SSE parsing
 - XMLHttpRequest-backed stream helpers for React Native runtimes
 
@@ -35,8 +41,10 @@ Record APIs and surface HTTP failures as `TrailBaseHttpError` instead of silentl
 closing the stream.
 
 `@tanstack/react-db`, `@tanstack/react-query`, and `trailbase` are peer
-dependencies. Consumers already using those packages can opt in to the adapter
-without pulling them into apps that do not need them.
+dependencies. The supported `trailbase` peer range starts at `0.12.1`, which is
+the current SDK version verified for `client.login()`, `client.tokens()`, and
+`client.headers()`. Consumers already using those packages can opt in to the
+adapter without pulling them into apps that do not need them.
 
 ## TanStack Query
 

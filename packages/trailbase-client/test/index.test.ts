@@ -5,6 +5,7 @@ import {
   createAnonymousHash,
   createSseParser,
   createTrailBaseAuthHeaders,
+  createTrailBaseClientAuthOptions,
   normalizeTrailBaseUrl,
   normalizeAppsInTossErrorMessage,
   normalizeAppsInTossLoginResult,
@@ -12,6 +13,7 @@ import {
   requestAppsInTossLogin,
   requestJson,
   resolveAnonymousHash,
+  toTrailBaseSdkTokens,
 } from "../src/index";
 
 describe("TrailBase client utilities", () => {
@@ -127,6 +129,21 @@ describe("TrailBase client utilities", () => {
       Authorization: "Bearer auth",
       "Refresh-Token": "refresh",
       "CSRF-Token": "csrf",
+    });
+    expect(toTrailBaseSdkTokens(tokens)).toEqual({
+      auth_token: "auth",
+      refresh_token: "refresh",
+      csrf_token: "csrf",
+    });
+    expect(createTrailBaseClientAuthOptions(tokens)).toEqual({
+      tokens: {
+        auth_token: "auth",
+        refresh_token: "refresh",
+        csrf_token: "csrf",
+      },
+    });
+    expect(createTrailBaseAuthHeaders({ auth_token: "sdk-auth" })).toEqual({
+      Authorization: "Bearer sdk-auth",
     });
     expect(createTrailBaseAuthHeaders(null)).toEqual({});
   });
