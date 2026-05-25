@@ -5,6 +5,10 @@ sharing, referrals, seasonal events, game rewards, onboarding rewards, or any
 other feature that needs an operator-managed Toss promotion code and reward
 amount.
 
+Use this pattern when product or operations teams need to turn a promotion on or
+off without changing app code or redeploying the proxy. If a single static env
+promotion is enough, the env fallback may be sufficient.
+
 ## Model
 
 Use `templates/trailbase/sql/promotion_campaigns.sql` when TrailBase should own
@@ -25,6 +29,10 @@ Feature keys are owned by the consumer app. They should be stable and meaningful
 to operators, but they do not have to encode the whole business rule. For
 example, an app can have one key for a mission reward and another for a share
 event; both use the same campaign table shape.
+
+Choose feature keys for people who operate the service. A short, stable key such
+as `share_reward` or `onboarding_bonus` is usually easier to maintain than a key
+that encodes every eligibility detail.
 
 ## Env Fallback
 
@@ -74,6 +82,14 @@ Promotion claims should be idempotent at the app ledger layer.
 If a retry sees a row already in `REQUESTED`, `PENDING`, or `GRANTED`, return the
 current ledger state instead of calling the proxy again. This keeps client
 retries and multi-device taps from executing the same promotion twice.
+
+## Operator Flow
+
+1. Create or update a campaign row with a provider promotion code and amount.
+2. Move the campaign to `ACTIVE` only after the Toss Console setup is ready.
+3. Watch ledger status, provider error codes, grant count, and remaining budget.
+4. Pause or exhaust the campaign locally before retrying suspicious provider
+   failures.
 
 ## Proxy Request
 

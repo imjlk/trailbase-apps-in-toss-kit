@@ -1,5 +1,15 @@
 # Contributing
 
+## Documentation
+
+Documentation should be maintained in English and Korean when practical. Docs
+under `docs/` use parallel paths: English files in `docs/en/` and Korean files
+with the same filenames in `docs/ko/`.
+
+For Markdown documentation outside `docs/`, keep the English filename as the
+default and add Korean translations with a `-ko.md` suffix, for example
+`README-ko.md` or `CONTRIBUTING-ko.md`.
+
 ## Agent Skills
 
 Repo-tracked agent skills live under `skills/`. Treat this directory as the

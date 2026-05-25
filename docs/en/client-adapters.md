@@ -4,6 +4,10 @@ The `trailbase-client` package is not a replacement for the official TrailBase
 SDK. It contains AppsInToss and React Native glue that repeats across consumer
 apps.
 
+Use it when consumer apps are repeating request handling, TrailBase error
+normalization, anonymous hash storage, or React Native SSE bridging. Keep
+product-specific API methods in the app.
+
 ## Core Utilities
 
 Shared client utilities include:
@@ -46,3 +50,7 @@ Consumer apps can adopt the subpaths independently. Use the core utilities first
 when an app only needs request/error/storage helpers, add the TanStack Query
 helpers when shared query defaults become useful, and add the TanStack DB adapter
 only after the app has repeated Record API snapshot and realtime collection code.
+
+If an app already has a stable client layer, migrate one repeated concern at a
+time. The expected result is less transport code, not a different application
+data model.

@@ -3,6 +3,9 @@
 SQL schema belongs to the consumer app. This kit may provide template snippets,
 but migrations copied into a consumer repo are owned and reviewed there.
 
+Read this before changing SQL, Record API exposure, or TrailBase migration
+history in a consumer app.
+
 ## Baselines And Additive Migrations
 
 Once production or production-like data exists, do not rewrite baseline SQL for
@@ -19,6 +22,9 @@ Safe additive changes include:
 
 Destructive changes and baseline resets require explicit user intent and a
 clear data compatibility decision.
+
+Before editing an existing baseline, ask whether any environment has data that
+must survive. If the answer is yes or unknown, create a new additive migration.
 
 ## Record API ACL
 

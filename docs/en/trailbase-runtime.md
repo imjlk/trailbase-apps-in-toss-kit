@@ -3,7 +3,11 @@
 This kit provides reusable runtime helpers for TrailBase-backed AppsInToss
 services. The helpers are intentionally small and source-consumed through the
 git submodule. Consumer apps still own their Dockerfile, Compose files,
-`entrypoint.sh`, TrailBase depot, app-specific settings, and deployment policy.
+`entrypoint.sh`, TrailBase runtime directory (`traildepot`), app-specific settings,
+and deployment policy.
+
+Use these helpers when multiple apps are repeating the same container startup
+logic. Do not use them to hide app-specific deployment decisions.
 
 ## Runtime Boundary
 
@@ -13,7 +17,7 @@ The shared runtime package is for repeatable container startup mechanics:
 - guarding production placeholders and development secrets
 - applying a fresh-start request once per token
 - syncing `config.textproto` `site_url`
-- copying migrations and components into the TrailBase depot
+- copying migrations and components into the TrailBase runtime directory (`traildepot`)
 - writing JSON settings files
 - finding available local host ports for dev stacks
 - running `trail run` with a predictable argument shape
@@ -26,6 +30,15 @@ The consumer app keeps app-specific behavior:
 - extra production env rules
 - Compose service names, profiles, and resource sizing
 - local development defaults for RN and WebView apps
+
+## Adoption Path
+
+1. Keep the consumer entrypoint in the consumer repo.
+2. Copy the runtime helper directory into the final image.
+3. Source `entrypoint/lib.sh` from the consumer entrypoint.
+4. Replace one repeated startup concern at a time, such as public URL
+   normalization or `config.textproto` sync.
+5. Run the consumer's production env check and WASM check before deploying.
 
 ## Entrypoint Pattern
 

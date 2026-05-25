@@ -11,7 +11,8 @@ It is intended to be consumed as a git submodule, usually at
 - `services/toss-mtls-client-proxy`: Bun-based internal mTLS client proxy.
 - `skills`: repo-tracked agent skills with adapters for Codex/OpenAI and other assistants.
 - `templates/trailbase`: copy-in SQL, Compose, env, smoke, and integration snippets.
-- `docs`: integration, publishing, Coolify, identity, proxy, and versioning notes.
+- `docs/en`: English integration, publishing, Coolify, identity, proxy, and versioning notes.
+- `docs/ko`: Korean translations that mirror `docs/en` filenames.
 
 Consumer apps should import Rust crates through path dependencies from the
 submodule. SQL migrations and Compose files should be copied into the consumer
@@ -26,9 +27,14 @@ of truth for repo behavior.
 For TrailBase migrations, Record API ACL, WASM guest, Coolify deployment,
 fresh-start, or mTLS proxy work, use `$trailbase-ops` after syncing the repo
 skills with `bun run skills:sync` or the relevant adapter command in
-`docs/skills.md`. If the skill is not installed in the current session, read
-`skills/trailbase-ops/SKILL.md` and
+`docs/en/agent-skills.md` or `docs/ko/agent-skills.md`. If the skill is not
+installed in the current session, read `skills/trailbase-ops/SKILL.md` and
 `skills/trailbase-ops/references/trailbase-ops.md` directly.
+
+When adding or changing documentation, maintain English and Korean content
+together. Docs under `docs/` must use matching filenames in `docs/en/` and
+`docs/ko/`. Markdown translations outside `docs/` should use a `-ko.md` suffix
+instead of replacing the English source file.
 
 When editing this repo from a consumer app, make changes in the real repo at
 the kit checkout, commit them there, then update the consumer app's submodule

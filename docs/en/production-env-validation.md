@@ -3,6 +3,10 @@
 Production env validation is split between shared safety rules and
 consumer-specific app rules.
 
+Run these checks in local shells, CI, and before production deployment. They are
+meant to catch mistakes that are easy to miss in review, such as placeholder
+secrets, local URLs, moving image tags, or accidental fresh-start settings.
+
 The shared runtime validator covers rules that repeat across TrailBase
 AppsInToss services:
 
@@ -20,6 +24,12 @@ AppsInToss services:
 Consumers should keep wrapper scripts for app-specific keys and policies. For
 example, a game might require reward or inventory settings while another app
 only needs Toss Login and IAP.
+
+## Responsibility Split
+
+- The kit validates rules that are common across TrailBase AppsInToss services.
+- The consumer app validates product-specific variables and policy decisions.
+- Deployment tooling decides which env file is production for that environment.
 
 ## Moving Image Tags
 

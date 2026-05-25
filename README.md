@@ -4,6 +4,18 @@ Reusable building blocks for AppsInToss services, with TrailBase-focused
 templates plus a standalone Toss mTLS client proxy that can be used by other
 server stacks.
 
+TrailBase is the backend runtime this kit targets for AppsInToss mini-apps. In
+this architecture, TrailBase owns the SQLite database, Record API, Rust WASM
+handlers, jobs, and runtime directory (`traildepot`) for each consumer app. The
+kit collects the parts that repeat across those apps: WASM guest helpers, safe schema and
+deployment templates, production checks, React Native client glue, and the
+private mTLS proxy used to call Toss APIs that require client certificates.
+
+The consuming app still owns its product schema, migrations, Record API ACL,
+public API shapes, environment policy, and release decisions. Treat this kit as
+a toolbox for TrailBase-backed AppsInToss services, not as a replacement for the
+app's TrailBase project.
+
 This repository intentionally keeps three kinds of assets together:
 
 - Rust crates for TrailBase WASM guests.
@@ -23,7 +35,29 @@ services/
 templates/
   trailbase/
 docs/
+  en/
+  ko/
 ```
+
+Documentation is maintained in English and Korean. English canonical docs live
+under `docs/en/`; Korean translations with matching filenames live under
+`docs/ko/`. Korean translations for Markdown files outside `docs/` use a
+`-ko.md` suffix, such as `README-ko.md`.
+
+Start with `docs/en/index.md` or `docs/ko/index.md` when deciding which part of
+the kit to adopt.
+
+## Reference Docs
+
+- [TrailBase](https://trailbase.io/) and TrailBase docs for
+  [Record APIs](https://trailbase.io/documentation/apis_record/),
+  [migrations](https://trailbase.io/documentation/migrations/), and
+  [production setup](https://trailbase.io/documentation/production/).
+- [AppsInToss Developer Center](https://developers-apps-in-toss.toss.im/).
+- [Coolify Docker Compose docs](https://coolify.io/docs/knowledge-base/docker/compose).
+- [Bun docs](https://bun.com/docs).
+- [TanStack DB](https://tanstack.com/db/latest/docs) and
+  [TanStack Query](https://tanstack.com/query/latest/docs/framework/react/overview).
 
 ## Integration Model
 
@@ -84,4 +118,5 @@ When `sampo release` bumps the proxy package version and the release commit land
 image workflow creates the matching `toss-mtls-client-proxy-vX.Y.Z` git tag if needed and publishes
 the GHCR release tags.
 
-See `docs/versioning.md` for the detailed release and image tag policy.
+See `docs/en/versioning.md` for the detailed release and image tag policy. See
+`docs/ko/versioning.md` for the Korean translation.

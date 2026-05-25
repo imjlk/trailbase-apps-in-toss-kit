@@ -11,7 +11,7 @@ const { consumerArg, mappingArg, strict } = parseArgs(args);
 
 if (!consumerArg) {
   console.error(
-    'Usage: node scripts/compare-consumer-templates.mjs <consumer-repo-path> [--strict] [--mapping <file>]',
+    'Usage: bun scripts/compare-consumer-templates.mjs <consumer-repo-path> [--strict] [--mapping <file>]',
   );
   process.exit(2);
 }

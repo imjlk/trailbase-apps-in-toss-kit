@@ -1,0 +1,49 @@
+# TrailBase 클라이언트 어댑터
+
+`trailbase-client` 패키지는 공식 TrailBase SDK를 대체하지 않습니다. 여러 AppsInToss
+React Native 앱에서 반복되는 연결 코드만 모아 둔 얇은 보조 패키지입니다.
+
+요청 처리, TrailBase 오류 정리, 익명 사용자 해시 저장, React Native에서의 SSE 연결 코드가
+앱마다 반복될 때 사용하세요. 제품별 API 함수와 데이터 모델은 앱 안에 두는 것이 좋습니다.
+
+## 공통 유틸리티
+
+공통 클라이언트 유틸리티는 다음을 제공합니다.
+
+- 기본 URL 정규화
+- JSON 요청과 응답 파싱
+- 일반 객체 요청 본문의 자동 JSON 직렬화
+- TrailBase 오류 정리
+- 저장소 어댑터를 통한 익명 사용자 해시 확인
+- SSE 파싱
+- React Native 런타임을 위한 `XMLHttpRequest` 기반 스트림 헬퍼
+
+도메인별 클라이언트 함수는 앱 패키지에 남기세요. kit는 재사용 가능한 전송 계층과 어댑터
+조각만 제공합니다.
+
+## TanStack DB
+
+TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에서 쓰기 쉬운 SSE 브리지,
+스냅샷 로딩, 재연결 훅을 갖춘 TrailBase Record API 컬렉션을 만들도록 돕지만, 테이블 이름,
+조회 조건, 레코드 모델은 앱에 남깁니다.
+
+XHR 기반 SSE 구독은 인증이 필요한 Record API를 위해 호출자가 넘긴 헤더를 사용할 수
+있습니다. HTTP 실패는 조용히 스트림을 닫지 않고 `TrailBaseHttpError`로 전달합니다.
+
+`@tanstack/react-db`, `@tanstack/react-query`, `trailbase`는 peer dependency입니다. 이미 이
+패키지들을 쓰는 앱은 선택적으로 어댑터를 도입할 수 있고, 필요 없는 앱에는 의존성을
+강제로 끌어들이지 않습니다.
+
+## TanStack Query
+
+TanStack Query 하위 경로는 작은 기본값과 옵션 헬퍼만 제공합니다. 쿼리 키, stale time,
+mutation 동작은 앱이 정해야 하므로 애플리케이션 쿼리를 감싸지 않습니다.
+
+## 도입 방식
+
+각 하위 경로는 독립적으로 도입할 수 있습니다. 요청, 오류, 저장소 헬퍼만 필요하면 공통
+유틸리티부터 사용하세요. 공유 쿼리 기본값이 필요해지면 TanStack Query 헬퍼를 더하고,
+Record API 스냅샷과 실시간 컬렉션 코드가 반복될 때만 TanStack DB 어댑터를 추가하세요.
+
+이미 안정적인 클라이언트 계층이 있는 앱이라면 반복되는 부분을 하나씩 옮기세요. 기대하는
+결과는 애플리케이션 데이터 모델 변경이 아니라 전송 코드 감소입니다.

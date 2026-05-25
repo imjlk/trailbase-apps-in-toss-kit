@@ -9,8 +9,10 @@ on:
       - "scripts/sync-codex-skills.mjs"
       - "scripts/validate-agent-skills.mjs"
       - "scripts/validate-codex-skills.mjs"
-      - "docs/skills.md"
+      - "docs/en/agent-skills.md"
+      - "docs/ko/agent-skills.md"
       - "CONTRIBUTING.md"
+      - "CONTRIBUTING-ko.md"
       - "package.json"
   push:
     branches:
@@ -22,8 +24,10 @@ on:
       - "scripts/sync-codex-skills.mjs"
       - "scripts/validate-agent-skills.mjs"
       - "scripts/validate-codex-skills.mjs"
-      - "docs/skills.md"
+      - "docs/en/agent-skills.md"
+      - "docs/ko/agent-skills.md"
       - "CONTRIBUTING.md"
+      - "CONTRIBUTING-ko.md"
       - "package.json"
   workflow_dispatch:
 

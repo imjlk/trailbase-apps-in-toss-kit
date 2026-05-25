@@ -11,7 +11,7 @@ const consumerArg = args.find((arg) => arg !== '--strict');
 
 if (!consumerArg) {
   console.error(
-    'Usage: node scripts/check-consumer-submodule.mjs <consumer-repo-path> [--strict]',
+    'Usage: bun scripts/check-consumer-submodule.mjs <consumer-repo-path> [--strict]',
   );
   process.exit(2);
 }

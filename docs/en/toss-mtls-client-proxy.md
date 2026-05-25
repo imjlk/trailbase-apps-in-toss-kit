@@ -8,6 +8,10 @@ The container is reusable outside TrailBase. A Node, Rails, Spring, Go, FastAPI,
 run it on the same private network, send authenticated HTTP requests to the proxy, and keep mTLS
 certificates out of the application container.
 
+Use the proxy when the backend needs to call Toss APIs that require client
+certificates. Do not use it for public callbacks from Toss to your app; those
+callbacks should terminate at the app backend.
+
 ## Runtime Model
 
 - Image may be public.
@@ -16,6 +20,10 @@ certificates out of the application container.
 - Application services receive only the internal proxy URL and `MTLS_PROXY_TOKEN`.
 - Production deployments should pin the image to an exact SemVer or minor tag, not `latest` or
   `edge`, unless moving tags are intentional.
+
+The most important boundary is certificate ownership: only the proxy container
+mounts certificate files. Application containers receive an internal URL and a
+bearer token.
 
 ## Minimal Environment
 

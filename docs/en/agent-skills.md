@@ -1,8 +1,14 @@
-# Agent Skills
+# Agent Skill Setup
 
-This repository is the source of truth for reusable agent skills that support
-TrailBase AppsInToss work. Local tool-specific skill directories are install
-targets, not canonical sources.
+This page is for people who want to install, review, or contribute the reusable
+agent skills that live in this repository.
+
+Agent-facing behavior belongs in `AGENTS.md` and `skills/**`. This page is
+human-facing: it explains where the files live, how to sync them into local
+tools, and what to check before opening a PR.
+
+The repository is the source of truth. Local tool-specific skill directories are
+install targets, not canonical sources.
 
 ## Layout
 
@@ -30,7 +36,7 @@ Each skill must follow the standard provider-neutral shape:
   the skill.
 - No `README.md`, `CHANGELOG.md`, or installation guide inside a skill folder.
 
-## Local Sync Matrix
+## Install Or Sync
 
 Use Bun from the kit repo root:
 
@@ -50,10 +56,10 @@ bun run skills:sync
 | GitHub Copilot | `bun run skills:sync:agent -- --target github-copilot --project <repo> --all --mode copy` | `<repo>/.github/instructions` |
 | Gemini CLI | `bun run skills:sync:agent -- --target gemini --project <repo> --all --mode copy` | `<repo>/.gemini/commands` |
 
-`link` is the contributor default for user-level installs. Use `copy` for
-stable snapshots or project-scoped files that will be committed in another repo.
-Project-scoped targets require `--project <repo-path>` and never update root
-always-on instruction files.
+Use `link` while developing this repo so local edits are visible immediately in
+the target tool. Use `copy` for stable snapshots or project-scoped files that
+will be committed in another repo. Project-scoped targets require
+`--project <repo-path>` and never update root always-on instruction files.
 
 Pass `--force` directly to the script when replacing an existing install:
 
@@ -61,7 +67,9 @@ Pass `--force` directly to the script when replacing an existing install:
 bun scripts/sync-agent-skills.mjs trailbase-ops --target claude-code --mode copy --force
 ```
 
-## Adding A Skill
+After syncing, restart or reload the target tool so it picks up the new files.
+
+## Add Or Change A Skill
 
 1. Create `skills/<skill-name>/SKILL.md`.
 2. Keep `SKILL.md` concise and move detailed guidance into `references/`.
@@ -70,3 +78,7 @@ bun scripts/sync-agent-skills.mjs trailbase-ops --target claude-code --mode copy
    Gemini CLI. Cline consumes the skill directory itself.
 5. Run `bun run skills:validate`.
 6. If useful locally, run `bun scripts/sync-agent-skills.mjs <skill-name> --target codex --mode link`.
+
+Keep the common case near the top of `SKILL.md`. Move long examples, reference
+tables, and troubleshooting notes into `references/` so the skill can load them
+only when needed.
