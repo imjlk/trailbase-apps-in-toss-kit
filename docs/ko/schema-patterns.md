@@ -34,10 +34,11 @@ SQL)을 다시 쓰지 마세요. 대신 앞으로만 진행되는 새 마이그�
 
 `config.textproto`를 바꾼 뒤에는 앱의 운영 검증 또는 ACL 검증을 실행하세요.
 
-새 AppsInToss 서비스는 TrailBase `_user`를 Record API principal로 사용하세요. 익명 사용자도
-첫 앱 세션에서 `_user` 레코드와 TrailBase auth token을 받아야 ACL rule이 `_USER_.id`를 바로
-쓸 수 있습니다. 앱 소유 `users` 세션 패턴은 legacy이며, 기존 앱을 마이그레이션하는 동안에만
-보존하세요.
+TrailBase `_user`를 Record API principal로 사용하세요. 익명 사용자도 첫 앱 세션에서 `_user`
+레코드와 TrailBase auth token을 받아야 ACL rule이 `_USER_.id`를 바로 쓸 수 있습니다. 새 작업에
+앱 소유 `users` auth 테이블을 추가하지 마세요. 이미 있다면 제거 대상으로 보고, 제품 필드는
+`_user` 기준 `profiles` 또는 도메인 테이블로 옮긴 뒤 참조를 전환하고 데이터 보존 결정이
+명확해졌을 때 기존 테이블을 drop합니다.
 
 공개 사용자 데이터는 `_user`에 두지 마세요. 표시 이름, 앱별 아바타, 캐릭터 선택, 제품
 도메인 필드는 `_user(id)`를 key로 하는 `profiles`, `profile_view`, 앱별 도메인 테이블에
@@ -66,9 +67,9 @@ Toss identity 충돌로 기존 Toss-linked `_user`가 canonical이 되면 기존
 metadata, log, 사용자에게 보이는 응답에 넣지 마세요.
 
 기본 `toss_identities` 형태는 BLOB foreign key로 `_user(id)`를 참조합니다. 도입 앱에 아직
-`toss_identities.user_id TEXT REFERENCES users(id)`가 있다면 이것은 legacy app-owned user
-mapping입니다. 운영 데이터가 있다면 baseline을 다시 쓰지 말고 forward migration으로
-옮기세요.
+`toss_identities.user_id TEXT REFERENCES users(id)`가 있다면 `_user(id)` 기준으로 옮기세요.
+canonical `_user` row를 추가하거나 파생하고, 참조를 다시 연결한 뒤 도입 앱의 데이터 보존
+결정이 명확해졌을 때 기존 app-owned auth 테이블을 제거합니다.
 
 ## 프로모션 캠페인
 

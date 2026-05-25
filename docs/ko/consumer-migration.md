@@ -14,8 +14,9 @@
   확인합니다.
 - 운영 또는 운영과 비슷한 데이터가 이미 있는지 판단합니다. 데이터가 있거나 확실하지
   않다면 마이그레이션 중에 기준 마이그레이션(baseline migration)을 다시 쓰지 마세요.
-- 앱이 아직 legacy 앱 소유 `users` 세션 모델을 쓰는지 확인합니다. 새 작업은 익명 사용자와
-  Toss-linked 사용자 모두 TrailBase `_user`를 사용해야 합니다.
+- 앱에 아직 앱 소유 `users` 세션 모델이 남아 있는지 확인합니다. 이 auth 테이블은 제거
+  대상으로 보고, 익명 사용자와 Toss-linked identity를 TrailBase `_user`로 옮길 계획을
+  세웁니다.
 
 ## 마이그레이션 체크리스트
 
@@ -31,10 +32,10 @@
 5. 서비스 참조 이름을 `toss-mtls-proxy`에서 `toss-mtls-client-proxy`로 바꿉니다.
 6. 프록시 stub 스모크 테스트, TrailBase Toss 스모크 테스트, 운영 배포 검증을 실행합니다.
 
-## Legacy `users`에서 `_user`로 이동하기
+## 앱 소유 `users` 제거하기
 
-기존 AppsInToss 도입 앱은 앱 소유 `users` 테이블과 `APP_SESSION_SECRET` 토큰을 쓰는 경우가
-많습니다. 이 형태는 호환성 목적으로만 유지하세요. 새 기본 흐름은 다음과 같습니다.
+일부 오래된 AppsInToss 도입 앱은 앱 소유 `users` 테이블과 `APP_SESSION_SECRET` 토큰을 씁니다.
+이 형태를 장기 호환 레이어로 보존하지 마세요. 앱을 다음 흐름으로 옮깁니다.
 
 1. AppsInToss 익명 hash를 HMAC 처리합니다.
 2. 서버에서 합성 `_user.email`과 서비스 관리 credential을 만듭니다.
@@ -53,15 +54,15 @@
 비밀번호로 한 번 로그인한 뒤 current secret 기준으로 `_user.password_hash`를 다시 저장할 수
 있습니다.
 
-운영 데이터가 있다면 forward migration을 추가하세요. baseline SQL을 다시 쓰지 않습니다.
-`light-on-off` 형태의 마이그레이션은 기존 도메인 `users` 테이블을 보존하면서 `_user` 매핑
-컬럼이나 companion profile 테이블을 추가하고, Record API ACL을 `_USER_.id`로 점진적으로
-이동합니다.
+운영 데이터가 있다면 forward migration을 추가하세요. 앱이 reset을 명시적으로 선택한 경우가
+아니라면 baseline SQL을 다시 쓰지 않습니다. 데이터셋이 작다면 직접 forward migration으로
+기존 사용자에 대응하는 canonical `_user` row를 만들고, 제품 필드를 `profiles` 또는 도메인
+테이블로 복사한 뒤, 도메인 foreign key를 `_user(id)`로 다시 연결하고 같은 migration series에서
+기존 app-owned auth 테이블을 drop할 수 있습니다.
 
 앱 데이터가 폐기 가능하거나 의도적으로 초기화할 수 있다면 baseline reset이 더 단순할 수
-있습니다. `tatatata-cattower` 같은 초기 배포는 데이터 손실을 명시적으로 받아들인 뒤
-`_user`, `profiles`, 새 `toss_identities("user")` foreign key 기준으로 baseline을 다시 만들 수
-있습니다.
+있습니다. 초기 배포 앱은 데이터 손실을 명시적으로 받아들인 뒤 `_user`, `profiles`, 새
+`toss_identities("user")` foreign key 기준으로 baseline을 다시 만들 수 있습니다.
 
 앱 코드에서 TrailBase JWT 서명이나 `_session` write를 복제하지 마세요. 앱별 `_user` 매핑이
 끝난 뒤 TrailBase auth endpoint 또는 검증된 runtime-safe 경로로 token을 발급하세요.

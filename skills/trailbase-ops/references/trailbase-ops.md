@@ -40,6 +40,9 @@
 - Track application auth state separately from `_user.verified`, for example `anonymous`,
   `toss_linked`, `email_linked`, or `disabled`. Custom WASM endpoints must reject disabled app users
   even if TrailBase still accepts an old auth token until the client bootstraps again.
+- Do not add app-owned `users` auth tables. If a consumer already has one, migrate product fields and
+  foreign keys to `_user`-keyed profiles or domain tables, then remove the old table once the
+  consumer's data retention decision allows it.
 - When a provider identity collision makes another `_user` canonical, write an alias such as
   `anonymous_user_links` before returning tokens for the canonical user. Bootstrap handlers should
   check aliases before creating or resurrecting app rows.

@@ -53,6 +53,14 @@ pub struct AuthTossIdentityRevokeResult {
     pub user: Vec<u8>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AuthTossIdentityUpsertResult {
+    pub id: String,
+    pub user: Vec<u8>,
+    pub canonical_user_changed: bool,
+}
+
 pub fn active_toss_identity_tx(
     tx: &mut Transaction,
     user_id: &str,
@@ -212,9 +220,9 @@ pub fn upsert_toss_identity_for_trailbase_user_tx(
     sealed_toss_identity: &SealedTossIdentity,
     referrer: &str,
     now: i64,
-) -> ApiResult<()> {
+) -> ApiResult<AuthTossIdentityUpsertResult> {
     let normalized_referrer = normalize_nonempty(referrer, "DEFAULT");
-    db::tx_execute(
+    let rows = db::tx_query(
         tx,
         "INSERT INTO toss_identities (
            id, \"user\", toss_user_key_hmac, toss_user_key_sealed,
@@ -227,7 +235,10 @@ pub fn upsert_toss_identity_for_trailbase_user_tx(
            NULL, NULL, ?5, ?5
          )
          ON CONFLICT(toss_user_key_hmac) DO UPDATE SET
-           \"user\" = excluded.\"user\",
+           \"user\" = CASE
+             WHEN toss_identities.status = 'ACTIVE' THEN toss_identities.\"user\"
+             ELSE excluded.\"user\"
+           END,
            toss_user_key_sealed = excluded.toss_user_key_sealed,
            referrer = excluded.referrer,
            status = 'ACTIVE',
@@ -238,7 +249,8 @@ pub fn upsert_toss_identity_for_trailbase_user_tx(
            last_seen_at = excluded.last_seen_at,
            revoked_at = NULL,
            revoke_referrer = NULL,
-           updated_at = excluded.updated_at",
+           updated_at = excluded.updated_at
+         RETURNING id, \"user\"",
         &[
             Value::Blob(user.to_vec()),
             Value::Text(sealed_toss_identity.hmac.clone()),
@@ -247,7 +259,15 @@ pub fn upsert_toss_identity_for_trailbase_user_tx(
             Value::Integer(now),
         ],
     )?;
-    Ok(())
+    let row = rows
+        .first()
+        .ok_or_else(|| internal("Failed to upsert Toss identity"))?;
+    let canonical_user = db::blob(&row[1], "trailbase_user")?;
+    Ok(AuthTossIdentityUpsertResult {
+        id: db::text(&row[0], "toss_identity_id")?,
+        canonical_user_changed: canonical_user.as_slice() != user,
+        user: canonical_user,
+    })
 }
 
 pub fn revoke_toss_identity_by_hmac_tx(

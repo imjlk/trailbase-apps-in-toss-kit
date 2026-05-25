@@ -1,13 +1,14 @@
 # Toss Identity Pattern
 
-New apps should start with an anonymous TrailBase `_user` row, not an app-owned `users` session row.
+Apps should start with an anonymous TrailBase `_user` row, not an app-owned `users` session row.
 The AppsInToss anonymous hash is HMACed, converted into a service-managed `_user.email`, and used to
 upsert a verified `_user`. The app then uses TrailBase's auth flow to return auth, refresh, and CSRF
 tokens to the client so Record API ACLs can immediately use the current `_USER_`.
 
-The older pattern where an app-owned `users` table issues `APP_SESSION_SECRET` tokens is legacy. It
-can be preserved during migrations, but new app state should hang off `_user(id)` through
-`profiles`, `profile_view`, or app-specific domain tables.
+Do not create a parallel app-owned `users` auth table or issue `APP_SESSION_SECRET` app sessions.
+If a consumer already has that shape, migrate the data needed by the product into `_user`-keyed
+`profiles`, `profile_view`, or app-specific domain tables, then remove the old auth table and token
+path once references are switched.
 
 When Toss Login is completed, link the existing anonymous `_user` to an ACTIVE `toss_identities` row.
 Do not create a second user just because Toss Login happened. If the same Toss identity is already
@@ -72,6 +73,11 @@ When Toss Login finds a Toss identity that is already linked to a different `_us
 Toss-linked row as canonical and write `anonymous_user_links`. Future bootstrap calls for the old
 anonymous hash should resolve through that alias and return fresh tokens for the canonical user
 instead of reviving the abandoned anonymous row.
+
+For the standard `_user`-keyed `toss_identities` schema, prefer
+`upsert_toss_identity_for_trailbase_user_tx`. On an active identity collision it preserves the
+existing Toss-linked `_user` as canonical and returns that canonical user so the app can write the
+anonymous alias and return fresh tokens for it.
 
 ## Toss Login Unlink Callback
 

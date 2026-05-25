@@ -22,7 +22,7 @@ or mTLS certificates.
    discarded before changing baseline SQL or fresh-start behavior.
 4. If Record API exposure changes, update `config.textproto` and run the repo ACL/prod checks.
 5. If auth flow changes, preserve the TrailBase `_user` principal path and official auth token flow;
-   custom app `users` rows are legacy/domain state, not the Record API principal.
+   do not add custom app-owned `users` auth tables.
 6. If Rust WASM changes, run the repo's `wasm32-wasip2` check.
 7. If deployment or proxy settings change, verify production env, Compose shape, and mTLS certificate
    mount boundaries.
@@ -40,8 +40,8 @@ available, create a migration that follows the repo's existing filename/version 
 - TrailBase is a SQLite single-writer service; avoid rolling updates and default to service recreate.
 - AppsInToss anonymous users should bootstrap into TrailBase `_user`, then receive tokens through the
   official auth login flow; do not mint JWTs or write `_session` rows directly.
-- If an app keeps `profiles` or legacy `users.auth_state`, enforce `disabled` in custom WASM
-  endpoints as well as in bootstrap alias handling.
+- If an app tracks `profiles.auth_state` or another domain auth-state field, enforce `disabled` in
+  custom WASM endpoints as well as in bootstrap alias handling.
 - mTLS certificates mount only into the proxy container, never into TrailBase or app containers.
 - Secrets, production env files, certs, raw Toss user keys, HMACs, sealed values, and real logs are
   never committed.

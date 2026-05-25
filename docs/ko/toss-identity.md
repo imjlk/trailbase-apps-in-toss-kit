@@ -1,14 +1,15 @@
 # Toss 식별자 저장 패턴
 
-새 앱은 앱 소유 `users` 세션 레코드가 아니라 TrailBase `_user` 레코드에서 시작하는 것을
+앱은 앱 소유 `users` 세션 레코드가 아니라 TrailBase `_user` 레코드에서 시작하는 것을
 기본값으로 삼습니다. AppsInToss 익명 hash를 HMAC 처리하고, 서비스 관리용 `_user.email`로
 바꾼 뒤 verified `_user`를 upsert합니다. 그 다음 TrailBase 공식 auth flow로 auth, refresh,
 CSRF token을 클라이언트에 내려 Record API 접근 제어가 즉시 현재 `_USER_`를 사용할 수 있게
 합니다.
 
-앱 소유 `users` 테이블과 `APP_SESSION_SECRET` 토큰으로 세션을 발급하는 기존 방식은 legacy
-입니다. 마이그레이션 중에는 보존할 수 있지만, 새 앱 상태는 `_user(id)`를 기준으로
-`profiles`, `profile_view`, 앱별 도메인 테이블에 연결하세요.
+앱 소유 `users` auth 테이블을 병렬로 만들거나 `APP_SESSION_SECRET` 앱 세션을 발급하지
+마세요. 도입 앱에 이미 그 형태가 있다면 제품에 필요한 데이터만 `_user` 기준 `profiles`,
+`profile_view`, 앱별 도메인 테이블로 옮기고, 참조 전환이 끝난 뒤 기존 auth 테이블과 토큰
+경로를 제거하세요.
 
 Toss Login이 완료되면 기존 익명 `_user`를 ACTIVE 상태의 `toss_identities` 레코드와
 연결합니다. Toss Login 때문에 새 사용자를 만들지 마세요. 같은 Toss identity가 이미 다른
@@ -76,6 +77,11 @@ Toss Login 중 같은 Toss identity가 이미 다른 `_user`에 연결되어 있
 canonical로 유지하고 `anonymous_user_links`를 기록하세요. 이후 기존 anonymous hash로
 bootstrap이 다시 들어오면 버려진 anonymous row를 되살리지 않고 alias를 통해 canonical user의
 새 TrailBase token을 반환해야 합니다.
+
+표준 `_user` 기준 `toss_identities` 스키마에서는
+`upsert_toss_identity_for_trailbase_user_tx`를 우선 사용하세요. ACTIVE identity 충돌이 나면
+기존 Toss-linked `_user`를 canonical로 보존하고 그 canonical user를 반환하므로, 앱은
+anonymous alias를 기록하고 canonical user용 token을 반환할 수 있습니다.
 
 ## Toss Login 연결 해제 콜백
 

@@ -15,8 +15,8 @@ public API, schema ownership, or deployment policy.
   are app-specific.
 - Decide whether production or production-like data already exists. If it does,
   do not rewrite baseline migrations as part of the migration.
-- Decide whether the app is still on the legacy app-owned `users` session model.
-  New work should use TrailBase `_user` for anonymous users and Toss-linked users.
+- Check whether the app still has an app-owned `users` session model. Plan to remove that auth table
+  and move anonymous plus Toss-linked identity to TrailBase `_user`.
 
 ## Migration Checklist
 
@@ -32,10 +32,10 @@ public API, schema ownership, or deployment policy.
 5. Rename service references from `toss-mtls-proxy` to `toss-mtls-client-proxy`.
 6. Run proxy stub smoke, TrailBase Toss smoke, and production release checks.
 
-## Moving From Legacy `users` To `_user`
+## Removing App-Owned `users`
 
-Legacy AppsInToss consumers often have an app-owned `users` table plus
-`APP_SESSION_SECRET` tokens. Keep that shape only for compatibility. The new default is:
+Some older AppsInToss consumers have an app-owned `users` table plus `APP_SESSION_SECRET` tokens.
+Do not preserve that as a long-term compatibility layer. Move the app to this flow:
 
 1. HMAC the AppsInToss anonymous hash.
 2. Create a synthetic `_user.email` and service-managed credential on the server.
@@ -54,13 +54,14 @@ If you rotate `TRAILBASE_AUTH_PASSWORD_SECRET`, deploy
 in with the previous derived password once and then rehash `_user.password_hash` with the current
 secret.
 
-If production data exists, add forward migrations. Do not rewrite baseline SQL. A `light-on-off`
-style migration should keep the existing domain `users` table while adding a `_user` mapping column
-or companion profile table, then move Record API ACLs to `_USER_.id` incrementally.
+If production data exists, add forward migrations. Do not rewrite baseline SQL unless the app has
+explicitly chosen a reset. For small datasets, a direct forward migration can create canonical
+`_user` rows for existing users, copy product fields into `profiles` or domain tables, repoint domain
+foreign keys to `_user(id)`, and then drop the old app-owned auth table in the same migration series.
 
-If the app is disposable or intentionally resettable, a baseline reset may be simpler. A
-`tatatata-cattower` style early deployment can rebuild the baseline around `_user`, `profiles`, and
-the new `toss_identities("user")` foreign key after explicitly accepting data loss.
+If the app is disposable or intentionally resettable, a baseline reset may be simpler. Early
+deployments can rebuild the baseline around `_user`, `profiles`, and the new `toss_identities("user")`
+foreign key after explicitly accepting data loss.
 
 Do not copy TrailBase JWT signing or `_session` writes into app code. Use TrailBase auth endpoints or
 a verified runtime-safe path to mint tokens after the app-specific `_user` mapping is complete.
