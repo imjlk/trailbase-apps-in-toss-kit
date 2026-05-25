@@ -18,6 +18,13 @@ struct SessionPayload {
     iat: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnonymousTrailbaseUserCredentials {
+    pub email: String,
+    pub password: String,
+}
+
 pub fn hmac_hex(secret: &str, input: &str) -> ApiResult<String> {
     hmac_sha256_hex(secret, input).map_err(internal)
 }
@@ -74,6 +81,50 @@ pub fn anonymous_hash_hmac(anonymous_hash: &str) -> ApiResult<String> {
     hmac_hex(&secret, anonymous_hash)
 }
 
+pub fn anonymous_trailbase_user_credentials(
+    anonymous_hash_hmac: &str,
+    password_secret: &str,
+) -> ApiResult<AnonymousTrailbaseUserCredentials> {
+    Ok(AnonymousTrailbaseUserCredentials {
+        email: anonymous_trailbase_user_email(anonymous_hash_hmac)?,
+        password: service_managed_user_password(anonymous_hash_hmac, password_secret)?,
+    })
+}
+
+pub fn anonymous_trailbase_user_email(anonymous_hash_hmac: &str) -> ApiResult<String> {
+    anonymous_trailbase_user_email_with_domain(anonymous_hash_hmac, "users.local.invalid")
+}
+
+pub fn anonymous_trailbase_user_email_with_domain(
+    anonymous_hash_hmac: &str,
+    domain: &str,
+) -> ApiResult<String> {
+    let digest = normalized_hex_digest(anonymous_hash_hmac)?;
+    let domain = domain.trim().trim_start_matches('@').to_ascii_lowercase();
+    if domain.is_empty() || !domain.contains('.') || domain.contains(' ') {
+        return Err(bad_request(
+            "INVALID_EMAIL_DOMAIN",
+            "Invalid anonymous user email domain",
+        ));
+    }
+    Ok(format!("anon+{}@{}", &digest[..32], domain))
+}
+
+pub fn service_managed_user_password(
+    anonymous_hash_hmac: &str,
+    password_secret: &str,
+) -> ApiResult<String> {
+    let digest = normalized_hex_digest(anonymous_hash_hmac)?;
+    let secret = password_secret.trim();
+    if secret.len() < 16 {
+        return Err(internal(
+            "Service-managed user password secret must be at least 16 bytes",
+        ));
+    }
+    let password_digest = hmac_hex(secret, &digest)?;
+    Ok(format!("Ait!1{password_digest}"))
+}
+
 fn session_secret() -> ApiResult<String> {
     settings::required("APP_SESSION_SECRET")
 }
@@ -107,6 +158,17 @@ pub fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
     diff == 0
 }
 
+fn normalized_hex_digest(value: &str) -> ApiResult<String> {
+    let digest = value.trim().to_ascii_lowercase();
+    if digest.len() < 32 || digest.len() > 128 || !digest.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        return Err(bad_request(
+            "INVALID_HASH_DIGEST",
+            "Invalid anonymous hash digest",
+        ));
+    }
+    Ok(digest)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -116,5 +178,34 @@ mod tests {
         assert!(constant_time_eq(b"abc", b"abc"));
         assert!(!constant_time_eq(b"abc", b"abd"));
         assert!(!constant_time_eq(b"abc", b"abcd"));
+    }
+
+    #[test]
+    fn derives_anonymous_trailbase_user_credentials() {
+        let digest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        let credentials =
+            anonymous_trailbase_user_credentials(digest, "service-password-secret").unwrap();
+
+        assert_eq!(
+            credentials.email,
+            "anon+0123456789abcdef0123456789abcdef@users.local.invalid"
+        );
+        assert!(credentials.password.starts_with("Ait!1"));
+        assert_eq!(credentials.password.len(), 69);
+    }
+
+    #[test]
+    fn rejects_invalid_anonymous_user_inputs() {
+        assert!(anonymous_trailbase_user_email("not-hex").is_err());
+        assert!(
+            anonymous_trailbase_user_email_with_domain(
+                "0123456789abcdef0123456789abcdef",
+                "bad domain"
+            )
+            .is_err()
+        );
+        assert!(
+            service_managed_user_password("0123456789abcdef0123456789abcdef", "short").is_err()
+        );
     }
 }

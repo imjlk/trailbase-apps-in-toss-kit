@@ -4,9 +4,11 @@ import {
   createAppsInTossSessionManager,
   createAnonymousHash,
   createSseParser,
+  createTrailBaseAuthHeaders,
   normalizeTrailBaseUrl,
   normalizeAppsInTossErrorMessage,
   normalizeAppsInTossLoginResult,
+  normalizeTrailBaseAuthTokens,
   requestAppsInTossLogin,
   requestJson,
   resolveAnonymousHash,
@@ -109,6 +111,26 @@ describe("TrailBase client utilities", () => {
     ).toEqual({ authorizationCode: "code-2", referrer: "SANDBOX" });
   });
 
+  test("normalizes TrailBase auth tokens and builds Record API headers", () => {
+    const tokens = normalizeTrailBaseAuthTokens({
+      auth_token: "auth",
+      refresh_token: "refresh",
+      csrf_token: "csrf",
+    });
+
+    expect(tokens).toEqual({
+      authToken: "auth",
+      refreshToken: "refresh",
+      csrfToken: "csrf",
+    });
+    expect(createTrailBaseAuthHeaders(tokens)).toEqual({
+      Authorization: "Bearer auth",
+      "Refresh-Token": "refresh",
+      "CSRF-Token": "csrf",
+    });
+    expect(createTrailBaseAuthHeaders(null)).toEqual({});
+  });
+
   test("normalizes Apps in Toss SDK and bridge errors for display", () => {
     expect(normalizeAppsInTossErrorMessage({ error: { message: "브릿지 오류" } })).toBe(
       "브릿지 오류",
@@ -163,5 +185,55 @@ describe("TrailBase client utilities", () => {
       user: { id: "user-1" },
     });
     expect(storage.get("trailbase.anonymousHash")).toBe("anon_1");
+  });
+
+  test("session manager stores TrailBase auth tokens for Record API access", async () => {
+    const storage = new Map<string, string>();
+    const manager = createAppsInTossSessionManager({
+      storage: {
+        getItem: (key) => storage.get(key) ?? null,
+        setItem: (key, value) => storage.set(key, value),
+      },
+      createAnonymousHash: () => "anon_2",
+      appLogin: async () => ({ authorizationCode: "code-2", referrer: "DEFAULT" }),
+      loadSession: async ({ authTokens }) => ({
+        authToken: authTokens?.authToken ?? "loaded-auth",
+        refreshToken: authTokens?.refreshToken ?? "loaded-refresh",
+        csrfToken: authTokens?.csrfToken ?? "loaded-csrf",
+        user: { id: "loaded" },
+      }),
+      bootstrap: async () => ({
+        auth_token: "anonymous-auth",
+        refresh_token: "anonymous-refresh",
+        csrf_token: "anonymous-csrf",
+        user: { id: "anonymous" },
+      }),
+      completeTossLogin: async () => ({
+        authToken: "toss-auth",
+        refreshToken: "toss-refresh",
+        csrfToken: "toss-csrf",
+        user: { id: "user-2" },
+      }),
+    });
+
+    const anonymous = await manager.getOrCreateAppSession();
+    expect(anonymous.authTokens).toEqual({
+      authToken: "anonymous-auth",
+      refreshToken: "anonymous-refresh",
+      csrfToken: "anonymous-csrf",
+    });
+
+    const restored = await manager.restoreStoredAppSession();
+    expect(restored?.authTokens?.authToken).toBe("anonymous-auth");
+
+    const toss = await manager.signInWithToss();
+    expect(toss.authTokens).toEqual({
+      authToken: "toss-auth",
+      refreshToken: "toss-refresh",
+      csrfToken: "toss-csrf",
+    });
+    expect(JSON.parse(storage.get("trailbase.tossSession") ?? "{}").authTokens.authToken).toBe(
+      "toss-auth",
+    );
   });
 });

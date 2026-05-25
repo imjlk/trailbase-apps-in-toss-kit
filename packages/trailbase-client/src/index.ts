@@ -116,23 +116,44 @@ export interface AppsInTossLoginResult {
   referrer: AppsInTossReferrer;
 }
 
+export type AppAuthProvider = "anonymous" | "toss";
+
+export interface TrailBaseAuthTokens {
+  authToken: string;
+  refreshToken?: string | null;
+  csrfToken?: string | null;
+}
+
 export interface StoredAppSession<TUser = unknown> {
-  authProvider: "anonymous" | "toss";
-  sessionToken: string;
+  authProvider: AppAuthProvider;
+  sessionToken?: string;
+  authTokens?: TrailBaseAuthTokens;
   user: TUser;
 }
 
 export interface AppSessionManagerResponse<TUser = unknown> {
-  sessionToken: string;
+  sessionToken?: string;
+  authToken?: string;
+  refreshToken?: string | null;
+  csrfToken?: string | null;
+  auth_token?: string;
+  refresh_token?: string | null;
+  csrf_token?: string | null;
+  tokens?: unknown;
   user: TUser;
   [key: string]: unknown;
+}
+
+export interface AppSessionLoadInput {
+  sessionToken?: string;
+  authTokens?: TrailBaseAuthTokens;
 }
 
 export interface AppsInTossSessionManagerOptions<TUser = unknown> {
   storage: KeyValueStorage;
   appLogin: () => Promise<unknown>;
   getIsTossLoginIntegratedService?: () => Promise<unknown>;
-  loadSession: (input: { sessionToken: string }) => Promise<AppSessionManagerResponse<TUser>>;
+  loadSession: (input: AppSessionLoadInput) => Promise<AppSessionManagerResponse<TUser>>;
   bootstrap: (anonymousHash: string) => Promise<AppSessionManagerResponse<TUser>>;
   completeTossLogin: (input: {
     anonymousHash: string;
@@ -179,6 +200,39 @@ export function normalizeAppsInTossReferrer(value: unknown): AppsInTossReferrer 
     return "DEFAULT";
   }
   return trimmed;
+}
+
+export function normalizeTrailBaseAuthTokens(value: unknown): TrailBaseAuthTokens | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const nested = normalizeTrailBaseAuthTokens(record.tokens);
+  if (nested) {
+    return nested;
+  }
+  const authToken = stringCandidate(record.authToken, record.auth_token);
+  if (!authToken) {
+    return null;
+  }
+  return {
+    authToken,
+    refreshToken: nullableStringCandidate(record.refreshToken, record.refresh_token),
+    csrfToken: nullableStringCandidate(record.csrfToken, record.csrf_token),
+  };
+}
+
+export function createTrailBaseAuthHeaders(
+  tokens: TrailBaseAuthTokens | null | undefined,
+): Record<string, string> {
+  if (!tokens?.authToken) {
+    return {};
+  }
+  return {
+    Authorization: `Bearer ${tokens.authToken}`,
+    ...(tokens.refreshToken ? { "Refresh-Token": tokens.refreshToken } : {}),
+    ...(tokens.csrfToken ? { "CSRF-Token": tokens.csrfToken } : {}),
+  };
 }
 
 export function normalizeAppsInTossErrorMessage(
@@ -249,7 +303,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
       return null;
     }
     try {
-      const response = await loadSession({ sessionToken: storedSession.sessionToken });
+      const response = await loadSession(sessionLoadInput(storedSession));
       await writeSession(storage, tossSessionStorageKey, response, "toss");
       await writeSession(storage, appSessionStorageKey, response, "toss");
       return withAuthProvider(response, "toss");
@@ -265,7 +319,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
       return await restoreStoredTossSession();
     }
     try {
-      const response = await loadSession({ sessionToken: storedSession.sessionToken });
+      const response = await loadSession(sessionLoadInput(storedSession));
       await writeSession(storage, appSessionStorageKey, response, storedSession.authProvider);
       return withAuthProvider(response, storedSession.authProvider);
     } catch {
@@ -360,11 +414,13 @@ export function createAnonymousHash({
 
 function withAuthProvider<TUser>(
   response: AppSessionManagerResponse<TUser>,
-  authProvider: "anonymous" | "toss",
+  authProvider: AppAuthProvider,
 ) {
+  const authTokens = normalizeTrailBaseAuthTokens(response);
   return {
     ...response,
     authProvider,
+    ...(authTokens ? { authTokens } : {}),
   };
 }
 
@@ -386,12 +442,14 @@ async function readStoredSession<TUser>(
       return null;
     }
     const sessionToken = stringCandidate(record.sessionToken);
-    if (!sessionToken || !record.user) {
+    const authTokens = normalizeTrailBaseAuthTokens(record.authTokens);
+    if ((!sessionToken && !authTokens) || !record.user) {
       return null;
     }
     return {
       authProvider: record.authProvider,
       sessionToken,
+      authTokens: authTokens ?? undefined,
       user: record.user as TUser,
     };
   } catch {
@@ -403,16 +461,26 @@ async function writeSession<TUser>(
   storage: KeyValueStorage,
   key: string,
   response: AppSessionManagerResponse<TUser>,
-  authProvider: "anonymous" | "toss",
+  authProvider: AppAuthProvider,
 ) {
+  const sessionToken = stringCandidate(response.sessionToken);
+  const authTokens = normalizeTrailBaseAuthTokens(response);
   await storage.setItem(
     key,
     JSON.stringify({
       authProvider,
-      sessionToken: response.sessionToken,
+      ...(sessionToken ? { sessionToken } : {}),
+      ...(authTokens ? { authTokens } : {}),
       user: response.user,
     }),
   );
+}
+
+function sessionLoadInput<TUser>(session: StoredAppSession<TUser>): AppSessionLoadInput {
+  return {
+    ...(session.sessionToken ? { sessionToken: session.sessionToken } : {}),
+    ...(session.authTokens ? { authTokens: session.authTokens } : {}),
+  };
 }
 
 function stringCandidate(...values: unknown[]): string | undefined {
@@ -422,6 +490,10 @@ function stringCandidate(...values: unknown[]): string | undefined {
     }
   }
   return undefined;
+}
+
+function nullableStringCandidate(...values: unknown[]): string | null {
+  return stringCandidate(...values) ?? null;
 }
 
 function readableErrorMessage(error: unknown): string | undefined {

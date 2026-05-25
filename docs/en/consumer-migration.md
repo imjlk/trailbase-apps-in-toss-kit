@@ -15,6 +15,8 @@ public API, schema ownership, or deployment policy.
   are app-specific.
 - Decide whether production or production-like data already exists. If it does,
   do not rewrite baseline migrations as part of the migration.
+- Decide whether the app is still on the legacy app-owned `users` session model.
+  New work should use TrailBase `_user` for anonymous users and Toss-linked users.
 
 ## Migration Checklist
 
@@ -29,6 +31,29 @@ public API, schema ownership, or deployment policy.
    - `TOSS_LOGIN_ME_PATH`
 5. Rename service references from `toss-mtls-proxy` to `toss-mtls-client-proxy`.
 6. Run proxy stub smoke, TrailBase Toss smoke, and production release checks.
+
+## Moving From Legacy `users` To `_user`
+
+Legacy AppsInToss consumers often have an app-owned `users` table plus
+`APP_SESSION_SECRET` tokens. Keep that shape only for compatibility. The new default is:
+
+1. HMAC the AppsInToss anonymous hash.
+2. Create a synthetic `_user.email` and service-managed credential on the server.
+3. Upsert a verified `_user`.
+4. Create or update app profile/domain rows keyed by `_user(id)`.
+5. Use TrailBase's official auth flow to return auth, refresh, and CSRF tokens.
+6. Link Toss Login by adding `toss_identities` to the existing anonymous `_user`.
+
+If production data exists, add forward migrations. Do not rewrite baseline SQL. A `light-on-off`
+style migration should keep the existing domain `users` table while adding a `_user` mapping column
+or companion profile table, then move Record API ACLs to `_USER_.id` incrementally.
+
+If the app is disposable or intentionally resettable, a baseline reset may be simpler. A
+`tatatata-cattower` style early deployment can rebuild the baseline around `_user`, `profiles`, and
+the new `toss_identities("user")` foreign key after explicitly accepting data loss.
+
+Do not copy TrailBase JWT signing or `_session` writes into app code. Use TrailBase auth endpoints or
+a verified runtime-safe path to mint tokens after the app-specific `_user` mapping is complete.
 
 ## Template Drift
 

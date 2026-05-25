@@ -35,6 +35,16 @@ where authorization and invariants live.
 
 Run the consumer's production or ACL checks after changing `config.textproto`.
 
+For new AppsInToss services, use TrailBase `_user` as the Record API principal. Anonymous users
+should still receive a `_user` row and TrailBase auth tokens so ACL rules can use `_USER_.id` from
+the first app session. The app-owned `users` session pattern is legacy; keep it only while migrating
+existing apps.
+
+Keep public user data out of `_user`. Store display names, app avatars, character choices, and other
+product fields in `profiles`, `profile_view`, or app domain tables keyed by `_user(id)`. Use
+TrailBase `_user_avatar` for auth avatar uploads, not as the only place for app-specific avatar
+selection.
+
 ## Toss Identity
 
 Apps should store Toss identity without exposing raw identifiers:
@@ -44,6 +54,10 @@ Apps should store Toss identity without exposing raw identifiers:
 
 Do not put raw Toss user keys, HMACs, sealed values, or related secrets in
 public Record API views, audit metadata, logs, or user-visible responses.
+
+The default `toss_identities` shape references `_user(id)` with a BLOB foreign key. If a consumer
+still has `toss_identities.user_id TEXT REFERENCES users(id)`, treat that as a legacy app-owned user
+mapping and migrate forward rather than rewriting production baselines.
 
 ## Promotion Campaigns
 

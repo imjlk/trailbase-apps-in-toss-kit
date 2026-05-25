@@ -15,6 +15,7 @@ pub mod session;
 pub mod settings;
 pub mod toss_identity_store;
 pub mod toss_unlink;
+pub mod trailbase_auth;
 
 pub type CommonResult<T> = Result<T, String>;
 

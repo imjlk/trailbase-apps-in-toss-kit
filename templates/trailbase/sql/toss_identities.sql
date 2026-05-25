@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS toss_identities (
   id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  "user" BLOB NOT NULL REFERENCES _user(id) ON DELETE CASCADE,
   toss_user_key_hmac TEXT NOT NULL UNIQUE,
   toss_user_key_sealed TEXT,
   referrer TEXT NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS toss_identities (
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS idx_toss_identities_user_status
-  ON toss_identities(user_id, status);
+  ON toss_identities("user", status);
 
 CREATE INDEX IF NOT EXISTS idx_toss_identities_active_last_seen
   ON toss_identities(last_seen_at DESC)

@@ -34,6 +34,16 @@ SQL)을 다시 쓰지 마세요. 대신 앞으로만 진행되는 새 마이그�
 
 `config.textproto`를 바꾼 뒤에는 앱의 운영 검증 또는 ACL 검증을 실행하세요.
 
+새 AppsInToss 서비스는 TrailBase `_user`를 Record API principal로 사용하세요. 익명 사용자도
+첫 앱 세션에서 `_user` 레코드와 TrailBase auth token을 받아야 ACL rule이 `_USER_.id`를 바로
+쓸 수 있습니다. 앱 소유 `users` 세션 패턴은 legacy이며, 기존 앱을 마이그레이션하는 동안에만
+보존하세요.
+
+공개 사용자 데이터는 `_user`에 두지 마세요. 표시 이름, 앱별 아바타, 캐릭터 선택, 제품
+도메인 필드는 `_user(id)`를 key로 하는 `profiles`, `profile_view`, 앱별 도메인 테이블에
+저장합니다. TrailBase `_user_avatar`는 auth avatar 업로드용이며, 앱별 avatar selection의
+유일한 저장소로 쓰지 않습니다.
+
 ## Toss 식별자
 
 앱은 Toss 식별자를 원문 그대로 노출하지 않아야 합니다.
@@ -43,6 +53,11 @@ SQL)을 다시 쓰지 마세요. 대신 앞으로만 진행되는 새 마이그�
 
 원본 Toss user key, HMAC, 암호문(sealed value), 관련 secret은 공개 Record API view, audit
 metadata, log, 사용자에게 보이는 응답에 넣지 마세요.
+
+기본 `toss_identities` 형태는 BLOB foreign key로 `_user(id)`를 참조합니다. 도입 앱에 아직
+`toss_identities.user_id TEXT REFERENCES users(id)`가 있다면 이것은 legacy app-owned user
+mapping입니다. 운영 데이터가 있다면 baseline을 다시 쓰지 말고 forward migration으로
+옮기세요.
 
 ## 프로모션 캠페인
 
