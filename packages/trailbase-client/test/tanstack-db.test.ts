@@ -1,16 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import {
   applyTrailbaseEvent,
+  createCollection,
   createTrailbaseRecordApiWithXhrSse,
   createTrailbaseRecordCollection,
   createTrailbaseXhrSseStream,
   encodeRecordId,
   trailbaseRecordCollectionOptions,
+  useLiveQuery,
 } from "../src/tanstack-db";
 import { TrailBaseHttpError } from "../src/index";
 import { createTrailbaseQueryClientOptions } from "../src/tanstack-query";
 
 describe("TanStack TrailBase adapters", () => {
+  test("re-exports TanStack React DB primitives", () => {
+    expect(typeof createCollection).toBe("function");
+    expect(typeof useLiveQuery).toBe("function");
+  });
+
   test("encodes record ids", () => {
     expect(encodeRecordId("*")).toBe("*");
     expect(encodeRecordId("a b")).toBe("a%20b");

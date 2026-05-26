@@ -40,11 +40,13 @@ XHR-backed SSE subscriptions support caller-provided headers for authenticated
 Record APIs and surface HTTP failures as `TrailBaseHttpError` instead of silently
 closing the stream.
 
-`@tanstack/react-db`, `@tanstack/react-query`, and `trailbase` are peer
-dependencies. The supported `trailbase` peer range starts at `0.12.1`, which is
-the current SDK version verified for `client.login()`, `client.tokens()`, and
-`client.headers()`. Consumers already using those packages can opt in to the
-adapter without pulling them into apps that do not need them.
+The `./tanstack-db` subpath depends on the pinned `@tanstack/react-db` version
+shipped with the kit so consumer apps can reuse the same adapter surface through
+the submodule. `@tanstack/react-query` and `trailbase` remain optional peer
+dependencies for apps that opt in to query defaults or official TrailBase SDK
+access. The supported `trailbase` peer range starts at `0.12.1`, which is the
+current SDK version verified for `client.login()`, `client.tokens()`, and
+`client.headers()`.
 
 ## TanStack Query
 

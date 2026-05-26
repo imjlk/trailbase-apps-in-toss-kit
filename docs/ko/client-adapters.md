@@ -35,11 +35,11 @@ TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에
 XHR 기반 SSE 구독은 인증이 필요한 Record API를 위해 호출자가 넘긴 헤더를 사용할 수
 있습니다. HTTP 실패는 조용히 스트림을 닫지 않고 `TrailBaseHttpError`로 전달합니다.
 
-`@tanstack/react-db`, `@tanstack/react-query`, `trailbase`는 peer dependency입니다. 지원하는
-`trailbase` peer 범위는 `0.12.1`부터 시작합니다. 이 버전은 `client.login()`,
-`client.tokens()`, `client.headers()` 동작을 확인한 현재 SDK 버전입니다. 이미 이 패키지들을
-쓰는 앱은 선택적으로 어댑터를 도입할 수 있고, 필요 없는 앱에는 의존성을 강제로 끌어들이지
-않습니다.
+`./tanstack-db` 하위 경로는 kit에 고정된 `@tanstack/react-db` 버전에 의존합니다. 소비 앱은
+서브모듈을 통해 같은 어댑터 표면을 재사용하면 됩니다. `@tanstack/react-query`와 `trailbase`는
+쿼리 기본값이나 공식 TrailBase SDK 접근을 선택적으로 도입하는 앱을 위한 peer dependency로
+남깁니다. 지원하는 `trailbase` peer 범위는 `0.12.1`부터 시작합니다. 이 버전은
+`client.login()`, `client.tokens()`, `client.headers()` 동작을 확인한 현재 SDK 버전입니다.
 
 ## TanStack Query
 
