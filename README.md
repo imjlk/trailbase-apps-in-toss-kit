@@ -97,7 +97,17 @@ Image tag policy:
 - `latest`, `0.1.0`, `0.1`, `0`: release tags created when a Sampo release bumps the proxy
   package version on `main`, or from a matching manual `toss-mtls-client-proxy-v0.1.0` tag.
 
-Dependabot runs monthly for GitHub Actions, Docker, Cargo, and Bun/npm dependencies.
+Renovate tracks package-level updates for GitHub Actions, Docker, Cargo,
+Bun/npm, mise tool versions, and documented TrailBase reference versions.
+TrailBase release notes are tracked separately by the `TrailBase release watch`
+workflow because upstream publishes operational compatibility notes, including
+Rust MSRV/MVRV and Rust toolchain changes, in GitHub releases and CHANGELOG
+entries.
+
+Do not automatically raise the kit's minimum supported TrailBase server version.
+Raise it only after consumer-app smoke tests pass. See
+`docs/en/trailbase-tracking.md` and `docs/ko/trailbase-tracking.md` for the
+tracking policy.
 
 ## Versioning
 

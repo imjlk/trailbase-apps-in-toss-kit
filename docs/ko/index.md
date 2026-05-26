@@ -27,6 +27,7 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 | Toss 프로모션 리워드 캠페인 설계하기 | [promotion-campaigns.md](promotion-campaigns.md) |
 | React Native 클라이언트 어댑터 사용하기 | [client-adapters.md](client-adapters.md) |
 | 버전과 GHCR 이미지 배포 흐름 이해하기 | [versioning.md](versioning.md), [publishing.md](publishing.md) |
+| TrailBase 업스트림 호환성 추적하기 | [trailbase-tracking.md](trailbase-tracking.md) |
 | 에이전트 스킬 설치 또는 기여하기 | [agent-skills.md](agent-skills.md) |
 
 ## 기본 관점

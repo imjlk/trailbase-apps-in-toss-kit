@@ -1,0 +1,70 @@
+# TrailBase Upstream Tracking
+
+This repository is a reusable AppsInToss integration kit for TrailBase-backed
+services. It does not vendor the TrailBase server. TrailBase server, client,
+runtime, and Rust toolchain changes are tracked as upstream compatibility
+inputs.
+
+## Official Upstream Sources
+
+- GitHub repository: https://github.com/trailbaseio/trailbase
+- GitHub releases: https://github.com/trailbaseio/trailbase/releases
+- CHANGELOG: https://raw.githubusercontent.com/trailbaseio/trailbase/main/CHANGELOG.md
+- Website/docs: https://trailbase.io/
+
+## Compatibility Policy
+
+These values are policy values for this kit.
+
+- Kit minimum supported TrailBase server: `TBD`
+- Last verified TrailBase server: `TBD`
+- Last verified TrailBase release date: `TBD`
+- Upstream latest TrailBase server: `0.27.9`
+- Upstream latest TrailBase release date: `2026-05-25`
+- Upstream Rust MSRV/MVRV from release notes: `1.93`
+- Upstream Rust toolchain from release notes: `1.95`
+
+Do not automatically raise the kit minimum supported TrailBase server. Raise it
+only after consumer-app smoke tests pass.
+
+Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
+`mise` is the preferred developer entrypoint for installing the repo toolchain,
+while `rust-toolchain.toml` keeps Cargo, rustup, editors, and CI compatible with
+standard Rust project behavior.
+
+After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
+`mise install` to install the pinned tools.
+
+## Renovate-Tracked Upstream Versions
+
+<!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
+- `trailbase-server-github-release`: `0.27.9`
+
+<!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
+- `trailbase-wasm`: `0.5.1`
+
+<!-- renovate: datasource=crate depName=trailbase-client versioning=cargo -->
+- `trailbase-client`: `0.8.1`
+
+<!-- renovate: datasource=npm depName=trailbase versioning=npm -->
+- `trailbase-js-client`: `0.12.1`
+
+## Release Watch Outputs
+
+The `TrailBase release watch` workflow writes upstream snapshots to:
+
+- `data/upstream/trailbase/latest-release.md`
+- `data/upstream/trailbase/version-policy.json`
+
+The snapshot script reads the latest GitHub release first. If the release notes
+do not mention Rust policy, it falls back to the newest matching TrailBase
+CHANGELOG section that mentions Rust MSRV/MVRV or toolchain changes.
+
+## Review Checklist When TrailBase Changes
+
+- Check release notes for breaking API behavior.
+- Check Record API, auth, realtime subscription, WASM runtime, and auth-ui notes.
+- Check whether TrailBase raised Rust MSRV/MVRV or toolchain.
+- Run Rust WASM guest checks against the policy toolchain.
+- Run consumer smoke tests with a real or stub TrailBase instance.
+- Update templates only after compatibility is verified.

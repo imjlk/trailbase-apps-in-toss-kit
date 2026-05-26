@@ -1,0 +1,81 @@
+name: TrailBase compatibility
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/trailbase-compat.yml"
+      - ".mise.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**"
+      - "data/upstream/trailbase/**"
+      - "docs/en/trailbase-tracking.md"
+      - "docs/ko/trailbase-tracking.md"
+      - "rust-toolchain.toml"
+      - "scripts/snapshot-trailbase-release.mjs"
+      - "scripts/sync-trailbase-rust-policy.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: trailbase-compat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-policy:
+    name: Check TrailBase Rust policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup mise tools
+        uses: jdx/mise-action@v3
+        with:
+          install: true
+          cache: true
+
+      - name: Read upstream Rust policy
+        id: policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs = require("node:fs");
+          const path = "data/upstream/trailbase/version-policy.json";
+          if (!fs.existsSync(path)) process.exit(0);
+          const policy = JSON.parse(fs.readFileSync(path, "utf8"));
+          if (policy.upstreamMinimumRustVersion) {
+            console.log(`msrv=${policy.upstreamMinimumRustVersion}`);
+          }
+          if (policy.upstreamRustToolchain) {
+            console.log(`toolchain=${policy.upstreamRustToolchain}`);
+          }
+          NODE
+
+      - name: Check repo Rust policy synchronization
+        run: node scripts/sync-trailbase-rust-policy.mjs --check
+
+      - name: Install upstream MVRV toolchain
+        if: steps.policy.outputs.msrv != ''
+        run: |
+          rustup toolchain install "${{ steps.policy.outputs.msrv }}" --profile minimal
+          rustup target add wasm32-wasip2 --toolchain "${{ steps.policy.outputs.msrv }}"
+
+      - name: Check WASI build with upstream MVRV
+        if: steps.policy.outputs.msrv != ''
+        run: cargo +"${{ steps.policy.outputs.msrv }}" check --workspace --target wasm32-wasip2
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Run Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Run tests
+        run: cargo test --workspace
+
+      - name: Check WASI build
+        run: cargo check --workspace --target wasm32-wasip2

@@ -98,7 +98,14 @@ ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy
   올라가거나 대응하는 `toss-mtls-client-proxy-v0.1.0` tag를 수동으로 push할 때 만들어지는
   릴리스 태그.
 
-Dependabot은 GitHub Actions, Docker, Cargo, Bun/npm dependency를 매월 확인합니다.
+Renovate는 GitHub Actions, Docker, Cargo, Bun/npm, mise 도구 버전, 문서화된
+TrailBase reference version을 추적합니다. TrailBase release notes는 별도의
+`TrailBase release watch` workflow로 추적합니다. 업스트림이 Rust MSRV/MVRV와 Rust
+toolchain 변경 같은 운영 호환성 메모를 GitHub release와 CHANGELOG에 기록하기 때문입니다.
+
+Kit minimum supported TrailBase server version은 자동으로 올리지 않습니다. 도입 앱 smoke
+test가 통과한 뒤에만 올립니다. 추적 정책은 `docs/en/trailbase-tracking.md`와
+`docs/ko/trailbase-tracking.md`를 참고하세요.
 
 ## 버전 관리
 

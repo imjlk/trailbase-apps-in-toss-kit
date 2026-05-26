@@ -28,6 +28,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Model Toss promotion reward campaigns | [promotion-campaigns.md](promotion-campaigns.md) |
 | Use RN/client-side adapters | [client-adapters.md](client-adapters.md) |
 | Release versions and GHCR images | [versioning.md](versioning.md) and [publishing.md](publishing.md) |
+| Track TrailBase upstream compatibility | [trailbase-tracking.md](trailbase-tracking.md) |
 | Install or contribute agent skills | [agent-skills.md](agent-skills.md) |
 
 ## Mental Model

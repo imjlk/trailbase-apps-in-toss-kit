@@ -1,0 +1,11 @@
+{
+  "latestTrailbaseVersion": "0.27.9",
+  "latestReleaseTag": "v0.27.9",
+  "latestReleasePublishedAt": "2026-05-25T11:42:08Z",
+  "latestReleaseUrl": "https://github.com/trailbaseio/trailbase/releases/tag/v0.27.9",
+  "rustPolicySource": "CHANGELOG.md",
+  "rustPolicySourceVersion": "0.27.0",
+  "upstreamMinimumRustVersion": "1.93",
+  "upstreamRustToolchain": "1.95",
+  "rawRustPolicyText": "## v0.27.0 - Cleanup release: remove the Sqlean's `define()` extensions for stored procedures. Breaking for users of Sqlean. - Read queries modify connection state, therefore don't work with the `query_only` pragma resulting in elevated scheduling requirements. - Doesn't allow anything that isn't possible with `VIEW` + WASM SQLite extensions. - Is another source of SQLite lock-in, while we're moving towards loosened coupling. - Other major changes since the previous major release are mostly around DB coupling and execution model. - There is a proof-of-concept Postgres driver now but it would still be a long way to hook it up: - different SQL dialects, - schema extraction missing, - dependencies on SQLite extensions for `CHECK()`, migrations, etc., - change notifications for RecordApi subscriptions would need to work very differently, - more fun surprises...? - Lift Rust MVRV (1.93) and Rust toolchain (1.95) versions. "
+}
