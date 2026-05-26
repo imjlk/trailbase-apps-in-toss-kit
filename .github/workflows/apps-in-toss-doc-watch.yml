@@ -1,0 +1,66 @@
+name: Apps in Toss doc watch
+
+on:
+  schedule:
+    # Weekdays at 10:11 Asia/Seoul.
+    - cron: "11 1 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: apps-in-toss-doc-watch
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    name: Snapshot Apps in Toss upstream docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup mise tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          install: true
+          cache: true
+
+      - name: Snapshot Apps in Toss docs and package references
+        run: node scripts/snapshot-apps-in-toss-docs.mjs
+
+      - name: Validate upstream watch token
+        env:
+          UPSTREAM_WATCH_TOKEN: ${{ secrets.TRAILBASE_RELEASE_WATCH_TOKEN }}
+        run: |
+          if [ -z "$UPSTREAM_WATCH_TOKEN" ]; then
+            echo "::error title=Apps in Toss doc watch token::Configure TRAILBASE_RELEASE_WATCH_TOKEN with a PAT or GitHub App token so generated PRs trigger downstream pull_request checks."
+            exit 1
+          fi
+
+      - name: Open PR when Apps in Toss upstream docs changed
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.TRAILBASE_RELEASE_WATCH_TOKEN }}
+          branch: docs/apps-in-toss-upstream-snapshot
+          commit-message: "docs: update Apps in Toss upstream snapshot"
+          title: "docs: update Apps in Toss upstream snapshot"
+          body: |
+            Apps in Toss upstream documentation or reference package metadata changed.
+
+            Review:
+            - data/upstream/apps-in-toss/docs-snapshot.md
+            - data/upstream/apps-in-toss/docs-snapshot.json
+            - docs/en/apps-in-toss-tracking.md
+            - docs/ko/apps-in-toss-tracking.md
+
+            Pay special attention to:
+            - SDK 2.x and Granite migration notes
+            - mTLS API integration process changes
+            - Login, IAP, promotion, and Smart Message API behavior
+            - TDS React Native package guidance
+            - Toss app minimum version requirements
+          labels: apps-in-toss,docs-watch

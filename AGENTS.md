@@ -194,7 +194,7 @@ Image tag policy:
 Prefer exact SemVer or minor tags for production. Use `latest` or `edge` only
 when a consumer app deliberately wants moving image builds.
 
-## Renovate, TrailBase Tracking, And CI
+## Renovate, Upstream Tracking, And CI
 
 Renovate tracks package-level updates for:
 
@@ -205,6 +205,8 @@ Renovate tracks package-level updates for:
 - mise tool versions
 - documented TrailBase reference versions in `docs/en/trailbase-tracking.md`
   and `docs/ko/trailbase-tracking.md`
+- documented Apps in Toss SDK/API reference versions in
+  `docs/en/apps-in-toss-tracking.md` and `docs/ko/apps-in-toss-tracking.md`
 
 TrailBase upstream release notes are tracked separately by the `TrailBase release
 watch` workflow. The workflow runs `scripts/snapshot-trailbase-release.mjs` to
@@ -222,6 +224,14 @@ apps that want to compare their copied Compose file or TrailBase server image
 tag against this kit's manual policy in `data/trailbase-compat-policy.json`.
 Do not turn this into a hard kit-level compatibility gate; consumers should
 enforce it with `CI_STRICT=1` only after they are ready for that policy.
+
+Apps in Toss SDK/API docs are tracked by the `Apps in Toss doc watch` workflow.
+The workflow runs `scripts/snapshot-apps-in-toss-docs.mjs` and stores document
+hashes plus npm reference package metadata under `data/upstream/apps-in-toss/`.
+Do not add `@apps-in-toss/framework`, `@granite-js/react-native`, or TDS packages
+to this kit's runtime dependencies just to track upstream. Consumer apps own
+those dependencies and must smoke-test SDK, Granite, TDS, Login, IAP, promotion,
+and Smart Message changes before raising their own supported version policy.
 
 Do not automatically raise the kit minimum supported TrailBase server version.
 That value is a manual compatibility policy and should move only after

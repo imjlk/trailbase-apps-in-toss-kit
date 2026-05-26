@@ -30,6 +30,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Release versions and GHCR images | [versioning.md](versioning.md) and [publishing.md](publishing.md) |
 | Draft release notes from Sampo changesets | [sampo-release-notes.md](sampo-release-notes.md) |
 | Track TrailBase upstream compatibility | [trailbase-tracking.md](trailbase-tracking.md) |
+| Track Apps in Toss SDK/API docs | [apps-in-toss-tracking.md](apps-in-toss-tracking.md) |
 | Install or contribute agent skills | [agent-skills.md](agent-skills.md) |
 
 ## Mental Model
