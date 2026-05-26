@@ -54,6 +54,11 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 <!-- renovate: datasource=npm depName=trailbase versioning=npm -->
 - `trailbase-js-client`: `0.12.1`
 
+If you edit these Renovate marker blocks or `renovate.json`, validate the
+configuration with `bun run renovate:validate`. The command installs the
+Renovate validator through `npx` for that run, so the validator does not need to
+be committed as a dependency.
+
 ## Release Watch Outputs
 
 The `TrailBase release watch` workflow writes upstream snapshots to:
@@ -64,6 +69,13 @@ The `TrailBase release watch` workflow writes upstream snapshots to:
 The snapshot script reads the latest GitHub release first. If the release notes
 do not mention Rust policy, it falls back to the newest matching TrailBase
 CHANGELOG section that mentions Rust MSRV/MVRV or toolchain changes.
+
+Configure a repo secret named `TRAILBASE_RELEASE_WATCH_TOKEN` before relying on
+the scheduled release-watch workflow. Use a fine-grained PAT or GitHub App token
+that can push branches and open pull requests for this repository. The workflow
+uses this non-default token so generated PRs trigger downstream `pull_request`
+checks automatically. If the secret is missing, the workflow fails fast instead
+of opening a PR with no automatic CI.
 
 ## Consumer Server Version Advisory
 

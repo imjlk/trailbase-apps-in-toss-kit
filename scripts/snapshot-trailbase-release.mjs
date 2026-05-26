@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 const OWNER = "trailbaseio";
 const REPO = "trailbase";
 const OUT_DIR = "data/upstream/trailbase";
+const REQUEST_TIMEOUT_MS = 30_000;
 
 const headers = {
   accept: "application/vnd.github+json",
@@ -13,8 +14,24 @@ if (process.env.GITHUB_TOKEN) {
   headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
 }
 
+async function fetchWithTimeout(url) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  try {
+    return await fetch(url, { headers, signal: controller.signal });
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error(`${url} timed out after ${REQUEST_TIMEOUT_MS}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function readJson(url) {
-  const res = await fetch(url, { headers });
+  const res = await fetchWithTimeout(url);
   if (!res.ok) {
     throw new Error(`${url} returned ${res.status}`);
   }
@@ -22,7 +39,7 @@ async function readJson(url) {
 }
 
 async function readText(url) {
-  const res = await fetch(url, { headers });
+  const res = await fetchWithTimeout(url);
   if (!res.ok) {
     throw new Error(`${url} returned ${res.status}`);
   }
@@ -54,7 +71,8 @@ function firstMatch(text, patterns) {
 }
 
 function extractRustPolicy(text) {
-  const normalized = String(text ?? "").replace(/\s+/g, " ");
+  const original = String(text ?? "");
+  const normalized = original.replace(/\s+/g, " ");
 
   const minimumRustVersion = firstMatch(normalized, [
     /Rust\s+MVRV[^\d]*(\d+\.\d+(?:\.\d+)?)/i,
@@ -77,7 +95,12 @@ function extractRustPolicy(text) {
   return {
     minimumRustVersion,
     rustToolchain,
-    rawText: normalized.slice(0, 1000)
+    rawTextLines: original
+      .trim()
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 40)
   };
 }
 
@@ -107,7 +130,7 @@ function findLatestRustPolicy(changelog, latestReleaseBody) {
     sourceVersion: null,
     minimumRustVersion: null,
     rustToolchain: null,
-    rawText: null
+    rawTextLines: null
   };
 }
 
@@ -147,7 +170,7 @@ await writeFile(
       rustPolicySourceVersion: rustPolicy.sourceVersion,
       upstreamMinimumRustVersion: rustPolicy.minimumRustVersion,
       upstreamRustToolchain: rustPolicy.rustToolchain,
-      rawRustPolicyText: rustPolicy.rawText
+      rawRustPolicyTextLines: rustPolicy.rawTextLines
     },
     null,
     2

@@ -194,6 +194,11 @@ snapshot the latest TrailBase GitHub release and `scripts/sync-trailbase-rust-po
 to synchronize Rust policy files when upstream changes Rust MSRV/MVRV or
 toolchain requirements.
 
+The release watch workflow requires `TRAILBASE_RELEASE_WATCH_TOKEN` as a repo
+secret. Use a PAT or GitHub App token there so snapshot PRs trigger downstream
+pull request workflows automatically. Do not fall back to `github.token` for
+generated snapshot PRs because that can skip downstream checks.
+
 `scripts/check-trailbase-version-policy.mjs` is an advisory checker for consumer
 apps that want to compare their copied Compose file or TrailBase server image
 tag against this kit's manual policy in `data/trailbase-compat-policy.json`.

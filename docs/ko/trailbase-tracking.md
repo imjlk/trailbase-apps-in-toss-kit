@@ -51,6 +51,10 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 <!-- renovate: datasource=npm depName=trailbase versioning=npm -->
 - `trailbase-js-client`: `0.12.1`
 
+이 Renovate marker block이나 `renovate.json`을 수정했다면 `bun run renovate:validate`로
+설정을 검증하세요. 이 명령은 실행 시점에 `npx`로 Renovate validator를 설치해서 쓰므로
+validator를 dependency로 커밋할 필요는 없습니다.
+
 ## Release Watch 출력물
 
 `TrailBase release watch` workflow는 업스트림 snapshot을 아래 경로에 씁니다.
@@ -61,6 +65,12 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 Snapshot script는 먼저 최신 GitHub release를 읽습니다. Release notes에 Rust 정책이 없으면
 TrailBase CHANGELOG에서 Rust MSRV/MVRV 또는 toolchain 변경을 언급한 가장 최신 섹션을
 찾습니다.
+
+정기 release-watch workflow를 사용하기 전에 `TRAILBASE_RELEASE_WATCH_TOKEN`이라는 repo secret을
+설정하세요. 이 secret은 해당 저장소에 branch push와 pull request 생성 권한이 있는
+fine-grained PAT 또는 GitHub App token이어야 합니다. Workflow는 이 non-default token을 사용해
+생성된 PR이 downstream `pull_request` check를 자동으로 트리거하도록 합니다. Secret이 없으면 CI
+없는 PR을 만들지 않도록 workflow가 빠르게 실패합니다.
 
 ## 도입 앱 서버 버전 참고 진단
 

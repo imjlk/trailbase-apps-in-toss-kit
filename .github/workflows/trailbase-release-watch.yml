@@ -37,9 +37,19 @@ jobs:
       - name: Sync Rust policy from TrailBase snapshot
         run: node scripts/sync-trailbase-rust-policy.mjs
 
+      - name: Validate release watch token
+        env:
+          RELEASE_WATCH_TOKEN: ${{ secrets.TRAILBASE_RELEASE_WATCH_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_WATCH_TOKEN" ]; then
+            echo "::error title=TrailBase release watch token::Configure TRAILBASE_RELEASE_WATCH_TOKEN with a PAT or GitHub App token so generated PRs trigger downstream pull_request checks."
+            exit 1
+          fi
+
       - name: Open PR when TrailBase upstream metadata changed
         uses: peter-evans/create-pull-request@v7
         with:
+          token: ${{ secrets.TRAILBASE_RELEASE_WATCH_TOKEN }}
           branch: docs/trailbase-upstream-snapshot
           commit-message: "docs: update TrailBase upstream snapshot"
           title: "docs: update TrailBase upstream snapshot"
