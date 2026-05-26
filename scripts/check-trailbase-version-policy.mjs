@@ -62,6 +62,10 @@ function normalizeVersion(value) {
 function policyVersion(value) {
   const normalized = normalizeVersion(value);
   if (!normalized || normalized.toUpperCase() === "TBD") return null;
+  if (!parseComparableVersion(normalized)) {
+    warning(`Ignoring invalid policy version '${value}'. Use MAJOR.MINOR[.PATCH] or TBD.`);
+    return null;
+  }
   return normalized;
 }
 
