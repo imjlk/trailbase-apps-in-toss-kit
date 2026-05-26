@@ -137,9 +137,16 @@ Typical Rust helper change flow:
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
+
+Use `bun run sampo:release-notes:draft` to turn pending changesets into a
+Markdown release-note draft before running `sampo release`. The draft command
+does not consume changesets. Keep changeset bodies user-facing: mention
+migrations, env vars, image tags, smoke tests, rollout notes, or compatibility
+limits when operators need them.
 
 The two Rust crates are configured as a fixed group and should move together.
 The Bun proxy is a private npm package tracked by Sampo for version/changelog
@@ -155,6 +162,17 @@ npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy: patch
 
 Describe the proxy change.
 ```
+
+Consumer apps can reuse the release-note draft script from the submodule:
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/scripts/draft-sampo-release-notes.mjs --root .
+```
+
+Do not add a repo-specific skill just for Sampo release-note drafting. Use the
+general `$sampo` skill for Sampo changeset/release/publish work, and load
+`trailbase-ops` only when the release note touches TrailBase migration, Record
+API, WASM auth, deployment, production reset, or mTLS certificate behavior.
 
 When `sampo release` bumps that package version and the release commit lands on
 `main`, the image workflow creates `toss-mtls-client-proxy-vX.Y.Z` if needed and

@@ -124,13 +124,19 @@ crate는 고정 버전 그룹(fixed version group)으로 묶여 `trailbase-guest
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
+
+`sampo release`를 실행하기 전에 release-note draft 명령으로 대기 중인 Sampo changeset을
+Markdown 요약으로 만들 수 있습니다. 컨슈머 앱도 자체 `.sampo/changesets`에서 릴리스 노트를
+만들고 싶을 때 kit submodule의 같은 스크립트를 실행할 수 있습니다.
 
 `sampo release`가 프록시 패키지 버전(proxy package version)을 올리고 릴리스 커밋(release
 commit)이 `main`에 들어가면, 이미지 워크플로는 필요한 경우 대응하는
 `toss-mtls-client-proxy-vX.Y.Z` git tag를 만들고 GHCR 릴리스 태그를 배포합니다.
 
-자세한 릴리스 및 이미지 태그 정책은 `docs/en/versioning.md`를 참고하세요. 한글 문서는
-`docs/ko/versioning.md`에 있습니다.
+자세한 릴리스, 릴리스 노트, 이미지 태그 정책은 `docs/en/versioning.md`와
+`docs/en/sampo-release-notes.md`를 참고하세요. 한글 문서는 `docs/ko/versioning.md`와
+`docs/ko/sampo-release-notes.md`에 있습니다.

@@ -17,12 +17,17 @@ changelog를 관리하지만 npm에는 publish하지 않습니다. GHCR 이미�
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
 
-`sampo release`는 대기 중인 changeset을 소비하고 package version을 올리며 package changelog를
-업데이트합니다. 프록시 변경에는 비공개 npm package를 대상으로 지정하세요.
+PR summary, GitHub Release body, 운영 handoff note를 준비할 때는 `sampo release` 전에
+`bun run sampo:release-notes:draft`를 실행하세요. 초안 명령은 대기 중인 changeset을 읽기만
+하고 소비하지 않습니다. `sampo release`는 대기 중인 changeset을 소비하고 package version을
+올리며 package changelog를 업데이트합니다.
+
+프록시 변경에는 비공개 npm package를 대상으로 지정하세요.
 
 ```md
 ---
@@ -31,6 +36,9 @@ npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy: patch
 
 Describe the proxy change.
 ```
+
+Changeset 작성 기준, 릴리스 노트 초안 작성법, 컨슈머 저장소 사용법은
+[sampo-release-notes.md](sampo-release-notes.md)를 참고하세요.
 
 ## 프록시 이미지 릴리스 흐름
 

@@ -16,6 +16,7 @@
     "trailbase:rust-policy:sync": "node scripts/sync-trailbase-rust-policy.mjs",
     "trailbase:rust-policy:check": "node scripts/sync-trailbase-rust-policy.mjs --check",
     "trailbase:version-policy:check": "node scripts/check-trailbase-version-policy.mjs",
+    "sampo:release-notes:draft": "node scripts/draft-sampo-release-notes.mjs",
     "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
     "skills:sync:copy": "bun scripts/sync-agent-skills.mjs --target codex --all --mode copy",
     "skills:sync:cline": "bun scripts/sync-agent-skills.mjs --target cline --all --mode link",

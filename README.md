@@ -126,13 +126,19 @@ Typical flow:
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
+
+Use the release-note draft command to turn pending Sampo changesets into a Markdown summary before
+running `sampo release`. Consumer apps can run the same script from the kit submodule when they want
+release notes from their own `.sampo/changesets`.
 
 When `sampo release` bumps the proxy package version and the release commit lands on `main`, the
 image workflow creates the matching `toss-mtls-client-proxy-vX.Y.Z` git tag if needed and publishes
 the GHCR release tags.
 
-See `docs/en/versioning.md` for the detailed release and image tag policy. See
-`docs/ko/versioning.md` for the Korean translation.
+See `docs/en/versioning.md` and `docs/en/sampo-release-notes.md` for the detailed release,
+release-note, and image tag policy. See `docs/ko/versioning.md` and
+`docs/ko/sampo-release-notes.md` for the Korean translation.
