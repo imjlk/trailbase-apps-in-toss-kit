@@ -26,6 +26,10 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 Kit minimum supported TrailBase server는 자동으로 올리지 않습니다. 도입 앱의 smoke
 test가 통과한 뒤에만 사람이 올립니다.
 
+수동 서버 호환성 값은 `data/trailbase-compat-policy.json`에도 기록합니다. 이 파일은
+업스트림 최신 릴리스에서 자동 생성하지 않습니다. 업스트림 최신 버전과 이 kit가 지원한다고
+선언한 버전은 서로 다른 신호이기 때문입니다.
+
 Rust 도구 버전은 `.mise.toml`과 `rust-toolchain.toml`에 함께 노출합니다. 개발자가 repo
 toolchain을 설치할 때는 `mise`를 기본 진입점으로 사용하고, `rust-toolchain.toml`은 Cargo,
 rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유지합니다.
@@ -57,6 +61,31 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 Snapshot script는 먼저 최신 GitHub release를 읽습니다. Release notes에 Rust 정책이 없으면
 TrailBase CHANGELOG에서 Rust MSRV/MVRV 또는 toolchain 변경을 언급한 가장 최신 섹션을
 찾습니다.
+
+## 도입 앱 서버 버전 참고 진단
+
+도입 앱은 복사해 간 Docker Compose 파일과 TrailBase 서버 이미지 태그를 직접 소유합니다. 그래서
+이 kit는 도입 앱이 업스트림 최신보다 낮은 TrailBase 서버를 사용한다는 이유만으로 CI를 실패시키지
+않습니다. 앱이 고정하고 검증한 버전이라면 낮은 버전도 유효할 수 있습니다.
+
+도입 앱의 CI나 배포 runbook에서 앱의 TrailBase 서버 태그와 kit의 수동 정책 사이의 관계를 보고
+싶다면 참고 진단 스크립트를 사용하세요.
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --compose docker-compose.yml
+
+node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --image trailbaseio/trailbase:0.27.9
+
+CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --version 0.27.9
+```
+
+일반 모드에서는 경고를 출력하되 성공으로 종료합니다. Strict 모드에서는 선언된 kit minimum보다
+낮거나, last verified보다 높거나, 서버 이미지 태그가 moving/unparseable인 것처럼 구체적인 정책
+위반을 확인할 수 있을 때만 실패합니다. Kit minimum과 last verified가 아직 `TBD`라면 이
+스크립트는 참고 진단으로만 동작합니다.
 
 ## TrailBase 변경 리뷰 체크리스트
 

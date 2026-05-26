@@ -1,0 +1,17 @@
+{
+  "kitMinimumSupportedTrailbaseServer": null,
+  "lastVerifiedTrailbaseServer": null,
+  "lastVerifiedTrailbaseReleaseDate": null,
+  "description": "Manual TrailBase server compatibility policy for this kit. null means TBD and must not be auto-promoted from upstream latest.",
+  "strictMode": {
+    "failWhenBelowMinimum": true,
+    "failWhenNewerThanLastVerified": true,
+    "failWhenTagIsMovingOrUnparseable": true,
+    "missingServerVersion": "warn"
+  },
+  "notes": [
+    "Consumers own their copied Docker Compose files and TrailBase server image pins.",
+    "Raise kitMinimumSupportedTrailbaseServer only after consumer smoke tests pass.",
+    "Raise lastVerifiedTrailbaseServer only after this kit has been checked against that server version."
+  ]
+}

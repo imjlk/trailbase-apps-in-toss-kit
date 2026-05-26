@@ -104,8 +104,14 @@ workflow because upstream publishes operational compatibility notes, including
 Rust MSRV/MVRV and Rust toolchain changes, in GitHub releases and CHANGELOG
 entries.
 
+Local development should use `mise trust` once per checkout and `mise install`
+to install the pinned Bun, Node, and Rust tools. The same Rust version is also
+mirrored in `rust-toolchain.toml` for Cargo, rustup, editors, and CI.
+
 Do not automatically raise the kit's minimum supported TrailBase server version.
-Raise it only after consumer-app smoke tests pass. See
+Raise it only after consumer-app smoke tests pass. Consumer apps can use
+`scripts/check-trailbase-version-policy.mjs` as an advisory check for their
+copied Compose files or TrailBase server image tags. See
 `docs/en/trailbase-tracking.md` and `docs/ko/trailbase-tracking.md` for the
 tracking policy.
 

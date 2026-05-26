@@ -27,6 +27,11 @@ These values are policy values for this kit.
 Do not automatically raise the kit minimum supported TrailBase server. Raise it
 only after consumer-app smoke tests pass.
 
+The manual server compatibility values are mirrored in
+`data/trailbase-compat-policy.json`. That file is intentionally not generated
+from the upstream latest release, because latest upstream and supported-by-this-kit
+are different signals.
+
 Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
 `mise` is the preferred developer entrypoint for installing the repo toolchain,
 while `rust-toolchain.toml` keeps Cargo, rustup, editors, and CI compatible with
@@ -59,6 +64,34 @@ The `TrailBase release watch` workflow writes upstream snapshots to:
 The snapshot script reads the latest GitHub release first. If the release notes
 do not mention Rust policy, it falls back to the newest matching TrailBase
 CHANGELOG section that mentions Rust MSRV/MVRV or toolchain changes.
+
+## Consumer Server Version Advisory
+
+Consumer apps own their copied Docker Compose files and TrailBase server image
+tags. This kit therefore does not fail CI just because a consumer is behind
+upstream latest. Older versions can be valid when the app has pinned and tested
+them.
+
+Use the advisory checker from a consumer app when you want CI or a deployment
+runbook to surface the relationship between that app's TrailBase server tag and
+this kit's manual policy:
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --compose docker-compose.yml
+
+node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --image trailbaseio/trailbase:0.27.9
+
+CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --version 0.27.9
+```
+
+In non-strict mode the script warns and exits successfully. In strict mode it
+fails only when it can see a concrete policy violation, such as a version below
+the declared kit minimum, a version newer than the last verified version, or a
+moving/unparseable server image tag. If the kit minimum and last verified values
+are still `TBD`, the script stays advisory.
 
 ## Review Checklist When TrailBase Changes
 

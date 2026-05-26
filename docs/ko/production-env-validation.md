@@ -48,6 +48,23 @@ edge
 latest
 ```
 
+## TrailBase 서버 이미지 참고 진단
+
+TrailBase 서버 이미지는 이 kit가 아니라 각 도입 앱이 소유합니다. 도입 앱이 특정 버전을 고정하고
+스모크 테스트까지 마쳤다면 업스트림 최신보다 낮은 서버 버전을 의도적으로 운영할 수 있습니다.
+
+선택 사항인 참고 진단 스크립트는 도입 앱의 Compose 파일, 이미지 태그, 명시 버전을 검사할 수
+있습니다.
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --compose docker-compose.yml
+```
+
+도입 앱이 kit의 수동 호환성 정책을 강제할 준비가 되었을 때만 `CI_STRICT=1`을 사용하세요. Kit
+minimum supported와 last verified TrailBase version이 선언되기 전까지 이 스크립트는 정보 제공
+용도로 동작합니다.
+
 예시 파일은 `--allow-placeholders`로 검증할 때 placeholder를 사용할 수 있습니다. 실제 운영
 env 파일에는 placeholder, 로컬 URL, 개발용 토큰, 움직이는 이미지 태그가 남아 있으면 안
 됩니다.

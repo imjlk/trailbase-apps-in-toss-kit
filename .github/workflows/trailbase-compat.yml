@@ -8,10 +8,13 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
+      - "data/trailbase-compat-policy.json"
       - "data/upstream/trailbase/**"
       - "docs/en/trailbase-tracking.md"
       - "docs/ko/trailbase-tracking.md"
+      - "package.json"
       - "rust-toolchain.toml"
+      - "scripts/check-trailbase-version-policy.mjs"
       - "scripts/snapshot-trailbase-release.mjs"
       - "scripts/sync-trailbase-rust-policy.mjs"
   workflow_dispatch:
@@ -57,6 +60,20 @@ jobs:
 
       - name: Check repo Rust policy synchronization
         run: node scripts/sync-trailbase-rust-policy.mjs --check
+
+      - name: Check TrailBase server version advisory
+        run: |
+          node <<'NODE'
+          const { spawnSync } = require("node:child_process");
+          const policy = require("./data/upstream/trailbase/version-policy.json");
+          const latest = policy.latestTrailbaseVersion;
+          const result = spawnSync(
+            process.execPath,
+            ["scripts/check-trailbase-version-policy.mjs", "--version", latest],
+            { stdio: "inherit" }
+          );
+          process.exit(result.status ?? 1);
+          NODE
 
       - name: Install upstream MVRV toolchain
         if: steps.policy.outputs.msrv != ''

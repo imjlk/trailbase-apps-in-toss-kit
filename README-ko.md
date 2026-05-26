@@ -103,8 +103,14 @@ TrailBase reference version을 추적합니다. TrailBase release notes는 별�
 `TrailBase release watch` workflow로 추적합니다. 업스트림이 Rust MSRV/MVRV와 Rust
 toolchain 변경 같은 운영 호환성 메모를 GitHub release와 CHANGELOG에 기록하기 때문입니다.
 
+로컬 개발 환경에서는 checkout마다 `mise trust`를 한 번 실행한 뒤 `mise install`로 고정된 Bun,
+Node, Rust 도구를 설치하세요. 같은 Rust 버전은 Cargo, rustup, editor, CI 호환성을 위해
+`rust-toolchain.toml`에도 함께 반영합니다.
+
 Kit minimum supported TrailBase server version은 자동으로 올리지 않습니다. 도입 앱 smoke
-test가 통과한 뒤에만 올립니다. 추적 정책은 `docs/en/trailbase-tracking.md`와
+test가 통과한 뒤에만 올립니다. 도입 앱은 복사해 간 Compose 파일이나 TrailBase 서버 이미지
+태그에 대해 `scripts/check-trailbase-version-policy.mjs`를 참고 진단으로 사용할 수 있습니다.
+추적 정책은 `docs/en/trailbase-tracking.md`와
 `docs/ko/trailbase-tracking.md`를 참고하세요.
 
 ## 버전 관리

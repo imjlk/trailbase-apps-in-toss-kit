@@ -194,6 +194,12 @@ snapshot the latest TrailBase GitHub release and `scripts/sync-trailbase-rust-po
 to synchronize Rust policy files when upstream changes Rust MSRV/MVRV or
 toolchain requirements.
 
+`scripts/check-trailbase-version-policy.mjs` is an advisory checker for consumer
+apps that want to compare their copied Compose file or TrailBase server image
+tag against this kit's manual policy in `data/trailbase-compat-policy.json`.
+Do not turn this into a hard kit-level compatibility gate; consumers should
+enforce it with `CI_STRICT=1` only after they are ready for that policy.
+
 Do not automatically raise the kit minimum supported TrailBase server version.
 That value is a manual compatibility policy and should move only after
 consumer-app smoke tests pass.
