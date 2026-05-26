@@ -50,6 +50,30 @@ function normalizeVersion(value) {
   return String(value ?? "").trim().replace(/^v/i, "");
 }
 
+function parseReleaseVersion(value) {
+  const match = normalizeVersion(value).match(/^(\d+)\.(\d+)\.(\d+)$/);
+  if (!match) return null;
+
+  return [
+    Number.parseInt(match[1], 10),
+    Number.parseInt(match[2], 10),
+    Number.parseInt(match[3], 10)
+  ];
+}
+
+function compareReleaseVersions(left, right) {
+  const leftParts = parseReleaseVersion(left);
+  const rightParts = parseReleaseVersion(right);
+  if (!leftParts || !rightParts) return null;
+
+  for (let index = 0; index < 3; index += 1) {
+    if (leftParts[index] < rightParts[index]) return -1;
+    if (leftParts[index] > rightParts[index]) return 1;
+  }
+
+  return 0;
+}
+
 function splitChangelogSections(changelog) {
   const headings = [...changelog.matchAll(/^##\s+(v?\d+\.\d+\.\d+)\b[^\n]*(?:\n|$)/gm)];
 
@@ -104,7 +128,7 @@ function extractRustPolicy(text) {
   };
 }
 
-function findLatestRustPolicy(changelog, latestReleaseBody) {
+function findLatestRustPolicy(changelog, latestReleaseBody, latestVersion) {
   const latestPolicy = extractRustPolicy(latestReleaseBody);
   if (latestPolicy) {
     return {
@@ -115,6 +139,11 @@ function findLatestRustPolicy(changelog, latestReleaseBody) {
   }
 
   for (const section of splitChangelogSections(changelog)) {
+    const releaseOrder = compareReleaseVersions(section.version, latestVersion);
+    if (releaseOrder != null && releaseOrder > 0) {
+      continue;
+    }
+
     const policy = extractRustPolicy(section.text);
     if (policy) {
       return {
@@ -140,7 +169,7 @@ const changelog = await readText(
 );
 
 const latestVersion = normalizeVersion(latest.tag_name);
-const rustPolicy = findLatestRustPolicy(changelog, latest.body ?? "");
+const rustPolicy = findLatestRustPolicy(changelog, latest.body ?? "", latestVersion);
 
 await mkdir(OUT_DIR, { recursive: true });
 
