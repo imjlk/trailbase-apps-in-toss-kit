@@ -50,7 +50,7 @@ function normalizeDescription(text) {
 function parseChangesetFrontmatter(filePath, content) {
   const lines = content.split(/\r?\n/);
   if (lines[0]?.trim() !== "---") {
-    throw new Error(`${filePath} does not start with changeset frontmatter`);
+    return null;
   }
 
   const endIndex = lines.findIndex((line, index) => index > 0 && line.trim() === "---");
@@ -104,6 +104,7 @@ async function readChangesets(changesetDir, root) {
     const absolutePath = path.join(changesetDir, file);
     const relativePath = path.relative(root, absolutePath) || file;
     const parsed = parseChangesetFrontmatter(relativePath, await readFile(absolutePath, "utf8"));
+    if (!parsed) continue;
 
     changesets.push({
       file: relativePath,
