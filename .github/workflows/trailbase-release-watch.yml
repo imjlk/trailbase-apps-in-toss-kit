@@ -1,0 +1,73 @@
+name: TrailBase release watch
+
+on:
+  schedule:
+    # Weekdays at 09:41 Asia/Seoul.
+    - cron: "41 0 * * 1-5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: trailbase-release-watch
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    name: Snapshot TrailBase upstream metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup mise tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          install: true
+          cache: true
+
+      - name: Snapshot TrailBase latest release and Rust policy
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/snapshot-trailbase-release.mjs
+
+      - name: Sync Rust policy from TrailBase snapshot
+        run: node scripts/sync-trailbase-rust-policy.mjs
+
+      - name: Validate release watch token
+        env:
+          RELEASE_WATCH_TOKEN: ${{ secrets.TRAILBASE_RELEASE_WATCH_TOKEN }}
+        run: |
+          if [ -z "$RELEASE_WATCH_TOKEN" ]; then
+            echo "::error title=TrailBase release watch token::Configure TRAILBASE_RELEASE_WATCH_TOKEN with a PAT or GitHub App token so generated PRs trigger downstream pull_request checks."
+            exit 1
+          fi
+
+      - name: Open PR when TrailBase upstream metadata changed
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.TRAILBASE_RELEASE_WATCH_TOKEN }}
+          branch: docs/trailbase-upstream-snapshot
+          commit-message: "docs: update TrailBase upstream snapshot"
+          title: "docs: update TrailBase upstream snapshot"
+          body: |
+            TrailBase upstream release metadata changed.
+
+            Review:
+            - data/upstream/trailbase/latest-release.md
+            - data/upstream/trailbase/version-policy.json
+            - docs/en/trailbase-tracking.md
+            - docs/ko/trailbase-tracking.md
+            - rust-toolchain.toml
+            - .mise.toml
+
+            Pay special attention to:
+            - TrailBase server breaking changes
+            - Rust MSRV/MVRV changes
+            - Rust toolchain changes
+            - WASM runtime or ABI changes
+            - Record API, auth, realtime, and auth-ui behavior
+          labels: trailbase,docs-watch

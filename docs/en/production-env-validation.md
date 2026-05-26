@@ -47,6 +47,24 @@ edge
 latest
 ```
 
+## TrailBase Server Image Advisory
+
+TrailBase server images are owned by each consumer app, not by this kit. A
+consumer may intentionally run a server version below upstream latest when that
+version has been pinned and smoke-tested.
+
+The optional advisory checker can inspect a consumer Compose file, image tag, or
+explicit version:
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
+  --compose docker-compose.yml
+```
+
+Use `CI_STRICT=1` only after the consumer app is ready to enforce the kit's
+manual compatibility policy. Until the kit minimum supported and last verified
+TrailBase versions are declared, the checker remains informational.
+
 Example files may use placeholders when the validator is run with
 `--allow-placeholders`. Real production env files should fail when placeholders,
 local URLs, dev tokens, or moving image tags are present.

@@ -4,17 +4,21 @@ on:
   pull_request:
     paths:
       - ".github/workflows/rust.yml"
+      - ".mise.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
+      - "rust-toolchain.toml"
   push:
     branches:
       - main
     paths:
       - ".github/workflows/rust.yml"
+      - ".mise.toml"
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/**"
+      - "rust-toolchain.toml"
   workflow_dispatch:
 
 permissions:
@@ -30,10 +34,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Add WASI target
-        run: rustup target add wasm32-wasip2
+      - name: Setup mise tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          install: true
+          cache: true
+
+      - name: Install Rust components
+        run: |
+          rustup component add rustfmt clippy
+          rustup target add wasm32-wasip2
 
       - name: Check formatting
         run: cargo fmt --all --check

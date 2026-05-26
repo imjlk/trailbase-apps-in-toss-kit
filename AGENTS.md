@@ -176,18 +176,48 @@ Image tag policy:
 Prefer exact SemVer or minor tags for production. Use `latest` or `edge` only
 when a consumer app deliberately wants moving image builds.
 
-## Dependabot And CI
+## Renovate, TrailBase Tracking, And CI
 
-Dependabot runs monthly for:
+Renovate tracks package-level updates for:
 
 - GitHub Actions
 - Docker
 - Cargo
-- Bun/npm for the proxy package
+- Bun/npm packages
+- mise tool versions
+- documented TrailBase reference versions in `docs/en/trailbase-tracking.md`
+  and `docs/ko/trailbase-tracking.md`
+
+TrailBase upstream release notes are tracked separately by the `TrailBase release
+watch` workflow. The workflow runs `scripts/snapshot-trailbase-release.mjs` to
+snapshot the latest TrailBase GitHub release and `scripts/sync-trailbase-rust-policy.mjs`
+to synchronize Rust policy files when upstream changes Rust MSRV/MVRV or
+toolchain requirements.
+
+The release watch workflow requires `TRAILBASE_RELEASE_WATCH_TOKEN` as a repo
+secret. Use a PAT or GitHub App token there so snapshot PRs trigger downstream
+pull request workflows automatically. Do not fall back to `github.token` for
+generated snapshot PRs because that can skip downstream checks.
+
+`scripts/check-trailbase-version-policy.mjs` is an advisory checker for consumer
+apps that want to compare their copied Compose file or TrailBase server image
+tag against this kit's manual policy in `data/trailbase-compat-policy.json`.
+Do not turn this into a hard kit-level compatibility gate; consumers should
+enforce it with `CI_STRICT=1` only after they are ready for that policy.
+
+Do not automatically raise the kit minimum supported TrailBase server version.
+That value is a manual compatibility policy and should move only after
+consumer-app smoke tests pass.
+
+When TrailBase upstream changes, review Record API, auth, realtime, WASM
+runtime, auth-ui, Postgres pre-alpha notes, and Rust toolchain compatibility
+before merging.
 
 The Rust helper workflow runs format, Clippy, tests, and the `wasm32-wasip2`
-check on crate changes. The proxy image workflow publishes to GHCR on source
-changes, manual dispatch, scheduled rebuilds, and release tags.
+check on crate changes. The TrailBase compatibility workflow checks the upstream
+MVRV and the synchronized repo toolchain policy. The proxy image workflow
+publishes to GHCR on source changes, manual dispatch, scheduled rebuilds, and
+release tags.
 
 ## Consumer Integration Notes
 
