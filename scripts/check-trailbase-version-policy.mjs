@@ -97,7 +97,7 @@ function compareVersions(left, right) {
 }
 
 function materializeShellDefault(value) {
-  return value.replace(/\$\{[^}:]+:-([^}]+)\}/g, "$1");
+  return value.replace(/\$\{[A-Za-z_][A-Za-z0-9_]*(?::-|-)([^}]+)\}/g, "$1");
 }
 
 function unquote(value) {
