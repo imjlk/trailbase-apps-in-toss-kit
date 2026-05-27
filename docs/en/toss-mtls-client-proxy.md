@@ -81,6 +81,12 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
 
+The smart-message adapter sends `tossUserKey` as `x-toss-user-key` and removes it from the upstream
+JSON body. It normalizes the Toss messenger response into app-friendly fields:
+`providerStatus`, `resultType`, `msgCount`, `sentPushCount`, `sentInboxCount`, `detail`, `fail`,
+`failureReason`, and `failures[].reachFailReason`. A partial delivery with at least one successful
+channel is treated as `SENT` so dispatch jobs do not retry and duplicate the delivered channel.
+
 The promotion reward adapter accepts `promotionCode` and `amount` in the request body.
 `promotionAmount` is also accepted as a compatibility alias, but new callers should prefer `amount`.
 When campaign fields are omitted, the proxy falls back to `TOSS_PROMOTION_CODE` and

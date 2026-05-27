@@ -7,6 +7,7 @@ use trailbase_wasm::fetch;
 use trailbase_wasm::http::IntoBody;
 
 pub mod apps_in_toss_login;
+pub mod apps_in_toss_messages;
 pub mod apps_in_toss_proxy;
 pub mod db;
 pub mod promotion_campaigns;

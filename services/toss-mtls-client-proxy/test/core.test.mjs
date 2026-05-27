@@ -448,6 +448,154 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
+  test("forward message normalizes official Toss success response counts", async () => {
+    let upstreamBody;
+    let upstreamUserKey;
+    const upstreamServer = http.createServer(async (req, res) => {
+      upstreamUserKey = req.headers["x-toss-user-key"];
+      upstreamBody = await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          result: {
+            msgCount: 1,
+            sentPushCount: 1,
+            sentInboxCount: 0,
+            detail: {
+              sentPush: [{ contentId: "toss:PUSH:1" }],
+              sentInbox: [],
+            },
+            fail: {
+              sentPush: [],
+              sentInbox: [],
+            },
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageSend,
+        {
+          providerRequestId: "msg-1",
+          templateSetCode: "reward_result",
+          context: { point: "100" },
+          tossUserKey: "toss-user-1",
+          requestedAt: 1234,
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(upstreamUserKey).toBe("toss-user-1");
+      expect(upstreamBody.tossUserKey).toBeUndefined();
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("SENT");
+      expect(res.body.resultType).toBe("SUCCESS");
+      expect(res.body.msgCount).toBe(1);
+      expect(res.body.sentPushCount).toBe(1);
+      expect(res.body.sentInboxCount).toBe(0);
+      expect(res.body.contentIds).toEqual(["toss:PUSH:1"]);
+    });
+  });
+
+  test("forward message maps official Toss failure response", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "FAIL",
+          error: {
+            errorCode: "INVALID_TEMPLATE",
+            reason: "template is not approved",
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageSend,
+        {
+          providerRequestId: "msg-2",
+          templateSetCode: "reward_result",
+          context: {},
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.resultType).toBe("FAIL");
+      expect(res.body.providerErrorCode).toBe("INVALID_TEMPLATE");
+      expect(res.body.failureReason).toBe("template is not approved");
+    });
+  });
+
+  test("forward message keeps partial delivery as sent while exposing reach failures", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          result: {
+            msgCount: 1,
+            sentPushCount: 1,
+            sentInboxCount: 0,
+            detail: {
+              sentPush: [{ contentId: "toss:PUSH:2" }],
+              sentInbox: [],
+            },
+            fail: {
+              sentPush: [],
+              sentInbox: [{ contentId: "toss:INBOX:2", reachFailReason: "사용자 알림함 도달 실패" }],
+            },
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageSend,
+        {
+          providerRequestId: "msg-3",
+          templateSetCode: "reward_result",
+          context: {},
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("SENT");
+      expect(res.body.failureReason).toBe("사용자 알림함 도달 실패");
+      expect(res.body.failures).toEqual([
+        {
+          channel: "sentInbox",
+          contentId: "toss:INBOX:2",
+          reachFailReason: "사용자 알림함 도달 실패",
+        },
+      ]);
+    });
+  });
+
   test("message adapter targets the Toss messenger API", () => {
     expect(TOSS_ENDPOINTS.messageSend).toBe("/api-partner/v1/apps-in-toss/messenger/send-message");
   });

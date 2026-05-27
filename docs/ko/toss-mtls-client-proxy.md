@@ -81,6 +81,12 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 - `POST /internal/apps-in-toss/smart-message/send`: 스마트 메시지 어댑터.
 - `GET /internal/apps-in-toss/health`: 로컬 health/mode 확인.
 
+스마트 메시지 어댑터는 `tossUserKey`를 `x-toss-user-key` 헤더로 전달하고 upstream JSON
+본문에서는 제거합니다. Toss messenger 응답은 앱이 저장하기 쉬운
+`providerStatus`, `resultType`, `msgCount`, `sentPushCount`, `sentInboxCount`, `detail`, `fail`,
+`failureReason`, `failures[].reachFailReason` 필드로 정규화합니다. 하나 이상의 채널 발송에
+성공한 부분 성공 응답은 `SENT`로 취급해서 잡이 이미 도달한 채널을 중복 발송하지 않게 합니다.
+
 프로모션 리워드 어댑터는 요청 본문(request body)에서 `promotionCode`와 `amount`를 받습니다.
 `promotionAmount`도 호환 alias로 허용되지만, 새 호출자는 `amount`를 우선 사용하세요. 캠페인
 필드가 생략되면 프록시는 환경 변수만 쓰는 기존 앱을 위해 `TOSS_PROMOTION_CODE`,
