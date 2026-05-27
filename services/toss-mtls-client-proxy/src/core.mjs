@@ -727,21 +727,108 @@ function readPathValue(value, paths) {
 }
 
 function normalizeMessageResponse(request, upstream) {
-  if (upstream?.providerStatus || upstream?.status) {
+  if (upstream?.providerStatus || (upstream?.status && !upstream?.resultType && !upstream?.result)) {
+    const providerStatus = upstream.providerStatus ?? upstream.status;
     return {
-      ok: upstream.ok ?? true,
+      ok: upstream.ok ?? messageStatusOk(providerStatus),
       providerRequestId: upstream.providerRequestId ?? request.providerRequestId,
-      providerStatus: upstream.providerStatus ?? upstream.status,
+      providerStatus,
       sentAt: upstream.sentAt,
       failureReason: upstream.failureReason ?? upstream.errorMessage ?? upstream.message,
     };
   }
+  const resultType = readPathString(upstream, ["resultType", "success.resultType", "data.resultType"]);
+  const result = objectOrSelf(readPathValue(upstream, ["result", "success.result", "data.result"]), {});
+  const providerRequestId =
+    readPathString(upstream, ["providerRequestId", "requestId", "result.providerRequestId"]) ?? request.providerRequestId;
+  const sentAt = upstream?.sentAt ?? request.requestedAt ?? Date.now();
+
+  if (isUpstreamFailure(upstream)) {
+    return {
+      ok: false,
+      providerRequestId,
+      providerStatus: "FAILED",
+      resultType,
+      sentAt,
+      failureReason: upstreamFailureReason(upstream),
+      providerErrorCode: upstreamFailureCode(upstream),
+    };
+  }
+
+  const msgCount = nonNegativeIntegerOrUndefined(readPathValue(result, ["msgCount"]));
+  const sentPushCount = nonNegativeIntegerOrUndefined(readPathValue(result, ["sentPushCount"]));
+  const sentInboxCount = nonNegativeIntegerOrUndefined(readPathValue(result, ["sentInboxCount"]));
+  const failures = collectMessageFailures(result);
+  const contentIds = collectMessageContentIds(result?.detail);
+  const sentCount = [msgCount, sentPushCount, sentInboxCount].filter((value) => value !== undefined).reduce((a, b) => a + b, 0);
+  const failureReason = firstMessageFailureReason(failures);
+  const providerStatus = sentCount > 0 || failures.length === 0 ? "SENT" : "FAILED";
+
   return {
-    ok: true,
-    providerRequestId: upstream?.providerRequestId ?? request.providerRequestId,
-    providerStatus: "SENT",
-    sentAt: upstream?.sentAt ?? request.requestedAt ?? Date.now(),
+    ok: providerStatus === "SENT",
+    providerRequestId,
+    providerStatus,
+    resultType,
+    sentAt,
+    failureReason,
+    msgCount: msgCount ?? (sentCount > 0 ? sentCount : undefined),
+    sentPushCount,
+    sentInboxCount,
+    detail: result?.detail,
+    fail: result?.fail,
+    failures: failures.length > 0 ? failures : undefined,
+    contentIds: contentIds.length > 0 ? contentIds : undefined,
   };
+}
+
+const MESSAGE_RESULT_CHANNELS = [
+  "sentPush",
+  "sentInbox",
+  "sentSms",
+  "sentAlimtalk",
+  "sentFriendtalk",
+];
+
+function collectMessageFailures(result) {
+  const failures = [];
+  const fail = objectOrSelf(result?.fail, {});
+  for (const channel of MESSAGE_RESULT_CHANNELS) {
+    const entries = Array.isArray(fail?.[channel]) ? fail[channel] : [];
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") continue;
+      failures.push({
+        channel,
+        contentId: readPathString(entry, ["contentId", "id"]),
+        reachFailReason: readPathString(entry, ["reachFailReason", "reason", "message", "errorMessage"]),
+      });
+    }
+  }
+  return failures;
+}
+
+function collectMessageContentIds(detail) {
+  const contentIds = [];
+  const detailObject = objectOrSelf(detail, {});
+  for (const channel of MESSAGE_RESULT_CHANNELS) {
+    const entries = Array.isArray(detailObject?.[channel]) ? detailObject[channel] : [];
+    for (const entry of entries) {
+      const contentId = readPathString(entry, ["contentId", "id"]);
+      if (contentId) contentIds.push(contentId);
+    }
+  }
+  return contentIds;
+}
+
+function firstMessageFailureReason(failures) {
+  for (const failure of failures) {
+    if (failure.reachFailReason) return failure.reachFailReason;
+  }
+  return undefined;
+}
+
+function messageStatusOk(status) {
+  const normalized = String(status ?? "").trim().toUpperCase();
+  return !["FAILED", "FAIL", "ERROR", "REJECTED"].includes(normalized);
 }
 
 function normalizeIapOrderStatusResponse(request, upstream) {
@@ -854,6 +941,11 @@ function parsePositiveInteger(value, fallback) {
 function positiveIntegerOrUndefined(value) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function nonNegativeIntegerOrUndefined(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function parseNonNegativeInteger(value, fallback) {

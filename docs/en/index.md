@@ -26,6 +26,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Design SQL migrations and Record API access | [schema-patterns.md](schema-patterns.md) |
 | Link anonymous users to Toss Login | [toss-identity.md](toss-identity.md) |
 | Model Toss promotion reward campaigns | [promotion-campaigns.md](promotion-campaigns.md) |
+| Add functional push/inbox messages | [functional-messages.md](functional-messages.md) |
 | Use RN/client-side adapters | [client-adapters.md](client-adapters.md) |
 | Release versions and GHCR images | [versioning.md](versioning.md) and [publishing.md](publishing.md) |
 | Draft release notes from Sampo changesets | [sampo-release-notes.md](sampo-release-notes.md) |
