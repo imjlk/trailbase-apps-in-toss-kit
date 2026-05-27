@@ -98,11 +98,16 @@ Image tag policy:
   package version on `main`, or from a matching manual `toss-mtls-client-proxy-v0.1.0` tag.
 
 Renovate tracks package-level updates for GitHub Actions, Docker, Cargo,
-Bun/npm, mise tool versions, and documented TrailBase reference versions.
+Bun/npm, mise tool versions, and documented TrailBase and Apps in Toss reference
+versions.
 TrailBase release notes are tracked separately by the `TrailBase release watch`
 workflow because upstream publishes operational compatibility notes, including
 Rust MSRV/MVRV and Rust toolchain changes, in GitHub releases and CHANGELOG
 entries.
+Apps in Toss SDK/API documentation and reference package versions are tracked by
+the `Apps in Toss doc watch` workflow and `docs/en/apps-in-toss-tracking.md`.
+This kit does not add Apps in Toss SDK, Granite, or TDS packages as runtime
+dependencies; consumer apps own those versions.
 
 Local development should use `mise trust` once per checkout and `mise install`
 to install the pinned Bun, Node, and Rust tools. The same Rust version is also
@@ -112,8 +117,9 @@ Do not automatically raise the kit's minimum supported TrailBase server version.
 Raise it only after consumer-app smoke tests pass. Consumer apps can use
 `scripts/check-trailbase-version-policy.mjs` as an advisory check for their
 copied Compose files or TrailBase server image tags. See
-`docs/en/trailbase-tracking.md` and `docs/ko/trailbase-tracking.md` for the
-tracking policy.
+`docs/en/trailbase-tracking.md`, `docs/ko/trailbase-tracking.md`,
+`docs/en/apps-in-toss-tracking.md`, and `docs/ko/apps-in-toss-tracking.md` for
+the tracking policy.
 
 ## Versioning
 
@@ -126,13 +132,19 @@ Typical flow:
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
+
+Use the release-note draft command to turn pending Sampo changesets into a Markdown summary before
+running `sampo release`. Consumer apps can run the same script from the kit submodule when they want
+release notes from their own `.sampo/changesets`.
 
 When `sampo release` bumps the proxy package version and the release commit lands on `main`, the
 image workflow creates the matching `toss-mtls-client-proxy-vX.Y.Z` git tag if needed and publishes
 the GHCR release tags.
 
-See `docs/en/versioning.md` for the detailed release and image tag policy. See
-`docs/ko/versioning.md` for the Korean translation.
+See `docs/en/versioning.md` and `docs/en/sampo-release-notes.md` for the detailed release,
+release-note, and image tag policy. See `docs/ko/versioning.md` and
+`docs/ko/sampo-release-notes.md` for the Korean translation.

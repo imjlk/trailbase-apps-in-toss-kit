@@ -17,12 +17,17 @@ it is not published to npm. Its GHCR image release version comes from
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
 
-`sampo release` consumes pending changesets, bumps package versions, and updates package
-changelogs. For proxy changes, target the private npm package:
+Use `bun run sampo:release-notes:draft` before `sampo release` when preparing a PR summary,
+GitHub Release body, or operator handoff note. The draft command reads pending changesets without
+consuming them. `sampo release` consumes pending changesets, bumps package versions, and updates
+package changelogs.
+
+For proxy changes, target the private npm package:
 
 ```md
 ---
@@ -31,6 +36,9 @@ npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy: patch
 
 Describe the proxy change.
 ```
+
+See [sampo-release-notes.md](sampo-release-notes.md) for changeset writing rules, release-note
+drafting guidance, and consumer-repo usage.
 
 ## Proxy Image Release Flow
 

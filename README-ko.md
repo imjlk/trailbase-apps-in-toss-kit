@@ -99,9 +99,12 @@ ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy
   릴리스 태그.
 
 Renovate는 GitHub Actions, Docker, Cargo, Bun/npm, mise 도구 버전, 문서화된
-TrailBase reference version을 추적합니다. TrailBase release notes는 별도의
+TrailBase 및 Apps in Toss reference version을 추적합니다. TrailBase release notes는 별도의
 `TrailBase release watch` workflow로 추적합니다. 업스트림이 Rust MSRV/MVRV와 Rust
 toolchain 변경 같은 운영 호환성 메모를 GitHub release와 CHANGELOG에 기록하기 때문입니다.
+Apps in Toss SDK/API 문서와 reference package version은 `Apps in Toss doc watch` workflow와
+`docs/ko/apps-in-toss-tracking.md`로 추적합니다. 이 kit는 Apps in Toss SDK, Granite, TDS
+package를 runtime dependency로 추가하지 않습니다. 해당 version은 컨슈머 앱이 소유합니다.
 
 로컬 개발 환경에서는 checkout마다 `mise trust`를 한 번 실행한 뒤 `mise install`로 고정된 Bun,
 Node, Rust 도구를 설치하세요. 같은 Rust 버전은 Cargo, rustup, editor, CI 호환성을 위해
@@ -110,8 +113,8 @@ Node, Rust 도구를 설치하세요. 같은 Rust 버전은 Cargo, rustup, edito
 Kit minimum supported TrailBase server version은 자동으로 올리지 않습니다. 도입 앱 smoke
 test가 통과한 뒤에만 올립니다. 도입 앱은 복사해 간 Compose 파일이나 TrailBase 서버 이미지
 태그에 대해 `scripts/check-trailbase-version-policy.mjs`를 참고 진단으로 사용할 수 있습니다.
-추적 정책은 `docs/en/trailbase-tracking.md`와
-`docs/ko/trailbase-tracking.md`를 참고하세요.
+추적 정책은 `docs/en/trailbase-tracking.md`, `docs/ko/trailbase-tracking.md`,
+`docs/en/apps-in-toss-tracking.md`, `docs/ko/apps-in-toss-tracking.md`를 참고하세요.
 
 ## 버전 관리
 
@@ -124,13 +127,19 @@ crate는 고정 버전 그룹(fixed version group)으로 묶여 `trailbase-guest
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
+
+`sampo release`를 실행하기 전에 release-note draft 명령으로 대기 중인 Sampo changeset을
+Markdown 요약으로 만들 수 있습니다. 컨슈머 앱도 자체 `.sampo/changesets`에서 릴리스 노트를
+만들고 싶을 때 kit submodule의 같은 스크립트를 실행할 수 있습니다.
 
 `sampo release`가 프록시 패키지 버전(proxy package version)을 올리고 릴리스 커밋(release
 commit)이 `main`에 들어가면, 이미지 워크플로는 필요한 경우 대응하는
 `toss-mtls-client-proxy-vX.Y.Z` git tag를 만들고 GHCR 릴리스 태그를 배포합니다.
 
-자세한 릴리스 및 이미지 태그 정책은 `docs/en/versioning.md`를 참고하세요. 한글 문서는
-`docs/ko/versioning.md`에 있습니다.
+자세한 릴리스, 릴리스 노트, 이미지 태그 정책은 `docs/en/versioning.md`와
+`docs/en/sampo-release-notes.md`를 참고하세요. 한글 문서는 `docs/ko/versioning.md`와
+`docs/ko/sampo-release-notes.md`에 있습니다.

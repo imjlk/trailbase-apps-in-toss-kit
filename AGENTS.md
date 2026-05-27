@@ -137,9 +137,16 @@ Typical Rust helper change flow:
 
 ```bash
 sampo add
+bun run sampo:release-notes:draft
 sampo release
 git push origin main
 ```
+
+Use `bun run sampo:release-notes:draft` to turn pending changesets into a
+Markdown release-note draft before running `sampo release`. The draft command
+does not consume changesets. Keep changeset bodies user-facing: mention
+migrations, env vars, image tags, smoke tests, rollout notes, or compatibility
+limits when operators need them.
 
 The two Rust crates are configured as a fixed group and should move together.
 The Bun proxy is a private npm package tracked by Sampo for version/changelog
@@ -155,6 +162,17 @@ npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy: patch
 
 Describe the proxy change.
 ```
+
+Consumer apps can reuse the release-note draft script from the submodule:
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/scripts/draft-sampo-release-notes.mjs --root .
+```
+
+Do not add a repo-specific skill just for Sampo release-note drafting. Use the
+general `$sampo` skill for Sampo changeset/release/publish work, and load
+`trailbase-ops` only when the release note touches TrailBase migration, Record
+API, WASM auth, deployment, production reset, or mTLS certificate behavior.
 
 When `sampo release` bumps that package version and the release commit lands on
 `main`, the image workflow creates `toss-mtls-client-proxy-vX.Y.Z` if needed and
@@ -176,7 +194,7 @@ Image tag policy:
 Prefer exact SemVer or minor tags for production. Use `latest` or `edge` only
 when a consumer app deliberately wants moving image builds.
 
-## Renovate, TrailBase Tracking, And CI
+## Renovate, Upstream Tracking, And CI
 
 Renovate tracks package-level updates for:
 
@@ -187,6 +205,8 @@ Renovate tracks package-level updates for:
 - mise tool versions
 - documented TrailBase reference versions in `docs/en/trailbase-tracking.md`
   and `docs/ko/trailbase-tracking.md`
+- documented Apps in Toss SDK/API reference versions in
+  `docs/en/apps-in-toss-tracking.md` and `docs/ko/apps-in-toss-tracking.md`
 
 TrailBase upstream release notes are tracked separately by the `TrailBase release
 watch` workflow. The workflow runs `scripts/snapshot-trailbase-release.mjs` to
@@ -204,6 +224,14 @@ apps that want to compare their copied Compose file or TrailBase server image
 tag against this kit's manual policy in `data/trailbase-compat-policy.json`.
 Do not turn this into a hard kit-level compatibility gate; consumers should
 enforce it with `CI_STRICT=1` only after they are ready for that policy.
+
+Apps in Toss SDK/API docs are tracked by the `Apps in Toss doc watch` workflow.
+The workflow runs `scripts/snapshot-apps-in-toss-docs.mjs` and stores document
+hashes plus npm reference package metadata under `data/upstream/apps-in-toss/`.
+Do not add `@apps-in-toss/framework`, `@granite-js/react-native`, or TDS packages
+to this kit's runtime dependencies just to track upstream. Consumer apps own
+those dependencies and must smoke-test SDK, Granite, TDS, Login, IAP, promotion,
+and Smart Message changes before raising their own supported version policy.
 
 Do not automatically raise the kit minimum supported TrailBase server version.
 That value is a manual compatibility policy and should move only after
