@@ -1,6 +1,8 @@
 CREATE TABLE IF NOT EXISTS message_outbox (
   id TEXT PRIMARY KEY,
   user_id BLOB NOT NULL REFERENCES _user(id) ON DELETE CASCADE,
+  toss_user_key_hmac TEXT NOT NULL,
+  toss_user_key_sealed TEXT,
   campaign_id TEXT,
   purpose TEXT NOT NULL CHECK (purpose IN ('FUNCTIONAL', 'MARKETING')),
   template_code TEXT NOT NULL,
@@ -37,6 +39,9 @@ CREATE INDEX IF NOT EXISTS idx_message_outbox_ready_dispatch
 
 CREATE INDEX IF NOT EXISTS idx_message_outbox_user_created
   ON message_outbox(user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_message_outbox_toss_user_key_hmac
+  ON message_outbox(toss_user_key_hmac);
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_message_outbox_provider_request
   ON message_outbox(provider, provider_request_id)

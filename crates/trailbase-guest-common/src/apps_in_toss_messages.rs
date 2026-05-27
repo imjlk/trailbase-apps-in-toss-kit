@@ -4,7 +4,7 @@ use trailbase_wasm::db::{Transaction, Value};
 
 use crate::db;
 use crate::read_string_path;
-use crate::responses::{ApiResult, bad_request};
+use crate::responses::{ApiResult, bad_request, internal};
 use crate::toss_identity_store;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -195,6 +195,7 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
 ) -> ApiResult<MessageDispatchGate> {
     let mut requires_template_agreement = false;
     let mut template_status = None;
+    let template_registry_exists = table_exists_tx(tx, "message_templates")?;
     if let Some(template) = message_template_tx(tx, template_code)? {
         template_status = Some(template.status.clone());
         if template.purpose != purpose {
@@ -218,6 +219,15 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
             });
         }
         requires_template_agreement = template.requires_agreement;
+    } else if template_registry_exists {
+        return Ok(MessageDispatchGate {
+            allowed: false,
+            purpose,
+            template_code: template_code.to_string(),
+            requires_template_agreement: false,
+            skip_reason: Some("template_not_found".to_string()),
+            template_status: None,
+        });
     }
 
     if purpose.requires_marketing_consent() && !marketing_opted_in_tx(tx, user)? {
@@ -265,11 +275,11 @@ pub fn unseal_toss_user_key_for_message_tx(
 
 pub fn skip_message_outbox_tx(
     tx: &mut Transaction,
-    outbox_id: &[u8],
+    outbox_id: &str,
     reason: &str,
     now: i64,
 ) -> ApiResult<()> {
-    db::tx_execute(
+    let updated = db::tx_execute(
         tx,
         "UPDATE message_outbox
          SET status = 'SKIPPED',
@@ -279,24 +289,27 @@ pub fn skip_message_outbox_tx(
              updated_at = ?2
          WHERE id = ?1",
         &[
-            Value::Blob(outbox_id.to_vec()),
+            Value::Text(outbox_id.to_string()),
             Value::Integer(now),
             Value::Text(reason.to_string()),
         ],
     )?;
+    if updated == 0 {
+        return Err(internal("Message outbox row was not found for skip"));
+    }
     Ok(())
 }
 
 pub fn complete_message_outbox_tx(
     tx: &mut Transaction,
-    outbox_id: &[u8],
+    outbox_id: &str,
     response: &MessageProviderResponse,
     raw_response_json: Option<&str>,
     now: i64,
 ) -> ApiResult<()> {
     let sent_at = response.sent_at.unwrap_or(now);
     let status = if response.is_sent() { "SENT" } else { "FAILED" };
-    db::tx_execute(
+    let updated = db::tx_execute(
         tx,
         "UPDATE message_outbox
          SET status = ?2,
@@ -314,7 +327,7 @@ pub fn complete_message_outbox_tx(
              updated_at = ?7
          WHERE id = ?1",
         &[
-            Value::Blob(outbox_id.to_vec()),
+            Value::Text(outbox_id.to_string()),
             Value::Text(status.to_string()),
             Value::Text(response.provider_request_id.clone()),
             Value::Text(response.provider_status.clone()),
@@ -328,6 +341,9 @@ pub fn complete_message_outbox_tx(
             optional_text(raw_response_json),
         ],
     )?;
+    if updated == 0 {
+        return Err(internal("Message outbox row was not found for completion"));
+    }
     Ok(())
 }
 

@@ -596,6 +596,41 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
+  test("forward message infers failed passthrough status when ok is omitted", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          providerRequestId: "msg-4",
+          providerStatus: "FAILED",
+          failureReason: "provider rejected message",
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageSend,
+        {
+          providerRequestId: "msg-4",
+          templateSetCode: "reward_result",
+          context: {},
+          tossUserKey: "toss-user-1",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.failureReason).toBe("provider rejected message");
+    });
+  });
+
   test("message adapter targets the Toss messenger API", () => {
     expect(TOSS_ENDPOINTS.messageSend).toBe("/api-partner/v1/apps-in-toss/messenger/send-message");
   });

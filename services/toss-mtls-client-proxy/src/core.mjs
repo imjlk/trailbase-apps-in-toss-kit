@@ -728,10 +728,11 @@ function readPathValue(value, paths) {
 
 function normalizeMessageResponse(request, upstream) {
   if (upstream?.providerStatus || (upstream?.status && !upstream?.resultType && !upstream?.result)) {
+    const providerStatus = upstream.providerStatus ?? upstream.status;
     return {
-      ok: upstream.ok ?? true,
+      ok: upstream.ok ?? messageStatusOk(providerStatus),
       providerRequestId: upstream.providerRequestId ?? request.providerRequestId,
-      providerStatus: upstream.providerStatus ?? upstream.status,
+      providerStatus,
       sentAt: upstream.sentAt,
       failureReason: upstream.failureReason ?? upstream.errorMessage ?? upstream.message,
     };
@@ -823,6 +824,11 @@ function firstMessageFailureReason(failures) {
     if (failure.reachFailReason) return failure.reachFailReason;
   }
   return undefined;
+}
+
+function messageStatusOk(status) {
+  const normalized = String(status ?? "").trim().toUpperCase();
+  return !["FAILED", "FAIL", "ERROR", "REJECTED"].includes(normalized);
 }
 
 function normalizeIapOrderStatusResponse(request, upstream) {
