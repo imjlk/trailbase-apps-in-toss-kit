@@ -9,15 +9,14 @@
     "./tanstack-db": "./src/tanstack-db.ts",
     "./tanstack-query": "./src/tanstack-query.ts"
   },
+  "dependencies": {
+    "@tanstack/react-db": "0.1.85"
+  },
   "peerDependencies": {
-    "@tanstack/react-db": ">=0.1.0",
     "@tanstack/react-query": ">=5.0.0",
     "trailbase": ">=0.12.1 <1"
   },
   "peerDependenciesMeta": {
-    "@tanstack/react-db": {
-      "optional": true
-    },
     "@tanstack/react-query": {
       "optional": true
     },

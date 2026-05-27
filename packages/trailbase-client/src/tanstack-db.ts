@@ -5,6 +5,9 @@ import {
   normalizeTrailBaseUrl,
 } from "./index";
 
+export { createCollection, useLiveQuery } from "@tanstack/react-db";
+export type { Collection } from "@tanstack/react-db";
+
 export type RecordId = string | number;
 
 export type TrailbaseEvent<Row> =
