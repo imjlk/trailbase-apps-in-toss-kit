@@ -594,9 +594,10 @@ fn table_has_column_tx(
 }
 
 fn validate_sqlite_identifier(value: &str) -> ApiResult<()> {
-    if value
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    if !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
     {
         Ok(())
     } else {
