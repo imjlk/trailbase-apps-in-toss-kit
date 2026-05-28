@@ -26,6 +26,14 @@ kit는 AppsInToss bootstrap endpoint가 반환한 token payload를 정규화하�
 도메인별 클라이언트 함수는 앱 패키지에 남기세요. kit는 재사용 가능한 전송 계층과 어댑터
 조각만 제공합니다.
 
+## Apps in Toss SDK 호출
+
+Apps in Toss SDK 호출은 mini-app 런타임 안에서 실행되므로 앱이 소유합니다. 사용자가 특정
+조건의 향후 알림을 신청하는 기능성 Smart Message 흐름에서는 `@apps-in-toss/framework` 또는
+`@apps-in-toss/web-framework`의
+`requestNotificationAgreement({ options: { templateCode } })`를 호출한 뒤, 그 결과를 앱
+백엔드로 보내 동의 상태를 저장하고 나서 발송하세요.
+
 ## TanStack DB
 
 TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에서 쓰기 쉬운 SSE 브리지,

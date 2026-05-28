@@ -75,6 +75,22 @@ impl NotificationAgreementResult {
     }
 }
 
+pub const APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE: &str = "apps_in_toss_sdk";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotificationTemplateAgreementRecord {
+    pub id: String,
+    pub user_id: Vec<u8>,
+    pub agreement_template_code: String,
+    pub status: String,
+    pub source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_result: Option<String>,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MessageProviderResponse {
@@ -110,6 +126,8 @@ pub struct MessageDispatchGate {
     pub purpose: MessagePurpose,
     pub template_code: String,
     pub requires_template_agreement: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agreement_template_code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skip_reason: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -194,6 +212,7 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
     template_code: &str,
 ) -> ApiResult<MessageDispatchGate> {
     let mut requires_template_agreement = false;
+    let mut agreement_template_code = None;
     let mut template_status = None;
     let template_registry_exists = table_exists_tx(tx, "message_templates")?;
     if let Some(template) = message_template_tx(tx, template_code)? {
@@ -204,6 +223,7 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
                 purpose,
                 template_code: template_code.to_string(),
                 requires_template_agreement: template.requires_agreement,
+                agreement_template_code: template.agreement_template_code,
                 skip_reason: Some("template_purpose_mismatch".to_string()),
                 template_status,
             });
@@ -214,17 +234,20 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
                 purpose,
                 template_code: template_code.to_string(),
                 requires_template_agreement: template.requires_agreement,
+                agreement_template_code: template.agreement_template_code,
                 skip_reason: Some("template_not_approved".to_string()),
                 template_status,
             });
         }
         requires_template_agreement = template.requires_agreement;
+        agreement_template_code = template.agreement_template_code;
     } else if template_registry_exists {
         return Ok(MessageDispatchGate {
             allowed: false,
             purpose,
             template_code: template_code.to_string(),
             requires_template_agreement: false,
+            agreement_template_code: None,
             skip_reason: Some("template_not_found".to_string()),
             template_status: None,
         });
@@ -236,23 +259,41 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
             purpose,
             template_code: template_code.to_string(),
             requires_template_agreement,
+            agreement_template_code,
             skip_reason: Some("marketing_not_opted_in".to_string()),
             template_status,
         });
     }
 
-    if purpose == MessagePurpose::Functional
-        && requires_template_agreement
-        && !template_agreement_opted_in_tx(tx, user, template_code)?
-    {
-        return Ok(MessageDispatchGate {
-            allowed: false,
-            purpose,
-            template_code: template_code.to_string(),
-            requires_template_agreement,
-            skip_reason: Some("functional_template_not_opted_in".to_string()),
-            template_status,
-        });
+    if purpose == MessagePurpose::Functional && requires_template_agreement {
+        let Some(required_agreement_template_code) = agreement_template_code
+            .as_deref()
+            .filter(|code| !code.trim().is_empty())
+        else {
+            return Ok(MessageDispatchGate {
+                allowed: false,
+                purpose,
+                template_code: template_code.to_string(),
+                requires_template_agreement,
+                agreement_template_code,
+                skip_reason: Some(
+                    "functional_template_missing_agreement_template_code".to_string(),
+                ),
+                template_status,
+            });
+        };
+
+        if !template_agreement_opted_in_tx(tx, user, required_agreement_template_code)? {
+            return Ok(MessageDispatchGate {
+                allowed: false,
+                purpose,
+                template_code: template_code.to_string(),
+                requires_template_agreement,
+                agreement_template_code,
+                skip_reason: Some("functional_template_not_opted_in".to_string()),
+                template_status,
+            });
+        }
     }
 
     Ok(MessageDispatchGate {
@@ -260,6 +301,7 @@ pub fn message_dispatch_gate_for_trailbase_user_tx(
         purpose,
         template_code: template_code.to_string(),
         requires_template_agreement,
+        agreement_template_code,
         skip_reason: None,
         template_status,
     })
@@ -271,6 +313,58 @@ pub fn unseal_toss_user_key_for_message_tx(
     unseal: impl FnOnce(&str) -> Result<String, String>,
 ) -> ApiResult<String> {
     toss_identity_store::unseal_active_toss_user_key_for_trailbase_user_tx(tx, user, unseal)
+}
+
+pub fn upsert_notification_template_agreement_tx(
+    tx: &mut Transaction,
+    user: &[u8],
+    agreement_template_code: &str,
+    result: NotificationAgreementResult,
+    source: &str,
+    now: i64,
+) -> ApiResult<NotificationTemplateAgreementRecord> {
+    if !table_exists_tx(tx, "notification_template_agreements")? {
+        return Err(internal(
+            "notification_template_agreements table is missing",
+        ));
+    }
+
+    let agreement_template_code =
+        normalize_required_text(agreement_template_code, "agreementTemplateCode")?;
+    let source = normalize_optional_text(source, APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE);
+    let status = result.consent_status();
+    let last_result = result.as_str();
+    let code_column = notification_agreement_code_column_tx(tx)?;
+    let sql = format!(
+        "INSERT INTO notification_template_agreements (
+           id, user_id, {code_column}, status, source, last_result, created_at, updated_at
+         )
+         VALUES (
+           lower(hex(randomblob(16))), ?1, ?2, ?3, ?4, ?5, ?6, ?6
+         )
+         ON CONFLICT(user_id, {code_column}) DO UPDATE SET
+           status = excluded.status,
+           source = excluded.source,
+           last_result = excluded.last_result,
+           updated_at = excluded.updated_at
+         RETURNING id, user_id, {code_column}, status, source, last_result, created_at, updated_at"
+    );
+    let rows = db::tx_query(
+        tx,
+        &sql,
+        &[
+            Value::Blob(user.to_vec()),
+            Value::Text(agreement_template_code),
+            Value::Text(status.to_string()),
+            Value::Text(source),
+            Value::Text(last_result.to_string()),
+            Value::Integer(now),
+        ],
+    )?;
+    let row = rows
+        .first()
+        .ok_or_else(|| internal("Failed to upsert notification template agreement"))?;
+    notification_template_agreement_from_row(row)
 }
 
 pub fn skip_message_outbox_tx(
@@ -352,6 +446,7 @@ struct MessageTemplate {
     purpose: MessagePurpose,
     status: String,
     requires_agreement: bool,
+    agreement_template_code: Option<String>,
 }
 
 fn message_template_tx(
@@ -361,9 +456,14 @@ fn message_template_tx(
     if !table_exists_tx(tx, "message_templates")? {
         return Ok(None);
     }
+    let has_agreement_template_code =
+        table_has_column_tx(tx, "message_templates", "agreement_template_code")?;
+    if !has_agreement_template_code {
+        return legacy_message_template_tx(tx, template_code);
+    }
     let rows = db::tx_query(
         tx,
-        "SELECT purpose, status, requires_agreement
+        "SELECT purpose, status, requires_agreement, agreement_template_code
          FROM message_templates
          WHERE template_code = ?1
          LIMIT 1",
@@ -375,6 +475,32 @@ fn message_template_tx(
                 purpose: MessagePurpose::parse(&db::text(&row[0], "purpose")?)?,
                 status: db::text(&row[1], "status")?,
                 requires_agreement: db::integer(&row[2], "requires_agreement")? != 0,
+                agreement_template_code: db::nullable_text(&row[3])?,
+            })
+        })
+        .transpose()
+}
+
+fn legacy_message_template_tx(
+    tx: &mut Transaction,
+    template_code: &str,
+) -> ApiResult<Option<MessageTemplate>> {
+    let rows = db::tx_query(
+        tx,
+        "SELECT purpose, status, requires_agreement
+         FROM message_templates
+         WHERE template_code = ?1
+         LIMIT 1",
+        &[Value::Text(template_code.to_string())],
+    )?;
+    rows.first()
+        .map(|row| {
+            let requires_agreement = db::integer(&row[2], "requires_agreement")? != 0;
+            Ok(MessageTemplate {
+                purpose: MessagePurpose::parse(&db::text(&row[0], "purpose")?)?,
+                status: db::text(&row[1], "status")?,
+                requires_agreement,
+                agreement_template_code: requires_agreement.then(|| template_code.to_string()),
             })
         })
         .transpose()
@@ -400,22 +526,26 @@ fn marketing_opted_in_tx(tx: &mut Transaction, user: &[u8]) -> ApiResult<bool> {
 fn template_agreement_opted_in_tx(
     tx: &mut Transaction,
     user: &[u8],
-    template_code: &str,
+    agreement_template_code: &str,
 ) -> ApiResult<bool> {
     if !table_exists_tx(tx, "notification_template_agreements")? {
         return Ok(false);
     }
-    let rows = db::tx_query(
-        tx,
+    let code_column = notification_agreement_code_column_tx(tx)?;
+    let sql = format!(
         "SELECT 1
          FROM notification_template_agreements
          WHERE user_id = ?1
-           AND template_code = ?2
+           AND {code_column} = ?2
            AND status = 'OPTED_IN'
-         LIMIT 1",
+         LIMIT 1"
+    );
+    let rows = db::tx_query(
+        tx,
+        &sql,
         &[
             Value::Blob(user.to_vec()),
-            Value::Text(template_code.to_string()),
+            Value::Text(agreement_template_code.to_string()),
         ],
     )?;
     Ok(!rows.is_empty())
@@ -432,6 +562,82 @@ fn table_exists_tx(tx: &mut Transaction, table_name: &str) -> ApiResult<bool> {
         &[Value::Text(table_name.to_string())],
     )?;
     Ok(!rows.is_empty())
+}
+
+fn notification_agreement_code_column_tx(tx: &mut Transaction) -> ApiResult<&'static str> {
+    if table_has_column_tx(
+        tx,
+        "notification_template_agreements",
+        "agreement_template_code",
+    )? {
+        Ok("agreement_template_code")
+    } else {
+        Ok("template_code")
+    }
+}
+
+fn table_has_column_tx(
+    tx: &mut Transaction,
+    table_name: &'static str,
+    column_name: &str,
+) -> ApiResult<bool> {
+    validate_sqlite_identifier(table_name)?;
+    let rows = db::tx_query(tx, &format!("PRAGMA table_info({table_name})"), &[])?;
+    for row in rows {
+        if let Some(Value::Text(name)) = row.get(1)
+            && name == column_name
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn validate_sqlite_identifier(value: &str) -> ApiResult<()> {
+    if !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    {
+        Ok(())
+    } else {
+        Err(internal("Invalid SQLite identifier"))
+    }
+}
+
+fn notification_template_agreement_from_row(
+    row: &[Value],
+) -> ApiResult<NotificationTemplateAgreementRecord> {
+    Ok(NotificationTemplateAgreementRecord {
+        id: db::text(&row[0], "notification_template_agreement_id")?,
+        user_id: db::blob(&row[1], "user_id")?,
+        agreement_template_code: db::text(&row[2], "agreement_template_code")?,
+        status: db::text(&row[3], "status")?,
+        source: db::text(&row[4], "source")?,
+        last_result: db::nullable_text(&row[5])?,
+        created_at: db::integer(&row[6], "created_at")?,
+        updated_at: db::integer(&row[7], "updated_at")?,
+    })
+}
+
+fn normalize_required_text(value: &str, field: &'static str) -> ApiResult<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(bad_request(
+            "MISSING_REQUIRED_FIELD",
+            format!("{field} is required"),
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
+fn normalize_optional_text(value: &str, fallback: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        fallback.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 fn read_i64_path(value: &JsonValue, paths: &[&str]) -> Option<i64> {

@@ -232,6 +232,10 @@ Do not add `@apps-in-toss/framework`, `@granite-js/react-native`, or TDS package
 to this kit's runtime dependencies just to track upstream. Consumer apps own
 those dependencies and must smoke-test SDK, Granite, TDS, Login, IAP, promotion,
 and Smart Message changes before raising their own supported version policy.
+For functional Smart Message flows where the user asks to receive a future
+alert, use the Apps in Toss `requestNotificationAgreement` SDK before server
+dispatch. Keep the SDK agreement `templateCode` separate from the message API
+`templateSetCode`; the proxy does not request or verify notification agreement.
 
 Do not automatically raise the kit minimum supported TrailBase server version.
 That value is a manual compatibility policy and should move only after

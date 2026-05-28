@@ -17,6 +17,8 @@ only after app-level smoke tests.
 - In-app purchase: https://developers-apps-in-toss.toss.im/iap/develop.md
 - Promotion: https://developers-apps-in-toss.toss.im/promotion/develop.md
 - Smart Message: https://developers-apps-in-toss.toss.im/smart-message/develop.md
+- Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/smart-message/intro.md
+- Notification agreement SDK: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
 - TDS React Native docs: https://tossmini-docs.toss.im/tds-react-native/
 
 ## Compatibility Policy
@@ -30,21 +32,28 @@ only after app-level smoke tests.
 - Framework 1.0 and newer should use `@toss/tds-react-native`; legacy framework
   versions used `@toss-design-system/react-native`.
 - mTLS API changes affect the proxy and server-side integration surface; review
-  Login, IAP, promotion, and Smart Message behavior together.
+  Login, IAP, promotion, Smart Message, and notification agreement behavior
+  together.
+- Functional Smart Message flows that represent a user-requested future alert
+  must use the Apps in Toss notification agreement SDK before server dispatch.
+  Keep the agreement `templateCode` distinct from the message `templateSetCode`.
+- `requestNotificationAgreement` is documented for React Native and WebView SDK
+  v2.5.0 or newer. Do not enable user-requested functional alert flows on older
+  consumer SDK versions.
 
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.6.0`
+- `apps-in-toss-framework`: `2.6.1`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.28`
+- `create-granite-app`: `1.0.29`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.28`
+- `granite-js-react-native`: `1.0.29`
 
 - `@toss-design-system/react-native`: legacy package name for pre-1.0 framework
   projects. No public npm `latest` metadata was available during the initial
@@ -74,6 +83,8 @@ for this repository so generated PRs trigger downstream `pull_request` checks.
 - Check mTLS API integration process changes before modifying proxy behavior.
 - Review Toss Login, IAP, promotion, and Smart Message docs for request/response
   or permission changes.
+- Review `requestNotificationAgreement` and Smart Message intro docs for
+  functional-message consent requirements before updating message templates.
 - Review TDS package guidance before updating non-game app templates.
 - Run consumer app smoke tests before raising any app-supported SDK/runtime
   version policy.

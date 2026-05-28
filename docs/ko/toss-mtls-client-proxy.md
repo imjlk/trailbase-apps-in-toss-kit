@@ -86,6 +86,9 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 `providerStatus`, `resultType`, `msgCount`, `sentPushCount`, `sentInboxCount`, `detail`, `fail`,
 `failureReason`, `failures[].reachFailReason` 필드로 정규화합니다. 하나 이상의 채널 발송에
 성공한 부분 성공 응답은 `SENT`로 취급해서 잡이 이미 도달한 채널을 중복 발송하지 않게 합니다.
+프록시는 알림 동의문을 요청하거나 검증하지 않습니다. 도입 앱은 필요한 경우 Apps in Toss
+`requestNotificationAgreement` SDK를 호출하고, 동의 결과를 저장한 뒤 이 어댑터를 호출하기
+전에 발송 가능 여부를 확인해야 합니다.
 
 프로모션 리워드 어댑터는 요청 본문(request body)에서 `promotionCode`와 `amount`를 받습니다.
 `promotionAmount`도 호환 alias로 허용되지만, 새 호출자는 `amount`를 우선 사용하세요. 캠페인

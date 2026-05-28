@@ -63,6 +63,7 @@ jobs:
             - SDK 2.x and Granite migration notes
             - mTLS API integration process changes
             - Login, IAP, promotion, and Smart Message API behavior
+            - Functional Smart Message notification agreement requirements and requestNotificationAgreement SDK behavior
             - TDS React Native package guidance
             - Toss app minimum version requirements
           labels: apps-in-toss,docs-watch

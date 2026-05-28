@@ -56,6 +56,16 @@ const DOC_SOURCES = [
     url: "https://developers-apps-in-toss.toss.im/smart-message/develop.md"
   },
   {
+    key: "smart-message-intro",
+    title: "Smart Message overview and notification agreement policy",
+    url: "https://developers-apps-in-toss.toss.im/smart-message/intro.md"
+  },
+  {
+    key: "notification-agreement-sdk",
+    title: "Notification agreement SDK requestNotificationAgreement",
+    url: "https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md"
+  },
+  {
     key: "tds-react-native",
     title: "TDS React Native docs",
     url: "https://tossmini-docs.toss.im/tds-react-native/"
