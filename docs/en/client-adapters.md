@@ -29,6 +29,14 @@ Shared client utilities include:
 Consumers should keep domain-specific client methods in their app packages. The
 kit should only provide reusable transport and adapter pieces.
 
+## Apps in Toss SDK Calls
+
+Apps in Toss SDK calls remain app-owned because they run inside the mini-app
+runtime. For functional Smart Message flows where a user asks to receive a
+future alert, call `requestNotificationAgreement({ options: { templateCode } })`
+from `@apps-in-toss/framework` or `@apps-in-toss/web-framework`, then send the
+result to the app backend so it can persist the agreement before dispatch.
+
 ## TanStack DB
 
 The TanStack DB adapter is intentionally thin. It helps build TrailBase Record

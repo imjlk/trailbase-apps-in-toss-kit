@@ -16,6 +16,8 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - In-app purchase: https://developers-apps-in-toss.toss.im/iap/develop.md
 - Promotion: https://developers-apps-in-toss.toss.im/promotion/develop.md
 - Smart Message: https://developers-apps-in-toss.toss.im/smart-message/develop.md
+- Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/smart-message/intro.md
+- Notification agreement SDK: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
 - TDS React Native docs: https://tossmini-docs.toss.im/tds-react-native/
 
 ## 호환성 정책
@@ -28,21 +30,27 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - Framework 1.0 이상에서는 `@toss/tds-react-native`를 사용합니다. Legacy framework에서는
   `@toss-design-system/react-native`를 사용했습니다.
 - mTLS API 변경은 proxy와 서버 연동 표면에 영향을 줍니다. Login, IAP, promotion,
-  Smart Message 동작을 함께 검토하세요.
+  Smart Message, 알림 동의문 동작을 함께 검토하세요.
+- 사용자가 특정 조건의 향후 알림을 신청하는 기능성 Smart Message 흐름은 서버 발송 전에
+  Apps in Toss 알림 동의문 SDK를 사용해야 합니다. 동의문 `templateCode`는 메시지
+  `templateSetCode`와 별도 값으로 관리하세요.
+- `requestNotificationAgreement`는 React Native와 WebView SDK v2.5.0 이상에서 문서화되어
+  있습니다. 더 낮은 SDK version을 쓰는 컨슈머 앱에서는 사용자가 신청하는 기능성 알림 흐름을
+  켜지 마세요.
 
 ## Renovate가 추적하는 reference version
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.6.0`
+- `apps-in-toss-framework`: `2.6.1`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.28`
+- `create-granite-app`: `1.0.29`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.28`
+- `granite-js-react-native`: `1.0.29`
 
 - `@toss-design-system/react-native`: framework 1.0 이전 프로젝트에서 쓰던 legacy package
   name입니다. 초기 tracking snapshot 시점에는 public npm `latest` metadata를 확인할 수
@@ -72,5 +80,7 @@ branch push와 pull request 생성 권한이 있어야 합니다.
 - Proxy 동작을 수정하기 전에 mTLS API integration process 변경을 확인합니다.
 - Toss Login, IAP, promotion, Smart Message 문서의 request/response 또는 permission 변경을
   확인합니다.
+- 메시지 template을 업데이트하기 전에 `requestNotificationAgreement`와 Smart Message 소개
+  문서에서 기능성 메시지 동의 요건을 확인합니다.
 - 비게임 앱 template을 업데이트하기 전에 TDS package guidance를 확인합니다.
 - 앱 지원 SDK/runtime version policy를 올리기 전에 컨슈머 앱 smoke test를 실행합니다.

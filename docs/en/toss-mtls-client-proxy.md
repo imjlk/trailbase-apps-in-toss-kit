@@ -86,6 +86,9 @@ JSON body. It normalizes the Toss messenger response into app-friendly fields:
 `providerStatus`, `resultType`, `msgCount`, `sentPushCount`, `sentInboxCount`, `detail`, `fail`,
 `failureReason`, and `failures[].reachFailReason`. A partial delivery with at least one successful
 channel is treated as `SENT` so dispatch jobs do not retry and duplicate the delivered channel.
+The proxy does not request or verify notification agreement. Consumer apps must
+call the Apps in Toss `requestNotificationAgreement` SDK where required, persist
+the agreement result, and gate dispatch before calling this adapter.
 
 The promotion reward adapter accepts `promotionCode` and `amount` in the request body.
 `promotionAmount` is also accepted as a compatibility alias, but new callers should prefer `amount`.
