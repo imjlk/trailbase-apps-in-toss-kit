@@ -211,7 +211,7 @@ pub fn campaign_unavailable_reason_for_amount(
         usage
             .committed_amount
             .checked_add(grant_amount)
-            .map_or(true, |amount| amount > limit)
+            .is_none_or(|amount| amount > limit)
     }) {
         return Some(PromotionCampaignUnavailableReason::BudgetExhausted);
     }
