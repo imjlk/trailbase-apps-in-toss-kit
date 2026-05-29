@@ -207,10 +207,12 @@ pub fn campaign_unavailable_reason_for_amount(
     if campaign.ends_at.is_some_and(|ends_at| ends_at <= now_ms) {
         return Some(PromotionCampaignUnavailableReason::Ended);
     }
-    if campaign
-        .budget_limit_amount
-        .is_some_and(|limit| usage.committed_amount + grant_amount > limit)
-    {
+    if campaign.budget_limit_amount.is_some_and(|limit| {
+        usage
+            .committed_amount
+            .checked_add(grant_amount)
+            .map_or(true, |amount| amount > limit)
+    }) {
         return Some(PromotionCampaignUnavailableReason::BudgetExhausted);
     }
     if campaign
@@ -493,6 +495,25 @@ mod tests {
                 0,
             ),
             Some(PromotionCampaignUnavailableReason::Misconfigured)
+        );
+    }
+
+    #[test]
+    fn budget_check_treats_overflow_as_exhausted() {
+        let mut campaign = active_campaign();
+        campaign.budget_limit_amount = Some(i64::MAX);
+
+        assert_eq!(
+            campaign_unavailable_reason_for_amount(
+                &campaign,
+                PromotionCampaignUsage {
+                    committed_amount: i64::MAX,
+                    committed_count: 0,
+                },
+                100,
+                1,
+            ),
+            Some(PromotionCampaignUnavailableReason::BudgetExhausted)
         );
     }
 

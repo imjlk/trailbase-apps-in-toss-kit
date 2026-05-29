@@ -103,7 +103,7 @@ pub struct PromotionRewardFeatureUsageQuery<'a> {
     pub campaign_table_feature_key_column: &'static str,
     pub feature_key: &'a str,
     pub committed_statuses: &'a [&'a str],
-    pub include_direct_campaign_id: bool,
+    pub direct_campaign_id: Option<&'a str>,
 }
 
 pub fn promotion_reward_payload(input: PromotionRewardPayloadInput<'_>) -> JsonValue {
@@ -291,6 +291,13 @@ pub fn promotion_reward_usage_for_feature_tx(
     tx: &mut Transaction,
     query: PromotionRewardFeatureUsageQuery<'_>,
 ) -> ApiResult<PromotionCampaignUsage> {
+    let (sql, params) = feature_usage_sql_and_params(query)?;
+    promotion_usage_from_query(tx, sql.as_str(), &params)
+}
+
+fn feature_usage_sql_and_params(
+    query: PromotionRewardFeatureUsageQuery<'_>,
+) -> ApiResult<(String, Vec<Value>)> {
     validate_usage_table(query.reward_table)?;
     validate_sql_identifier(query.campaign_table)?;
     validate_sql_identifier(query.campaign_table_id_column)?;
@@ -299,13 +306,10 @@ pub fn promotion_reward_usage_for_feature_tx(
         return Err(internal("committed statuses must not be empty"));
     }
 
-    let first_status_index = if query.include_direct_campaign_id {
-        2
-    } else {
-        1
-    };
+    let has_direct_campaign = query.direct_campaign_id.is_some();
+    let first_status_index = if has_direct_campaign { 2 } else { 1 };
     let status_placeholders = placeholders(first_status_index + 1, query.committed_statuses.len());
-    let direct_clause = if query.include_direct_campaign_id {
+    let direct_clause = if has_direct_campaign {
         format!(
             "{campaign_id_column} = ?1 OR ",
             campaign_id_column = query.reward_table.campaign_id_column
@@ -313,11 +317,7 @@ pub fn promotion_reward_usage_for_feature_tx(
     } else {
         String::new()
     };
-    let feature_param = if query.include_direct_campaign_id {
-        "?2"
-    } else {
-        "?1"
-    };
+    let feature_param = if has_direct_campaign { "?2" } else { "?1" };
     let sql = format!(
         "SELECT COALESCE(SUM(COALESCE({amount_column}, 0)), 0), COUNT(DISTINCT {id_column})
          FROM {reward_table}
@@ -340,11 +340,10 @@ pub fn promotion_reward_usage_for_feature_tx(
         status_placeholders = status_placeholders,
     );
 
-    let mut params = Vec::with_capacity(
-        usize::from(query.include_direct_campaign_id) + 1 + query.committed_statuses.len(),
-    );
-    if query.include_direct_campaign_id {
-        params.push(Value::Text(query.feature_key.to_string()));
+    let mut params =
+        Vec::with_capacity(usize::from(has_direct_campaign) + 1 + query.committed_statuses.len());
+    if let Some(direct_campaign_id) = query.direct_campaign_id {
+        params.push(Value::Text(direct_campaign_id.to_string()));
     }
     params.push(Value::Text(query.feature_key.to_string()));
     params.extend(
@@ -353,7 +352,7 @@ pub fn promotion_reward_usage_for_feature_tx(
             .iter()
             .map(|status| Value::Text((*status).to_string())),
     );
-    promotion_usage_from_query(tx, sql.as_str(), &params)
+    Ok((sql, params))
 }
 
 fn promotion_usage_from_query(
@@ -572,5 +571,30 @@ mod tests {
         assert!(validate_sql_identifier("reward grants").is_err());
         assert!(validate_sql_identifier("1reward_grants").is_err());
         assert!(validate_sql_identifier("reward_grants;DROP").is_err());
+    }
+
+    #[test]
+    fn feature_usage_query_binds_direct_campaign_id_separately() {
+        let (_sql, params) = feature_usage_sql_and_params(PromotionRewardFeatureUsageQuery {
+            reward_table: PromotionRewardUsageTable {
+                table: "promotion_reward_ledger",
+                id_column: "id",
+                campaign_id_column: "campaign_id",
+                amount_column: "amount",
+                status_column: "status",
+            },
+            campaign_table: "promotion_campaigns",
+            campaign_table_id_column: "id",
+            campaign_table_feature_key_column: "feature_key",
+            feature_key: "attendance",
+            committed_statuses: &["pending", "success"],
+            direct_campaign_id: Some("env:attendance"),
+        })
+        .unwrap();
+
+        assert!(matches!(&params[0], Value::Text(value) if value == "env:attendance"));
+        assert!(matches!(&params[1], Value::Text(value) if value == "attendance"));
+        assert!(matches!(&params[2], Value::Text(value) if value == "pending"));
+        assert!(matches!(&params[3], Value::Text(value) if value == "success"));
     }
 }
