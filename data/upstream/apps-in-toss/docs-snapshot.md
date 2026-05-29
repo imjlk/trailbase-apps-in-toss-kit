@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Snapshot
 
-- Fetched at: 2026-05-28T11:41:46.075Z
+- Fetched at: 2026-05-29T01:52:26.084Z
 
 ## Documents
 
