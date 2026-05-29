@@ -71,15 +71,38 @@ pub fn resolve_promotion_campaign_tx(
     tx: &mut Transaction,
     lookup: &PromotionCampaignLookup<'_>,
 ) -> ApiResult<PromotionCampaignResolution> {
+    resolve_promotion_campaign_with_amount_tx(tx, lookup, None)
+}
+
+pub fn resolve_promotion_campaign_for_amount_tx(
+    tx: &mut Transaction,
+    lookup: &PromotionCampaignLookup<'_>,
+    grant_amount: i64,
+) -> ApiResult<PromotionCampaignResolution> {
+    resolve_promotion_campaign_with_amount_tx(tx, lookup, Some(grant_amount))
+}
+
+fn resolve_promotion_campaign_with_amount_tx(
+    tx: &mut Transaction,
+    lookup: &PromotionCampaignLookup<'_>,
+    grant_amount: Option<i64>,
+) -> ApiResult<PromotionCampaignResolution> {
     if promotion_campaigns_table_exists_tx(tx)? {
         let rows = load_campaign_rows_tx(tx, lookup.feature_key)?;
         if !rows.is_empty() {
             let mut temporal_reason = None;
             for row in rows {
                 let campaign = campaign_from_row(&row)?;
-                if let Some(reason) =
-                    campaign_unavailable_reason(&campaign, lookup.usage, lookup.now_ms)
-                {
+                let unavailable_reason = match grant_amount {
+                    Some(amount) => campaign_unavailable_reason_for_amount(
+                        &campaign,
+                        lookup.usage,
+                        lookup.now_ms,
+                        amount,
+                    ),
+                    None => campaign_unavailable_reason(&campaign, lookup.usage, lookup.now_ms),
+                };
+                if let Some(reason) = unavailable_reason {
                     if matches!(
                         reason,
                         PromotionCampaignUnavailableReason::NotStarted
@@ -108,10 +131,27 @@ pub fn resolve_promotion_campaign_tx(
     }
 
     Ok(match env_fallback_campaign(lookup) {
-        Some(campaign) => PromotionCampaignResolution {
-            campaign: Some(campaign),
-            unavailable_reason: None,
-        },
+        Some(campaign) => {
+            let unavailable_reason = match grant_amount {
+                Some(amount) => campaign_unavailable_reason_for_amount(
+                    &campaign,
+                    lookup.usage,
+                    lookup.now_ms,
+                    amount,
+                ),
+                None => campaign_unavailable_reason(&campaign, lookup.usage, lookup.now_ms),
+            };
+            match unavailable_reason {
+                Some(reason) => PromotionCampaignResolution {
+                    campaign: None,
+                    unavailable_reason: Some(reason),
+                },
+                None => PromotionCampaignResolution {
+                    campaign: Some(campaign),
+                    unavailable_reason: None,
+                },
+            }
+        }
         None => PromotionCampaignResolution {
             campaign: None,
             unavailable_reason: Some(if env_fallback_enabled(lookup.env_fallback_enabled_key) {
@@ -127,6 +167,15 @@ pub fn campaign_unavailable_reason(
     campaign: &PromotionCampaign,
     usage: PromotionCampaignUsage,
     now_ms: i64,
+) -> Option<PromotionCampaignUnavailableReason> {
+    campaign_unavailable_reason_for_amount(campaign, usage, now_ms, campaign.reward_amount)
+}
+
+pub fn campaign_unavailable_reason_for_amount(
+    campaign: &PromotionCampaign,
+    usage: PromotionCampaignUsage,
+    now_ms: i64,
+    grant_amount: i64,
 ) -> Option<PromotionCampaignUnavailableReason> {
     match campaign.status.trim().to_ascii_uppercase().as_str() {
         "ACTIVE" => {}
@@ -146,6 +195,9 @@ pub fn campaign_unavailable_reason(
     {
         return Some(PromotionCampaignUnavailableReason::Misconfigured);
     }
+    if grant_amount <= 0 {
+        return Some(PromotionCampaignUnavailableReason::Misconfigured);
+    }
     if campaign
         .starts_at
         .is_some_and(|starts_at| starts_at > now_ms)
@@ -155,10 +207,12 @@ pub fn campaign_unavailable_reason(
     if campaign.ends_at.is_some_and(|ends_at| ends_at <= now_ms) {
         return Some(PromotionCampaignUnavailableReason::Ended);
     }
-    if campaign
-        .budget_limit_amount
-        .is_some_and(|limit| usage.committed_amount + campaign.reward_amount > limit)
-    {
+    if campaign.budget_limit_amount.is_some_and(|limit| {
+        usage
+            .committed_amount
+            .checked_add(grant_amount)
+            .is_none_or(|amount| amount > limit)
+    }) {
         return Some(PromotionCampaignUnavailableReason::BudgetExhausted);
     }
     if campaign
@@ -360,6 +414,106 @@ mod tests {
                 100,
             ),
             Some(PromotionCampaignUnavailableReason::CountExhausted)
+        );
+    }
+
+    #[test]
+    fn fixed_amount_availability_matches_existing_behavior() {
+        let campaign = active_campaign();
+        let usage = PromotionCampaignUsage {
+            committed_amount: 9,
+            committed_count: 0,
+        };
+
+        assert_eq!(
+            campaign_unavailable_reason(&campaign, usage, 100),
+            campaign_unavailable_reason_for_amount(&campaign, usage, 100, campaign.reward_amount)
+        );
+    }
+
+    #[test]
+    fn amount_override_controls_budget_availability() {
+        let mut campaign = active_campaign();
+        campaign.reward_amount = 1;
+        campaign.budget_limit_amount = Some(10);
+
+        assert_eq!(
+            campaign_unavailable_reason_for_amount(
+                &campaign,
+                PromotionCampaignUsage {
+                    committed_amount: 8,
+                    committed_count: 0,
+                },
+                100,
+                2,
+            ),
+            None
+        );
+        assert_eq!(
+            campaign_unavailable_reason_for_amount(
+                &campaign,
+                PromotionCampaignUsage {
+                    committed_amount: 8,
+                    committed_count: 0,
+                },
+                100,
+                3,
+            ),
+            Some(PromotionCampaignUnavailableReason::BudgetExhausted)
+        );
+    }
+
+    #[test]
+    fn count_limit_is_independent_from_amount_override() {
+        let mut campaign = active_campaign();
+        campaign.budget_limit_amount = Some(100);
+        campaign.max_grant_count = Some(2);
+
+        assert_eq!(
+            campaign_unavailable_reason_for_amount(
+                &campaign,
+                PromotionCampaignUsage {
+                    committed_amount: 0,
+                    committed_count: 2,
+                },
+                100,
+                1,
+            ),
+            Some(PromotionCampaignUnavailableReason::CountExhausted)
+        );
+    }
+
+    #[test]
+    fn amount_override_rejects_non_positive_grant_amount() {
+        let campaign = active_campaign();
+
+        assert_eq!(
+            campaign_unavailable_reason_for_amount(
+                &campaign,
+                PromotionCampaignUsage::default(),
+                100,
+                0,
+            ),
+            Some(PromotionCampaignUnavailableReason::Misconfigured)
+        );
+    }
+
+    #[test]
+    fn budget_check_treats_overflow_as_exhausted() {
+        let mut campaign = active_campaign();
+        campaign.budget_limit_amount = Some(i64::MAX);
+
+        assert_eq!(
+            campaign_unavailable_reason_for_amount(
+                &campaign,
+                PromotionCampaignUsage {
+                    committed_amount: i64::MAX,
+                    committed_count: 0,
+                },
+                100,
+                1,
+            ),
+            Some(PromotionCampaignUnavailableReason::BudgetExhausted)
         );
     }
 
