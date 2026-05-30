@@ -1,7 +1,9 @@
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 const OUT_DIR = "data/upstream/apps-in-toss";
+const JSON_OUT = `${OUT_DIR}/docs-snapshot.json`;
+const MARKDOWN_OUT = `${OUT_DIR}/docs-snapshot.md`;
 const REQUEST_TIMEOUT_MS = 30_000;
 
 const DOC_SOURCES = [
@@ -131,7 +133,7 @@ async function readJson(url, { optional = false } = {}) {
   return res.json();
 }
 
-async function snapshotDocs(fetchedAt) {
+async function snapshotDocs() {
   const docs = [];
 
   for (const source of DOC_SOURCES) {
@@ -140,7 +142,6 @@ async function snapshotDocs(fetchedAt) {
       key: source.key,
       title: source.title,
       url: source.url,
-      fetchedAt,
       sha256: sha256(body),
       bytes: Buffer.byteLength(body, "utf8")
     });
@@ -149,14 +150,13 @@ async function snapshotDocs(fetchedAt) {
   return docs;
 }
 
-async function snapshotPackages(fetchedAt) {
+async function snapshotPackages() {
   const packages = [];
 
   for (const source of NPM_PACKAGES) {
     const result = await readJson(registryUrl(source.packageName), { optional: source.optional });
     packages.push({
       packageName: source.packageName,
-      fetchedAt,
       version: result.version ?? null,
       unavailable: result.unavailable === true,
       status: result.status ?? null,
@@ -165,6 +165,59 @@ async function snapshotPackages(fetchedAt) {
   }
 
   return packages;
+}
+
+async function readExistingSnapshot() {
+  try {
+    return JSON.parse(await readFile(JSON_OUT, "utf8"));
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function readExistingText(path) {
+  try {
+    return await readFile(path, "utf8");
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function writeFileIfChanged(path, contents) {
+  if ((await readExistingText(path)) === contents) {
+    return false;
+  }
+  await writeFile(path, contents);
+  return true;
+}
+
+function comparableSnapshot(snapshot) {
+  return {
+    documents: (snapshot?.documents ?? []).map((doc) => ({
+      key: doc.key,
+      title: doc.title,
+      url: doc.url,
+      sha256: doc.sha256,
+      bytes: doc.bytes
+    })),
+    packages: (snapshot?.packages ?? []).map((pkg) => ({
+      packageName: pkg.packageName,
+      version: pkg.version ?? null,
+      unavailable: pkg.unavailable === true,
+      status: pkg.status ?? null,
+      registryUrl: pkg.registryUrl
+    }))
+  };
+}
+
+function snapshotsHaveSameContent(left, right) {
+  return JSON.stringify(comparableSnapshot(left)) === JSON.stringify(comparableSnapshot(right));
 }
 
 function formatSnapshotMarkdown(snapshot) {
@@ -195,23 +248,37 @@ function formatSnapshotMarkdown(snapshot) {
   return lines.join("\n");
 }
 
-const fetchedAt = new Date().toISOString();
+const existingSnapshot = await readExistingSnapshot();
 const [documents, packages] = await Promise.all([
-  snapshotDocs(fetchedAt),
-  snapshotPackages(fetchedAt)
+  snapshotDocs(),
+  snapshotPackages()
 ]);
 
-const snapshot = {
-  fetchedAt,
+const nextSnapshot = {
   documents,
   packages
 };
 
+const snapshot = {
+  fetchedAt:
+    existingSnapshot && snapshotsHaveSameContent(existingSnapshot, nextSnapshot)
+      ? existingSnapshot.fetchedAt
+      : new Date().toISOString(),
+  documents,
+  packages
+};
+
+const nextJson = `${JSON.stringify(snapshot, null, 2)}\n`;
+const nextMarkdown = formatSnapshotMarkdown(snapshot);
+
 await mkdir(OUT_DIR, { recursive: true });
-await writeFile(`${OUT_DIR}/docs-snapshot.json`, `${JSON.stringify(snapshot, null, 2)}\n`);
-await writeFile(`${OUT_DIR}/docs-snapshot.md`, formatSnapshotMarkdown(snapshot));
+const jsonChanged = await writeFileIfChanged(JSON_OUT, nextJson);
+const markdownChanged = await writeFileIfChanged(MARKDOWN_OUT, nextMarkdown);
 
 console.log(`Apps in Toss docs tracked: ${documents.length}`);
+console.log(
+  `Snapshot files changed: ${jsonChanged || markdownChanged ? "yes" : "no"}`
+);
 for (const pkg of packages) {
   const status = pkg.unavailable ? `unavailable (${pkg.status})` : pkg.version;
   console.log(`${pkg.packageName}: ${status}`);

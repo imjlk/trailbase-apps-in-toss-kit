@@ -162,14 +162,16 @@ pub fn promotion_reward_outcome_from_response(
     requested_at: Option<i64>,
 ) -> PromotionRewardOutcome {
     let provider_status = promotion_provider_status_from_response(response);
+    let ledger_status = promotion_ledger_status(&provider_status);
     let granted_at = if provider_status == "GRANTED" {
         read_integer_path(response, &["grantedAt", "data.grantedAt", "body.grantedAt"])
             .or(requested_at)
     } else {
         None
     };
-    let failed_at = if provider_status == "FAILED" {
-        requested_at
+    let failed_at = if ledger_status == "failed" {
+        read_integer_path(response, &["failedAt", "data.failedAt", "body.failedAt"])
+            .or(requested_at)
     } else {
         None
     };
@@ -526,6 +528,36 @@ mod tests {
         assert_eq!(outcome.failed_at, None);
         assert_eq!(outcome.failure_reason.as_deref(), Some("done"));
         assert!(outcome.raw_response_json.is_some());
+    }
+
+    #[test]
+    fn provider_outcome_marks_failed_ledger_statuses_with_failed_at() {
+        let explicit_failed_at = promotion_reward_outcome_from_response(
+            &json!({
+                "providerStatus": "PROMOTION_EXECUTE_FAILED",
+                "data": { "failedAt": 321 },
+            }),
+            "request-1",
+            Some(100),
+        );
+        assert_eq!(
+            explicit_failed_at.provider_status,
+            "PROMOTION_EXECUTE_FAILED"
+        );
+        assert_eq!(explicit_failed_at.granted_at, None);
+        assert_eq!(explicit_failed_at.failed_at, Some(321));
+
+        for status in ["MISSING_TOSS_USER_KEY", "UPSTREAM_REJECTED"] {
+            let outcome = promotion_reward_outcome_from_response(
+                &json!({ "providerStatus": status }),
+                "request-1",
+                Some(100),
+            );
+
+            assert_eq!(outcome.provider_status, status);
+            assert_eq!(outcome.granted_at, None);
+            assert_eq!(outcome.failed_at, Some(100));
+        }
     }
 
     #[test]
