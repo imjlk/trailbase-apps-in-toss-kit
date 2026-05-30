@@ -2,8 +2,8 @@
 /.DS_Store
 /.local-consumers.md
 /node_modules/
-/bun.lock
 /bun.lockb
+/packages/*/node_modules/
 /services/*/node_modules/
 /services/*/bun.lock
 /services/*/bun.lockb

@@ -19,8 +19,15 @@ TrailBase가 프록시 환경 변수뿐 아니라 프로모션 설정까지 관�
 - `provider_promotion_code`: Toss Console 프로모션 코드.
 - `reward_amount`: 해당 캠페인에서 Toss로 보낼 금액.
 - `status`: `DRAFT`, `ACTIVE`, `PAUSED`, `ENDED`, `EXHAUSTED` 같은 운영 상태.
-- `starts_at` / `ends_at`: 선택 사항인 활성 기간. epoch milliseconds 값입니다.
+- `starts_at` / `ends_at`: 활성 기간. epoch milliseconds 값입니다. DB 기반 캠페인을
+  `ACTIVE`로 전환하기 전에는 필수입니다.
 - `budget_limit_amount` / `max_grant_count`: Toss 호출 전에 확인하는 로컬 안전 한도.
+  DB 기반 `ACTIVE` 캠페인에는 `budget_limit_amount`가 필수이고, `max_grant_count`는
+  선택 사항입니다.
+
+환경 변수 대체값(fallback)은 활성 기간이나 로컬 예산 없이도 동작할 수 있습니다. DB 기반
+캠페인은 실제 Toss 호출 전에 운영자가 캠페인 기간과 총 로컬 예산을 명시하도록 더 엄격하게
+다룹니다.
 
 기능 키(feature key)는 도입 앱이 소유합니다. 운영자가 이해할 수 있고 오래 유지될 이름이면
 충분하며, 모든 비즈니스 규칙을 키에 담을 필요는 없습니다. 예를 들어 한 앱은 미션 리워드용

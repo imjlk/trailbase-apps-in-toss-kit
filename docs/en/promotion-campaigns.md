@@ -21,9 +21,15 @@ The table stores:
 - `reward_amount`: amount sent to Toss for that campaign.
 - `status`: operator state such as `DRAFT`, `ACTIVE`, `PAUSED`, `ENDED`, or
   `EXHAUSTED`.
-- `starts_at` / `ends_at`: optional active window in epoch milliseconds.
+- `starts_at` / `ends_at`: active window in epoch milliseconds. These are
+  required before a DB-backed campaign can be moved to `ACTIVE`.
 - `budget_limit_amount` / `max_grant_count`: local safety limits before calling
-  Toss.
+  Toss. `budget_limit_amount` is required for DB-backed `ACTIVE` campaigns;
+  `max_grant_count` remains optional.
+
+The env fallback path can run without a configured active window or local budget.
+DB-backed campaigns are stricter because operators should make the campaign
+window and total local budget explicit before real Toss calls start.
 
 Feature keys are owned by the consumer app. They should be stable and meaningful
 to operators, but they do not have to encode the whole business rule. For
