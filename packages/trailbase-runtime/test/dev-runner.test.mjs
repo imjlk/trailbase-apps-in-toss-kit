@@ -5,7 +5,9 @@ import {
   buildComposeArgs,
   detectLanIp,
   findAvailablePort,
+  parseDockerPublishedHostPorts,
   parseDevRunnerArgs,
+  resolveLocalDevPorts,
 } from "../src/dev-runner.mjs";
 
 const servers = [];
@@ -84,6 +86,52 @@ describe("dev runner helpers", () => {
     expect(result.port).toBeGreaterThan(busyPort);
     expect(result.changed).toBe(true);
     expect(warnings[0]).toContain(`TrailBase port ${busyPort} is already in use`);
+  });
+
+  test("increments when Docker already publishes the preferred port", async () => {
+    const warnings = [];
+
+    const result = await findAvailablePort({
+      preferredPort: 49000,
+      host: "127.0.0.1",
+      label: "TrailBase port",
+      logger: { warn: (message) => warnings.push(message) },
+      maxAttempts: 3,
+      busyPorts: new Set([49000]),
+    });
+
+    expect(result.port).toBe(49001);
+    expect(result.changed).toBe(true);
+    expect(warnings[0]).toContain("TrailBase port 49000 is already in use");
+  });
+
+  test("parses Docker published host ports and ignores current project containers", () => {
+    const ports = parseDockerPublishedHostPorts(
+      [
+        "zero-three-three-trailbase-1\t0.0.0.0:4001->4000/tcp",
+        "trailbase-trailbase-1\t0.0.0.0:4000->4000/tcp, [::]:4000->4000/tcp",
+        "kit-proxy-1\t127.0.0.1:8787->8787/tcp",
+        "internal-only\t4000/tcp",
+      ].join("\n"),
+      { ignoreContainerNamePrefixes: ["zero-three-three-"] },
+    );
+
+    expect([...ports].sort((a, b) => a - b)).toEqual([4000, 8787]);
+  });
+
+  test("resolves TrailBase, proxy, and asset preview ports without overlap", async () => {
+    const result = await resolveLocalDevPorts({
+      trailbasePort: 49100,
+      mtlsProxyPort: 49101,
+      assetPreviewPort: 49101,
+      host: "127.0.0.1",
+      logger: { warn: () => {} },
+    });
+
+    expect(result.trailbasePort).toBe(49100);
+    expect(result.mtlsProxyPort).toBe(49101);
+    expect(result.assetPreviewPort).toBe(49102);
+    expect(result.changed).toBe(true);
   });
 
   test("shell entrypoint helper has valid syntax", () => {

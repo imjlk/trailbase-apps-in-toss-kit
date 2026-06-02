@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 
@@ -62,11 +63,12 @@ export async function findAvailablePort({
   label = "port",
   maxAttempts = 100,
   logger = console,
+  busyPorts = new Set(),
 } = {}) {
   const preferred = parsePort(preferredPort, label);
   for (let offset = 0; offset < maxAttempts; offset += 1) {
     const port = preferred + offset;
-    if (await isPortAvailable(port, host)) {
+    if (!busyPorts.has(port) && (await isPortAvailable(port, host))) {
       const changed = port !== preferred;
       const warning = changed
         ? `${label} ${preferred} is already in use on ${host}; using ${port}`
@@ -83,28 +85,105 @@ export async function findAvailablePort({
 export async function resolveLocalDevPorts({
   trailbasePort = 4000,
   mtlsProxyPort = 8787,
+  assetPreviewPort,
   host = "127.0.0.1",
   logger = console,
+  ignoreContainerNamePrefixes = [],
 } = {}) {
+  const dockerPublishedPorts = getDockerPublishedHostPorts({
+    ignoreContainerNamePrefixes,
+    logger,
+  });
+  const busyPorts = new Set(dockerPublishedPorts);
   const trailbase = await findAvailablePort({
     preferredPort: trailbasePort,
     host,
     label: "TrailBase port",
     logger,
+    busyPorts,
   });
+  busyPorts.add(trailbase.port);
   const mtlsProxy = await findAvailablePort({
     preferredPort: mtlsProxyPort,
     host,
     label: "mTLS proxy port",
     logger,
+    busyPorts,
   });
+  busyPorts.add(mtlsProxy.port);
+  const assetPreview = assetPreviewPort
+    ? await findAvailablePort({
+        preferredPort: assetPreviewPort,
+        host,
+        label: "Asset preview port",
+        logger,
+        busyPorts,
+      })
+    : undefined;
   return {
     trailbasePort: trailbase.port,
     mtlsProxyPort: mtlsProxy.port,
+    assetPreviewPort: assetPreview?.port,
     changed:
-      trailbase.changed || mtlsProxy.changed,
-    warnings: [trailbase.warning, mtlsProxy.warning].filter(Boolean),
+      trailbase.changed || mtlsProxy.changed || Boolean(assetPreview?.changed),
+    warnings: [
+      trailbase.warning,
+      mtlsProxy.warning,
+      assetPreview?.warning,
+    ].filter(Boolean),
   };
+}
+
+export function getDockerPublishedHostPorts({
+  spawnSyncImpl = spawnSync,
+  ignoreContainerNamePrefixes = [],
+  logger = console,
+} = {}) {
+  const result = spawnSyncImpl(
+    "docker",
+    ["ps", "--format", "{{.Names}}\t{{.Ports}}"],
+    {
+      encoding: "utf8",
+      stdio: "pipe",
+    },
+  );
+  if (result.status !== 0) {
+    if (logger?.debug) {
+      logger.debug(
+        `docker ps failed while resolving dev ports: ${
+          result.stderr || result.stdout || result.status
+        }`,
+      );
+    }
+    return new Set();
+  }
+  return parseDockerPublishedHostPorts(result.stdout, {
+    ignoreContainerNamePrefixes,
+  });
+}
+
+export function parseDockerPublishedHostPorts(
+  output = "",
+  { ignoreContainerNamePrefixes = [] } = {},
+) {
+  const ports = new Set();
+  for (const line of String(output).split(/\r?\n/)) {
+    const [name = "", published = ""] = line.split("\t");
+    if (
+      ignoreContainerNamePrefixes.some((prefix) =>
+        name.trim().startsWith(prefix),
+      )
+    ) {
+      continue;
+    }
+    for (const segment of published.split(",")) {
+      const match = segment.trim().match(/:(\d+)(?:-\d+)?->/);
+      if (match) {
+        ports.add(Number(match[1]));
+      }
+    }
+  }
+  return ports;
 }
 
 export function detectLanIp({
