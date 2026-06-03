@@ -33,6 +33,12 @@ Prefer repo scripts or TrailBase CLI helpers when creating migrations, but inspe
 repo scripts, or existing migrations before assuming exact command flags. When no safe generator is
 available, create a migration that follows the repo's existing filename/version pattern.
 
+For host-side `trail` CLI workflows, check whether the consumer repo wants `apps/trailbase/traildepot`
+to be usable as the default `--data-dir`. The recommended layout is a Git-tracked
+`traildepot-template` as the source of truth, plus tracked symlinks from `traildepot/config.textproto`
+and `traildepot/migrations` back to the template. Runtime DBs, secrets, uploads, metadata, and WASM
+outputs under `traildepot` should stay ignored.
+
 ## Safety Defaults
 
 - Baseline SQL is immutable after production starts unless the task is explicitly a reset.

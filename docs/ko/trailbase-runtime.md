@@ -38,6 +38,46 @@
 4. 공개 URL 정규화나 `config.textproto` 동기화처럼 반복되는 시작 작업을 하나씩 교체합니다.
 5. 배포 전에 도입 앱의 운영 환경 변수 검증과 WASM 검증을 실행합니다.
 
+## TrailBase Depot 레이아웃
+
+도입 앱은 보통 두 종류의 depot 경로를 함께 둡니다.
+
+- `apps/trailbase/traildepot-template`: Git으로 추적하는 원본입니다. `config.textproto`,
+  `migrations/main`, seed SQL처럼 리뷰되어야 하는 파일만 둡니다.
+- `apps/trailbase/traildepot`: TrailBase CLI의 기본 `--data-dir` 이름입니다. DB, secret,
+  upload, generated WASM, metadata 같은 런타임 출력은 ignore합니다.
+
+호스트에서 `cd apps/trailbase && trail ...` 형태로 기본 CLI 명령을 쓰고 싶다면
+`traildepot/config.textproto`와 `traildepot/migrations`를 template으로 향하는 symlink로
+추적하는 패턴을 권장합니다.
+
+```text
+apps/trailbase/
+  traildepot-template/
+    config.textproto
+    migrations/main/
+  traildepot/
+    .gitignore
+    config.textproto -> ../traildepot-template/config.textproto
+    migrations -> ../traildepot-template/migrations
+```
+
+repo root `.gitignore`는 런타임 출력 전체를 무시하되 symlink 두 개만 허용합니다.
+
+```gitignore
+apps/trailbase/traildepot/*
+!apps/trailbase/traildepot/.gitignore
+!apps/trailbase/traildepot/config.textproto
+!apps/trailbase/traildepot/migrations
+```
+
+이 구조에서는 `trail migration <suffix> main`이 `traildepot/migrations` symlink를 따라
+`traildepot-template/migrations/main`에 새 migration을 만듭니다. 컨테이너 entrypoint는
+여전히 image에 포함된 template을 `/app/traildepot` 런타임 볼륨으로 복사하므로 배포
+경로와 호스트 CLI 경로가 같은 원본 파일을 바라봅니다. Docker named volume의 DB를 직접
+수정해야 하는 운영 작업은 별도 스크립트나 컨테이너 내부 `trail --data-dir /app/traildepot`
+명령으로 다루세요.
+
 ## Entrypoint 패턴
 
 도입 앱 이미지는 런타임 entrypoint 라이브러리를 최종 이미지(final image)로 복사해야 합니다.

@@ -83,3 +83,6 @@ Before changing a TrailBase app, inspect:
 - `apps/trailbase/scripts/production-release-check.sh`
 - `apps/trailbase/traildepot-template/config.textproto`
 - `apps/trailbase/traildepot-template/migrations/main/`
+- `apps/trailbase/traildepot/.gitignore`
+- Optional host CLI symlinks: `apps/trailbase/traildepot/config.textproto`,
+  `apps/trailbase/traildepot/migrations`

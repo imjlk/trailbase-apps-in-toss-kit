@@ -40,6 +40,47 @@ The consumer app keeps app-specific behavior:
    normalization or `config.textproto` sync.
 5. Run the consumer's production env check and WASM check before deploying.
 
+## TrailBase Depot Layout
+
+Consumer apps usually keep two depot paths:
+
+- `apps/trailbase/traildepot-template`: the Git-tracked source of truth. Keep
+  reviewed files such as `config.textproto`, `migrations/main`, and seed SQL here.
+- `apps/trailbase/traildepot`: TrailBase CLI's default `--data-dir` name. Ignore
+  runtime output such as DBs, secrets, uploads, generated WASM, and metadata.
+
+If developers should be able to run `cd apps/trailbase && trail ...` without
+passing `--data-dir`, track symlinks from the default depot back to the template:
+
+```text
+apps/trailbase/
+  traildepot-template/
+    config.textproto
+    migrations/main/
+  traildepot/
+    .gitignore
+    config.textproto -> ../traildepot-template/config.textproto
+    migrations -> ../traildepot-template/migrations
+```
+
+The repo root `.gitignore` should ignore runtime output while allowing only the
+two symlinks and the depot-local ignore file:
+
+```gitignore
+apps/trailbase/traildepot/*
+!apps/trailbase/traildepot/.gitignore
+!apps/trailbase/traildepot/config.textproto
+!apps/trailbase/traildepot/migrations
+```
+
+With this layout, `trail migration <suffix> main` follows the
+`traildepot/migrations` symlink and creates the migration under
+`traildepot-template/migrations/main`. The container entrypoint can still copy
+the image-bundled template into the `/app/traildepot` runtime volume, so deploys
+and host-side CLI commands read from the same tracked source. Use app scripts or
+container-side `trail --data-dir /app/traildepot` commands when you intentionally
+need to mutate a Docker named volume database.
+
 ## Entrypoint Pattern
 
 Consumer images should copy the runtime entrypoint library into the final image:
