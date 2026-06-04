@@ -16,18 +16,39 @@ printf '\n'
 
 curl_proxy \
   -H 'content-type: application/json' \
-  -d '{"authorizationCode":"smoke-authorization-code","referrer":"SANDBOX"}' \
+  -d '{
+    "authorizationCode": "smoke-authorization-code",
+    "referrer": "SANDBOX"
+  }' \
   "${BASE_URL%/}/internal/apps-in-toss/toss-login/complete"
 printf '\n'
 
 curl_proxy \
   -H 'content-type: application/json' \
-  -d '{"orderId":"smoke-order-001","sku":"loo.credits.50","tossUserKey":"smoke-toss-user-key"}' \
-  "${BASE_URL%/}/internal/apps-in-toss/iap/order/status"
+  -d '{
+    "providerRequestId": "smoke:reward:001",
+    "eligibilityId": "smoke-eligibility",
+    "userId": "smoke-user",
+    "sourceType": "SMOKE",
+    "sourceId": "smoke-source",
+    "requestedAt": 1,
+    "tossUserKey": "smoke-toss-user-key"
+  }' \
+  "${BASE_URL%/}/internal/apps-in-toss/promotion/reward/grant"
 printf '\n'
 
 curl_proxy \
   -H 'content-type: application/json' \
-  -d '{"method":"POST","path":"/internal/smoke","body":{"kind":"smoke"}}' \
-  "${BASE_URL%/}/internal/mtls/request" || true
+  -d '{
+    "providerRequestId": "smoke:message:001",
+    "messageId": "smoke-message",
+    "userId": "smoke-user",
+    "purpose": "FUNCTIONAL",
+    "templateSetCode": "smoke_template",
+    "context": {"kind": "smoke"},
+    "idempotencyKey": "smoke-message-001",
+    "requestedAt": 1,
+    "tossUserKey": "smoke-toss-user-key"
+  }' \
+  "${BASE_URL%/}/internal/apps-in-toss/smart-message/send"
 printf '\n'
