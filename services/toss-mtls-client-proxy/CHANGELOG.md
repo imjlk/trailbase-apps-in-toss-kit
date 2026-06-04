@@ -1,5 +1,18 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.5 — 2026-06-05
+
+### Patch changes
+
+- [ce52936](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/ce52936566a16c340b749944cbaed3bacb8ec79c) Normalize AppsInToss smart-message responses around official `resultType`, delivery counts, detail,
+  failure, and reach-failure fields, and add shared functional-message helpers plus SQL/docs templates
+  for template registry, SDK notification agreement tracking, and reusable outbox provider summaries.
+  The message `templateSetCode` and notification agreement SDK `templateCode` are stored separately so
+  consumer apps can gate user-requested functional alerts before dispatching through the proxy. — Thanks @imjlk!
+- [a0a1d3f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/a0a1d3f2107c84908598dbe1a139d5b8e344044d) Update the reusable Toss mTLS proxy smoke template to exercise Toss login,
+  promotion reward grants, and smart-message dispatch, matching the current
+  AppsInToss operational paths used by consumer apps. — Thanks @imjlk!
+
 ## 0.1.4 — 2026-05-22
 
 ### Patch changes

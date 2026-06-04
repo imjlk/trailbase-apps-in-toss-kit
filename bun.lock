@@ -7,7 +7,7 @@
     },
     "packages/trailbase-client": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-client",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@tanstack/react-db": "0.1.85",
       },
@@ -22,14 +22,14 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "bin": {
         "trailbase-prod-env-validate": "./bin/validate-production-env.mjs",
       },
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.1.4",
+      "version": "0.1.5",
     },
   },
   "packages": {

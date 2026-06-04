@@ -1,5 +1,12 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.2.1 — 2026-06-05
+
+### Patch changes
+
+- [b52b2e3](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/b52b2e320c1020dfff6d606f728cf01921c154f2) Detect Docker-published host ports when resolving local development ports so
+  consumer fresh-start helpers can automatically move to the next available port. — Thanks @imjlk!
+
 ## 0.2.0 — 2026-05-22
 
 ### Minor changes
