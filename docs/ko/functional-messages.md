@@ -42,7 +42,9 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
 Toss 콘솔의 두 코드는 분리해서 관리하세요.
 
 - `templateSetCode`: `/api-partner/v1/apps-in-toss/messenger/send-message`에 전달하는
-  기능성 메시지 템플릿 코드입니다.
+  기능성 메시지 템플릿 코드입니다. 여러 사용자에게 같은 템플릿을 보내는 경우에는
+  `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`를 사용하며, 한 요청당 최대
+  2,500명까지 `contextList`에 담을 수 있습니다.
 - `templateCode`: `requestNotificationAgreement`에 전달하는 알림 동의문 코드입니다.
 
 ## 런타임 흐름
@@ -54,8 +56,11 @@ Toss 콘솔의 두 코드는 분리해서 관리하세요.
    `OPTED_OUT`으로 저장합니다. TrailBase WASM 핸들러에서는 앱 흐름에서 받은 동의문
    `templateCode`와 함께 `upsert_notification_template_agreement_tx`를 사용할 수 있습니다.
 3. 잡은 활성 Toss identity를 읽고, 템플릿 상태와 동의, 멱등 키, 쿨다운을 확인한 뒤 사설
-   프록시의 `/internal/apps-in-toss/smart-message/send`를 호출합니다.
-4. 프록시는 `/api-partner/v1/apps-in-toss/messenger/send-message`를 호출하고 Toss 응답의
+   프록시의 `/internal/apps-in-toss/smart-message/send` 또는
+   `/internal/apps-in-toss/smart-message/send-bulk`를 호출합니다. 대량 발송은 같은
+   `templateSetCode`끼리 묶고, Toss 제한에 맞춰 한 요청을 2,500명 이하로 유지합니다.
+4. 프록시는 `/api-partner/v1/apps-in-toss/messenger/send-message` 또는
+   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`를 호출하고 Toss 응답의
    `resultType`, `msgCount`, `sentPushCount`, `sentInboxCount`, `detail`, `fail`,
    `reachFailReason`을 앱이 저장하기 쉬운 형태로 정규화합니다.
 

@@ -6,6 +6,7 @@ pub const TOSS_LOGIN_COMPLETE_PATH: &str = "/internal/apps-in-toss/toss-login/co
 pub const IAP_ORDER_STATUS_PATH: &str = "/internal/apps-in-toss/iap/order/status";
 pub const PROMOTION_REWARD_GRANT_PATH: &str = "/internal/apps-in-toss/promotion/reward/grant";
 pub const SMART_MESSAGE_SEND_PATH: &str = "/internal/apps-in-toss/smart-message/send";
+pub const SMART_MESSAGE_BULK_SEND_PATH: &str = "/internal/apps-in-toss/smart-message/send-bulk";
 
 pub async fn toss_login_complete(
     proxy_url: &str,
@@ -63,6 +64,19 @@ pub async fn smart_message_send(
 ) -> CommonResult<JsonValue> {
     post_json_with_optional_bearer(
         &join_url(proxy_url, SMART_MESSAGE_SEND_PATH),
+        payload,
+        bearer_token,
+    )
+    .await
+}
+
+pub async fn smart_message_bulk_send(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    payload: JsonValue,
+) -> CommonResult<JsonValue> {
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, SMART_MESSAGE_BULK_SEND_PATH),
         payload,
         bearer_token,
     )
@@ -188,6 +202,10 @@ mod tests {
         assert_eq!(
             SMART_MESSAGE_SEND_PATH,
             "/internal/apps-in-toss/smart-message/send"
+        );
+        assert_eq!(
+            SMART_MESSAGE_BULK_SEND_PATH,
+            "/internal/apps-in-toss/smart-message/send-bulk"
         );
     }
 }

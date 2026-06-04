@@ -46,7 +46,10 @@ summary columns with a forward migration instead of replacing the table.
 Keep these two Toss console codes separate:
 
 - `templateSetCode`: the functional message template code passed to
-  `/api-partner/v1/apps-in-toss/messenger/send-message`.
+  `/api-partner/v1/apps-in-toss/messenger/send-message`. For multiple users
+  with the same template, use
+  `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`; each request can
+  include up to 2,500 recipients in `contextList`.
 - `templateCode`: the notification agreement code passed to
   `requestNotificationAgreement`.
 
@@ -62,9 +65,13 @@ Keep these two Toss console codes separate:
    `templateCode` returned from the app-side flow.
 3. The job loads the active Toss identity, checks template status and consent,
    applies idempotency and cooldown rules, then calls
-   `/internal/apps-in-toss/smart-message/send` on the private proxy.
-4. The proxy calls `/api-partner/v1/apps-in-toss/messenger/send-message` and
-   normalizes Toss response fields such as `resultType`, `msgCount`,
+   `/internal/apps-in-toss/smart-message/send` or
+   `/internal/apps-in-toss/smart-message/send-bulk` on the private proxy. Bulk
+   dispatch should group the same `templateSetCode` and keep each request at or
+   below the Toss limit of 2,500 recipients.
+4. The proxy calls `/api-partner/v1/apps-in-toss/messenger/send-message` or
+   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message` and normalizes
+   Toss response fields such as `resultType`, `msgCount`,
    `sentPushCount`, `sentInboxCount`, `detail`, `fail`, and `reachFailReason`.
 
 ## QA Checklist

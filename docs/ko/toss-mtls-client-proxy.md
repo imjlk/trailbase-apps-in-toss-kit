@@ -79,6 +79,7 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 - `POST /internal/apps-in-toss/iap/order/status`: 인앱 결제 주문 상태 어댑터.
 - `POST /internal/apps-in-toss/promotion/reward/grant`: 프로모션 리워드 어댑터.
 - `POST /internal/apps-in-toss/smart-message/send`: 스마트 메시지 어댑터.
+- `POST /internal/apps-in-toss/smart-message/send-bulk`: 기능성 스마트 메시지 대량 발송 어댑터.
 - `GET /internal/apps-in-toss/health`: 로컬 health/mode 확인.
 
 스마트 메시지 어댑터는 `tossUserKey`를 `x-toss-user-key` 헤더로 전달하고 upstream JSON
@@ -89,6 +90,12 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 프록시는 알림 동의문을 요청하거나 검증하지 않습니다. 도입 앱은 필요한 경우 Apps in Toss
 `requestNotificationAgreement` SDK를 호출하고, 동의 결과를 저장한 뒤 이 어댑터를 호출하기
 전에 발송 가능 여부를 확인해야 합니다.
+
+대량 발송 어댑터는 AppsInToss의
+`/api-partner/v1/apps-in-toss/messenger/send-bulk-message`를 호출합니다. 같은
+`templateSetCode`를 쓰는 기능성 메시지만 `contextList`로 묶고, 한 요청은 Toss 제한에 맞춰
+최대 2,500명으로 유지하세요. 2,500명을 넘는 대상자는 도입 앱의 outbox/job이 다음 배치로
+분할해서 호출해야 합니다.
 
 프로모션 리워드 어댑터는 요청 본문(request body)에서 `promotionCode`와 `amount`를 받습니다.
 `promotionAmount`도 호환 alias로 허용되지만, 새 호출자는 `amount`를 우선 사용하세요. 캠페인

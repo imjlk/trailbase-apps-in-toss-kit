@@ -79,6 +79,7 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/iap/order/status`: in-app purchase order status adapter.
 - `POST /internal/apps-in-toss/promotion/reward/grant`: promotion reward adapter.
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
+- `POST /internal/apps-in-toss/smart-message/send-bulk`: functional smart-message bulk adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
 
 The smart-message adapter sends `tossUserKey` as `x-toss-user-key` and removes it from the upstream
@@ -89,6 +90,12 @@ channel is treated as `SENT` so dispatch jobs do not retry and duplicate the del
 The proxy does not request or verify notification agreement. Consumer apps must
 call the Apps in Toss `requestNotificationAgreement` SDK where required, persist
 the agreement result, and gate dispatch before calling this adapter.
+
+The bulk adapter calls AppsInToss
+`/api-partner/v1/apps-in-toss/messenger/send-bulk-message`. Group only functional
+messages that share the same `templateSetCode`, and keep each request at or
+below the Toss limit of 2,500 recipients. Consumer outbox jobs should split
+larger audiences into subsequent batches.
 
 The promotion reward adapter accepts `promotionCode` and `amount` in the request body.
 `promotionAmount` is also accepted as a compatibility alias, but new callers should prefer `amount`.

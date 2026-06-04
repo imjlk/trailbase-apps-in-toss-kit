@@ -4,7 +4,14 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { PROXY_ENDPOINTS, TOSS_ENDPOINTS, createConfig, createProxyServer, handleRequest } from "../src/core.mjs";
+import {
+  PROXY_ENDPOINTS,
+  SMART_MESSAGE_BULK_MAX_CONTEXTS,
+  TOSS_ENDPOINTS,
+  createConfig,
+  createProxyServer,
+  handleRequest,
+} from "../src/core.mjs";
 
 describe("toss-mtls-client-proxy", () => {
   test("rejects unauthorized requests when token is configured", async () => {
@@ -504,6 +511,101 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
+  test("forward bulk message targets Toss bulk API with sanitized context list", async () => {
+    let upstreamBody;
+    let upstreamUserKey;
+    let upstreamPath;
+    const upstreamServer = http.createServer(async (req, res) => {
+      upstreamPath = req.url;
+      upstreamUserKey = req.headers["x-toss-user-key"];
+      upstreamBody = await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          success: {
+            msgCount: 2,
+            sentPushCount: 2,
+            sentInboxCount: 0,
+            detail: {
+              sentPush: [{ contentId: "toss:PUSH:1" }, { contentId: "toss:PUSH:2" }],
+              sentInbox: [],
+            },
+            fail: {
+              sentPush: [],
+              sentInbox: [],
+            },
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageBulkSend,
+        {
+          providerRequestId: "bulk-1",
+          templateSetCode: "mission_daily_status_v1",
+          purpose: "FUNCTIONAL",
+          contextList: [
+            {
+              messageId: "message-1",
+              userId: "user-1",
+              idempotencyKey: "idem-1",
+              tossUserKey: "toss-user-1",
+              context: { correctCount: 1 },
+            },
+            {
+              messageId: "message-2",
+              userId: "user-2",
+              idempotencyKey: "idem-2",
+              userKey: "toss-user-2",
+              context: { correctCount: 2 },
+            },
+          ],
+          requestedAt: 1234,
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+
+      expect(upstreamPath).toBe(TOSS_ENDPOINTS.messageBulkSend);
+      expect(upstreamUserKey).toBeUndefined();
+      expect(upstreamBody).toEqual({
+        templateSetCode: "mission_daily_status_v1",
+        contextList: [
+          { userKey: "toss-user-1", context: { correctCount: 1 } },
+          { userKey: "toss-user-2", context: { correctCount: 2 } },
+        ],
+      });
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("SENT");
+      expect(res.body.resultType).toBe("SUCCESS");
+      expect(res.body.msgCount).toBe(2);
+      expect(res.body.sentPushCount).toBe(2);
+      expect(res.body.contentIds).toEqual(["toss:PUSH:1", "toss:PUSH:2"]);
+    });
+  });
+
+  test("bulk message rejects context lists over Toss limit", async () => {
+    const req = request("POST", PROXY_ENDPOINTS.smartMessageBulkSend, {
+      providerRequestId: "bulk-too-large",
+      templateSetCode: "mission_daily_status_v1",
+      contextList: Array.from({ length: SMART_MESSAGE_BULK_MAX_CONTEXTS + 1 }, (_, index) => ({
+        userKey: `toss-user-${index}`,
+        context: {},
+      })),
+    });
+
+    await expect(handleRequest(req, { mode: "stub", internalToken: "" })).rejects.toThrow(
+      "contextList supports at most 2500 recipients",
+    );
+  });
+
   test("forward message maps official Toss failure response", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
@@ -633,6 +735,7 @@ describe("toss-mtls-client-proxy", () => {
 
   test("message adapter targets the Toss messenger API", () => {
     expect(TOSS_ENDPOINTS.messageSend).toBe("/api-partner/v1/apps-in-toss/messenger/send-message");
+    expect(TOSS_ENDPOINTS.messageBulkSend).toBe("/api-partner/v1/apps-in-toss/messenger/send-bulk-message");
   });
 
   test("adapter routes use Apps in Toss feature names", () => {
@@ -640,6 +743,7 @@ describe("toss-mtls-client-proxy", () => {
     expect(PROXY_ENDPOINTS.iapOrderStatus).toBe("/internal/apps-in-toss/iap/order/status");
     expect(PROXY_ENDPOINTS.promotionRewardGrant).toBe("/internal/apps-in-toss/promotion/reward/grant");
     expect(PROXY_ENDPOINTS.smartMessageSend).toBe("/internal/apps-in-toss/smart-message/send");
+    expect(PROXY_ENDPOINTS.smartMessageBulkSend).toBe("/internal/apps-in-toss/smart-message/send-bulk");
   });
 });
 

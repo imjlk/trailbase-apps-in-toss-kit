@@ -10,6 +10,7 @@ export const DEFAULT_UPSTREAM_BODY_LIMIT_BYTES = 2_097_152;
 export const DEFAULT_UPSTREAM_TIMEOUT_MS = 15_000;
 export const DEFAULT_IAP_ORDER_STATUS_MAX_ATTEMPTS = 6;
 export const DEFAULT_IAP_ORDER_STATUS_RETRY_DELAY_MS = 350;
+export const SMART_MESSAGE_BULK_MAX_CONTEXTS = 2_500;
 export const TOSS_ENDPOINTS = Object.freeze({
   loginGenerateToken: "/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
   loginMe: "/api-partner/v1/apps-in-toss/user/oauth2/login-me",
@@ -18,6 +19,7 @@ export const TOSS_ENDPOINTS = Object.freeze({
   promotionResult: "/api-partner/v1/apps-in-toss/promotion/execution-result",
   iapOrderStatus: "/api-partner/v1/apps-in-toss/order/get-order-status",
   messageSend: "/api-partner/v1/apps-in-toss/messenger/send-message",
+  messageBulkSend: "/api-partner/v1/apps-in-toss/messenger/send-bulk-message",
 });
 
 export const PROXY_ENDPOINTS = Object.freeze({
@@ -27,6 +29,7 @@ export const PROXY_ENDPOINTS = Object.freeze({
   iapOrderStatus: "/internal/apps-in-toss/iap/order/status",
   promotionRewardGrant: "/internal/apps-in-toss/promotion/reward/grant",
   smartMessageSend: "/internal/apps-in-toss/smart-message/send",
+  smartMessageBulkSend: "/internal/apps-in-toss/smart-message/send-bulk",
 });
 
 const HOP_BY_HOP_HEADERS = new Set([
@@ -211,19 +214,31 @@ export async function handleRequest(req, config = createConfig()) {
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageSend) {
     const body = await readJson(req, requestBodyLimitBytes(config));
     if (config.mode !== "forward") {
-      return response(200, {
-        ok: true,
-        providerRequestId: body.providerRequestId,
-        providerStatus: "SENT",
-        sentAt: body.requestedAt ?? Date.now(),
-      });
+      return response(200, stubSmartMessageResponse(body, 1));
     }
     const upstream = await forwardJson(
       {
         method: "POST",
         path: TOSS_ENDPOINTS.messageSend,
-        body: withoutTossUserKey(body),
+        body: messageUpstreamBody(body),
         tossUserKey: body.tossUserKey,
+      },
+      config,
+    );
+    return response(200, normalizeMessageResponse(body, upstream.body));
+  }
+
+  if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageBulkSend) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    const upstreamBody = bulkMessageUpstreamBody(body);
+    if (config.mode !== "forward") {
+      return response(200, stubSmartMessageResponse(body, upstreamBody.contextList.length));
+    }
+    const upstream = await forwardJson(
+      {
+        method: "POST",
+        path: TOSS_ENDPOINTS.messageBulkSend,
+        body: upstreamBody,
       },
       config,
     );
@@ -676,10 +691,64 @@ function stubIapOrderStatus(body) {
   };
 }
 
-function withoutTossUserKey(body) {
-  if (!body || typeof body !== "object") return body;
-  const { tossUserKey, ...rest } = body;
-  return rest;
+function stubSmartMessageResponse(body, msgCount) {
+  return {
+    ok: true,
+    providerRequestId: body?.providerRequestId,
+    providerStatus: "SENT",
+    resultType: "SUCCESS",
+    sentAt: body?.requestedAt ?? Date.now(),
+    msgCount,
+    sentPushCount: msgCount,
+    sentInboxCount: 0,
+  };
+}
+
+function messageUpstreamBody(body) {
+  const templateSetCode = stringOrUndefined(body?.templateSetCode);
+  if (!templateSetCode) {
+    throw clientError("MISSING_TEMPLATE_SET_CODE", "templateSetCode is required");
+  }
+  return {
+    templateSetCode,
+    context: messageContext(body?.context, "context"),
+  };
+}
+
+function bulkMessageUpstreamBody(body) {
+  const templateSetCode = stringOrUndefined(body?.templateSetCode);
+  if (!templateSetCode) {
+    throw clientError("MISSING_TEMPLATE_SET_CODE", "templateSetCode is required");
+  }
+  if (!Array.isArray(body?.contextList)) {
+    throw clientError("INVALID_CONTEXT_LIST", "contextList must be an array");
+  }
+  if (body.contextList.length < 1) {
+    throw clientError("EMPTY_CONTEXT_LIST", "contextList must include at least one recipient");
+  }
+  if (body.contextList.length > SMART_MESSAGE_BULK_MAX_CONTEXTS) {
+    throw clientError("CONTEXT_LIST_TOO_LARGE", "contextList supports at most 2500 recipients", 413);
+  }
+  return {
+    templateSetCode,
+    contextList: body.contextList.map((entry, index) => {
+      const userKey = stringOrUndefined(entry?.userKey ?? entry?.tossUserKey);
+      if (!userKey) {
+        throw clientError("MISSING_CONTEXT_USER_KEY", `contextList[${index}].userKey is required`);
+      }
+      return {
+        userKey,
+        context: messageContext(entry?.context, `contextList[${index}].context`),
+      };
+    }),
+  };
+}
+
+function messageContext(value, name) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw clientError("INVALID_MESSAGE_CONTEXT", `${name} must be an object`);
+  }
+  return value;
 }
 
 function normalizeLoginReferrer(value) {
@@ -738,7 +807,10 @@ function normalizeMessageResponse(request, upstream) {
     };
   }
   const resultType = readPathString(upstream, ["resultType", "success.resultType", "data.resultType"]);
-  const result = objectOrSelf(readPathValue(upstream, ["result", "success.result", "data.result"]), {});
+  const result = objectOrSelf(
+    readPathValue(upstream, ["result", "success.result", "success", "data.result", "data.success"]),
+    {},
+  );
   const providerRequestId =
     readPathString(upstream, ["providerRequestId", "requestId", "result.providerRequestId"]) ?? request.providerRequestId;
   const sentAt = upstream?.sentAt ?? request.requestedAt ?? Date.now();
