@@ -33,11 +33,15 @@ Prefer repo scripts or TrailBase CLI helpers when creating migrations, but inspe
 repo scripts, or existing migrations before assuming exact command flags. When no safe generator is
 available, create a migration that follows the repo's existing filename/version pattern.
 
-For host-side `trail` CLI workflows, check whether the consumer repo wants `apps/trailbase/traildepot`
-to be usable as the default `--data-dir`. The recommended layout is a Git-tracked
-`traildepot-template` as the source of truth, plus tracked symlinks from `traildepot/config.textproto`
-and `traildepot/migrations` back to the template. Runtime DBs, secrets, uploads, metadata, and WASM
-outputs under `traildepot` should stay ignored.
+Consumer repos should normally keep only `apps/trailbase/traildepot-template` as the Git-tracked
+schema/config source of truth. Do not add tracked `traildepot` symlinks by default; `traildepot` is
+runtime output and should stay ignored.
+
+When a developer needs the TrailBase CLI, prefer a root `package.json` alias that runs the CLI inside
+the TrailBase Docker container instead of using a host-installed binary. The recommended alias is
+`bun trail -- ...`, wrapping `docker compose exec trailbase /app/trail --data-dir /app/traildepot ...`.
+Keep Git-tracked schema/config source in `traildepot-template`; do not add host-side `traildepot`
+symlinks by default.
 
 ## Safety Defaults
 

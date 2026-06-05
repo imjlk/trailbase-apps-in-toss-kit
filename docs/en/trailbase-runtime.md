@@ -42,44 +42,42 @@ The consumer app keeps app-specific behavior:
 
 ## TrailBase Depot Layout
 
-Consumer apps usually keep two depot paths:
+Consumer apps should keep one Git-tracked depot template and one ignored runtime depot:
 
 - `apps/trailbase/traildepot-template`: the Git-tracked source of truth. Keep
   reviewed files such as `config.textproto`, `migrations/main`, and seed SQL here.
-- `apps/trailbase/traildepot`: TrailBase CLI's default `--data-dir` name. Ignore
-  runtime output such as DBs, secrets, uploads, generated WASM, and metadata.
+- `apps/trailbase/traildepot`: local or container runtime output. Ignore DBs,
+  secrets, uploads, generated WASM, and metadata. Do not track symlinks here by default.
 
-If developers should be able to run `cd apps/trailbase && trail ...` without
-passing `--data-dir`, track symlinks from the default depot back to the template:
+The default repository layout is:
 
 ```text
 apps/trailbase/
   traildepot-template/
     config.textproto
     migrations/main/
-  traildepot/
-    .gitignore
-    config.textproto -> ../traildepot-template/config.textproto
-    migrations -> ../traildepot-template/migrations
 ```
 
-The repo root `.gitignore` should ignore runtime output while allowing only the
-two symlinks and the depot-local ignore file:
+The repo root `.gitignore` should ignore the runtime depot:
 
 ```gitignore
-apps/trailbase/traildepot/*
-!apps/trailbase/traildepot/.gitignore
-!apps/trailbase/traildepot/config.textproto
-!apps/trailbase/traildepot/migrations
+apps/trailbase/traildepot/
 ```
 
-With this layout, `trail migration <suffix> main` follows the
-`traildepot/migrations` symlink and creates the migration under
-`traildepot-template/migrations/main`. The container entrypoint can still copy
-the image-bundled template into the `/app/traildepot` runtime volume, so deploys
-and host-side CLI commands read from the same tracked source. Use app scripts or
-container-side `trail --data-dir /app/traildepot` commands when you intentionally
-need to mutate a Docker named volume database.
+For TrailBase CLI access, prefer a root `package.json` alias that executes the
+image-bundled CLI inside the running TrailBase container instead of a host-installed binary:
+
+```json
+{
+  "scripts": {
+    "trail": "bash apps/trailbase/scripts/trail-cli.sh"
+  }
+}
+```
+
+The helper should wrap `docker compose exec trailbase /app/trail --data-dir
+/app/traildepot ...`. Keep Git-tracked schema/config source in
+`traildepot-template`; do not add host-side `traildepot` symlinks by default.
 
 ## Entrypoint Pattern
 
