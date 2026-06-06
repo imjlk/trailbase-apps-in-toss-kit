@@ -200,7 +200,7 @@ export function normalizeAppsInTossReferrer(value: unknown): AppsInTossReferrer 
   }
   const trimmed = value.trim();
   if (trimmed.toUpperCase() === "SANDBOX") {
-    return "SANDBOX";
+    return trimmed;
   }
   if (trimmed.toUpperCase() === "DEFAULT") {
     return "DEFAULT";

@@ -110,7 +110,13 @@ describe("TrailBase client utilities", () => {
         authorization_code: "code-2",
         referrer: "sandbox",
       }),
-    ).toEqual({ authorizationCode: "code-2", referrer: "SANDBOX" });
+    ).toEqual({ authorizationCode: "code-2", referrer: "sandbox" });
+    expect(
+      normalizeAppsInTossLoginResult({
+        authorization_code: "code-3",
+        referrer: " SANDBOX ",
+      }),
+    ).toEqual({ authorizationCode: "code-3", referrer: "SANDBOX" });
   });
 
   test("normalizes TrailBase auth tokens and builds Record API headers", () => {
