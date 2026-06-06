@@ -73,9 +73,30 @@
 - Production image references should use exact SemVer or minor tags, not `edge` or `latest`, unless
   moving tags are intentionally being tested.
 
+## Apps In Toss Docs Tooling
+
+This skill should not replace official Apps in Toss SDK/API documentation lookup.
+When a task is primarily about Apps in Toss, Toss Login, IAP, Promotion, Smart
+Message, notification agreement, `requestNotificationAgreement`, Granite,
+Bedrock, TDS, or app review policy, first discover available Apps in Toss MCP,
+CLI, docs-search, or project-validator tooling. Search Apps in Toss docs with
+concise Korean keywords, keeping proper nouns and API names as-is.
+
 ## Repo Discovery Checklist
 
-Before changing a TrailBase app, inspect:
+Before changing this kit repository, inspect the relevant files:
+
+- `AGENTS.md`
+- `crates/trailbase-guest-common/`
+- `crates/trailbase-toss-identity/`
+- `services/toss-mtls-client-proxy/`
+- `packages/trailbase-client/`
+- `packages/trailbase-runtime/`
+- `templates/trailbase/`
+- `docs/en/` and `docs/ko/`
+- `data/upstream/`
+
+Before changing a consumer TrailBase app, inspect:
 
 - `AGENTS.md`
 - `apps/trailbase/README.md`

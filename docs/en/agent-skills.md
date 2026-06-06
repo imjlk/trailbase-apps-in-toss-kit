@@ -61,6 +61,16 @@ the target tool. Use `copy` for stable snapshots or project-scoped files that
 will be committed in another repo. Project-scoped targets require
 `--project <repo-path>` and never update root always-on instruction files.
 
+For a global Codex/OpenAI install, run `bun run skills:sync` from the canonical
+kit checkout, not from a consumer app's `vendor/trailbase-apps-in-toss-kit`
+submodule. Otherwise Codex can keep following an older consumer submodule after
+the kit repo has moved ahead. To repair a stale Codex link, run this from the
+canonical kit checkout and restart Codex:
+
+```bash
+bun run skills:sync -- --force
+```
+
 Pass `--force` directly to the script when replacing an existing install:
 
 ```bash
