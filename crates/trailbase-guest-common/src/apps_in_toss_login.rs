@@ -143,7 +143,7 @@ pub fn should_use_dev_sandbox_stub(
     let app_env = app_env.trim();
     let is_sandbox_referrer = referrer.trim().eq_ignore_ascii_case("sandbox");
     let is_local_dev_code = authorization_code.trim().starts_with("dev-");
-    app_env != "production" && is_sandbox_referrer && (mode.is_empty() || is_local_dev_code)
+    app_env != "production" && is_sandbox_referrer && is_local_dev_code
 }
 
 async fn fetch_json(
@@ -179,11 +179,17 @@ mod tests {
             "DEFAULT",
             "real-code"
         ));
-        assert!(should_use_dev_sandbox_stub(
+        assert!(!should_use_dev_sandbox_stub(
             "",
             "development",
             "SANDBOX",
             "real-code"
+        ));
+        assert!(should_use_dev_sandbox_stub(
+            "",
+            "development",
+            "SANDBOX",
+            "dev-local"
         ));
         assert!(should_use_dev_sandbox_stub(
             "proxy",

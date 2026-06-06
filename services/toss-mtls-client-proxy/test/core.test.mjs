@@ -591,6 +591,70 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
+  test("forward message treats non-2xx upstream responses as failed", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(500, { "content-type": "application/json" });
+      res.end(JSON.stringify({ message: "upstream unavailable", errorCode: "UPSTREAM_500" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageSend,
+        {
+          providerRequestId: "msg-http-500",
+          templateSetCode: "reward_result",
+          context: {},
+          tossUserKey: "toss-user-1",
+          requestedAt: 1234,
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.failureReason).toBe("upstream unavailable");
+      expect(res.body.providerErrorCode).toBe("UPSTREAM_500");
+      expect(res.body.upstreamStatus).toBe(500);
+    });
+  });
+
+  test("forward bulk message treats raw non-2xx upstream responses as failed", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(502, { "content-type": "text/plain" });
+      res.end("bad gateway");
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageBulkSend,
+        {
+          providerRequestId: "bulk-http-502",
+          templateSetCode: "mission_daily_status_v1",
+          contextList: [{ userKey: "toss-user-1", context: {} }],
+          requestedAt: 1234,
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.failureReason).toBe("bad gateway");
+      expect(res.body.upstreamStatus).toBe(502);
+    });
+  });
+
   test("bulk message rejects context lists over Toss limit", async () => {
     const req = request("POST", PROXY_ENDPOINTS.smartMessageBulkSend, {
       providerRequestId: "bulk-too-large",

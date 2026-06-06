@@ -5,4 +5,6 @@ cargo/trailbase-guest-common: patch
 
 Add an internal AppsInToss smart-message bulk adapter for
 `send-bulk-message`, enforce the 2,500 recipient limit, and expose matching
-Rust proxy helpers for TrailBase jobs.
+Rust proxy helpers for TrailBase jobs. Treat non-2xx upstream smart-message
+responses as failed dispatches instead of inferring success from missing Toss
+result fields.

@@ -225,7 +225,7 @@ export async function handleRequest(req, config = createConfig()) {
       },
       config,
     );
-    return response(200, normalizeMessageResponse(body, upstream.body));
+    return response(200, normalizeMessageResponse(body, upstream.body, upstream.status));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageBulkSend) {
@@ -242,7 +242,7 @@ export async function handleRequest(req, config = createConfig()) {
       },
       config,
     );
-    return response(200, normalizeMessageResponse(body, upstream.body));
+    return response(200, normalizeMessageResponse(body, upstream.body, upstream.status));
   }
 
   return response(404, { ok: false, error: "NOT_FOUND" });
@@ -795,7 +795,25 @@ function readPathValue(value, paths) {
   return undefined;
 }
 
-function normalizeMessageResponse(request, upstream) {
+function normalizeMessageResponse(request, upstream, upstreamStatus = 200) {
+  const resultType = readPathString(upstream, ["resultType", "success.resultType", "data.resultType"]);
+  const providerRequestId =
+    readPathString(upstream, ["providerRequestId", "requestId", "result.providerRequestId"]) ?? request.providerRequestId;
+  const sentAt = upstream?.sentAt ?? request.requestedAt ?? Date.now();
+
+  if (!httpStatusOk(upstreamStatus)) {
+    return {
+      ok: false,
+      providerRequestId,
+      providerStatus: "FAILED",
+      resultType,
+      sentAt,
+      failureReason: upstreamFailureReason(upstream),
+      providerErrorCode: upstreamFailureCode(upstream),
+      upstreamStatus,
+    };
+  }
+
   if (upstream?.providerStatus || (upstream?.status && !upstream?.resultType && !upstream?.result)) {
     const providerStatus = upstream.providerStatus ?? upstream.status;
     return {
@@ -806,14 +824,10 @@ function normalizeMessageResponse(request, upstream) {
       failureReason: upstream.failureReason ?? upstream.errorMessage ?? upstream.message,
     };
   }
-  const resultType = readPathString(upstream, ["resultType", "success.resultType", "data.resultType"]);
   const result = objectOrSelf(
     readPathValue(upstream, ["result", "success.result", "success", "data.result", "data.success"]),
     {},
   );
-  const providerRequestId =
-    readPathString(upstream, ["providerRequestId", "requestId", "result.providerRequestId"]) ?? request.providerRequestId;
-  const sentAt = upstream?.sentAt ?? request.requestedAt ?? Date.now();
 
   if (isUpstreamFailure(upstream)) {
     return {
@@ -903,6 +917,10 @@ function messageStatusOk(status) {
   return !["FAILED", "FAIL", "ERROR", "REJECTED"].includes(normalized);
 }
 
+function httpStatusOk(status) {
+  return Number.isInteger(status) && status >= 200 && status < 300;
+}
+
 function normalizeIapOrderStatusResponse(request, upstream) {
   if (isUpstreamFailure(upstream)) {
     return {
@@ -988,6 +1006,7 @@ function upstreamFailureReason(value) {
       "success.reason",
       "data.reason",
       "data.message",
+      "raw",
     ]) || "unknown upstream failure"
   );
 }
