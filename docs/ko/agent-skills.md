@@ -59,6 +59,16 @@ bun run skills:sync
 필요할 때는 `copy` 모드를 사용하세요. 프로젝트별 대상은 `--project <repo-path>`가 필요하며,
 루트의 상시 로드 지시문 파일은 건드리지 않습니다.
 
+전역 Codex/OpenAI 설치는 컨슈머 앱의 `vendor/trailbase-apps-in-toss-kit` 서브모듈이 아니라
+기준 kit 체크아웃에서 `bun run skills:sync`를 실행하세요. 서브모듈에서 동기화하면 kit
+저장소가 앞으로 이동한 뒤에도 Codex가 오래된 컨슈머 서브모듈을 계속 따라갈 수 있습니다.
+낡은 Codex 링크를 고치려면 기준 kit 체크아웃에서 아래 명령을 실행한 뒤 Codex를
+재시작하세요.
+
+```bash
+bun run skills:sync -- --force
+```
+
 기존 설치본을 덮어쓸 때는 `--force`를 스크립트에 직접 전달합니다.
 
 ```bash

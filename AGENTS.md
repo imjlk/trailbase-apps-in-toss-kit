@@ -31,6 +31,16 @@ skills with `bun run skills:sync` or the relevant adapter command in
 installed in the current session, read `skills/trailbase-ops/SKILL.md` and
 `skills/trailbase-ops/references/trailbase-ops.md` directly.
 
+For Apps in Toss SDK/API questions, do not stretch `trailbase-ops` into the
+source of truth. When the task mentions Apps in Toss, Toss Login, IAP,
+Promotion, Smart Message, notification agreement, `requestNotificationAgreement`,
+Granite, Bedrock, TDS, or app review policy, first discover and use available
+Apps in Toss documentation tooling such as the Apps in Toss MCP, `docs-search`,
+or project validators. Search Korean documentation with concise Korean keywords
+when using Apps in Toss docs tooling. Load `trailbase-ops` only when that work
+also changes TrailBase schema/config, Rust WASM guests, copied kit templates,
+deployment, or the mTLS proxy boundary.
+
 When adding or changing documentation, maintain English and Korean content
 together. Docs under `docs/` must use matching filenames in `docs/en/` and
 `docs/ko/`. Markdown translations outside `docs/` should use a `-ko.md` suffix

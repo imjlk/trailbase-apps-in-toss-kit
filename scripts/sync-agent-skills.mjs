@@ -113,13 +113,18 @@ function syncSkill(skillName, targetConfig) {
     die(`${skillName}: missing adapter source ${path.relative(repoRoot, source)}`);
   }
 
-  if (existsSync(destination)) {
+  if (entryExists(destination)) {
     if (isSameLink(destination, source)) {
       console.log(`OK ${skillName}: already linked`);
       return;
     }
     if (!args.force) {
-      die(`${destination} already exists. Re-run with --force to replace it.`);
+      die(
+        [
+          `${destination} already exists${describeExisting(destination)}.`,
+          "Re-run from the intended source checkout with --force to replace it.",
+        ].join(" "),
+      );
     }
     rmSync(destination, { recursive: true, force: true });
   }
@@ -159,6 +164,30 @@ function isSameLink(destination, source) {
     return realpathSync(targetPath) === realpathSync(source);
   } catch {
     return false;
+  }
+}
+
+function entryExists(filePath) {
+  try {
+    lstatSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function describeExisting(destination) {
+  try {
+    const stat = lstatSync(destination);
+    if (stat.isSymbolicLink()) {
+      return ` and points to ${readlinkSync(destination)}`;
+    }
+    if (stat.isDirectory()) {
+      return " as a directory";
+    }
+    return " as a file";
+  } catch {
+    return "";
   }
 }
 

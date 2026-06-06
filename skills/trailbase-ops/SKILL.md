@@ -14,6 +14,13 @@ For detailed guardrails, load [references/trailbase-ops.md](references/trailbase
 touches migrations, production data, auth principal mapping, `config.textproto`, Coolify deployment,
 or mTLS certificates.
 
+This skill is not the source of truth for Apps in Toss SDK/API documentation.
+For Apps in Toss, Toss Login, IAP, Promotion, Smart Message, notification agreement,
+`requestNotificationAgreement`, Granite, Bedrock, TDS, or review-policy questions, first discover
+available Apps in Toss MCP/CLI/docs tooling and search official Korean docs with concise Korean
+keywords. Use this skill after that when the same work changes TrailBase schema/config, WASM,
+templates, deployment, or the mTLS proxy boundary.
+
 ## Workflow
 
 1. Decide whether production or production-like data may exist.
