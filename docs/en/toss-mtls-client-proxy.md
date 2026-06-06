@@ -114,6 +114,15 @@ hard-coding promotion configuration in env files. See
 The Toss Login adapter expects the `authorizationCode` and `referrer` returned by `appLogin()`.
 Forward the SDK `referrer` value as-is. In sandbox RN builds this can be `SANDBOX`, and changing the
 casing can make Toss reject the one-time authorization code as `invalid_grant`.
+TrailBase WASM consumers should use `trailbase_guest_common::apps_in_toss_login::normalize_login_referrer`
+when preparing the proxy/forward request instead of hand-rolled uppercase/lowercase normalization.
+
+Consumer app servers should not treat `referrer=SANDBOX` as a local stub signal. An
+`authorizationCode` from the real AppsInToss sandbox app still needs to be exchanged server-side for
+the real sandbox `userKey`. Keep local development stubs explicit with `TOSS_LOGIN_MODE=stub`, or
+limit them to `dev-*` authorization codes produced by a simulator fallback when the SDK is absent.
+When `TOSS_LOGIN_MODE=proxy` or `forward`, send `SANDBOX` referrers through the proxy/forward path so
+promotion, smart-message, and functional-notification QA stores a usable userKey.
 
 The generic relay accepts a JSON body shaped like:
 

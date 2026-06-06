@@ -116,6 +116,15 @@ Toss Login 어댑터는 `appLogin()`이 반환한 `authorizationCode`와 `referr
 `referrer` 값은 그대로 전달하세요. 샌드박스 RN 빌드(sandbox RN build)에서는 이 값이
 `SANDBOX`일 수 있고, 대소문자를 바꾸면 Toss가 1회용 인증 코드(one-time authorization code)를
 `invalid_grant`로 거부할 수 있습니다.
+TrailBase WASM 소비 앱은 프록시/forward 요청을 만들 때 자체 uppercase/lowercase 정규화를 하지
+말고 `trailbase_guest_common::apps_in_toss_login::normalize_login_referrer`를 사용하세요.
+
+소비 앱 서버는 `referrer=SANDBOX`를 로컬 stub 신호로 취급하지 마세요. 실제 AppsInToss
+샌드박스 앱에서 받은 `authorizationCode`도 서버에서 Toss Login 토큰 교환을 거쳐 실제 sandbox
+`userKey`로 바뀌어야 합니다. 로컬 개발 편의를 위한 stub은 `TOSS_LOGIN_MODE=stub`처럼 명시적으로
+켜거나, SDK가 없는 순수 시뮬레이터에서 앱이 만든 `dev-*` authorization code에만 제한하세요.
+`TOSS_LOGIN_MODE=proxy` 또는 `forward`일 때는 `SANDBOX` referrer도 프록시/forward 경로로
+보내야 프로모션, 스마트 메시지, 기능성 알림 QA에 사용할 수 있는 userKey가 저장됩니다.
 
 일반 relay는 다음 모양의 JSON 본문(body)을 받습니다.
 

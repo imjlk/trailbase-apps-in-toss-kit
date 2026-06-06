@@ -109,6 +109,12 @@ pub fn toss_login_error_reason(response: &JsonValue, fallback: &str) -> String {
     .unwrap_or_else(|| fallback.to_string())
 }
 
+/// Normalize a Toss Login referrer without changing the SDK-provided sandbox casing.
+///
+/// AppsInToss sandbox builds may return `SANDBOX` or `sandbox`; preserve that exact
+/// casing when exchanging the one-time authorization code with Toss. Re-casing the
+/// referrer in consumer WASM can make Toss reject an otherwise fresh code with
+/// `invalid_grant`.
 pub fn normalize_login_referrer(referrer: &str) -> String {
     let trimmed = referrer.trim();
     if trimmed.eq_ignore_ascii_case("sandbox") {
@@ -116,6 +122,28 @@ pub fn normalize_login_referrer(referrer: &str) -> String {
     } else {
         "DEFAULT".to_string()
     }
+}
+
+/// Decide whether a consumer should bypass Toss Login for local development only.
+///
+/// A real `referrer=SANDBOX` from the AppsInToss sandbox app is not a stub marker.
+/// In proxy/forward mode it should still be exchanged through Toss unless the
+/// authorization code is a simulator-only `dev-*` fallback.
+pub fn should_use_dev_sandbox_stub(
+    toss_login_mode: &str,
+    app_env: &str,
+    referrer: &str,
+    authorization_code: &str,
+) -> bool {
+    let mode = toss_login_mode.trim();
+    if mode == "stub" {
+        return true;
+    }
+
+    let app_env = app_env.trim();
+    let is_sandbox_referrer = referrer.trim().eq_ignore_ascii_case("sandbox");
+    let is_local_dev_code = authorization_code.trim().starts_with("dev-");
+    app_env != "production" && is_sandbox_referrer && (mode.is_empty() || is_local_dev_code)
 }
 
 async fn fetch_json(
@@ -141,6 +169,46 @@ mod tests {
         assert_eq!(normalize_login_referrer(" SANDBOX "), "SANDBOX".to_string());
         assert_eq!(normalize_login_referrer("DEFAULT"), "DEFAULT".to_string());
         assert_eq!(normalize_login_referrer(""), "DEFAULT".to_string());
+    }
+
+    #[test]
+    fn dev_sandbox_stub_requires_explicit_stub_or_local_dev_code() {
+        assert!(should_use_dev_sandbox_stub(
+            "stub",
+            "production",
+            "DEFAULT",
+            "real-code"
+        ));
+        assert!(should_use_dev_sandbox_stub(
+            "",
+            "development",
+            "SANDBOX",
+            "real-code"
+        ));
+        assert!(should_use_dev_sandbox_stub(
+            "proxy",
+            "development",
+            "SANDBOX",
+            "dev-local"
+        ));
+        assert!(!should_use_dev_sandbox_stub(
+            "proxy",
+            "development",
+            "SANDBOX",
+            "real-code"
+        ));
+        assert!(!should_use_dev_sandbox_stub(
+            "proxy",
+            "production",
+            "SANDBOX",
+            "real-code"
+        ));
+        assert!(!should_use_dev_sandbox_stub(
+            "proxy",
+            "development",
+            "DEFAULT",
+            "real-code"
+        ));
     }
 
     #[test]

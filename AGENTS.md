@@ -47,6 +47,13 @@ pointer.
   real logs.
 - Do not log or persist raw Toss `userKey` outside the narrow proxy response and
   identity-linking boundary.
+- Do not treat AppsInToss `referrer=SANDBOX` as a local stub by itself. Real
+  sandbox app login still returns a one-time authorization code that should be
+  exchanged through the configured proxy/forward path. Use explicit stub mode or
+  simulator-only `dev-*` codes for local fallbacks. Rust WASM consumers should
+  forward referrers with
+  `trailbase_guest_common::apps_in_toss_login::normalize_login_referrer`, not a
+  local uppercase/lowercase helper.
 - Application tables should store Toss identity as:
   - deterministic `toss_user_key_hmac` for lookup
   - AES-GCM `toss_user_key_sealed` when reversible access is needed

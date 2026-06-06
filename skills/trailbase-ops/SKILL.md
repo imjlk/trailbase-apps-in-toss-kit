@@ -50,6 +50,12 @@ symlinks by default.
 - TrailBase is a SQLite single-writer service; avoid rolling updates and default to service recreate.
 - AppsInToss anonymous users should bootstrap into TrailBase `_user`, then receive tokens through the
   official auth login flow; do not mint JWTs or write `_session` rows directly.
+- Toss Login sandbox referrers are real SDK outputs, not local-stub markers. If
+  `TOSS_LOGIN_MODE=proxy` or `forward`, route `referrer=SANDBOX` authorization codes through the
+  mTLS proxy/forward exchange. Restrict local stubs to explicit `TOSS_LOGIN_MODE=stub` or
+  simulator-only `dev-*` authorization codes. In Rust WASM consumers, use
+  `trailbase_guest_common::apps_in_toss_login::normalize_login_referrer` when forwarding the
+  referrer; do not hand-roll uppercase/lowercase normalization.
 - If an app tracks `profiles.auth_state` or another domain auth-state field, enforce `disabled` in
   custom WASM endpoints as well as in bootstrap alias handling.
 - mTLS certificates mount only into the proxy container, never into TrailBase or app containers.
