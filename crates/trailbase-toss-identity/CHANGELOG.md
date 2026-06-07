@@ -8,9 +8,9 @@
 
 ### Patch changes
 
-- [fcbc9a7](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/fcbc9a7ce04b4dffc21f5707b292821547b0398e) Add a shared helper for persisting
-  `requestNotificationAgreement` results and gate user-requested functional alerts against the
-  stored functional notification template code before dispatch. — Thanks @imjlk!
+- [fcbc9a7](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/fcbc9a7ce04b4dffc21f5707b292821547b0398e) Separate functional Smart Message `templateSetCode` from the notification agreement SDK
+  `templateCode`, add a shared helper for persisting `requestNotificationAgreement` results, and
+  gate user-requested functional alerts against the stored agreement code before dispatch. — Thanks @imjlk!
 - Updated dependencies: trailbase-guest-common (Cargo)@0.3.0
 
 ## 0.2.0 — 2026-05-18

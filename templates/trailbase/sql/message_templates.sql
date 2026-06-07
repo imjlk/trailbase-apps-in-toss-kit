@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS message_templates (
-  template_code TEXT PRIMARY KEY,
+  template_code TEXT PRIMARY KEY CHECK (length(trim(template_code)) > 0),
   purpose TEXT NOT NULL CHECK (purpose IN ('FUNCTIONAL', 'MARKETING')),
   status TEXT NOT NULL DEFAULT 'DRAFT' CHECK (status IN ('DRAFT', 'APPROVED', 'PAUSED', 'RETIRED')),
   requires_agreement INTEGER NOT NULL DEFAULT 0 CHECK (requires_agreement IN (0, 1)),

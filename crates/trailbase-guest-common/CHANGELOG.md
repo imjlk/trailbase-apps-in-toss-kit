@@ -19,13 +19,13 @@
 - [ce52936](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/ce52936566a16c340b749944cbaed3bacb8ec79c) Normalize AppsInToss smart-message responses around official `resultType`, delivery counts, detail,
   failure, and reach-failure fields, and add shared functional-message helpers plus SQL/docs templates
   for template registry, SDK notification agreement tracking, and reusable outbox provider summaries.
-  The functional notification `templateCode` is stored as a generic `template_code` so consumer apps
-  can gate user-requested functional alerts before dispatching through the proxy. — Thanks @imjlk!
+  The message `templateSetCode` and notification agreement SDK `templateCode` are stored separately so
+  consumer apps can gate user-requested functional alerts before dispatching through the proxy. — Thanks @imjlk!
 - [85059c3](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/85059c39784e0eb97a57ef31f09adc453752a8d2) Fix promotion reward failure timestamps, stabilize Apps in Toss upstream snapshot output, and
   document DB-backed promotion campaign activation requirements. — Thanks @imjlk!
-- [fcbc9a7](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/fcbc9a7ce04b4dffc21f5707b292821547b0398e) Add a shared helper for persisting
-  `requestNotificationAgreement` results and gate user-requested functional alerts against the
-  stored functional notification template code before dispatch. — Thanks @imjlk!
+- [fcbc9a7](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/fcbc9a7ce04b4dffc21f5707b292821547b0398e) Separate functional Smart Message `templateSetCode` from the notification agreement SDK
+  `templateCode`, add a shared helper for persisting `requestNotificationAgreement` results, and
+  gate user-requested functional alerts against the stored agreement code before dispatch. — Thanks @imjlk!
 
 ## 0.2.0 — 2026-05-18
 
