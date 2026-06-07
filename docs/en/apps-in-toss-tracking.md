@@ -36,7 +36,9 @@ only after app-level smoke tests.
   together.
 - Functional Smart Message flows that represent a user-requested future alert
   must use the Apps in Toss notification agreement SDK before server dispatch.
-  Keep the agreement `templateCode` distinct from the message `templateSetCode`.
+  Persist the SDK `templateCode` as the app's functional notification
+  `template_code`. The default kit SQL manages the message `templateSetCode`
+  and SDK `templateCode` as the same functional notification code.
 - `requestNotificationAgreement` is documented for React Native and WebView SDK
   v2.5.0 or newer. Do not enable user-requested functional alert flows on older
   consumer SDK versions.

@@ -16,11 +16,13 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
 1. AppsInToss 콘솔에 mTLS 인증서를 등록하고, 다운로드한 `*_public.crt`,
    `*_private.key` 파일은 프록시 컨테이너에만 마운트합니다. TrailBase나 RN 환경 변수에
    인증서 원문을 넣지 마세요.
-2. 스마트 발송 콘솔에서 메시지 템플릿을 만들고 문구 검수를 완료한 뒤 앱 발송을 켭니다.
-   콘솔의 `templateSetCode`는 `message_templates.template_code`에 저장합니다.
-3. 사전 알림 동의가 필요한 템플릿은 콘솔에서 동의문을 등록합니다. 그 동의문
-   `templateCode`는 `message_templates.agreement_template_code`에 저장하고
-   `requestNotificationAgreement({ options: { templateCode } })`에 전달합니다.
+2. 스마트 발송 콘솔에서 기능성 알림 템플릿을 만들고 문구 검수를 완료한 뒤 앱 발송을 켭니다.
+   콘솔의 발송코드(`templateSetCode`)는 `message_templates.template_code`에 저장합니다.
+3. 사전 알림 동의가 필요한 템플릿은 콘솔에서 알림 동의문을 등록하고, 캠페인과 연결합니다.
+   SDK 호출에는 해당 기능성 알림의 `template_code`를
+   `requestNotificationAgreement({ options: { templateCode } })`의 `templateCode`로
+   전달합니다. Apps in Toss 콘솔에 별도 알림동의문 코드 항목이 없더라도, 발송코드를
+   앱별 DB에서 명확히 관리하면 됩니다.
 4. sandbox QA를 위해 테스트 `userKey`와 API scope를 준비합니다. 프록시는 사용자 키를
    `x-toss-user-key` 헤더로 Toss에 전달합니다.
 
@@ -39,13 +41,15 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
 이미 자체 `message_outbox`가 있는 앱은 테이블을 교체하지 말고 forward migration으로 provider
 응답 요약 컬럼만 추가하세요.
 
-Toss 콘솔의 두 코드는 분리해서 관리하세요.
+Toss 콘솔의 기능성 알림 템플릿 코드는 앱별 DB에서 일반적인 `template_code`로 관리하세요.
 
 - `templateSetCode`: `/api-partner/v1/apps-in-toss/messenger/send-message`에 전달하는
   기능성 메시지 템플릿 코드입니다. 여러 사용자에게 같은 템플릿을 보내는 경우에는
   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`를 사용하며, 한 요청당 최대
   2,500명까지 `contextList`에 담을 수 있습니다.
-- `templateCode`: `requestNotificationAgreement`에 전달하는 알림 동의문 코드입니다.
+- `templateCode`: `requestNotificationAgreement`에 전달하는 SDK 옵션 이름입니다. 기본
+  kit SQL과 헬퍼는 `message_templates.template_code`와
+  `notification_template_agreements.template_code`를 같은 기능성 알림 코드로 사용합니다.
 
 ## 런타임 흐름
 
@@ -53,8 +57,8 @@ Toss 콘솔의 두 코드는 분리해서 관리하세요.
    `requestNotificationAgreement({ options: { templateCode } })`를 호출합니다. `onEvent`와
    `onError`에서는 반환된 cleanup 함수를 호출하세요.
 2. 앱은 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로, `agreementRejected`를
-   `OPTED_OUT`으로 저장합니다. TrailBase WASM 핸들러에서는 앱 흐름에서 받은 동의문
-   `templateCode`와 함께 `upsert_notification_template_agreement_tx`를 사용할 수 있습니다.
+   `OPTED_OUT`으로 저장합니다. TrailBase WASM 핸들러에서는 앱 흐름에서 SDK에 전달한
+   `templateCode` 값과 함께 `upsert_notification_template_agreement_tx`를 사용할 수 있습니다.
 3. 잡은 활성 Toss identity를 읽고, 템플릿 상태와 동의, 멱등 키, 쿨다운을 확인한 뒤 사설
    프록시의 `/internal/apps-in-toss/smart-message/send` 또는
    `/internal/apps-in-toss/smart-message/send-bulk`를 호출합니다. 대량 발송은 같은
@@ -67,9 +71,9 @@ Toss 콘솔의 두 코드는 분리해서 관리하세요.
 ## QA 체크리스트
 
 - 승인된 템플릿이 `message_templates`에 등록되어 있습니다.
-- 사전 동의가 필요한 기능성 템플릿은
-  `message_templates.agreement_template_code`에 SDK 동의문 `templateCode`가 설정되어
-  있습니다.
+- 사전 동의가 필요한 기능성 템플릿은 SDK에 전달한 `templateCode` 기준으로 동의 row가
+  저장되고 검증됩니다. 기본 SQL 템플릿은 `message_templates.template_code`를 동의 검증
+  키로도 사용합니다.
 - 사전 동의가 필요한 기능성 템플릿은 매칭되는 동의 row가 `OPTED_IN`이 되기 전까지
   차단됩니다.
 - 마케팅 또는 재방문 유도 템플릿은 마케팅 동의 없이는 차단됩니다.
