@@ -251,8 +251,10 @@ those dependencies and must smoke-test SDK, Granite, TDS, Login, IAP, promotion,
 and Smart Message changes before raising their own supported version policy.
 For functional Smart Message flows where the user asks to receive a future
 alert, use the Apps in Toss `requestNotificationAgreement` SDK before server
-dispatch. Keep the SDK agreement `templateCode` separate from the message API
-`templateSetCode`; the proxy does not request or verify notification agreement.
+dispatch. Persist the functional notification `templateCode` used by the app's
+console flow as `template_code`; the same code is commonly used as the message
+API `templateSetCode` and the SDK agreement `templateCode`. The proxy does not
+request or verify notification agreement.
 
 Do not automatically raise the kit minimum supported TrailBase server version.
 That value is a manual compatibility policy and should move only after

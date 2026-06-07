@@ -18,13 +18,16 @@ migrations, copy, admin workflow, and dispatch jobs.
    downloaded `*_public.crt` and `*_private.key` files only into the proxy
    container. Do not put certificate contents in TrailBase or RN environment
    variables.
-2. Create message templates in the smart-message console and complete Toss copy
-   review before enabling app dispatch. Store the console `templateSetCode` as
-   `message_templates.template_code`.
+2. Create functional notification templates in the smart-message console and
+   complete Toss copy review before enabling app dispatch. Store the console
+   send code (`templateSetCode`) as `message_templates.template_code`.
 3. For templates that require prior notification agreement, register the
-   agreement copy in the console. Store that agreement `templateCode` as
-   `message_templates.agreement_template_code` and pass it to
-   `requestNotificationAgreement({ options: { templateCode } })`.
+   agreement copy in the console and link it to the campaign. Pass that
+   functional notification `template_code` to
+   `requestNotificationAgreement({ options: { templateCode } })` as
+   `templateCode`. Even when the Apps in Toss console does not expose a separate
+   agreement-code field, storing the send code explicitly in the app DB keeps
+   dispatch and agreement checks aligned.
 4. Prepare test `userKey` values and API scopes for sandbox QA. The proxy sends
    the user key through the `x-toss-user-key` header.
 
@@ -43,15 +46,19 @@ Copy the templates into the app migration set before editing:
 Existing apps with their own `message_outbox` should add the provider response
 summary columns with a forward migration instead of replacing the table.
 
-Keep these two Toss console codes separate:
+Manage Apps in Toss functional notification template codes as generic
+`template_code` values in the app DB:
 
 - `templateSetCode`: the functional message template code passed to
   `/api-partner/v1/apps-in-toss/messenger/send-message`. For multiple users
   with the same template, use
   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`; each request can
   include up to 2,500 recipients in `contextList`.
-- `templateCode`: the notification agreement code passed to
-  `requestNotificationAgreement`.
+- `templateCode`: the SDK option name passed to
+  `requestNotificationAgreement`. The default kit SQL and helpers use
+  `message_templates.template_code` and
+  `notification_template_agreements.template_code` as the same functional
+  notification code.
 
 ## Runtime Flow
 
@@ -61,8 +68,8 @@ Keep these two Toss console codes separate:
    `onError`.
 2. The app stores `newAgreement` and `alreadyAgreed` as `OPTED_IN`, and
    `agreementRejected` as `OPTED_OUT`. TrailBase WASM handlers can use
-   `upsert_notification_template_agreement_tx` with the agreement
-   `templateCode` returned from the app-side flow.
+   `upsert_notification_template_agreement_tx` with the `templateCode` value
+   used by the app-side flow.
 3. The job loads the active Toss identity, checks template status and consent,
    applies idempotency and cooldown rules, then calls
    `/internal/apps-in-toss/smart-message/send` or
@@ -77,9 +84,9 @@ Keep these two Toss console codes separate:
 ## QA Checklist
 
 - Approved template exists in `message_templates`.
-- Functional templates that require agreement have
-  `message_templates.agreement_template_code` set to the SDK agreement
-  `templateCode`.
+- Functional templates that require agreement persist and verify consent by the
+  SDK `templateCode`. The default SQL templates also use
+  `message_templates.template_code` as the consent gate.
 - Functional templates that require agreement are blocked until the matching
   agreement row is `OPTED_IN`.
 - Marketing or re-engagement templates are blocked without marketing consent.

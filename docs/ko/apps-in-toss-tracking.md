@@ -32,8 +32,9 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - mTLS API 변경은 proxy와 서버 연동 표면에 영향을 줍니다. Login, IAP, promotion,
   Smart Message, 알림 동의문 동작을 함께 검토하세요.
 - 사용자가 특정 조건의 향후 알림을 신청하는 기능성 Smart Message 흐름은 서버 발송 전에
-  Apps in Toss 알림 동의문 SDK를 사용해야 합니다. 동의문 `templateCode`는 메시지
-  `templateSetCode`와 별도 값으로 관리하세요.
+  Apps in Toss 알림 동의문 SDK를 사용해야 합니다. SDK에 전달한 `templateCode`는 앱의
+  기능성 알림 `template_code`로 저장하세요. 기본 kit SQL은 메시지 `templateSetCode`와
+  SDK `templateCode`를 같은 기능성 알림 코드로 관리합니다.
 - `requestNotificationAgreement`는 React Native와 WebView SDK v2.5.0 이상에서 문서화되어
   있습니다. 더 낮은 SDK version을 쓰는 컨슈머 앱에서는 사용자가 신청하는 기능성 알림 흐름을
   켜지 마세요.
