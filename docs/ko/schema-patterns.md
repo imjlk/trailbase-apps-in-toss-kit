@@ -82,6 +82,40 @@ canonical `_user` row를 추가하거나 파생하고, 참조를 다시 연결�
 멱등성(claim idempotency), 요청 형태, 제공자 오류 신호(provider error signal)는
 [promotion-campaigns.md](promotion-campaigns.md)를 참고하세요.
 
+## 도메인 이벤트
+
+출시된 앱의 클릭, 노출, 퍼널 분석은 AppsInToss Analytics를 기준으로 두세요. 페이지 이동 로그는
+자동으로 수집되고, 의미 있는 클릭과 노출은 라이브 환경에서 `Analytics.Press`,
+`Analytics.Impression`, `Analytics.Area`로 보낼 수 있습니다.
+
+TrailBase 도메인 이벤트는 별도의 앱 소유 히스토리 및 운영 원장입니다. 앱 안의 내역 화면,
+고객 지원용 진단, 멱등성이 필요한 기능 감사, 서버 상태 변경 기록처럼 AppsInToss Analytics가
+집계되기 전에도 앱이 직접 읽어야 하는 기록에 사용하세요. 이벤트 metadata에는 원본 Toss user
+key, HMAC, 암호문, 토큰, secret을 저장하지 마세요.
+
+선택적으로 `trailbase_guest_common::domain_events` helper를 사용하면 앱 소유 테이블에 이벤트를
+추가하고 조회할 수 있습니다. 스키마는 도입 앱에서 관리하며, 예시는 다음과 같습니다.
+
+```sql
+CREATE TABLE app_events (
+  id INTEGER PRIMARY KEY,
+  user_id TEXT,
+  event_name TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(metadata_json)),
+  source_type TEXT,
+  source_id_json TEXT CHECK (source_id_json IS NULL OR json_valid(source_id_json)),
+  request_id TEXT,
+  created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX idx_app_events_user_created
+  ON app_events(user_id, created_at DESC);
+```
+
+이벤트 이름은 `mission_claim`, `furnace_save`, `promotion_reward_requested`처럼 안정적인
+값으로 두고, metadata는 구조화된 JSON으로 유지하세요. 그러면 필요할 때 AppsInToss Analytics
+파라미터와도 자연스럽게 맞출 수 있습니다.
+
 ## 템플릿 차이
 
 하위 모듈(submodule)을 업데이트해도 `templates/trailbase`에서 복사해 간 파일은 자동으로
