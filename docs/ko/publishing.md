@@ -33,7 +33,7 @@ rebuild)에서 실행됩니다. 정기 재빌드는 upstream Bun 기반 이미�
 ## 태그 정책
 
 프록시 이미지 워크플로는 `services/toss-mtls-client-proxy/package.json`을 읽습니다. Sampo
-릴리스 커밋(release commit)이 `main`에서 비공개 npm 패키지 버전(package version)을 올리면,
+릴리스 PR이 `main`에서 비공개 npm 패키지 버전(package version)을 올리면,
 워크플로는 대응하는 `toss-mtls-client-proxy-vX.Y.Z` 태그가 없을 때 이를 만들고 릴리스 이미지
 태그(release image tag)를 배포합니다. 수동으로 `toss-mtls-client-proxy-vX.Y.Z` 태그를 push하는 방식도
 지원합니다. 워크플로는 태그 버전(tag version)이 프록시 패키지 버전(proxy package version)과
@@ -50,11 +50,11 @@ Coolify 운영 환경에서는 `0.1.4` 같은 정확한 태그 또는 `0.1` 같�
 
 ## 버전 관리
 
-Sampo는 Rust WASM crate와 비공개 proxy package의 version/changelog 관리를 맡습니다.
-사용자가 체감하는 Rust helper 변경이나 proxy 변경에는 changeset을 추가하고, `sampo release`를
-실행한 뒤 생성된 릴리스 커밋(release commit)을 push하세요. Rust helper crate는 고정 버전
-그룹(fixed version group)으로 묶여 있습니다. Proxy package는 비공개이며 npm에 publish하지
-않습니다. GHCR 태그는 proxy의 `package.json` version에서 나옵니다.
+Sampo는 Rust WASM crate와 비공개 JS package의 version/changelog 관리를 맡습니다. 사용자가
+체감하는 Rust helper 변경, proxy 변경, 공유 JS package 변경에는 changeset을 추가하고, 기능 PR이
+`main`에 들어간 뒤 `Sampo release` workflow가 생성 또는 갱신하는 릴리스 PR을 검토하세요. Rust
+helper crate는 고정 버전 그룹(fixed version group)으로 묶여 있습니다. JS package는 비공개이며
+npm에 publish하지 않습니다. GHCR 태그는 proxy의 `package.json` version에서 나옵니다.
 
 이미지는 인증서와 토큰을 실행 시점(runtime)에만 받기 때문에 공개해도 안전합니다. 실행 중인
 프록시 인스턴스는 애플리케이션 네트워크 안에서 비공개(private)로 유지해야 합니다.

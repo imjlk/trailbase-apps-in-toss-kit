@@ -169,7 +169,7 @@ function buildReleaseNotesDraft(changesets, options) {
   lines.push("- Keep user-facing behavior first; move implementation detail to maintainer notes.");
   lines.push("- Call out migrations, deployment steps, secrets, image tags, or compatibility checks when they affect operators.");
   lines.push("- Do not claim consumer compatibility until the relevant smoke tests have passed.");
-  lines.push("- After copying useful text into release notes, run `sampo release` to update package changelogs.");
+  lines.push("- After merging feature PRs, review the generated Sampo release PR for package changelog output.");
   lines.push("");
 
   return lines.join("\n");

@@ -32,8 +32,8 @@ patches.
 
 ## Tag Policy
 
-The proxy image workflow reads `services/toss-mtls-client-proxy/package.json`. When a Sampo release
-commit bumps that private npm package version on `main`, the workflow creates the matching
+The proxy image workflow reads `services/toss-mtls-client-proxy/package.json`. When the Sampo
+release PR bumps that private npm package version on `main`, the workflow creates the matching
 `toss-mtls-client-proxy-vX.Y.Z` tag if it does not already exist and publishes the release image
 tags. Manual `toss-mtls-client-proxy-vX.Y.Z` tag pushes are still supported; the workflow validates
 that the tag version matches the proxy package version.
@@ -49,11 +49,11 @@ For Coolify production, prefer an exact `0.1.4` tag or a minor tag such as `0.1`
 
 ## Versioning
 
-Sampo is initialized for Rust WASM crate and private proxy package version/changelog management. Add
-a changeset for user-facing Rust helper changes or proxy changes, run `sampo release`, then push the
-resulting release commit. The Rust helper crates are configured as a fixed version group. The proxy
-package stays private and is not published to npm; its GHCR tags move from the proxy `package.json`
-version.
+Sampo is initialized for Rust WASM crate and private JS package version/changelog management. Add a
+changeset for user-facing Rust helper changes, proxy changes, or shared JS package changes and let
+the `Sampo release` workflow open or refresh the generated release PR after the feature PR lands on
+`main`. The Rust helper crates are configured as a fixed version group. JS packages stay private and
+are not published to npm; proxy GHCR tags move from the proxy `package.json` version.
 
 The image is safe to make public because certificates and tokens are only provided at runtime. The
 running proxy instance should remain private on the application network.

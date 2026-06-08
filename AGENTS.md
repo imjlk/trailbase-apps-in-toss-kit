@@ -155,20 +155,27 @@ Typical Rust helper change flow:
 ```bash
 sampo add
 bun run sampo:release-notes:draft
-sampo release
-git push origin main
 ```
 
 Use `bun run sampo:release-notes:draft` to turn pending changesets into a
-Markdown release-note draft before running `sampo release`. The draft command
+Markdown release-note draft before merging the feature PR. The draft command
 does not consume changesets. Keep changeset bodies user-facing: mention
 migrations, env vars, image tags, smoke tests, rollout notes, or compatibility
 limits when operators need them.
 
+After changesets land on `main`, the `Sampo release` workflow runs Sampo in
+`auto` mode and opens or refreshes the `release/main` PR. Do not run
+`sampo release` directly on feature branches unless explicitly preparing a
+manual release recovery. Prefer reviewing and merging the generated release PR.
+Configure `SAMPO_RELEASE_TOKEN` as a repo secret with a PAT or GitHub App token
+so the generated release PR can trigger downstream pull request checks. The
+workflow falls back to `github.token`, but that fallback can skip downstream PR
+checks on GitHub-generated commits.
+
 The two Rust crates are configured as a fixed group and should move together.
-The Bun proxy is a private npm package tracked by Sampo for version/changelog
-management only. It is not published to npm. Its container release version
-comes from `services/toss-mtls-client-proxy/package.json`.
+The Bun proxy and shared JS packages are private npm packages tracked by Sampo
+for version/changelog management only. They are not published to npm. The proxy
+container release version comes from `services/toss-mtls-client-proxy/package.json`.
 
 Proxy changeset example:
 
@@ -191,9 +198,9 @@ general `$sampo` skill for Sampo changeset/release/publish work, and load
 `trailbase-ops` only when the release note touches TrailBase migration, Record
 API, WASM auth, deployment, production reset, or mTLS certificate behavior.
 
-When `sampo release` bumps that package version and the release commit lands on
-`main`, the image workflow creates `toss-mtls-client-proxy-vX.Y.Z` if needed and
-publishes the GHCR release tags.
+When the Sampo release PR bumps that package version and the release commit lands
+on `main`, the image workflow creates `toss-mtls-client-proxy-vX.Y.Z` if needed
+and publishes the GHCR release tags.
 
 GHCR image:
 

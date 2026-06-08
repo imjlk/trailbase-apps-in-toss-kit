@@ -7,25 +7,33 @@ This repository uses Sampo for changeset-driven version and changelog management
 - `cargo/trailbase-guest-common`
 - `cargo/trailbase-toss-identity`
 - `npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy`
+- `npm/@trailbase-apps-in-toss-kit/trailbase-client`
+- `npm/@trailbase-apps-in-toss-kit/trailbase-runtime`
 
 The two Rust WASM helper crates are configured as a fixed group in `.sampo/config.toml` so they move
-together. The Bun mTLS proxy is a private npm package; Sampo manages its version and changelog, but
-it is not published to npm. Its GHCR image release version comes from
-`services/toss-mtls-client-proxy/package.json`.
+together. The Bun mTLS proxy and shared JS packages are private npm packages; Sampo manages their
+versions and changelogs, but they are not published to npm. The proxy GHCR image release version
+comes from `services/toss-mtls-client-proxy/package.json`.
 
 ## Regular Change Flow
 
 ```bash
 sampo add
 bun run sampo:release-notes:draft
-sampo release
-git push origin main
 ```
 
-Use `bun run sampo:release-notes:draft` before `sampo release` when preparing a PR summary,
+Use `bun run sampo:release-notes:draft` before merging a feature PR when preparing a PR summary,
 GitHub Release body, or operator handoff note. The draft command reads pending changesets without
-consuming them. `sampo release` consumes pending changesets, bumps package versions, and updates
-package changelogs.
+consuming them.
+
+After changesets land on `main`, the `Sampo release` workflow runs Sampo in `auto` mode and opens or
+refreshes the release PR on `release/main`. Review that generated release PR for package version
+bumps and changelog output, then merge it to publish the release commit. Use a manual local
+`sampo release` only for release recovery or when the workflow is unavailable.
+
+Configure `SAMPO_RELEASE_TOKEN` as a repository secret with a fine-grained PAT or GitHub App token
+that can write contents and pull requests. The workflow falls back to `github.token`, but PRs created
+with the default token may not trigger downstream pull request checks.
 
 For proxy changes, target the private npm package:
 
@@ -42,8 +50,8 @@ drafting guidance, and consumer-repo usage.
 
 ## Proxy Image Release Flow
 
-After `sampo release` bumps the proxy package version and the release commit lands on `main`, the
-GHCR image workflow reads `services/toss-mtls-client-proxy/package.json`. If
+After the Sampo release PR bumps the proxy package version and the release commit lands on `main`,
+the GHCR image workflow reads `services/toss-mtls-client-proxy/package.json`. If
 `toss-mtls-client-proxy-vX.Y.Z` does not exist yet, the workflow creates that git tag and pushes the
 `latest`, `X.Y.Z`, `X.Y`, and `X` image tags in the same run.
 

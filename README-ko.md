@@ -120,25 +120,24 @@ test가 통과한 뒤에만 올립니다. 도입 앱은 복사해 간 Compose �
 
 Sampo는 changeset 기반 버전(version)과 changelog 관리를 위해 초기화되어 있습니다. Rust helper
 crate는 고정 버전 그룹(fixed version group)으로 묶여 `trailbase-guest-common`과
-`trailbase-toss-identity`가 함께 이동합니다. Bun 프록시는 버전 관리(versioning)만을 위해
-비공개 npm package로 추적되며 npm에는 publish하지 않습니다.
+`trailbase-toss-identity`가 함께 이동합니다. Bun 프록시와 공유 JS package는 버전
+관리(versioning)만을 위해 비공개 npm package로 추적되며 npm에는 publish하지 않습니다.
 
 일반적인 흐름은 다음과 같습니다.
 
 ```bash
 sampo add
 bun run sampo:release-notes:draft
-sampo release
-git push origin main
 ```
 
-`sampo release`를 실행하기 전에 release-note draft 명령으로 대기 중인 Sampo changeset을
+기능 PR을 머지하기 전에 release-note draft 명령으로 대기 중인 Sampo changeset을
 Markdown 요약으로 만들 수 있습니다. 컨슈머 앱도 자체 `.sampo/changesets`에서 릴리스 노트를
 만들고 싶을 때 kit submodule의 같은 스크립트를 실행할 수 있습니다.
 
-`sampo release`가 프록시 패키지 버전(proxy package version)을 올리고 릴리스 커밋(release
-commit)이 `main`에 들어가면, 이미지 워크플로는 필요한 경우 대응하는
-`toss-mtls-client-proxy-vX.Y.Z` git tag를 만들고 GHCR 릴리스 태그를 배포합니다.
+Changeset이 `main`에 들어가면 `Sampo release` workflow가 `release/main` 릴리스 PR을 열거나
+갱신합니다. 그 릴리스 PR이 프록시 패키지 버전(proxy package version)을 올리고 `main`에
+들어가면, 이미지 워크플로는 필요한 경우 대응하는 `toss-mtls-client-proxy-vX.Y.Z` git tag를
+만들고 GHCR 릴리스 태그를 배포합니다.
 
 자세한 릴리스, 릴리스 노트, 이미지 태그 정책은 `docs/en/versioning.md`와
 `docs/en/sampo-release-notes.md`를 참고하세요. 한글 문서는 `docs/ko/versioning.md`와
