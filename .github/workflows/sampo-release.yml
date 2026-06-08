@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   release:
-    name: Create release PR or publish release tags
+    name: Create release PR
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -43,7 +43,22 @@ jobs:
           install: true
           cache: true
 
+      - name: Detect pending changesets
+        id: changesets
+        shell: bash
+        run: |
+          if [ -d .sampo/changesets ]; then
+            count="$(find .sampo/changesets -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
+          else
+            count="0"
+          fi
+          echo "count=${count}" >> "$GITHUB_OUTPUT"
+          if [ "$count" = "0" ]; then
+            echo "No pending changesets; skipping Sampo release PR generation."
+          fi
+
       - name: Run Sampo release automation
+        if: steps.changesets.outputs.count != '0'
         id: sampo
         uses: bruits/sampo/crates/sampo-github-action@cargo-sampo-github-action-v0.16.0
         with:

@@ -27,9 +27,11 @@ PR summary, GitHub Release body, 운영 handoff note를 준비할 때는 기능 
 하고 소비하지 않습니다.
 
 Changeset이 `main`에 들어가면 `Sampo release` workflow가 Sampo를 `auto` 모드로 실행하고
-`release/main` 릴리스 PR을 열거나 갱신합니다. 생성된 릴리스 PR에서 package version bump와
-changelog 출력을 검토한 뒤 머지하세요. 로컬에서 직접 `sampo release`를 실행하는 방식은
-workflow를 사용할 수 없거나 릴리스 복구가 필요할 때만 사용합니다.
+`release/main` 릴리스 PR을 열거나 갱신합니다. 대기 중인 changeset이 없으면 이 repo의
+비공개/unpublishable package를 publish하려고 하지 않도록 Sampo 단계를 건너뜁니다. 생성된
+릴리스 PR에서 package version bump와 changelog 출력을 검토한 뒤 머지하세요. 로컬에서 직접
+`sampo release`를 실행하는 방식은 workflow를 사용할 수 없거나 릴리스 복구가 필요할 때만
+사용합니다.
 
 `SAMPO_RELEASE_TOKEN` repo secret에는 contents와 pull requests 쓰기 권한이 있는 fine-grained
 PAT 또는 GitHub App token을 설정하세요. 이 secret이 없으면 workflow는

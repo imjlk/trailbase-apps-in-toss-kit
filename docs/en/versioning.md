@@ -27,9 +27,10 @@ GitHub Release body, or operator handoff note. The draft command reads pending c
 consuming them.
 
 After changesets land on `main`, the `Sampo release` workflow runs Sampo in `auto` mode and opens or
-refreshes the release PR on `release/main`. Review that generated release PR for package version
-bumps and changelog output, then merge it to publish the release commit. Use a manual local
-`sampo release` only for release recovery or when the workflow is unavailable.
+refreshes the release PR on `release/main`. When no pending changesets remain, the workflow skips
+Sampo instead of publishing this repo's private/unpublishable packages. Review the generated release
+PR for package version bumps and changelog output, then merge it to publish the release commit. Use a
+manual local `sampo release` only for release recovery or when the workflow is unavailable.
 
 Configure `SAMPO_RELEASE_TOKEN` as a repository secret with a fine-grained PAT or GitHub App token
 that can write contents and pull requests. If that secret is absent, the workflow reuses
