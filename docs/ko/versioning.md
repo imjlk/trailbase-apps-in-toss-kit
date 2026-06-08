@@ -32,8 +32,9 @@ changelog 출력을 검토한 뒤 머지하세요. 로컬에서 직접 `sampo re
 workflow를 사용할 수 없거나 릴리스 복구가 필요할 때만 사용합니다.
 
 `SAMPO_RELEASE_TOKEN` repo secret에는 contents와 pull requests 쓰기 권한이 있는 fine-grained
-PAT 또는 GitHub App token을 설정하세요. Workflow는 `github.token`으로 fallback할 수 있지만,
-기본 토큰으로 생성된 PR은 downstream pull request check를 트리거하지 않을 수 있습니다.
+PAT 또는 GitHub App token을 설정하세요. 이 secret이 없으면 workflow는
+`TRAILBASE_RELEASE_WATCH_TOKEN`을 재사용한 뒤 `github.token`으로 fallback합니다. 기본 토큰으로
+생성된 PR은 downstream pull request check를 트리거하지 않을 수 있습니다.
 
 프록시 변경에는 비공개 npm package를 대상으로 지정하세요.
 
