@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 0.3.1 — 2026-06-08
+
+### Patch changes
+
+- [a3435c6](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/a3435c629c976c652cf29c2b5953f8b520eb54d0) Preserve the AppsInToss SDK-provided sandbox referrer casing when normalizing
+  Toss Login results so backend proxy and forward flows can exchange the original
+  one-time authorization code reliably. — Thanks @imjlk!
+
 ## 0.3.0 — 2026-06-05
 
 ### Minor changes
