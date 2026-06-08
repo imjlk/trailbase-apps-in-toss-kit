@@ -7,10 +7,12 @@
 - `cargo/trailbase-guest-common`
 - `cargo/trailbase-toss-identity`
 - `npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy`
+- `npm/@trailbase-apps-in-toss-kit/trailbase-client`
+- `npm/@trailbase-apps-in-toss-kit/trailbase-runtime`
 
 두 Rust WASM helper crate는 `.sampo/config.toml`에서 고정 버전 그룹(fixed group)으로 묶여
-함께 이동합니다. Bun mTLS 프록시는 비공개 npm package입니다. Sampo가 버전(version)과
-changelog를 관리하지만 npm에는 publish하지 않습니다. GHCR 이미지 릴리스 버전은
+함께 이동합니다. Bun mTLS 프록시와 공유 JS package는 비공개 npm package입니다. Sampo가
+버전(version)과 changelog를 관리하지만 npm에는 publish하지 않습니다. GHCR 이미지 릴리스 버전은
 `services/toss-mtls-client-proxy/package.json`에서 가져옵니다.
 
 ## 일반 변경 흐름
@@ -18,14 +20,20 @@ changelog를 관리하지만 npm에는 publish하지 않습니다. GHCR 이미�
 ```bash
 sampo add
 bun run sampo:release-notes:draft
-sampo release
-git push origin main
 ```
 
-PR summary, GitHub Release body, 운영 handoff note를 준비할 때는 `sampo release` 전에
+PR summary, GitHub Release body, 운영 handoff note를 준비할 때는 기능 PR을 머지하기 전에
 `bun run sampo:release-notes:draft`를 실행하세요. 초안 명령은 대기 중인 changeset을 읽기만
-하고 소비하지 않습니다. `sampo release`는 대기 중인 changeset을 소비하고 package version을
-올리며 package changelog를 업데이트합니다.
+하고 소비하지 않습니다.
+
+Changeset이 `main`에 들어가면 `Sampo release` workflow가 Sampo를 `auto` 모드로 실행하고
+`release/main` 릴리스 PR을 열거나 갱신합니다. 생성된 릴리스 PR에서 package version bump와
+changelog 출력을 검토한 뒤 머지하세요. 로컬에서 직접 `sampo release`를 실행하는 방식은
+workflow를 사용할 수 없거나 릴리스 복구가 필요할 때만 사용합니다.
+
+`SAMPO_RELEASE_TOKEN` repo secret에는 contents와 pull requests 쓰기 권한이 있는 fine-grained
+PAT 또는 GitHub App token을 설정하세요. Workflow는 `github.token`으로 fallback할 수 있지만,
+기본 토큰으로 생성된 PR은 downstream pull request check를 트리거하지 않을 수 있습니다.
 
 프록시 변경에는 비공개 npm package를 대상으로 지정하세요.
 
@@ -42,7 +50,7 @@ Changeset 작성 기준, 릴리스 노트 초안 작성법, 컨슈머 저장소 
 
 ## 프록시 이미지 릴리스 흐름
 
-`sampo release`가 프록시 패키지 버전(proxy package version)을 올리고 릴리스 커밋(release
+Sampo 릴리스 PR이 프록시 패키지 버전(proxy package version)을 올리고 릴리스 커밋(release
 commit)이 `main`에 들어가면, GHCR 이미지 워크플로(image workflow)는
 `services/toss-mtls-client-proxy/package.json`을 읽습니다.
 `toss-mtls-client-proxy-vX.Y.Z`가 아직 없으면 workflow가 해당 git tag를 만들고 같은 run에서

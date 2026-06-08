@@ -1,0 +1,59 @@
+name: Sampo release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/sampo-release.yml"
+      - ".sampo/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/**/Cargo.toml"
+      - "crates/**/CHANGELOG.md"
+      - "packages/**/package.json"
+      - "packages/**/CHANGELOG.md"
+      - "services/**/package.json"
+      - "services/**/CHANGELOG.md"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: sampo-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Create release PR or publish release tags
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SAMPO_RELEASE_TOKEN || github.token }}
+
+      - name: Setup mise tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
+        with:
+          install: true
+          cache: true
+
+      - name: Run Sampo release automation
+        id: sampo
+        uses: bruits/sampo/crates/sampo-github-action@cargo-sampo-github-action-v0.16.0
+        with:
+          command: auto
+          base-branch: main
+          pr-branch: release/main
+          pr-title: "chore: release packages"
+          github-token: ${{ secrets.SAMPO_RELEASE_TOKEN || github.token }}
+          create-github-release: false
+          open-discussion: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.SAMPO_RELEASE_TOKEN || github.token }}
+

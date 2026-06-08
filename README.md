@@ -125,25 +125,24 @@ the tracking policy.
 
 Sampo is initialized for changeset-driven version and changelog management. The Rust helper crates
 are configured as a fixed group so `trailbase-guest-common` and `trailbase-toss-identity` move
-together. The Bun proxy is tracked as a private npm package for versioning only; it is not published
-to npm.
+together. The Bun proxy and shared JS packages are tracked as private npm packages for versioning
+only; they are not published to npm.
 
 Typical flow:
 
 ```bash
 sampo add
 bun run sampo:release-notes:draft
-sampo release
-git push origin main
 ```
 
 Use the release-note draft command to turn pending Sampo changesets into a Markdown summary before
-running `sampo release`. Consumer apps can run the same script from the kit submodule when they want
+merging the feature PR. Consumer apps can run the same script from the kit submodule when they want
 release notes from their own `.sampo/changesets`.
 
-When `sampo release` bumps the proxy package version and the release commit lands on `main`, the
-image workflow creates the matching `toss-mtls-client-proxy-vX.Y.Z` git tag if needed and publishes
-the GHCR release tags.
+After changesets land on `main`, the `Sampo release` workflow opens or refreshes the release PR on
+`release/main`. When that release PR bumps the proxy package version and lands on `main`, the image
+workflow creates the matching `toss-mtls-client-proxy-vX.Y.Z` git tag if needed and publishes the
+GHCR release tags.
 
 See `docs/en/versioning.md` and `docs/en/sampo-release-notes.md` for the detailed release,
 release-note, and image tag policy. See `docs/ko/versioning.md` and

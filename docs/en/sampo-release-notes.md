@@ -60,8 +60,8 @@ bun run sampo:release-notes:draft -- --output RELEASE_NOTES_DRAFT.md
 
 The draft contains a one-entry-per-changeset highlights section, package impact
 sections, source changeset paths, and a short review checklist. It is a writing
-aid; `sampo release` remains the source of truth for package version bumps and
-package changelog updates.
+aid; the generated Sampo release PR remains the source of truth for package
+version bumps and package changelog updates.
 
 ## Use From a Consumer Repository
 
@@ -93,10 +93,10 @@ experience.
    audience.
 3. Move polished text into the PR summary, release issue, GitHub Release body,
    or internal rollout note.
-4. Run `sampo release` only when preparing the actual package version/changelog
-   release commit.
-5. After release, verify generated changelogs and package versions before
-   publishing or relying on image release automation.
+4. Merge the feature PR with its changeset. The `Sampo release` workflow opens
+   or refreshes the generated `release/main` PR from pending changesets.
+5. Review the generated changelogs and package versions in that release PR
+   before merging it or relying on image release automation.
 
 ## Agent Guidance
 

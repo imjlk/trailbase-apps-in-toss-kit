@@ -56,7 +56,7 @@ bun run sampo:release-notes:draft -- --output RELEASE_NOTES_DRAFT.md
 
 초안에는 changeset별 highlights, package impact 섹션, 원본 changeset 경로, 간단한 검토
 체크리스트가 들어갑니다. 이 파일은 작성 보조 도구입니다. package version bump와 package
-changelog 업데이트의 기준은 여전히 `sampo release`입니다.
+changelog 업데이트의 기준은 생성된 Sampo 릴리스 PR입니다.
 
 ## 컨슈머 저장소에서 사용하기
 
@@ -84,9 +84,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/draft-sampo-release-notes.mjs \
 1. `sampo add`로 changeset을 추가하거나 기존 changeset을 검토합니다.
 2. `bun run sampo:release-notes:draft`로 초안을 만들고 대상 독자에 맞게 다듬습니다.
 3. 다듬은 문장을 PR summary, release issue, GitHub Release body, 내부 rollout note에 옮깁니다.
-4. 실제 package version/changelog release commit을 준비할 때만 `sampo release`를 실행합니다.
-5. 릴리스 후에는 publish 또는 image release automation에 의존하기 전에 생성된 changelog와
-   package version을 확인합니다.
+4. Changeset이 포함된 기능 PR을 머지합니다. `Sampo release` workflow가 대기 중인 changeset으로
+   `release/main` 릴리스 PR을 열거나 갱신합니다.
+5. 릴리스 PR의 changelog와 package version을 검토한 뒤 머지하거나 image release automation에
+   의존하세요.
 
 ## 에이전트 지침
 
