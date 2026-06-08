@@ -1,5 +1,30 @@
 # trailbase-guest-common
 
+## 0.4.0 — 2026-06-08
+
+### Minor changes
+
+- [8e5851c](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/8e5851c6be1db2f16778304fa0023eb289ab05ce) Generalize functional notification agreement storage around `template_code`,
+  rename the dispatch gate fields to notification-specific names, and keep
+  message-template consent keys normalized across current and legacy SQL schemas. — Thanks @imjlk!
+- [e79fc6a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/e79fc6a607e8f9f17a2ae7c1847027a656779bb1) Add generic TrailBase domain event helpers for app-owned event history tables,
+  including safe SQL identifier validation, insert/list statement builders, and
+  schema guidance that keeps server-side ledgers separate from AppsInToss
+  Analytics. — Thanks @imjlk!
+
+### Patch changes
+
+- [2121078](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/212107855e79e2a575cdbf341ebf1775dac38eb3) Add a shared Toss Login sandbox stub decision helper and document that real
+  AppsInToss sandbox `authorizationCode` values should be exchanged through the
+  configured proxy or forward path instead of being treated as local stubs.
+  Only explicit stub mode or simulator-only `dev-*` authorization codes should
+  activate local fallback behavior. — Thanks @imjlk!
+- [480b382](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/480b3829d7ba6c3094c860bb37970762ddcbb061) Add an internal AppsInToss smart-message bulk adapter for
+  `send-bulk-message`, enforce the 2,500 recipient limit, and expose matching
+  Rust proxy helpers for TrailBase jobs. Treat non-2xx upstream smart-message
+  responses as failed dispatches instead of inferring success from missing Toss
+  result fields. — Thanks @imjlk!
+
 ## 0.3.0 — 2026-06-05
 
 ### Minor changes

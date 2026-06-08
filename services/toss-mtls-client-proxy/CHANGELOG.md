@@ -1,5 +1,15 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.6 — 2026-06-08
+
+### Patch changes
+
+- [480b382](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/480b3829d7ba6c3094c860bb37970762ddcbb061) Add an internal AppsInToss smart-message bulk adapter for
+  `send-bulk-message`, enforce the 2,500 recipient limit, and expose matching
+  Rust proxy helpers for TrailBase jobs. Treat non-2xx upstream smart-message
+  responses as failed dispatches instead of inferring success from missing Toss
+  result fields. — Thanks @imjlk!
+
 ## 0.1.5 — 2026-06-05
 
 ### Patch changes
