@@ -82,6 +82,44 @@ See [promotion-campaigns.md](promotion-campaigns.md) for the full model,
 including feature keys, env fallback, ledger ownership, claim idempotency,
 request shape, and provider error signals.
 
+## Domain Events
+
+AppsInToss Analytics should remain the source for launched-app click,
+impression, and funnel reporting. Page navigation logs are collected
+automatically, while meaningful clicks and impressions can be sent with
+`Analytics.Press`, `Analytics.Impression`, or `Analytics.Area` in live
+environments.
+
+TrailBase domain events are a separate app-owned history and operations
+ledger. Use them for in-app timelines, support diagnostics, idempotent feature
+audits, or server-side state changes that must be visible before AppsInToss
+Analytics is available. Do not store raw Toss user keys, HMACs, sealed values,
+tokens, or secrets in event metadata.
+
+The optional `trailbase_guest_common::domain_events` helpers insert and list
+events against an app-owned table. Keep the schema in the consumer app, for
+example:
+
+```sql
+CREATE TABLE app_events (
+  id INTEGER PRIMARY KEY,
+  user_id TEXT,
+  event_name TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(metadata_json)),
+  source_type TEXT,
+  source_id_json TEXT CHECK (source_id_json IS NULL OR json_valid(source_id_json)),
+  request_id TEXT,
+  created_at INTEGER NOT NULL
+) STRICT;
+
+CREATE INDEX idx_app_events_user_created
+  ON app_events(user_id, created_at DESC);
+```
+
+Use stable names such as `mission_claim`, `furnace_save`, or
+`promotion_reward_requested`, and keep metadata structured so the same names can
+map cleanly to AppsInToss Analytics parameters when needed.
+
 ## Template Drift
 
 Submodule updates do not update files that were copied out of
