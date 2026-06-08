@@ -164,9 +164,11 @@ migrations, env vars, image tags, smoke tests, rollout notes, or compatibility
 limits when operators need them.
 
 After changesets land on `main`, the `Sampo release` workflow runs Sampo in
-`auto` mode and opens or refreshes the `release/main` PR. Do not run
-`sampo release` directly on feature branches unless explicitly preparing a
-manual release recovery. Prefer reviewing and merging the generated release PR.
+`auto` mode and opens or refreshes the `release/main` PR. When no pending
+changesets remain, the workflow skips Sampo so it does not try to publish the
+repo's private/unpublishable packages. Do not run `sampo release` directly on
+feature branches unless explicitly preparing a manual release recovery. Prefer
+reviewing and merging the generated release PR.
 Configure `SAMPO_RELEASE_TOKEN` as a repo secret with a PAT or GitHub App token
 so the generated release PR can trigger downstream pull request checks. If that
 secret is absent, the workflow reuses `TRAILBASE_RELEASE_WATCH_TOKEN` before
