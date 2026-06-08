@@ -32,8 +32,9 @@ bumps and changelog output, then merge it to publish the release commit. Use a m
 `sampo release` only for release recovery or when the workflow is unavailable.
 
 Configure `SAMPO_RELEASE_TOKEN` as a repository secret with a fine-grained PAT or GitHub App token
-that can write contents and pull requests. The workflow falls back to `github.token`, but PRs created
-with the default token may not trigger downstream pull request checks.
+that can write contents and pull requests. If that secret is absent, the workflow reuses
+`TRAILBASE_RELEASE_WATCH_TOKEN` before falling back to `github.token`. PRs created with the default
+token may not trigger downstream pull request checks.
 
 For proxy changes, target the private npm package:
 

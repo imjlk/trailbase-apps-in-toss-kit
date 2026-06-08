@@ -168,9 +168,10 @@ After changesets land on `main`, the `Sampo release` workflow runs Sampo in
 `sampo release` directly on feature branches unless explicitly preparing a
 manual release recovery. Prefer reviewing and merging the generated release PR.
 Configure `SAMPO_RELEASE_TOKEN` as a repo secret with a PAT or GitHub App token
-so the generated release PR can trigger downstream pull request checks. The
-workflow falls back to `github.token`, but that fallback can skip downstream PR
-checks on GitHub-generated commits.
+so the generated release PR can trigger downstream pull request checks. If that
+secret is absent, the workflow reuses `TRAILBASE_RELEASE_WATCH_TOKEN` before
+falling back to `github.token`. The default token fallback can skip downstream
+PR checks on GitHub-generated commits.
 
 The two Rust crates are configured as a fixed group and should move together.
 The Bun proxy and shared JS packages are private npm packages tracked by Sampo

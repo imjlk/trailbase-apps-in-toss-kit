@@ -35,7 +35,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
-          token: ${{ secrets.SAMPO_RELEASE_TOKEN || github.token }}
+          token: ${{ secrets.SAMPO_RELEASE_TOKEN || secrets.TRAILBASE_RELEASE_WATCH_TOKEN || github.token }}
 
       - name: Setup mise tools
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db # v3
@@ -51,9 +51,8 @@ jobs:
           base-branch: main
           pr-branch: release/main
           pr-title: "chore: release packages"
-          github-token: ${{ secrets.SAMPO_RELEASE_TOKEN || github.token }}
+          github-token: ${{ secrets.SAMPO_RELEASE_TOKEN || secrets.TRAILBASE_RELEASE_WATCH_TOKEN || github.token }}
           create-github-release: false
           open-discussion: false
         env:
-          GITHUB_TOKEN: ${{ secrets.SAMPO_RELEASE_TOKEN || github.token }}
-
+          GITHUB_TOKEN: ${{ secrets.SAMPO_RELEASE_TOKEN || secrets.TRAILBASE_RELEASE_WATCH_TOKEN || github.token }}
