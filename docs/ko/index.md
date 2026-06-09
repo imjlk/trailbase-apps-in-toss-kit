@@ -27,6 +27,7 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 | Toss 프로모션 리워드 캠페인 설계하기 | [promotion-campaigns.md](promotion-campaigns.md) |
 | 기능성 푸시/알림 메시지 붙이기 | [functional-messages.md](functional-messages.md) |
 | React Native 클라이언트 어댑터 사용하기 | [client-adapters.md](client-adapters.md) |
+| 상세 분석과 AppsInToss 분석 설정하기 | [analytics.md](analytics.md) |
 | 버전과 GHCR 이미지 배포 흐름 이해하기 | [versioning.md](versioning.md), [publishing.md](publishing.md) |
 | Sampo changeset으로 릴리스 노트 초안 만들기 | [sampo-release-notes.md](sampo-release-notes.md) |
 | TrailBase 업스트림 호환성 추적하기 | [trailbase-tracking.md](trailbase-tracking.md) |

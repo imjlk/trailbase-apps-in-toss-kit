@@ -6,6 +6,7 @@
   "description": "Shared TrailBase client glue for AppsInToss React Native apps.",
   "exports": {
     ".": "./src/index.ts",
+    "./analytics": "./src/analytics.ts",
     "./apps-in-toss": "./src/apps-in-toss.ts",
     "./tanstack-db": "./src/tanstack-db.ts",
     "./tanstack-query": "./src/tanstack-query.ts"
