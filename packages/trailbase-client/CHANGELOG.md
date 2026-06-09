@@ -1,5 +1,17 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 0.4.0 — 2026-06-09
+
+### Minor changes
+
+- [2ee561a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2ee561a09675477a9cc97d9677a71bf90cc62f50) Add a configurable analytics router for TrailBase detailed analytics and AppsInToss console analytics integration. — Thanks @imjlk!
+
+### Patch changes
+
+- [07da898](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/07da8988ad6037bd0507dc02d6050d3fa7496f68) Add a dedicated AppsInToss client adapter subpath and normalize notification
+  agreement SDK results for TrailBase functional-message consent storage without
+  forwarding raw SDK event payloads. — Thanks @imjlk!
+
 ## 0.3.1 — 2026-06-08
 
 ### Patch changes
