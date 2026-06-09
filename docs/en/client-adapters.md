@@ -37,6 +37,31 @@ future alert, call `requestNotificationAgreement({ options: { templateCode } })`
 from `@apps-in-toss/framework` or `@apps-in-toss/web-framework`, then send the
 result to the app backend so it can persist the agreement before dispatch.
 
+The `./apps-in-toss` subpath reexports the shared Toss Login/session helpers and
+adds a thin notification agreement adapter. Import the official SDK function in
+the app and inject it into the kit helper:
+
+```ts
+import { requestNotificationAgreement } from "@apps-in-toss/web-framework";
+import {
+  requestAppsInTossNotificationAgreement,
+} from "@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss";
+
+const agreement = await requestAppsInTossNotificationAgreement({
+  requestNotificationAgreement,
+  templateCode: "ORDER_READY",
+});
+
+await api.saveNotificationAgreement(agreement);
+```
+
+The helper maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
+`agreementRejected` to `OPTED_OUT`, and sets `source` to `apps_in_toss_sdk`.
+It returns the functional notification template as `template_code` for backend
+storage.
+The kit does not depend on `@apps-in-toss/*`; WebView and React Native apps own
+the official SDK import.
+
 ## TanStack DB
 
 The TanStack DB adapter is intentionally thin. It helps build TrailBase Record
