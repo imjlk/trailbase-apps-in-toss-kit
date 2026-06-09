@@ -34,6 +34,28 @@ describe("analytics router", () => {
     });
   });
 
+  test("respects explicit null track context overrides", () => {
+    const events: Array<AnalyticsEvent<"screen_view">> = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      screen: "main",
+      detail: {
+        enabled: true,
+        sessionTokenProvider: () => "session-token",
+        enqueueBatch: (batch) => {
+          events.push(...batch);
+        },
+      },
+    });
+
+    router.track("screen_view", {}, { screen: null, sessionToken: null });
+
+    expect(events[0]).toMatchObject({
+      eventName: "screen_view",
+      screen: null,
+      sessionToken: null,
+    });
+  });
+
   test("initializes AppsInToss analytics and mirrors SDK logger events to detail", () => {
     const initCalls: unknown[] = [];
     const events: Array<AnalyticsEvent<string>> = [];
@@ -70,6 +92,53 @@ describe("analytics router", () => {
       button: "answer_submit",
       appsInTossLogType: "press",
     });
+  });
+
+  test("retries AppsInToss initialization when the module becomes available later", () => {
+    const initCalls: unknown[] = [];
+    let module = null as null | { init: (options: unknown) => void };
+    const router = createAnalyticsRouter({
+      appsInToss: {
+        enabled: true,
+        analyticsModule: () => module,
+      },
+    });
+
+    router.track("screen_view", { source: "before-module" });
+    module = {
+      init: (options) => initCalls.push(options),
+    };
+    router.configure({});
+
+    expect(initCalls).toHaveLength(1);
+  });
+
+  test("retries AppsInToss initialization after init throws", () => {
+    const errors: string[] = [];
+    const initCalls: string[] = [];
+    let shouldThrow = true;
+    const router = createAnalyticsRouter({
+      appsInToss: {
+        enabled: true,
+        analyticsModule: {
+          init: () => {
+            initCalls.push("init");
+            if (shouldThrow) {
+              throw new Error("init boom");
+            }
+          },
+        },
+      },
+      onError: (error, context) => {
+        errors.push(`${context.sink}:${String((error as Error).message)}`);
+      },
+    });
+
+    shouldThrow = false;
+    router.configure({});
+
+    expect(initCalls).toEqual(["init", "init"]);
+    expect(errors).toEqual(["appsInToss:init boom"]);
   });
 
   test("dispatches mapped AppsInToss events only when a mapper includes them", async () => {
@@ -118,5 +187,25 @@ describe("analytics router", () => {
     await router.flush();
 
     expect(errors).toEqual(["detail:network down"]);
+  });
+
+  test("reports sync sink errors without throwing from track", async () => {
+    const errors: string[] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      detail: {
+        enabled: true,
+        enqueueBatch: () => {
+          throw new Error("sync boom");
+        },
+      },
+      onError: (error, context) => {
+        errors.push(`${context.sink}:${String((error as Error).message)}`);
+      },
+    });
+
+    expect(() => router.track("screen_view")).not.toThrow();
+    await router.flush();
+
+    expect(errors).toEqual(["detail:sync boom"]);
   });
 });

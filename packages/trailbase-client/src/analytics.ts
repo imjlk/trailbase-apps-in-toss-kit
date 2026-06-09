@@ -153,8 +153,12 @@ export function createAnalyticsRouter<
     const event: AnalyticsEvent<TEventName, TPayload> = {
       eventName,
       eventPayload: payload,
-      screen: options.screen ?? config.screen ?? null,
-      sessionToken: options.sessionToken ?? resolveSessionToken(config.detail) ?? config.sessionToken ?? null,
+      screen: optionOrFallback(options, "screen", config.screen ?? null),
+      sessionToken: optionOrFallback(
+        options,
+        "sessionToken",
+        resolveSessionToken(config.detail) ?? config.sessionToken ?? null,
+      ),
       source: options.source ?? null,
       clientCreatedAt: options.clientCreatedAt ?? Date.now(),
     };
@@ -175,10 +179,12 @@ export function createAnalyticsRouter<
     if (!isEnabled(appsInToss) || appsInTossInitialized) {
       return;
     }
-    appsInTossInitialized = true;
-    const module = resolveAppsInTossModule(appsInToss.analyticsModule);
     try {
-      module?.init?.({
+      const module = resolveAppsInTossModule(appsInToss.analyticsModule);
+      if (!module) {
+        return;
+      }
+      module.init?.({
         debug: appsInToss.debug,
         logger: (params) => {
           if (appsInToss.captureSdkLoggerToDetail !== false) {
@@ -196,6 +202,7 @@ export function createAnalyticsRouter<
           }
         },
       });
+      appsInTossInitialized = true;
     } catch (error) {
       reportError(error, { sink: "appsInToss" });
     }
@@ -206,7 +213,7 @@ export function createAnalyticsRouter<
     if (!isEnabled(detail)) {
       return;
     }
-    captureSinkResult(detail.enqueueBatch([event], { sink: "detail" }), {
+    captureSinkCall(() => detail.enqueueBatch([event], { sink: "detail" }), {
       sink: "detail",
     });
   }
@@ -216,14 +223,19 @@ export function createAnalyticsRouter<
     if (!isEnabled(appsInToss)) {
       return;
     }
-    initializeAppsInToss();
-    const mapped = appsInToss.mapEvent?.(event);
-    if (!mapped || !appsInToss.dispatch) {
-      return;
-    }
-    captureSinkResult(appsInToss.dispatch(mapped, event), {
-      sink: "appsInToss",
-    });
+    captureSinkCall(
+      () => {
+        initializeAppsInToss();
+        const mapped = appsInToss.mapEvent?.(event);
+        if (!mapped || !appsInToss.dispatch) {
+          return;
+        }
+        return appsInToss.dispatch(mapped, event);
+      },
+      {
+        sink: "appsInToss",
+      },
+    );
   }
 
   function sendToDebug(event: AnalyticsEvent<TEventName, TPayload>) {
@@ -231,9 +243,20 @@ export function createAnalyticsRouter<
     if (!isEnabled(debug)) {
       return;
     }
-    captureSinkResult(debug.logger(event, { sink: "debug" }), {
+    captureSinkCall(() => debug.logger(event, { sink: "debug" }), {
       sink: "debug",
     });
+  }
+
+  function captureSinkCall(
+    call: () => AnalyticsSinkResult,
+    context: AnalyticsSinkContext,
+  ) {
+    try {
+      captureSinkResult(call(), context);
+    } catch (error) {
+      reportError(error, context);
+    }
   }
 
   function captureSinkResult(result: AnalyticsSinkResult, context: AnalyticsSinkContext) {
@@ -278,6 +301,17 @@ function resolveAppsInTossModule(
     return moduleOrFactory();
   }
   return moduleOrFactory ?? null;
+}
+
+function optionOrFallback(
+  options: AnalyticsTrackOptions,
+  key: "screen" | "sessionToken",
+  fallback: string | null,
+): string | null {
+  if (Object.prototype.hasOwnProperty.call(options, key)) {
+    return options[key] ?? null;
+  }
+  return fallback;
 }
 
 function isPromiseLike(value: unknown): value is Promise<void> {
