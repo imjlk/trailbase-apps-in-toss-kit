@@ -193,7 +193,7 @@ export function createAnalyticsRouter<
               eventPayload: {
                 ...params.params,
                 appsInTossLogType: params.log_type,
-              } as TPayload,
+              } as unknown as TPayload,
               screen: config.screen ?? null,
               sessionToken: resolveSessionToken(config.detail) ?? config.sessionToken ?? null,
               source: "apps-in-toss-sdk",
@@ -287,7 +287,12 @@ function isEnabled<T extends { enabled: true }>(config: T | false | undefined): 
   return config !== false && config?.enabled === true;
 }
 
-function resolveSessionToken(config: DetailAnalyticsConfig): string | null {
+function resolveSessionToken<
+  TEventName extends string,
+  TPayload extends AnalyticsPayload,
+>(
+  config: DetailAnalyticsConfig<TEventName, TPayload> | undefined,
+): string | null {
   if (!isEnabled(config)) {
     return null;
   }
