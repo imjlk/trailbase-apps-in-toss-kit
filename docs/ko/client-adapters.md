@@ -34,6 +34,28 @@ Apps in Toss SDK 호출은 mini-app 런타임 안에서 실행되므로 앱이 �
 `requestNotificationAgreement({ options: { templateCode } })`를 호출한 뒤, 그 결과를 앱
 백엔드로 보내 동의 상태를 저장하고 나서 발송하세요.
 
+`./apps-in-toss` 하위 경로는 공유 Toss Login/session 헬퍼를 다시 내보내고, 얇은 알림 동의
+어댑터를 제공합니다. 공식 SDK 함수는 앱에서 import한 뒤 kit 헬퍼에 주입하세요.
+
+```ts
+import { requestNotificationAgreement } from "@apps-in-toss/web-framework";
+import {
+  requestAppsInTossNotificationAgreement,
+} from "@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss";
+
+const agreement = await requestAppsInTossNotificationAgreement({
+  requestNotificationAgreement,
+  templateCode: "ORDER_READY",
+});
+
+await api.saveNotificationAgreement(agreement);
+```
+
+이 헬퍼는 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로, `agreementRejected`를
+`OPTED_OUT`으로 바꾸고 `source`를 `apps_in_toss_sdk`로 설정합니다. kit는
+`@apps-in-toss/*`에 의존하지 않습니다. WebView와 React Native 앱이 공식 SDK import를
+소유합니다.
+
 ## TanStack DB
 
 TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에서 쓰기 쉬운 SSE 브리지,
