@@ -53,8 +53,9 @@ await api.saveNotificationAgreement(agreement);
 
 이 헬퍼는 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로, `agreementRejected`를
 `OPTED_OUT`으로 바꾸고 `source`를 `apps_in_toss_sdk`로 설정합니다. 기능성 알림 템플릿은
-백엔드 저장용 `template_code`로 반환합니다. kit는 `@apps-in-toss/*`에 의존하지 않습니다.
-WebView와 React Native 앱이 공식 SDK import를 소유합니다.
+백엔드 저장용 `template_code`로 반환하되, 원본 SDK 이벤트 payload는 전달하지 않습니다.
+kit는 `@apps-in-toss/*`에 의존하지 않습니다. WebView와 React Native 앱이 공식 SDK import를
+소유합니다.
 
 ## TanStack DB
 

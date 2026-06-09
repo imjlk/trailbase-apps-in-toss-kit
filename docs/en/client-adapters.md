@@ -58,7 +58,7 @@ await api.saveNotificationAgreement(agreement);
 The helper maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
 `agreementRejected` to `OPTED_OUT`, and sets `source` to `apps_in_toss_sdk`.
 It returns the functional notification template as `template_code` for backend
-storage.
+storage, without forwarding the raw SDK event payload.
 The kit does not depend on `@apps-in-toss/*`; WebView and React Native apps own
 the official SDK import.
 

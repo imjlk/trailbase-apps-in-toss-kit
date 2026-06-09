@@ -22,7 +22,6 @@ export interface AppsInTossNotificationAgreementResultPayload {
   status: AppsInTossNotificationAgreementStatus;
   result: AppsInTossNotificationAgreementResult;
   source: typeof APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE;
-  providerPayload: unknown;
 }
 
 export interface AppsInTossNotificationAgreementRequestOptions {
@@ -107,7 +106,6 @@ export function requestAppsInTossNotificationAgreement({
               status: notificationAgreementStatus(result),
               result,
               source: APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,
-              providerPayload: event,
             });
           });
         },

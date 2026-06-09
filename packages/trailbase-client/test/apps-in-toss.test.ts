@@ -32,8 +32,8 @@ describe("AppsInToss client adapters", () => {
       status: "OPTED_IN",
       result: "newAgreement",
       source: APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,
-      providerPayload: { type: "newAgreement", raw: true },
     });
+    expect("providerPayload" in result).toBe(false);
     expect(cleanupCalls).toBe(1);
   });
 
