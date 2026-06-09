@@ -28,7 +28,7 @@ describe("AppsInToss client adapters", () => {
     });
 
     expect(result).toEqual({
-      templateCode: "ORDER_READY",
+      template_code: "ORDER_READY",
       status: "OPTED_IN",
       result: "newAgreement",
       source: APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,

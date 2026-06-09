@@ -18,7 +18,7 @@ export type AppsInTossNotificationAgreementResult =
 export type AppsInTossNotificationAgreementStatus = "OPTED_IN" | "OPTED_OUT";
 
 export interface AppsInTossNotificationAgreementResultPayload {
-  templateCode: string;
+  template_code: string;
   status: AppsInTossNotificationAgreementStatus;
   result: AppsInTossNotificationAgreementResult;
   source: typeof APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE;
@@ -103,7 +103,7 @@ export function requestAppsInTossNotificationAgreement({
               return;
             }
             resolve({
-              templateCode: normalizedTemplateCode,
+              template_code: normalizedTemplateCode,
               status: notificationAgreementStatus(result),
               result,
               source: APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,
