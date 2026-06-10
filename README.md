@@ -71,6 +71,12 @@ same container. Keep certificates mounted only into the proxy, give the applicat
 internal proxy URL and bearer token, and call either the generic mTLS relay or the AppsInToss adapter
 endpoints.
 
+For backend request shapes, token handling, and the generic relay contract, see
+[`docs/en/toss-mtls-client-proxy.md`](docs/en/toss-mtls-client-proxy.md). For Docker Compose or
+Coolify, start from
+[`templates/trailbase/compose/toss-mtls-client-proxy.yml`](templates/trailbase/compose/toss-mtls-client-proxy.yml)
+and the deployment notes in [`docs/en/coolify.md`](docs/en/coolify.md).
+
 The mTLS proxy image is safe to publish as long as certificates and tokens are only provided at
 runtime. The running proxy instance should stay private on the Compose or platform-internal network.
 

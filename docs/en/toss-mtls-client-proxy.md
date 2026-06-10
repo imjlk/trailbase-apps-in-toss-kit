@@ -25,6 +25,12 @@ The most important boundary is certificate ownership: only the proxy container
 mounts certificate files. Application containers receive an internal URL and a
 bearer token.
 
+For Docker Compose or Coolify, copy
+[`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml)
+and read [coolify.md](coolify.md). The template exposes port `8787` only on the Compose network, so
+any backend in the same project can call `http://toss-mtls-client-proxy:8787` with
+`Authorization: Bearer <MTLS_PROXY_TOKEN>`.
+
 ## Minimal Environment
 
 ```text
@@ -34,7 +40,9 @@ MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im
 ```
 
 `MTLS_PROXY_TOKEN` is required in `forward` mode. Stub mode can run without a token for local smoke
-tests, but production deployments should always set one.
+tests, but production deployments should always set one. This is an app-owned internal bearer secret,
+not a Toss-issued value. Generate one with a standard CLI such as `openssl rand -hex 32` and store it
+in the deployment secret store; do not commit it.
 
 Certificates are resolved in this order:
 
@@ -81,6 +89,142 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `POST /internal/apps-in-toss/smart-message/send-bulk`: functional smart-message bulk adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
+
+## Backend Integration Contract
+
+Application backends should treat the proxy as an internal HTTP dependency:
+
+```text
+MTLS_PROXY_URL=http://toss-mtls-client-proxy:8787
+MTLS_PROXY_TOKEN=replace-with-internal-proxy-token
+```
+
+Generate `MTLS_PROXY_TOKEN` with a high-entropy random value such as `openssl rand -hex 32`.
+
+When `MTLS_PROXY_TOKEN` is set, every proxy request, including health checks, must include:
+
+```http
+Authorization: Bearer <MTLS_PROXY_TOKEN>
+```
+
+POST requests with JSON bodies should also include:
+
+```http
+Content-Type: application/json
+```
+
+Minimal curl smoke:
+
+```bash
+curl -sS "$MTLS_PROXY_URL/internal/apps-in-toss/health" \
+  -H "Authorization: Bearer $MTLS_PROXY_TOKEN"
+```
+
+Minimal Node/Fetch helper:
+
+```ts
+const proxyUrl = process.env.MTLS_PROXY_URL ?? "http://toss-mtls-client-proxy:8787";
+const proxyToken = process.env.MTLS_PROXY_TOKEN;
+
+export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${proxyUrl}${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${proxyToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`mTLS proxy request failed: ${response.status}`);
+  }
+  return await response.json() as T;
+}
+```
+
+Adapter request bodies:
+
+- Toss Login:
+
+  ```json
+  {
+    "authorizationCode": "code-from-appLogin",
+    "referrer": "SANDBOX"
+  }
+  ```
+
+- IAP order status:
+
+  ```json
+  {
+    "orderId": "order-123",
+    "tossUserKey": "toss-user-key"
+  }
+  ```
+
+- Promotion reward grant:
+
+  ```json
+  {
+    "providerRequestId": "reward-20260610-001",
+    "tossUserKey": "toss-user-key",
+    "promotionCode": "PROMOTION_CODE",
+    "amount": 50
+  }
+  ```
+
+- Smart Message send:
+
+  ```json
+  {
+    "providerRequestId": "message-20260610-001",
+    "tossUserKey": "toss-user-key",
+    "templateSetCode": "ORDER_READY",
+    "context": {
+      "userName": "Kim"
+    }
+  }
+  ```
+
+- Smart Message bulk send:
+
+  ```json
+  {
+    "providerRequestId": "message-bulk-20260610-001",
+    "templateSetCode": "ORDER_READY",
+    "contextList": [
+      {
+        "userKey": "toss-user-key-1",
+        "context": {
+          "userName": "Kim"
+        }
+      }
+    ]
+  }
+  ```
+
+- Generic relay:
+
+  ```json
+  {
+    "method": "POST",
+    "path": "/api-partner/v1/apps-in-toss/messenger/send-message",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "templateSetCode": "ORDER_READY",
+      "context": {
+        "userName": "Kim"
+      }
+    },
+    "tossUserKey": "toss-user-key"
+  }
+  ```
+
+Use `providerRequestId` values from the application ledger or outbox when the app needs idempotency,
+operator audit, or retry correlation. The proxy returns JSON on the same request and does not persist
+application state.
 
 The smart-message adapter sends `tossUserKey` as `x-toss-user-key` and removes it from the upstream
 JSON body. It normalizes the Toss messenger response into app-friendly fields:

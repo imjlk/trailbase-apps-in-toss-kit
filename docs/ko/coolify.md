@@ -3,8 +3,15 @@
 프록시 서비스는 TrailBase와 같은 Compose 프로젝트에 추가하고
 `COMPOSE_PROFILES=toss-proxy`로 활성화합니다.
 
+Compose 조각은
+[`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml)에서
+시작하세요. 이 조각은 공개 포트 매핑 대신 `expose: ["8787"]`를 사용해 프록시를 내부 서비스로
+유지합니다. 같은 Coolify Compose 프로젝트 안의 TrailBase나 다른 백엔드 서비스는 같은 내부
+서비스 URL과 토큰 경계를 사용할 수 있습니다.
+
 `toss-mtls-client-proxy`에는 공개 도메인을 설정하지 마세요. 공개 도메인은 TrailBase에만
-설정합니다. TrailBase는 아래 내부 주소로 프록시를 호출해야 합니다.
+또는 애플리케이션 백엔드에만 설정합니다. 백엔드 서비스는 아래 내부 주소로 프록시를 호출해야
+합니다.
 
 ```text
 MTLS_PROXY_URL=http://toss-mtls-client-proxy:8787

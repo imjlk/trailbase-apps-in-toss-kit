@@ -25,6 +25,13 @@
 가장 중요한 경계는 인증서 소유권입니다. 인증서 파일은 프록시 컨테이너만 마운트합니다.
 애플리케이션 컨테이너는 내부 URL과 Bearer 토큰만 받습니다.
 
+Docker Compose 또는 Coolify에서는
+[`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml)을
+복사하고 [coolify.md](coolify.md)를 함께 확인하세요. 이 템플릿은 포트 `8787`을 Compose
+네트워크 안에서만 노출하므로, 같은 프로젝트의 어떤 백엔드도
+`Authorization: Bearer <MTLS_PROXY_TOKEN>`와 함께 `http://toss-mtls-client-proxy:8787`로
+호출할 수 있습니다.
+
 ## 최소 환경 변수
 
 ```text
@@ -34,7 +41,9 @@ MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im
 ```
 
 `MTLS_PROXY_TOKEN`은 `forward` 모드에서 필수입니다. `stub` 모드는 로컬 스모크 테스트를 위해
-토큰 없이 실행할 수 있지만, 운영 배포에서는 항상 토큰을 설정해야 합니다.
+토큰 없이 실행할 수 있지만, 운영 배포에서는 항상 토큰을 설정해야 합니다. 이 값은 Toss가
+발급하는 값이 아니라 앱이 소유하는 내부 bearer secret입니다. `openssl rand -hex 32` 같은 표준
+CLI로 생성해서 배포 secret store에 저장하고, 커밋하지 마세요.
 
 인증서는 다음 순서로 찾습니다.
 
@@ -81,6 +90,143 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 - `POST /internal/apps-in-toss/smart-message/send`: 스마트 메시지 어댑터.
 - `POST /internal/apps-in-toss/smart-message/send-bulk`: 기능성 스마트 메시지 대량 발송 어댑터.
 - `GET /internal/apps-in-toss/health`: 로컬 health/mode 확인.
+
+## 백엔드 연동 계약
+
+애플리케이션 백엔드는 프록시를 내부 HTTP 의존성으로 취급하면 됩니다.
+
+```text
+MTLS_PROXY_URL=http://toss-mtls-client-proxy:8787
+MTLS_PROXY_TOKEN=replace-with-internal-proxy-token
+```
+
+`MTLS_PROXY_TOKEN`은 `openssl rand -hex 32`처럼 고엔트로피 난수로 생성하세요.
+
+`MTLS_PROXY_TOKEN`이 설정되어 있다면 health check를 포함한 모든 프록시 요청에 아래 헤더를
+붙여야 합니다.
+
+```http
+Authorization: Bearer <MTLS_PROXY_TOKEN>
+```
+
+JSON 본문이 있는 POST 요청에는 아래 헤더도 함께 붙이세요.
+
+```http
+Content-Type: application/json
+```
+
+최소 curl smoke 예시는 다음과 같습니다.
+
+```bash
+curl -sS "$MTLS_PROXY_URL/internal/apps-in-toss/health" \
+  -H "Authorization: Bearer $MTLS_PROXY_TOKEN"
+```
+
+최소 Node/Fetch 헬퍼는 다음과 같습니다.
+
+```ts
+const proxyUrl = process.env.MTLS_PROXY_URL ?? "http://toss-mtls-client-proxy:8787";
+const proxyToken = process.env.MTLS_PROXY_TOKEN;
+
+export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${proxyUrl}${path}`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${proxyToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    throw new Error(`mTLS proxy request failed: ${response.status}`);
+  }
+  return await response.json() as T;
+}
+```
+
+어댑터별 요청 본문은 다음 형태를 사용합니다.
+
+- Toss Login:
+
+  ```json
+  {
+    "authorizationCode": "code-from-appLogin",
+    "referrer": "SANDBOX"
+  }
+  ```
+
+- IAP 주문 상태:
+
+  ```json
+  {
+    "orderId": "order-123",
+    "tossUserKey": "toss-user-key"
+  }
+  ```
+
+- 프로모션 리워드 지급:
+
+  ```json
+  {
+    "providerRequestId": "reward-20260610-001",
+    "tossUserKey": "toss-user-key",
+    "promotionCode": "PROMOTION_CODE",
+    "amount": 50
+  }
+  ```
+
+- 스마트 메시지 단건 발송:
+
+  ```json
+  {
+    "providerRequestId": "message-20260610-001",
+    "tossUserKey": "toss-user-key",
+    "templateSetCode": "ORDER_READY",
+    "context": {
+      "userName": "Kim"
+    }
+  }
+  ```
+
+- 스마트 메시지 대량 발송:
+
+  ```json
+  {
+    "providerRequestId": "message-bulk-20260610-001",
+    "templateSetCode": "ORDER_READY",
+    "contextList": [
+      {
+        "userKey": "toss-user-key-1",
+        "context": {
+          "userName": "Kim"
+        }
+      }
+    ]
+  }
+  ```
+
+- 일반 relay:
+
+  ```json
+  {
+    "method": "POST",
+    "path": "/api-partner/v1/apps-in-toss/messenger/send-message",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "templateSetCode": "ORDER_READY",
+      "context": {
+        "userName": "Kim"
+      }
+    },
+    "tossUserKey": "toss-user-key"
+  }
+  ```
+
+앱에서 멱등성, 운영 감사, 재시도 추적이 필요하다면 앱의 ledger 또는 outbox에서 만든
+`providerRequestId`를 사용하세요. 프록시는 같은 요청에서 JSON을 반환하며 애플리케이션 상태를
+저장하지 않습니다.
 
 스마트 메시지 어댑터는 `tossUserKey`를 `x-toss-user-key` 헤더로 전달하고 upstream JSON
 본문에서는 제거합니다. Toss messenger 응답은 앱이 저장하기 쉬운

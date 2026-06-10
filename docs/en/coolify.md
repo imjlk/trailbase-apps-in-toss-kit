@@ -3,8 +3,14 @@
 Add the proxy service in the same Compose project as TrailBase and enable it with
 `COMPOSE_PROFILES=toss-proxy`.
 
+Start from the Compose snippet at
+[`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml).
+The snippet keeps the proxy internal by using `expose: ["8787"]` instead of a public port mapping.
+TrailBase and non-TrailBase backends in the same Coolify Compose project can use the same internal
+service URL and token boundary.
+
 Do not configure a public domain for `toss-mtls-client-proxy`. Configure the public domain only for
-TrailBase. TrailBase should call:
+TrailBase or the application backend. The backend service should call:
 
 ```text
 MTLS_PROXY_URL=http://toss-mtls-client-proxy:8787

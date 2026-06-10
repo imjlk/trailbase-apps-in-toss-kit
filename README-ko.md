@@ -69,6 +69,12 @@ mTLS 프록시는 TrailBase 전용이 아닙니다. TrailBase WASM 게스트는 
 Bearer 토큰만 제공하세요. 호출은 일반 mTLS relay 또는 AppsInToss 어댑터 엔드포인트(adapter
 endpoint)를 사용합니다.
 
+백엔드 요청 형태, 토큰 처리, 일반 relay 계약은
+[`docs/ko/toss-mtls-client-proxy.md`](docs/ko/toss-mtls-client-proxy.md)를 참고하세요. Docker
+Compose 또는 Coolify에서는
+[`templates/trailbase/compose/toss-mtls-client-proxy.yml`](templates/trailbase/compose/toss-mtls-client-proxy.yml)과
+[`docs/ko/coolify.md`](docs/ko/coolify.md)에서 시작하면 됩니다.
+
 mTLS 프록시 이미지는 인증서와 토큰을 실행 시점(runtime)에만 받는 한 공개해도 안전합니다.
 실행 중인 프록시 인스턴스는 Compose 또는 플랫폼 내부 네트워크 안에서 비공개(private)로
 유지해야 합니다.
