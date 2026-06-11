@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-08T01:59:01.565Z",
+  "fetchedAt": "2026-06-11T02:02:41.508Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,7 +12,7 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "8b065b94b5c82b02996337de96a6d5abe00c34324e17704222be40142131de19",
+      "sha256": "b8b2a849d61fd7ab1bb22c2ef9fc09678a13cee3a755bfe0c820a0ee7c89993a",
       "bytes": 58670
     },
     {
@@ -96,7 +96,7 @@
   "packages": [
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.6.1",
+      "version": "2.6.2",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
