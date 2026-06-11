@@ -22,12 +22,14 @@ migrations, copy, admin workflow, and dispatch jobs.
    complete Toss copy review before enabling app dispatch. Store the console
    send code (`templateSetCode`) as `message_templates.template_code`.
 3. For templates that require prior notification agreement, register the
-   agreement copy in the console and link it to the campaign. Pass that
-   functional notification `template_code` to
-   `requestNotificationAgreement({ options: { templateCode } })` as
-   `templateCode`. Even when the Apps in Toss console does not expose a separate
-   agreement-code field, storing the send code explicitly in the app DB keeps
-   dispatch and agreement checks aligned.
+   agreement copy in the smart-message notification agreement tab. Pass the
+   notification agreement code (`templateCode`), not the send-template code
+   (`templateSetCode`), to
+   `requestNotificationAgreement({ options: { templateCode } })`. Simple apps
+   with a one-to-one send-template/agreement relationship may use the same
+   string for both codes. Apps where multiple send templates share one agreement
+   should keep an app-owned mapping column such as `agreement_template_code` so
+   dispatch codes and agreement codes stay distinct.
 4. Prepare test `userKey` values and API scopes for sandbox QA. The proxy sends
    the user key through the `x-toss-user-key` header.
 
@@ -46,26 +48,30 @@ Copy the templates into the app migration set before editing:
 Existing apps with their own `message_outbox` should add the provider response
 summary columns with a forward migration instead of replacing the table.
 
-Manage Apps in Toss functional notification template codes as generic
-`template_code` values in the app DB:
+Manage Apps in Toss console codes by their role in the app DB:
 
-- `templateSetCode`: the functional message template code passed to
-  `/api-partner/v1/apps-in-toss/messenger/send-message`. For multiple users
+- `templateSetCode`: the functional message send-template code passed to
+  `/api-partner/v1/apps-in-toss/messenger/send-message`. The kit SQL template
+  stores this value in `message_templates.template_code`. For multiple users
   with the same template, use
   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`; each request can
   include up to 2,500 recipients in `contextList`.
 - `templateCode`: the SDK option name passed to
-  `requestNotificationAgreement`. The default kit SQL and helpers use
-  `message_templates.template_code` and
-  `notification_template_agreements.template_code` as the same functional
-  notification code.
+  `requestNotificationAgreement`. This value is the notification agreement code
+  registered in the console. The default kit SQL and helpers support a simple
+  one-to-one setup where `message_templates.template_code` and
+  `notification_template_agreements.template_code` are the same functional
+  notification code. If multiple send templates share one agreement, add a
+  consumer-app migration such as `message_templates.agreement_template_code` and
+  persist/verify consent by that notification agreement code.
 
 ## Runtime Flow
 
 1. RN or WebView calls
    `requestNotificationAgreement({ options: { templateCode } })` when a template
-   requires prior agreement. Call the cleanup function from `onEvent` and
-   `onError`.
+   requires prior agreement. Here `templateCode` is the notification agreement
+   code, not the send-template code. Call the cleanup function from `onEvent`
+   and `onError`.
 2. The app stores `newAgreement` and `alreadyAgreed` as `OPTED_IN`, and
    `agreementRejected` as `OPTED_OUT`. TrailBase WASM handlers can use
    `upsert_notification_template_agreement_tx` with the `templateCode` value
@@ -85,8 +91,11 @@ Manage Apps in Toss functional notification template codes as generic
 
 - Approved template exists in `message_templates`.
 - Functional templates that require agreement persist and verify consent by the
-  SDK `templateCode`. The default SQL templates also use
-  `message_templates.template_code` as the consent gate.
+  notification agreement `templateCode` passed to the SDK. The default SQL
+  templates can also use `message_templates.template_code` as the consent gate
+  for simple one-to-one setups. Apps with shared agreement prompts should link
+  send templates to agreement codes through an `agreement_template_code` column
+  or equivalent mapping table.
 - Functional templates that require agreement are blocked until the matching
   agreement row is `OPTED_IN`.
 - Marketing or re-engagement templates are blocked without marketing consent.
