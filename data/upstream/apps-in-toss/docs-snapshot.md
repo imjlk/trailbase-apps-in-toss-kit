@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Snapshot
 
-- Fetched at: 2026-06-08T01:59:01.565Z
+- Fetched at: 2026-06-11T02:02:41.508Z
 
 ## Documents
 
@@ -10,7 +10,7 @@
   - Bytes: 359
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `8b065b94b5c82b02996337de96a6d5abe00c34324e17704222be40142131de19`
+  - SHA-256: `b8b2a849d61fd7ab1bb22c2ef9fc09678a13cee3a755bfe0c820a0ee7c89993a`
   - Bytes: 58670
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/tutorials/react-native.md
@@ -59,7 +59,7 @@
 
 ## Reference Packages
 
-- `@apps-in-toss/framework`: 2.6.1
+- `@apps-in-toss/framework`: 2.6.2
 - `@toss/tds-react-native`: 2.0.3
 - `create-granite-app`: 1.0.31
 - `@granite-js/react-native`: 1.0.31
