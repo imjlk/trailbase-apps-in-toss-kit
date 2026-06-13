@@ -1,3 +1,10 @@
+import { readdirSync } from "node:fs";
+
+const TOSS_CERT_FILE_SUFFIX = "_public.crt";
+const TOSS_KEY_FILE_SUFFIX = "_private.key";
+const GENERIC_CLIENT_CERT_FILE = "client-cert.pem";
+const GENERIC_CLIENT_KEY_FILE = "client-key.pem";
+
 export function parseEnv(raw) {
   const values = {};
   for (const line of raw.split(/\r?\n/)) {
@@ -166,6 +173,7 @@ export function validateProductionEnv({
   requiredHttps = [],
   optionalHttps = [],
   positiveIntegers = [],
+  mtlsCertificatePairDir,
   rules = [],
 } = {}) {
   const context = createValidationContext({
@@ -182,6 +190,7 @@ export function validateProductionEnv({
     requiredHttps,
     optionalHttps,
     positiveIntegers,
+    mtlsCertificatePairDir,
   });
 
   for (const rule of rules) {
@@ -201,6 +210,7 @@ export function applyCommonProductionRules(context, options = {}) {
     requiredHttps = [],
     optionalHttps = [],
     positiveIntegers = [],
+    mtlsCertificatePairDir,
   } = options;
 
   if (appEnvKey) {
@@ -229,7 +239,7 @@ export function applyCommonProductionRules(context, options = {}) {
   }
 
   applyTrailBaseRuntimeRules(context);
-  applyMtlsProxyRules(context);
+  applyMtlsProxyRules(context, { certificatePairDir: mtlsCertificatePairDir });
 }
 
 export function applyTrailBaseRuntimeRules(context) {
@@ -270,6 +280,8 @@ export function applyMtlsProxyRules(context, options = {}) {
     requireForwardForInternalProxy = false,
     requireProxyWhen = () => Boolean(context.get(proxyUrlKey)),
     internalServiceName = "toss-mtls-client-proxy",
+    certificatePairDir,
+    certificatePairLabel = "mTLS certificate directory",
   } = options;
 
   if (!context.allowPlaceholders && usesMovingProxyImageTag(context.get(imageKey))) {
@@ -297,6 +309,45 @@ export function applyMtlsProxyRules(context, options = {}) {
   if (context.get(proxyModeKey) === "forward") {
     context.requiredHttps(upstreamBaseUrlKey);
   }
+
+  if (!context.allowPlaceholders && certificatePairDir) {
+    const pair = detectMtlsCertificatePair(certificatePairDir);
+    if (!pair.found) {
+      context.fail(
+        `Provide mTLS certificates in ${certificatePairLabel}: expected one Toss Console pair (*_public.crt + *_private.key) or client-cert.pem + client-key.pem`,
+      );
+    }
+  }
+}
+
+export function detectMtlsCertificatePair(dir) {
+  try {
+    const files = readdirSync(dir, { withFileTypes: true })
+      .filter((entry) => entry.isFile() || entry.isSymbolicLink())
+      .map((entry) => entry.name)
+      .sort();
+
+    const tossPair = detectSingleTossConsolePair(files, dir);
+    if (tossPair) {
+      return tossPair;
+    }
+
+    if (
+      files.includes(GENERIC_CLIENT_CERT_FILE) &&
+      files.includes(GENERIC_CLIENT_KEY_FILE)
+    ) {
+      return {
+        found: true,
+        kind: "generic",
+        clientCertPath: joinPath(dir, GENERIC_CLIENT_CERT_FILE),
+        clientKeyPath: joinPath(dir, GENERIC_CLIENT_KEY_FILE),
+      };
+    }
+  } catch {
+    return { found: false, kind: "unreadable" };
+  }
+
+  return { found: false, kind: "missing" };
 }
 
 export function looksLikeEncryptionKey(value) {
@@ -318,4 +369,36 @@ export function usesMovingProxyImageTag(value) {
 
 function normalizeKeyRules(rules) {
   return rules.map((rule) => (Array.isArray(rule) ? rule : [rule]));
+}
+
+function detectSingleTossConsolePair(files, dir) {
+  const certPrefixes = new Set(
+    files
+      .filter((file) => file.endsWith(TOSS_CERT_FILE_SUFFIX))
+      .map((file) => file.slice(0, -TOSS_CERT_FILE_SUFFIX.length)),
+  );
+  const keyPrefixes = new Set(
+    files
+      .filter((file) => file.endsWith(TOSS_KEY_FILE_SUFFIX))
+      .map((file) => file.slice(0, -TOSS_KEY_FILE_SUFFIX.length)),
+  );
+  const pairPrefixes = [...certPrefixes].filter((prefix) =>
+    keyPrefixes.has(prefix),
+  );
+
+  if (pairPrefixes.length !== 1) {
+    return null;
+  }
+
+  const prefix = pairPrefixes[0];
+  return {
+    found: true,
+    kind: "toss-console",
+    clientCertPath: joinPath(dir, `${prefix}${TOSS_CERT_FILE_SUFFIX}`),
+    clientKeyPath: joinPath(dir, `${prefix}${TOSS_KEY_FILE_SUFFIX}`),
+  };
+}
+
+function joinPath(dir, file) {
+  return `${String(dir || ".").replace(/\/+$/, "")}/${file}`;
 }

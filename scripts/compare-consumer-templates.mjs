@@ -8,6 +8,7 @@ const MAX_DIFF_LINES = 120;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
 const { consumerArg, mappingArg, strict } = parseArgs(args);
+const ALLOWED_MODES = new Set(['exact', 'compose-service', 'env-subset']);
 
 if (!consumerArg) {
   console.error(
@@ -60,21 +61,24 @@ for (const check of checks) {
       continue;
     }
 
-    const diff = spawnSync(
-      'git',
-      ['diff', '--no-index', '--color=never', '--', templatePath, candidatePath],
-      { encoding: 'utf8' },
-    );
-    const different = diff.status !== 0;
-    if (different) {
+    const comparison = compareCandidate(check, templatePath, candidatePath);
+    if (comparison.missing) {
+      hasMissing = true;
+      console.log(`candidate: ${relCandidate}`);
+      console.log(`status: ${comparison.missing}`);
+      console.log('');
+      continue;
+    }
+
+    if (comparison.different) {
       hasDrift = true;
     }
 
     console.log(`candidate: ${relCandidate}`);
-    if (!different) {
-      console.log('status: identical');
+    if (!comparison.different) {
+      console.log(`status: ${comparison.status}`);
     } else {
-      printDiff(diff.stdout || diff.stderr || '<diff unavailable>');
+      printDiff(comparison.diff || '<diff unavailable>');
     }
     console.log('');
   }
@@ -169,6 +173,18 @@ function mappingChecks(mappingPath) {
   return mapping.checks.map((entry, index) => {
     const template = stringField(entry, 'template', index);
     const name = entry.name || template;
+    const mode = entry.mode || 'exact';
+    if (!ALLOWED_MODES.has(mode)) {
+      console.error(
+        `Mapping check ${index + 1} mode must be one of ${[...ALLOWED_MODES].join(', ')}`,
+      );
+      process.exit(2);
+    }
+    const service = entry.service ?? entry.serviceName;
+    if (mode === 'compose-service' && (typeof service !== 'string' || service.trim() === '')) {
+      console.error(`Mapping check ${index + 1} must include service for compose-service mode`);
+      process.exit(2);
+    }
     const consumer = entry.consumer ?? entry.candidate;
     const consumers = entry.consumers ?? entry.candidates ?? (consumer ? [consumer] : []);
     if (!Array.isArray(consumers) || consumers.length === 0) {
@@ -178,9 +194,182 @@ function mappingChecks(mappingPath) {
     return {
       name,
       template,
+      mode,
+      service,
+      volumes: Array.isArray(entry.volumes) ? entry.volumes.map(String) : [],
       candidates: consumers.map((candidate) => resolve(consumerRoot, String(candidate))),
     };
   });
+}
+
+function compareCandidate(check, templatePath, candidatePath) {
+  if (check.mode === 'env-subset') {
+    return compareEnvSubset(templatePath, candidatePath);
+  }
+  if (check.mode === 'compose-service') {
+    return compareScopedText(
+      scopedComposeText(check, templatePath),
+      scopedComposeText(check, candidatePath),
+      `${check.template}#${check.service}`,
+      relative(consumerRoot, candidatePath),
+    );
+  }
+
+  const diff = spawnSync(
+    'git',
+    ['diff', '--no-index', '--color=never', '--', templatePath, candidatePath],
+    { encoding: 'utf8' },
+  );
+  return {
+    different: diff.status !== 0,
+    status: 'identical',
+    diff: diff.stdout || diff.stderr,
+  };
+}
+
+function compareEnvSubset(templatePath, candidatePath) {
+  const templateKeys = parseActiveEnvKeys(readFileSync(templatePath, 'utf8'));
+  const candidateKeys = new Set(parseActiveEnvKeys(readFileSync(candidatePath, 'utf8')));
+  const missingKeys = templateKeys.filter((key) => !candidateKeys.has(key));
+  if (missingKeys.length === 0) {
+    return {
+      different: false,
+      status: 'env subset present',
+    };
+  }
+
+  return {
+    different: true,
+    diff: [
+      'env subset missing required keys:',
+      ...missingKeys.map((key) => `- ${key}`),
+    ].join('\n'),
+  };
+}
+
+function scopedComposeText(check, filePath) {
+  const text = readFileSync(filePath, 'utf8');
+  const serviceBlock = extractYamlMappingEntry(text, 'services', check.service);
+  if (!serviceBlock) {
+    return { missing: `missing service ${check.service}` };
+  }
+
+  const sections = [`services:\n${serviceBlock}`];
+  if (check.volumes.length > 0) {
+    const volumeBlocks = [];
+    for (const volume of check.volumes) {
+      const volumeBlock = extractYamlMappingEntry(text, 'volumes', volume);
+      if (!volumeBlock) {
+        return { missing: `missing volume ${volume}` };
+      }
+      volumeBlocks.push(volumeBlock);
+    }
+    sections.push(`volumes:\n${volumeBlocks.join('')}`);
+  }
+
+  return { text: `${sections.join('\n')}\n` };
+}
+
+function compareScopedText(template, candidate, templateLabel, candidateLabel) {
+  if (template.missing) {
+    return { missing: `template ${template.missing}` };
+  }
+  if (candidate.missing) {
+    return { missing: candidate.missing };
+  }
+  if (template.text === candidate.text) {
+    return {
+      different: false,
+      status: 'scoped match',
+    };
+  }
+
+  return {
+    different: true,
+    diff: scopedDiff(template.text, candidate.text, templateLabel, candidateLabel),
+  };
+}
+
+function extractYamlMappingEntry(text, parentKey, entryKey) {
+  const lines = text.split(/\r?\n/);
+  const parentIndex = lines.findIndex((line) =>
+    new RegExp(`^${escapeRegex(parentKey)}:\\s*(?:#.*)?$`).test(line),
+  );
+  if (parentIndex < 0) {
+    return '';
+  }
+
+  const parentIndent = indentation(lines[parentIndex]);
+  const parentEnd = findYamlBlockEnd(lines, parentIndex + 1, parentIndent);
+  for (let index = parentIndex + 1; index < parentEnd; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) {
+      continue;
+    }
+    const entryIndent = indentation(line);
+    if (
+      entryIndent > parentIndent &&
+      new RegExp(`^\\s{${entryIndent}}${escapeRegex(entryKey)}:\\s*`).test(line)
+    ) {
+      const entryEnd = findYamlBlockEnd(lines, index + 1, entryIndent);
+      return `${lines.slice(index, entryEnd).join('\n')}\n`;
+    }
+  }
+  return '';
+}
+
+function findYamlBlockEnd(lines, start, baseIndent) {
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (!line.trim()) {
+      continue;
+    }
+    if (indentation(line) <= baseIndent) {
+      return index;
+    }
+  }
+  return lines.length;
+}
+
+function parseActiveEnvKeys(text) {
+  const keys = [];
+  const seen = new Set();
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const withoutExport = trimmed.startsWith('export ')
+      ? trimmed.slice('export '.length).trim()
+      : trimmed;
+    const index = withoutExport.indexOf('=');
+    if (index < 1) {
+      continue;
+    }
+    const key = withoutExport.slice(0, index).trim();
+    if (key && !seen.has(key)) {
+      seen.add(key);
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+function scopedDiff(templateText, candidateText, templateLabel, candidateLabel) {
+  return [
+    `--- ${templateLabel}`,
+    `+++ ${candidateLabel}`,
+    ...templateText.split('\n').map((line) => `- ${line}`),
+    ...candidateText.split('\n').map((line) => `+ ${line}`),
+  ].join('\n');
+}
+
+function indentation(line) {
+  return line.match(/^\s*/)[0].length;
+}
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function stringField(entry, field, index) {

@@ -1,6 +1,6 @@
 services:
   toss-mtls-client-proxy:
-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.4
+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.6
     profiles:
       - toss-proxy
     expose:

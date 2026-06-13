@@ -97,11 +97,24 @@ Mapping 파일은 다음 형태입니다.
     {
       "name": "Proxy env example",
       "template": "templates/trailbase/env/toss-mtls-client-proxy.env.example",
-      "consumer": "apps/trailbase/.env.production.example"
+      "consumer": "apps/trailbase/.env.production.example",
+      "mode": "env-subset"
+    },
+    {
+      "name": "Compose toss mTLS proxy",
+      "template": "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+      "consumer": "apps/trailbase/docker-compose.yml",
+      "mode": "compose-service",
+      "service": "toss-mtls-client-proxy",
+      "volumes": ["mtls_client_certs"]
     }
   ]
 }
 ```
+
+Mapping `mode`의 기본값은 `exact`이며 전체 파일을 비교합니다. 도입 앱의 Compose 파일 안에
+앱 고유 서비스와 복사한 proxy 조각이 함께 있다면 `compose-service`를 사용하세요. 앱별 env
+예시 파일 안에 kit가 요구하는 proxy key만 포함되어 있는지 보고 싶다면 `env-subset`을 사용합니다.
 
 하위 모듈 checkout만 바꾸고 도입 앱의 gitlink를 stage하지 않은 실수를 잡으려면 submodule
 checker를 실행하세요.
