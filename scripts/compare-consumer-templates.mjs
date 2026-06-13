@@ -343,7 +343,7 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
 
   for (let index = parentIndex + 1; index < parentEnd; index += 1) {
     const line = lines[index];
-    if (!line.trim()) {
+    if (isYamlSkippableLine(line)) {
       continue;
     }
     const entryIndent = indentation(line);
@@ -361,7 +361,7 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
 function findYamlBlockEnd(lines, start, baseIndent) {
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
-    if (!line.trim()) {
+    if (isYamlSkippableLine(line)) {
       continue;
     }
     if (indentation(line) <= baseIndent) {
@@ -371,11 +371,15 @@ function findYamlBlockEnd(lines, start, baseIndent) {
   return lines.length;
 }
 
+function isYamlSkippableLine(line) {
+  const trimmed = line.trim();
+  return !trimmed || trimmed.startsWith('#');
+}
+
 function findYamlDirectChildIndent(lines, start, end, parentIndent) {
   for (let index = start; index < end; index += 1) {
     const line = lines[index];
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
+    if (isYamlSkippableLine(line)) {
       continue;
     }
     const lineIndent = indentation(line);
@@ -410,18 +414,7 @@ function parseActiveEnvEntries(text) {
       continue;
     }
     const key = withoutExport.slice(0, index).trim();
-    let value = withoutExport.slice(index + 1).trim();
-    if (
-      (value.startsWith("'") && value.endsWith("'")) ||
-      (value.startsWith('"') && value.endsWith('"'))
-    ) {
-      value = value.slice(1, -1);
-    } else {
-      const commentIndex = value.search(/\s#/);
-      if (commentIndex >= 0) {
-        value = value.slice(0, commentIndex).trim();
-      }
-    }
+    const value = parseEnvValue(withoutExport.slice(index + 1));
     if (key) {
       const entry = { key, value };
       if (entryIndexes.has(key)) {
@@ -433,6 +426,25 @@ function parseActiveEnvEntries(text) {
     }
   }
   return entries;
+}
+
+function parseEnvValue(rawValue) {
+  const value = String(rawValue ?? '').trim();
+  const quote = value[0];
+  if (quote === '"' || quote === "'") {
+    for (let index = 1; index < value.length; index += 1) {
+      if (value[index] === quote && value[index - 1] !== '\\') {
+        return value.slice(1, index);
+      }
+    }
+    return value.slice(1);
+  }
+
+  const commentIndex = value.search(/\s#/);
+  if (commentIndex >= 0) {
+    return value.slice(0, commentIndex).trim();
+  }
+  return value;
 }
 
 function envSubsetValueMismatch(templateEntry, candidateValue) {
@@ -509,13 +521,13 @@ function scopedDiff(templateText, candidateText, templateLabel, candidateLabel) 
     writeFileSync(candidateTmp, candidateText);
     const diff = spawnSync(
       'git',
-      ['diff', '--no-index', '--color=never', '--no-prefix', '--', templateTmp, candidateTmp],
-      { encoding: 'utf8' },
+      ['diff', '--no-index', '--color=never', '--no-prefix', '--', 'template', 'candidate'],
+      { cwd: tmpRoot, encoding: 'utf8' },
     );
     return labelDiffPaths(
       diff.stdout || diff.stderr,
-      templateTmp,
-      candidateTmp,
+      'template',
+      'candidate',
       templateLabel,
       candidateLabel,
     );
@@ -526,8 +538,20 @@ function scopedDiff(templateText, candidateText, templateLabel, candidateLabel) 
 
 function labelDiffPaths(diffText, templatePath, candidatePath, templateLabel, candidateLabel) {
   return diffText
-    .split(templatePath).join(templateLabel)
-    .split(candidatePath).join(candidateLabel);
+    .split('\n')
+    .map((line) => {
+      if (line === `diff --git ${templatePath} ${candidatePath}`) {
+        return `diff --git ${templateLabel} ${candidateLabel}`;
+      }
+      if (line === `--- ${templatePath}`) {
+        return `--- ${templateLabel}`;
+      }
+      if (line === `+++ ${candidatePath}`) {
+        return `+++ ${candidateLabel}`;
+      }
+      return line;
+    })
+    .join('\n');
 }
 
 function indentation(line) {

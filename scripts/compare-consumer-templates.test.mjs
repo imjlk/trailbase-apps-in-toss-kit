@@ -71,6 +71,11 @@ describe("compare-consumer-templates", () => {
       expect(result.stdout).toContain(
         "+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.5",
       );
+      expect(result.stdout).toContain(
+        "--- templates/trailbase/compose/toss-mtls-client-proxy.yml#toss-mtls-client-proxy",
+      );
+      expect(result.stdout).toContain("+++ apps/trailbase/docker-compose.yml");
+      expect(result.stdout).not.toContain("compare-consumer-templates-");
       expect(result.stdout).not.toContain("-    profiles:");
       expect(result.stdout).not.toContain("  trailbase:");
       expect(result.stdout).not.toContain("trailbase_data");
@@ -87,6 +92,38 @@ describe("compare-consumer-templates", () => {
         consumerRoot,
         "apps/trailbase/docker-compose.yml",
         template.replace("\n\nvolumes:\n", "\n\n\nvolumes:\n"),
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Compose toss mTLS proxy",
+          template: "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+          consumer: "apps/trailbase/docker-compose.yml",
+          mode: "compose-service",
+          service: "toss-mtls-client-proxy",
+          volumes: ["mtls_client_certs"],
+        },
+      ]);
+
+      const result = runCompare(consumerRoot);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("status: scoped match");
+    });
+  });
+
+  test("compose-service mode ignores top-level comments between service entries", () => {
+    withConsumer((consumerRoot) => {
+      const template = readFileSync(
+        path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"),
+        "utf8",
+      );
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/docker-compose.yml",
+        template.replace(
+          "  toss-mtls-client-proxy:\n",
+          "# app service comments are valid YAML here\n  toss-mtls-client-proxy:\n",
+        ),
       );
       writeMapping(consumerRoot, [
         {
@@ -185,6 +222,34 @@ describe("compare-consumer-templates", () => {
         [
           "COMPOSE_PROFILES=toss-proxy",
           "TOSS_LOGIN_MODE=forward",
+          "MTLS_PROXY_TOKEN=app-owned-secret",
+          "",
+        ].join("\n"),
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Proxy env example",
+          template: "templates/trailbase/env/toss-mtls-client-proxy.env.example",
+          consumer: "apps/trailbase/.env.production.example",
+          mode: "env-subset",
+        },
+      ]);
+
+      const result = runCompare(consumerRoot);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("status: env subset present");
+    });
+  });
+
+  test("env-subset mode accepts quoted values with inline comments", () => {
+    withConsumer((consumerRoot) => {
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/.env.production.example",
+        [
+          'COMPOSE_PROFILES="worker,toss-proxy" # production compose profiles',
+          "TOSS_LOGIN_MODE='forward' # route SANDBOX through the proxy path",
           "MTLS_PROXY_TOKEN=app-owned-secret",
           "",
         ].join("\n"),

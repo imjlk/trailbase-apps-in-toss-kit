@@ -313,20 +313,28 @@ export function applyMtlsProxyRules(context, options = {}) {
     context.requiredHttps(upstreamBaseUrlKey);
   }
 
+  const explicitCertPath = context.get(clientCertPathKey);
+  const explicitKeyPath = context.get(clientKeyPathKey);
+  const detectedPair =
+    !context.allowPlaceholders && isForwardMode && certificatePairDir
+      ? detectMtlsCertificatePair(certificatePairDir)
+      : null;
+  const hasTossConsolePair = detectedPair?.found && detectedPair.kind === "toss-console";
+
   if (
     !context.allowPlaceholders &&
     isForwardMode &&
-    (context.get(clientCertPathKey) || context.get(clientKeyPathKey))
+    !hasTossConsolePair &&
+    (explicitCertPath || explicitKeyPath)
   ) {
-    if (!context.get(clientCertPathKey)) {
+    if (!explicitCertPath) {
       context.fail(`${clientCertPathKey} is required when ${clientKeyPathKey} is set`);
     }
-    if (!context.get(clientKeyPathKey)) {
+    if (!explicitKeyPath) {
       context.fail(`${clientKeyPathKey} is required when ${clientCertPathKey} is set`);
     }
   } else if (!context.allowPlaceholders && isForwardMode && certificatePairDir) {
-    const pair = detectMtlsCertificatePair(certificatePairDir);
-    if (!pair.found) {
+    if (!detectedPair?.found) {
       context.fail(
         `Provide mTLS certificates in ${certificatePairLabel}: expected one Toss Console pair (*_public.crt + *_private.key) or client-cert.pem + client-key.pem`,
       );
