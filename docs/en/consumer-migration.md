@@ -95,11 +95,25 @@ Mapping files use this shape:
     {
       "name": "Proxy env example",
       "template": "templates/trailbase/env/toss-mtls-client-proxy.env.example",
-      "consumer": "apps/trailbase/.env.production.example"
+      "consumer": "apps/trailbase/.env.production.example",
+      "mode": "env-subset"
+    },
+    {
+      "name": "Compose toss mTLS proxy",
+      "template": "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+      "consumer": "apps/trailbase/docker-compose.yml",
+      "mode": "compose-service",
+      "service": "toss-mtls-client-proxy",
+      "volumes": ["mtls_client_certs"]
     }
   ]
 }
 ```
+
+Mapping `mode` defaults to `exact`, which compares the whole file. Use
+`compose-service` when a consumer Compose file contains app-owned services around
+the copied proxy snippet. Use `env-subset` when a consumer env example keeps the
+kit-required proxy keys inside a larger app-specific file.
 
 Use the submodule checker to catch a checkout that was updated without staging the consumer gitlink:
 

@@ -17,10 +17,10 @@ inputs.
 These values are policy values for this kit.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `TBD`
-- Last verified TrailBase release date: `TBD`
-- Upstream latest TrailBase server: `0.27.9`
-- Upstream latest TrailBase release date: `2026-05-25`
+- Last verified TrailBase server: `0.28.5`
+- Last verified TrailBase release date: `2026-06-12`
+- Upstream latest TrailBase server: `0.28.5`
+- Upstream latest TrailBase release date: `2026-06-12`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -43,7 +43,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.27.9`
+- `trailbase-server-github-release`: `0.28.5`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.5.1`
@@ -93,17 +93,18 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbaseio/trailbase:0.27.9
+  --image trailbaseio/trailbase:0.28.5
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.27.9
+  --version 0.28.5
 ```
 
 In non-strict mode the script warns and exits successfully. In strict mode it
 fails only when it can see a concrete policy violation, such as a version below
 the declared kit minimum, a version newer than the last verified version, or a
-moving/unparseable server image tag. If the kit minimum and last verified values
-are still `TBD`, the script stays advisory.
+moving/unparseable server image tag. If the kit minimum is still `TBD`, the
+script skips the minimum-version gate while still checking the last verified
+upper bound.
 
 ## Review Checklist When TrailBase Changes
 

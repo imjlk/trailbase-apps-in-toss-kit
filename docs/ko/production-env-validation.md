@@ -20,6 +20,8 @@ secret(placeholder secret), 로컬 URL, 움직이는 이미지 태그, 실수로
 - 운영 환경에서 `TRAILBASE_DEV_ADMIN_*`가 켜지는 것을 막습니다.
 - `latest`, `edge`처럼 움직이는 mTLS 프록시 이미지 태그를 거부합니다.
 - `MTLS_PROXY_*`와 `COMPOSE_PROFILES` 조합을 검증합니다.
+- 로컬 또는 마운트된 mTLS 인증서 디렉터리에 사용할 수 있는 cert/key 쌍이 있는지 선택적으로
+  검증할 수 있습니다.
 
 각 앱은 앱 고유의 key와 정책을 검증하는 얇은 래퍼 스크립트(wrapper script)를 유지해야 합니다.
 예를 들어 게임은 리워드나 인벤토리 설정이 필요할 수 있고, 다른 앱은 Toss Login과 IAP만
@@ -37,7 +39,7 @@ secret(placeholder secret), 로컬 URL, 움직이는 이미지 태그, 실수로
 SemVer 태그를 사용할 수 있습니다.
 
 ```text
-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.4
+ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.6
 ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1
 ```
 
@@ -83,3 +85,7 @@ Fresh start는 토큰(token)과 확인 값(confirmation value)이 함께 있을 
 앱별 래퍼는 공통 검증기를 import하고, 앱 고유 규칙을 작은 함수로 추가하는 방식이 좋습니다.
 CI, 로컬 셸, 배포 runbook에서 모두 쓸 수 있도록 출력은 사람이 읽기 쉽고 항상 같은 형식으로
 유지하세요.
+
+운영 검증에서 프록시 인증서 디렉터리를 볼 수 있다면 `mtlsCertificatePairDir`를 넘겨 검증할 수
+있습니다. 이 디렉터리는 Toss Console 파일 쌍(`*_public.crt`와 같은 prefix의
+`*_private.key`) 하나 또는 `client-cert.pem`과 `client-key.pem`을 포함해야 합니다.

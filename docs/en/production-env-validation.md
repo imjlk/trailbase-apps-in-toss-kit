@@ -20,6 +20,7 @@ AppsInToss services:
 - validate `TRAILBASE_DEV_ADMIN_*` is not enabled in production
 - reject moving mTLS proxy image tags such as `latest` and `edge`
 - validate `MTLS_PROXY_*` and `COMPOSE_PROFILES` combinations
+- optionally validate that a local or mounted mTLS certificate directory has a usable cert/key pair
 
 Consumers should keep wrapper scripts for app-specific keys and policies. For
 example, a game might require reward or inventory settings while another app
@@ -36,7 +37,7 @@ only needs Toss Login and IAP.
 Production should use exact SemVer or, when intentional, a minor SemVer tag:
 
 ```text
-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.4
+ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.6
 ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1
 ```
 
@@ -84,3 +85,8 @@ allowed in a given environment.
 Consumer wrappers should import the shared validator and add app-specific rules
 as small functions. Keep wrapper output human-readable and deterministic so it
 is useful in CI, local shells, and deployment runbooks.
+
+When a production check can see the proxy certificate directory, pass
+`mtlsCertificatePairDir` to validate that it contains either one Toss Console
+pair (`*_public.crt` and matching `*_private.key`) or `client-cert.pem` plus
+`client-key.pem`.
