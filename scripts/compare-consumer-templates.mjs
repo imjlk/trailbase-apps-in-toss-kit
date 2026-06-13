@@ -228,22 +228,43 @@ function compareCandidate(check, templatePath, candidatePath) {
 }
 
 function compareEnvSubset(templatePath, candidatePath) {
-  const templateKeys = parseActiveEnvKeys(readFileSync(templatePath, 'utf8'));
-  const candidateKeys = new Set(parseActiveEnvKeys(readFileSync(candidatePath, 'utf8')));
-  const missingKeys = templateKeys.filter((key) => !candidateKeys.has(key));
-  if (missingKeys.length === 0) {
+  const templateEntries = parseActiveEnvEntries(readFileSync(templatePath, 'utf8'));
+  const candidateEntries = parseActiveEnvEntries(readFileSync(candidatePath, 'utf8'));
+  const candidateValues = new Map(candidateEntries.map((entry) => [entry.key, entry.value]));
+  const missingKeys = templateEntries
+    .filter((entry) => !candidateValues.has(entry.key))
+    .map((entry) => entry.key);
+  const mismatchedValues = templateEntries
+    .filter((entry) => candidateValues.has(entry.key))
+    .map((entry) => envSubsetValueMismatch(entry, candidateValues.get(entry.key)))
+    .filter(Boolean);
+  if (missingKeys.length === 0 && mismatchedValues.length === 0) {
     return {
       different: false,
       status: 'env subset present',
     };
   }
 
-  return {
-    different: true,
-    diff: [
+  const diff = [];
+  if (missingKeys.length > 0) {
+    diff.push(
       'env subset missing required keys:',
       ...missingKeys.map((key) => `- ${key}`),
-    ].join('\n'),
+    );
+  }
+  if (mismatchedValues.length > 0) {
+    if (diff.length > 0) {
+      diff.push('');
+    }
+    diff.push(
+      'env subset mismatched fixed values:',
+      ...mismatchedValues.map((message) => `- ${message}`),
+    );
+  }
+
+  return {
+    different: true,
+    diff: diff.join('\n'),
   };
 }
 
@@ -312,7 +333,7 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
       new RegExp(`^\\s{${entryIndent}}${escapeRegex(entryKey)}:\\s*`).test(line)
     ) {
       const entryEnd = findYamlBlockEnd(lines, index + 1, entryIndent);
-      return `${lines.slice(index, entryEnd).join('\n')}\n`;
+      return `${trimTrailingBlankLines(lines.slice(index, entryEnd)).join('\n')}\n`;
     }
   }
   return '';
@@ -331,8 +352,16 @@ function findYamlBlockEnd(lines, start, baseIndent) {
   return lines.length;
 }
 
-function parseActiveEnvKeys(text) {
-  const keys = [];
+function trimTrailingBlankLines(lines) {
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1].trim()) {
+    end -= 1;
+  }
+  return lines.slice(0, end);
+}
+
+function parseActiveEnvEntries(text) {
+  const entries = [];
   const seen = new Set();
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
@@ -347,12 +376,74 @@ function parseActiveEnvKeys(text) {
       continue;
     }
     const key = withoutExport.slice(0, index).trim();
+    let value = withoutExport.slice(index + 1).trim();
+    if (
+      (value.startsWith("'") && value.endsWith("'")) ||
+      (value.startsWith('"') && value.endsWith('"'))
+    ) {
+      value = value.slice(1, -1);
+    } else {
+      const commentIndex = value.search(/\s#/);
+      if (commentIndex >= 0) {
+        value = value.slice(0, commentIndex).trim();
+      }
+    }
     if (key && !seen.has(key)) {
       seen.add(key);
-      keys.push(key);
+      entries.push({ key, value });
     }
   }
-  return keys;
+  return entries;
+}
+
+function envSubsetValueMismatch(templateEntry, candidateValue) {
+  const { key, value } = templateEntry;
+  if (!shouldCompareEnvSubsetValue(key, value)) {
+    return null;
+  }
+
+  if (key === 'COMPOSE_PROFILES') {
+    const requiredProfiles = splitList(value);
+    const candidateProfiles = splitList(candidateValue);
+    const missingProfiles = requiredProfiles.filter((profile) =>
+      !candidateProfiles.includes(profile),
+    );
+    if (missingProfiles.length === 0) {
+      return null;
+    }
+    return `${key} must include ${missingProfiles.join(', ')} (found ${displayEnvValue(candidateValue)})`;
+  }
+
+  if (candidateValue === value) {
+    return null;
+  }
+  return `${key} expected ${displayEnvValue(value)}, found ${displayEnvValue(candidateValue)}`;
+}
+
+function shouldCompareEnvSubsetValue(key, value) {
+  return Boolean(value) && !isSensitiveEnvKey(key) && !isPlaceholderEnvValue(value);
+}
+
+function isSensitiveEnvKey(key) {
+  return /(^|_)(TOKEN|SECRET|PASSWORD|PRIVATE|HMAC|SEALED|USER_KEY)($|_)|(^|_)(CERT|KEY)_PATH$/i
+    .test(key);
+}
+
+function isPlaceholderEnvValue(value) {
+  return /replace-with|change-me|changeme|todo_|placeholder|example\.com|example\.invalid|<[^>]+>/.test(
+    String(value).toLowerCase(),
+  );
+}
+
+function splitList(value) {
+  return String(value || '')
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function displayEnvValue(value) {
+  return value ? JSON.stringify(value) : '<empty>';
 }
 
 function scopedDiff(templateText, candidateText, templateLabel, candidateLabel) {

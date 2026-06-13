@@ -115,6 +115,66 @@ INLINE=value # ignored
       expect(result.ok).toBe(true);
     });
   });
+
+  test("accepts explicit mTLS certificate paths instead of directory auto-detection", () => {
+    withTempDir((dir) => {
+      const result = validateProductionEnv({
+        raw: [
+          "APP_ENV=production",
+          "MTLS_PROXY_MODE=forward",
+          "MTLS_PROXY_TOKEN=12345678901234567890123456789012",
+          "MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im",
+          "MTLS_CLIENT_CERT_PATH=/run/mtls/custom_public.crt",
+          "MTLS_CLIENT_KEY_PATH=/run/mtls/custom_private.key",
+        ].join("\n"),
+        appEnvKey: "APP_ENV",
+        mtlsCertificatePairDir: dir,
+      });
+
+      expect(result.ok).toBe(true);
+    });
+  });
+
+  test("rejects incomplete explicit mTLS certificate path settings", () => {
+    withTempDir((dir) => {
+      const result = validateProductionEnv({
+        raw: [
+          "APP_ENV=production",
+          "MTLS_PROXY_MODE=forward",
+          "MTLS_PROXY_TOKEN=12345678901234567890123456789012",
+          "MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im",
+          "MTLS_CLIENT_CERT_PATH=/run/mtls/custom_public.crt",
+        ].join("\n"),
+        appEnvKey: "APP_ENV",
+        mtlsCertificatePairDir: dir,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failures).toContain(
+        "MTLS_CLIENT_KEY_PATH is required when MTLS_CLIENT_CERT_PATH is set",
+      );
+    });
+  });
+
+  test("rejects missing mTLS certificate files when no explicit paths are configured", () => {
+    withTempDir((dir) => {
+      const result = validateProductionEnv({
+        raw: [
+          "APP_ENV=production",
+          "MTLS_PROXY_MODE=forward",
+          "MTLS_PROXY_TOKEN=12345678901234567890123456789012",
+          "MTLS_UPSTREAM_BASE_URL=https://apps-in-toss-api.toss.im",
+        ].join("\n"),
+        appEnvKey: "APP_ENV",
+        mtlsCertificatePairDir: dir,
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.failures).toContain(
+        "Provide mTLS certificates in mTLS certificate directory: expected one Toss Console pair (*_public.crt + *_private.key) or client-cert.pem + client-key.pem",
+      );
+    });
+  });
 });
 
 function withTempDir(fn) {

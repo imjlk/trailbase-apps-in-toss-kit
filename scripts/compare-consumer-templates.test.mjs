@@ -70,6 +70,35 @@ describe("compare-consumer-templates", () => {
     });
   });
 
+  test("compose-service mode ignores separator blank lines after scoped entries", () => {
+    withConsumer((consumerRoot) => {
+      const template = readFileSync(
+        path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"),
+        "utf8",
+      );
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/docker-compose.yml",
+        template.replace("\n\nvolumes:\n", "\n\n\nvolumes:\n"),
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Compose toss mTLS proxy",
+          template: "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+          consumer: "apps/trailbase/docker-compose.yml",
+          mode: "compose-service",
+          service: "toss-mtls-client-proxy",
+          volumes: ["mtls_client_certs"],
+        },
+      ]);
+
+      const result = runCompare(consumerRoot);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("status: scoped match");
+    });
+  });
+
   test("env-subset mode accepts required template keys inside a larger env file", () => {
     withConsumer((consumerRoot) => {
       writeConsumerFile(
@@ -77,7 +106,7 @@ describe("compare-consumer-templates", () => {
         "apps/trailbase/.env.production.example",
         [
           "PM_APP_ENV=production",
-          "COMPOSE_PROFILES=toss-proxy",
+          "COMPOSE_PROFILES=worker,toss-proxy",
           "TOSS_LOGIN_MODE=proxy",
           "MTLS_PROXY_TOKEN=replace-with-internal-proxy-token",
           "APP_SPECIFIC_VALUE=ok",
@@ -98,6 +127,40 @@ describe("compare-consumer-templates", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("status: env subset present");
       expect(result.stdout).not.toContain("APP_SPECIFIC_VALUE");
+    });
+  });
+
+  test("env-subset mode reports fixed template value drift", () => {
+    withConsumer((consumerRoot) => {
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/.env.production.example",
+        [
+          "PM_APP_ENV=production",
+          "COMPOSE_PROFILES=worker",
+          "TOSS_LOGIN_MODE=stub",
+          "MTLS_PROXY_TOKEN=app-owned-secret",
+          "",
+        ].join("\n"),
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Proxy env example",
+          template: "templates/trailbase/env/toss-mtls-client-proxy.env.example",
+          consumer: "apps/trailbase/.env.production.example",
+          mode: "env-subset",
+        },
+      ]);
+
+      const result = runCompare(consumerRoot);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("env subset mismatched fixed values:");
+      expect(result.stdout).toContain(
+        'COMPOSE_PROFILES must include toss-proxy (found "worker")',
+      );
+      expect(result.stdout).toContain('TOSS_LOGIN_MODE expected "proxy", found "stub"');
+      expect(result.stdout).not.toContain("MTLS_PROXY_TOKEN");
     });
   });
 

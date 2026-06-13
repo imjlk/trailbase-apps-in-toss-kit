@@ -277,6 +277,8 @@ export function applyMtlsProxyRules(context, options = {}) {
     proxyModeKey = "MTLS_PROXY_MODE",
     proxyTokenKey = "MTLS_PROXY_TOKEN",
     upstreamBaseUrlKey = "MTLS_UPSTREAM_BASE_URL",
+    clientCertPathKey = "MTLS_CLIENT_CERT_PATH",
+    clientKeyPathKey = "MTLS_CLIENT_KEY_PATH",
     requireForwardForInternalProxy = false,
     requireProxyWhen = () => Boolean(context.get(proxyUrlKey)),
     internalServiceName = "toss-mtls-client-proxy",
@@ -310,7 +312,17 @@ export function applyMtlsProxyRules(context, options = {}) {
     context.requiredHttps(upstreamBaseUrlKey);
   }
 
-  if (!context.allowPlaceholders && certificatePairDir) {
+  if (
+    !context.allowPlaceholders &&
+    (context.get(clientCertPathKey) || context.get(clientKeyPathKey))
+  ) {
+    if (!context.get(clientCertPathKey)) {
+      context.fail(`${clientCertPathKey} is required when ${clientKeyPathKey} is set`);
+    }
+    if (!context.get(clientKeyPathKey)) {
+      context.fail(`${clientKeyPathKey} is required when ${clientCertPathKey} is set`);
+    }
+  } else if (!context.allowPlaceholders && certificatePairDir) {
     const pair = detectMtlsCertificatePair(certificatePairDir);
     if (!pair.found) {
       context.fail(
