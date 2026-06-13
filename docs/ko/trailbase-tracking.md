@@ -16,10 +16,10 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 아래 값은 이 kit의 정책 값입니다.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `TBD`
-- Last verified TrailBase release date: `TBD`
-- Upstream latest TrailBase server: `0.27.9`
-- Upstream latest TrailBase release date: `2026-05-25`
+- Last verified TrailBase server: `0.28.5`
+- Last verified TrailBase release date: `2026-06-12`
+- Upstream latest TrailBase server: `0.28.5`
+- Upstream latest TrailBase release date: `2026-06-12`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -40,7 +40,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.27.9`
+- `trailbase-server-github-release`: `0.28.5`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.5.1`
@@ -86,16 +86,16 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbaseio/trailbase:0.27.9
+  --image trailbaseio/trailbase:0.28.5
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.27.9
+  --version 0.28.5
 ```
 
 일반 모드에서는 경고를 출력하되 성공으로 종료합니다. Strict 모드에서는 선언된 kit minimum보다
 낮거나, last verified보다 높거나, 서버 이미지 태그가 moving/unparseable인 것처럼 구체적인 정책
-위반을 확인할 수 있을 때만 실패합니다. Kit minimum과 last verified가 아직 `TBD`라면 이
-스크립트는 참고 진단으로만 동작합니다.
+위반을 확인할 수 있을 때만 실패합니다. Kit minimum이 아직 `TBD`이면 minimum-version gate는
+건너뛰지만, last verified 상한 검사는 계속 적용합니다.
 
 ## TrailBase 변경 리뷰 체크리스트
 
