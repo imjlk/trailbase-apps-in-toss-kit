@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.2.2 — 2026-06-13
+
+### Patch changes
+
+- [7eed7d8](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/7eed7d83af8e08fd13d15d747edee97bca67da8c) Add shared mTLS certificate-pair detection for mounted proxy certificate directories, explicit
+  mTLS certificate path validation aligned with proxy certificate precedence, and comment-aware
+  scoped consumer template drift checks for larger Compose and env files. — Thanks @imjlk!
+
 ## 0.2.1 — 2026-06-05
 
 ### Patch changes
