@@ -78,6 +78,15 @@ INLINE=value # ignored
     });
   });
 
+  test("rejects empty-prefix Toss Console certificate filenames", () => {
+    withTempDir((dir) => {
+      writeFileSync(path.join(dir, "_public.crt"), "cert");
+      writeFileSync(path.join(dir, "_private.key"), "key");
+
+      expect(detectMtlsCertificatePair(dir).found).toBe(false);
+    });
+  });
+
   test("detects generic client certificate fallback filenames", () => {
     withTempDir((dir) => {
       writeFileSync(path.join(dir, "client-cert.pem"), "cert");
@@ -173,6 +182,21 @@ INLINE=value # ignored
       expect(result.failures).toContain(
         "Provide mTLS certificates in mTLS certificate directory: expected one Toss Console pair (*_public.crt + *_private.key) or client-cert.pem + client-key.pem",
       );
+    });
+  });
+
+  test("skips mTLS certificate directory validation outside forward mode", () => {
+    withTempDir((dir) => {
+      const result = validateProductionEnv({
+        raw: [
+          "APP_ENV=production",
+          "MTLS_PROXY_MODE=stub",
+        ].join("\n"),
+        appEnvKey: "APP_ENV",
+        mtlsCertificatePairDir: dir,
+      });
+
+      expect(result.ok).toBe(true);
     });
   });
 });

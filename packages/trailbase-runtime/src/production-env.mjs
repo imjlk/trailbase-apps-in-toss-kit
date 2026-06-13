@@ -308,12 +308,14 @@ export function applyMtlsProxyRules(context, options = {}) {
     }
   }
 
-  if (context.get(proxyModeKey) === "forward") {
+  const isForwardMode = context.get(proxyModeKey) === "forward";
+  if (isForwardMode) {
     context.requiredHttps(upstreamBaseUrlKey);
   }
 
   if (
     !context.allowPlaceholders &&
+    isForwardMode &&
     (context.get(clientCertPathKey) || context.get(clientKeyPathKey))
   ) {
     if (!context.get(clientCertPathKey)) {
@@ -322,7 +324,7 @@ export function applyMtlsProxyRules(context, options = {}) {
     if (!context.get(clientKeyPathKey)) {
       context.fail(`${clientKeyPathKey} is required when ${clientCertPathKey} is set`);
     }
-  } else if (!context.allowPlaceholders && certificatePairDir) {
+  } else if (!context.allowPlaceholders && isForwardMode && certificatePairDir) {
     const pair = detectMtlsCertificatePair(certificatePairDir);
     if (!pair.found) {
       context.fail(
@@ -403,6 +405,10 @@ function detectSingleTossConsolePair(files, dir) {
   }
 
   const prefix = pairPrefixes[0];
+  if (prefix === "") {
+    return null;
+  }
+
   return {
     found: true,
     kind: "toss-console",

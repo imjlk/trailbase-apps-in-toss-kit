@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -322,6 +331,16 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
 
   const parentIndent = indentation(lines[parentIndex]);
   const parentEnd = findYamlBlockEnd(lines, parentIndex + 1, parentIndent);
+  const entryDirectIndent = findYamlDirectChildIndent(
+    lines,
+    parentIndex + 1,
+    parentEnd,
+    parentIndent,
+  );
+  if (entryDirectIndent === null) {
+    return '';
+  }
+
   for (let index = parentIndex + 1; index < parentEnd; index += 1) {
     const line = lines[index];
     if (!line.trim()) {
@@ -329,7 +348,7 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
     }
     const entryIndent = indentation(line);
     if (
-      entryIndent > parentIndent &&
+      entryIndent === entryDirectIndent &&
       new RegExp(`^\\s{${entryIndent}}${escapeRegex(entryKey)}:\\s*`).test(line)
     ) {
       const entryEnd = findYamlBlockEnd(lines, index + 1, entryIndent);
@@ -352,6 +371,21 @@ function findYamlBlockEnd(lines, start, baseIndent) {
   return lines.length;
 }
 
+function findYamlDirectChildIndent(lines, start, end, parentIndent) {
+  for (let index = start; index < end; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const lineIndent = indentation(line);
+    if (lineIndent > parentIndent) {
+      return lineIndent;
+    }
+  }
+  return null;
+}
+
 function trimTrailingBlankLines(lines) {
   let end = lines.length;
   while (end > 0 && !lines[end - 1].trim()) {
@@ -362,7 +396,7 @@ function trimTrailingBlankLines(lines) {
 
 function parseActiveEnvEntries(text) {
   const entries = [];
-  const seen = new Set();
+  const entryIndexes = new Map();
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) {
@@ -388,9 +422,14 @@ function parseActiveEnvEntries(text) {
         value = value.slice(0, commentIndex).trim();
       }
     }
-    if (key && !seen.has(key)) {
-      seen.add(key);
-      entries.push({ key, value });
+    if (key) {
+      const entry = { key, value };
+      if (entryIndexes.has(key)) {
+        entries[entryIndexes.get(key)] = entry;
+      } else {
+        entryIndexes.set(key, entries.length);
+        entries.push(entry);
+      }
     }
   }
   return entries;
@@ -414,6 +453,14 @@ function envSubsetValueMismatch(templateEntry, candidateValue) {
     return `${key} must include ${missingProfiles.join(', ')} (found ${displayEnvValue(candidateValue)})`;
   }
 
+  const allowedValues = envSubsetAllowedValues(key);
+  if (allowedValues) {
+    if (allowedValues.includes(candidateValue)) {
+      return null;
+    }
+    return `${key} must be one of ${allowedValues.join(', ')} (found ${displayEnvValue(candidateValue)})`;
+  }
+
   if (candidateValue === value) {
     return null;
   }
@@ -422,6 +469,13 @@ function envSubsetValueMismatch(templateEntry, candidateValue) {
 
 function shouldCompareEnvSubsetValue(key, value) {
   return Boolean(value) && !isSensitiveEnvKey(key) && !isPlaceholderEnvValue(value);
+}
+
+function envSubsetAllowedValues(key) {
+  if (key === 'TOSS_LOGIN_MODE') {
+    return ['proxy', 'forward'];
+  }
+  return null;
 }
 
 function isSensitiveEnvKey(key) {
@@ -447,12 +501,33 @@ function displayEnvValue(value) {
 }
 
 function scopedDiff(templateText, candidateText, templateLabel, candidateLabel) {
-  return [
-    `--- ${templateLabel}`,
-    `+++ ${candidateLabel}`,
-    ...templateText.split('\n').map((line) => `- ${line}`),
-    ...candidateText.split('\n').map((line) => `+ ${line}`),
-  ].join('\n');
+  const tmpRoot = mkdtempSync(join(tmpdir(), 'compare-consumer-templates-'));
+  const templateTmp = join(tmpRoot, 'template');
+  const candidateTmp = join(tmpRoot, 'candidate');
+  try {
+    writeFileSync(templateTmp, templateText);
+    writeFileSync(candidateTmp, candidateText);
+    const diff = spawnSync(
+      'git',
+      ['diff', '--no-index', '--color=never', '--no-prefix', '--', templateTmp, candidateTmp],
+      { encoding: 'utf8' },
+    );
+    return labelDiffPaths(
+      diff.stdout || diff.stderr,
+      templateTmp,
+      candidateTmp,
+      templateLabel,
+      candidateLabel,
+    );
+  } finally {
+    rmSync(tmpRoot, { recursive: true, force: true });
+  }
+}
+
+function labelDiffPaths(diffText, templatePath, candidatePath, templateLabel, candidateLabel) {
+  return diffText
+    .split(templatePath).join(templateLabel)
+    .split(candidatePath).join(candidateLabel);
 }
 
 function indentation(line) {
