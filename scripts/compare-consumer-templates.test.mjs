@@ -143,6 +143,69 @@ describe("compare-consumer-templates", () => {
     });
   });
 
+  test("compose-service mode ignores root comments after scoped entries", () => {
+    withConsumer((consumerRoot) => {
+      const template = readFileSync(
+        path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"),
+        "utf8",
+      );
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/docker-compose.yml",
+        `${template.replace(
+          "\nvolumes:\n",
+          "\n# app-owned root comment before volumes\nvolumes:\n",
+        )}# app-owned trailing root comment\n`,
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Compose toss mTLS proxy",
+          template: "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+          consumer: "apps/trailbase/docker-compose.yml",
+          mode: "compose-service",
+          service: "toss-mtls-client-proxy",
+          volumes: ["mtls_client_certs"],
+        },
+      ]);
+
+      const result = runCompare(consumerRoot);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("status: scoped match");
+    });
+  });
+
+  test("compose-service mode matches quoted service and volume keys", () => {
+    withConsumer((consumerRoot) => {
+      const template = readFileSync(
+        path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"),
+        "utf8",
+      );
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/docker-compose.yml",
+        template
+          .replace("  toss-mtls-client-proxy:\n", '  "toss-mtls-client-proxy":\n')
+          .replace("  mtls_client_certs:\n", "  'mtls_client_certs':\n"),
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Compose toss mTLS proxy",
+          template: "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+          consumer: "apps/trailbase/docker-compose.yml",
+          mode: "compose-service",
+          service: "toss-mtls-client-proxy",
+          volumes: ["mtls_client_certs"],
+        },
+      ]);
+
+      const result = runCompare(consumerRoot);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("status: scoped match");
+    });
+  });
+
   test("compose-service mode matches direct services instead of nested keys", () => {
     withConsumer((consumerRoot) => {
       const template = readFileSync(

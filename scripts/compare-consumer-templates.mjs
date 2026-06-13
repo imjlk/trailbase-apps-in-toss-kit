@@ -330,7 +330,9 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
   }
 
   const parentIndent = indentation(lines[parentIndex]);
-  const parentEnd = findYamlBlockEnd(lines, parentIndex + 1, parentIndent);
+  const parentEnd = findYamlBlockEnd(lines, parentIndex + 1, parentIndent, {
+    skipBoundaryComments: true,
+  });
   const entryDirectIndent = findYamlDirectChildIndent(
     lines,
     parentIndex + 1,
@@ -349,26 +351,56 @@ function extractYamlMappingEntry(text, parentKey, entryKey) {
     const entryIndent = indentation(line);
     if (
       entryIndent === entryDirectIndent &&
-      new RegExp(`^\\s{${entryIndent}}${escapeRegex(entryKey)}:\\s*`).test(line)
+      yamlMappingEntryPattern(entryIndent, entryKey).test(line)
     ) {
       const entryEnd = findYamlBlockEnd(lines, index + 1, entryIndent);
-      return `${trimTrailingBlankLines(lines.slice(index, entryEnd)).join('\n')}\n`;
+      const entryLines = trimTrailingBlankLines(lines.slice(index, entryEnd));
+      entryLines[0] = normalizeYamlMappingEntryLine(entryLines[0], entryIndent, entryKey);
+      return `${entryLines.join('\n')}\n`;
     }
   }
   return '';
 }
 
-function findYamlBlockEnd(lines, start, baseIndent) {
+function findYamlBlockEnd(lines, start, baseIndent, { skipBoundaryComments = false } = {}) {
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
-    if (isYamlSkippableLine(line)) {
+    const trimmed = line.trim();
+    if (!trimmed) {
       continue;
+    }
+    if (trimmed.startsWith('#')) {
+      if (skipBoundaryComments || indentation(line) > baseIndent) {
+        continue;
+      }
+      return index;
     }
     if (indentation(line) <= baseIndent) {
       return index;
     }
   }
   return lines.length;
+}
+
+function normalizeYamlMappingEntryLine(line, entryIndent, entryKey) {
+  const match = line.match(yamlMappingEntryPattern(entryIndent, entryKey));
+  if (!match) {
+    return line;
+  }
+  return `${match[1]}${entryKey}${match[2]}`;
+}
+
+function yamlMappingEntryPattern(entryIndent, entryKey) {
+  const keyPattern = yamlMappingKeyAlternatives(entryKey);
+  return new RegExp(`^(\\s{${entryIndent}})(?:${keyPattern})(\\s*:\\s*.*)$`);
+}
+
+function yamlMappingKeyAlternatives(entryKey) {
+  return [
+    escapeRegex(entryKey),
+    `"${escapeRegex(entryKey)}"`,
+    `'${escapeRegex(entryKey)}'`,
+  ].join('|');
 }
 
 function isYamlSkippableLine(line) {
