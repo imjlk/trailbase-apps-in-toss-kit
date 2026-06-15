@@ -160,4 +160,28 @@ describe("dev runner helpers", () => {
       "https://example.com:4000",
     ]);
   });
+
+  test("shell Toss unlink callback guard validates production settings", () => {
+    const root = new URL("../../..", import.meta.url).pathname;
+    const ok = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && TOSS_LOGIN_UNLINK_BASIC_AUTH="console-user:console-password" TOSS_UNLINK_CALLBACK_METHODS="GET,POST" trailbase_runtime_require_toss_unlink_callback_settings production',
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(ok.status).toBe(0);
+
+    const bad = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && TOSS_LOGIN_UNLINK_BASIC_AUTH="console-user:console-password" TOSS_UNLINK_CALLBACK_METHODS="PUT" trailbase_runtime_require_toss_unlink_callback_settings production',
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toContain("TOSS_UNLINK_CALLBACK_METHODS supports only GET and POST");
+  });
 });

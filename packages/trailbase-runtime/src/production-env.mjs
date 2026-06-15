@@ -342,6 +342,45 @@ export function applyMtlsProxyRules(context, options = {}) {
   }
 }
 
+export function applyTossLoginUnlinkRules(context, options = {}) {
+  const {
+    basicAuthKey = "TOSS_LOGIN_UNLINK_BASIC_AUTH",
+    legacyBasicAuthKey = "TOSS_UNLINK_CALLBACK_BASIC_AUTH",
+    methodsKey = "TOSS_UNLINK_CALLBACK_METHODS",
+    requireWhen = () =>
+      Boolean(context.get(basicAuthKey) || context.get(legacyBasicAuthKey) || context.get(methodsKey)),
+  } = options;
+
+  const basicAuth = context.get(basicAuthKey);
+  const legacyBasicAuth = context.get(legacyBasicAuthKey);
+  const callbackRequired = requireWhen(context);
+
+  if (legacyBasicAuth) {
+    context.warn(`${legacyBasicAuthKey} is supported for compatibility; prefer ${basicAuthKey}`);
+  }
+
+  if (callbackRequired && !basicAuth && !legacyBasicAuth) {
+    context.fail(`${basicAuthKey} is required for Toss Login unlink callbacks`);
+  }
+
+  validateUnlinkBasicAuth(context, basicAuthKey, basicAuth);
+  validateUnlinkBasicAuth(context, legacyBasicAuthKey, legacyBasicAuth);
+
+  const methods = context.get(methodsKey);
+  if (methods) {
+    for (const method of methods.split(",")) {
+      const normalized = method.trim().toUpperCase();
+      if (!normalized) {
+        continue;
+      }
+      if (!["GET", "POST"].includes(normalized)) {
+        context.fail(`${methodsKey} supports only GET and POST`);
+        break;
+      }
+    }
+  }
+}
+
 export function detectMtlsCertificatePair(dir) {
   try {
     const files = readdirSync(dir, { withFileTypes: true })
@@ -391,6 +430,22 @@ export function usesMovingProxyImageTag(value) {
 
 function normalizeKeyRules(rules) {
   return rules.map((rule) => (Array.isArray(rule) ? rule : [rule]));
+}
+
+function validateUnlinkBasicAuth(context, key, value) {
+  if (!value || context.allowPlaceholders) {
+    return;
+  }
+  const trimmed = String(value).trim();
+  if (trimmed.startsWith("Basic ")) {
+    if (trimmed.length < 18) {
+      context.fail(`${key} must contain a non-empty Basic Auth credential`);
+    }
+    return;
+  }
+  if (!trimmed.includes(":") || trimmed.length < 8) {
+    context.fail(`${key} must be user:password or a pre-encoded Basic header value`);
+  }
 }
 
 function detectSingleTossConsolePair(files, dir) {
