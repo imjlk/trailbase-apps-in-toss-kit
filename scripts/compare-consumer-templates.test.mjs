@@ -425,6 +425,60 @@ describe("compare-consumer-templates", () => {
   });
 });
 
+describe("toss-proxy-smoke template script", () => {
+  const smokeScript = path.join(repoRoot, "templates/trailbase/scripts/toss-proxy-smoke.sh");
+
+  test("defaults to health-only and requires forward mode", () => {
+    withFakeCurl("forward", (binDir) => {
+      const result = runSmokeScript(binDir);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('"mode":"forward"');
+    });
+  });
+
+  test("fails health-only when the proxy is still in stub mode", () => {
+    withFakeCurl("stub", (binDir) => {
+      const result = runSmokeScript(binDir);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Expected proxy mode forward, got stub.");
+    });
+  });
+
+  test("prevents full fake-payload smoke against forward mode", () => {
+    withFakeCurl("forward", (binDir) => {
+      const result = runSmokeScript(binDir, ["--full"]);
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Expected proxy mode stub, got forward.");
+    });
+  });
+
+  test("allows full fake-payload smoke in stub mode", () => {
+    withFakeCurl("stub", (binDir) => {
+      const result = runSmokeScript(binDir, ["--full"]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/toss-login/complete"');
+      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/promotion/reward/grant"');
+      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/smart-message/send"');
+    });
+  });
+
+  function runSmokeScript(binDir, args = []) {
+    return spawnSync("bash", [smokeScript, ...args], {
+      cwd: repoRoot,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+        TOSS_PROXY_SMOKE_URL: "http://toss-proxy.test",
+      },
+    });
+  }
+});
+
 function withConsumer(fn) {
   const dir = mkdtempSync(path.join(tmpdir(), "trailbase-consumer-"));
   try {
@@ -458,4 +512,29 @@ function runCompare(consumerRoot) {
       encoding: "utf8",
     },
   );
+}
+
+function withFakeCurl(mode, fn) {
+  const dir = mkdtempSync(path.join(tmpdir(), "trailbase-fake-curl-"));
+  try {
+    const curlPath = path.join(dir, "curl");
+    writeFileSync(
+      curlPath,
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'url="${@: -1}"',
+        'if [[ "$url" == */internal/apps-in-toss/health ]]; then',
+        `  printf '%s\\n' '{"ok":true,"mode":"${mode}"}'`,
+        "else",
+        '  printf \'{"ok":true,"path":"%s"}\\n\' "${url#http://toss-proxy.test}"',
+        "fi",
+        "",
+      ].join("\n"),
+    );
+    chmodSync(curlPath, 0o755);
+    fn(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
