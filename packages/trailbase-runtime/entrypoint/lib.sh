@@ -107,7 +107,13 @@ trailbase_runtime_require_toss_unlink_callback_settings() {
   if [ -z "$auth_value" ]; then
     trailbase_runtime_die "TOSS_LOGIN_UNLINK_BASIC_AUTH is required for Toss Login unlink callbacks"
   fi
+  case "$auth_value" in
+    dev-*|test-*|*:dev-*|*:test-*)
+      trailbase_runtime_die "TOSS_LOGIN_UNLINK_BASIC_AUTH must not use local dev/test credentials in production"
+      ;;
+  esac
   trailbase_runtime_require_production_value "TOSS_LOGIN_UNLINK_BASIC_AUTH" "$auth_value"
+  trailbase_runtime_require_production_value "TOSS_USER_KEY_HMAC_SECRET" "${TOSS_USER_KEY_HMAC_SECRET:-}"
 
   methods="${TOSS_UNLINK_CALLBACK_METHODS:-POST}"
   old_ifs="$IFS"

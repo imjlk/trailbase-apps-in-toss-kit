@@ -250,15 +250,28 @@ INLINE=value # ignored
     const result = validateProductionEnv({
       raw: ["APP_ENV=production"].join("\n"),
       appEnvKey: "APP_ENV",
-      rules: [
-        (context) => applyTossLoginUnlinkRules(context, { requireWhen: () => true }),
-      ],
+      rules: [applyTossLoginUnlinkRules],
     });
 
     expect(result.ok).toBe(false);
     expect(result.failures).toContain(
       "TOSS_LOGIN_UNLINK_BASIC_AUTH is required for Toss Login unlink callbacks",
     );
+    expect(result.failures).toContain("TOSS_USER_KEY_HMAC_SECRET is required");
+  });
+
+  test("requires Toss userKey HMAC secret when unlink callback auth is configured", () => {
+    const result = validateProductionEnv({
+      raw: [
+        "APP_ENV=production",
+        "TOSS_LOGIN_UNLINK_BASIC_AUTH=console-user:console-password",
+      ].join("\n"),
+      appEnvKey: "APP_ENV",
+      rules: [applyTossLoginUnlinkRules],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain("TOSS_USER_KEY_HMAC_SECRET is required");
   });
 
   test("validates Toss Login unlink callback methods", () => {
@@ -266,6 +279,7 @@ INLINE=value # ignored
       raw: [
         "APP_ENV=production",
         "TOSS_LOGIN_UNLINK_BASIC_AUTH=console-user:console-password",
+        "TOSS_USER_KEY_HMAC_SECRET=12345678901234567890123456789012",
         "TOSS_UNLINK_CALLBACK_METHODS=POST,PUT",
       ].join("\n"),
       appEnvKey: "APP_ENV",
@@ -276,11 +290,29 @@ INLINE=value # ignored
     expect(result.failures).toContain("TOSS_UNLINK_CALLBACK_METHODS supports only GET and POST");
   });
 
+  test("rejects local Toss unlink callback credentials in production", () => {
+    const result = validateProductionEnv({
+      raw: [
+        "APP_ENV=production",
+        "TOSS_LOGIN_UNLINK_BASIC_AUTH=dev-user:dev-password",
+        "TOSS_USER_KEY_HMAC_SECRET=12345678901234567890123456789012",
+      ].join("\n"),
+      appEnvKey: "APP_ENV",
+      rules: [applyTossLoginUnlinkRules],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.failures).toContain(
+      "TOSS_LOGIN_UNLINK_BASIC_AUTH must not use local dev/test credentials in production",
+    );
+  });
+
   test("accepts legacy Toss unlink Basic Auth key with a warning", () => {
     const result = validateProductionEnv({
       raw: [
         "APP_ENV=production",
         "TOSS_UNLINK_CALLBACK_BASIC_AUTH=console-user:console-password",
+        "TOSS_USER_KEY_HMAC_SECRET=12345678901234567890123456789012",
         "TOSS_UNLINK_CALLBACK_METHODS=GET,POST",
       ].join("\n"),
       appEnvKey: "APP_ENV",

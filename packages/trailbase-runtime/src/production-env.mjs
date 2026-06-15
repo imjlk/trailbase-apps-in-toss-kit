@@ -347,8 +347,8 @@ export function applyTossLoginUnlinkRules(context, options = {}) {
     basicAuthKey = "TOSS_LOGIN_UNLINK_BASIC_AUTH",
     legacyBasicAuthKey = "TOSS_UNLINK_CALLBACK_BASIC_AUTH",
     methodsKey = "TOSS_UNLINK_CALLBACK_METHODS",
-    requireWhen = () =>
-      Boolean(context.get(basicAuthKey) || context.get(legacyBasicAuthKey) || context.get(methodsKey)),
+    hmacSecretKey = "TOSS_USER_KEY_HMAC_SECRET",
+    requireWhen = () => true,
   } = options;
 
   const basicAuth = context.get(basicAuthKey);
@@ -361,6 +361,9 @@ export function applyTossLoginUnlinkRules(context, options = {}) {
 
   if (callbackRequired && !basicAuth && !legacyBasicAuth) {
     context.fail(`${basicAuthKey} is required for Toss Login unlink callbacks`);
+  }
+  if (callbackRequired) {
+    context.requiredSecret(hmacSecretKey, 32);
   }
 
   validateUnlinkBasicAuth(context, basicAuthKey, basicAuth);
@@ -441,11 +444,33 @@ function validateUnlinkBasicAuth(context, key, value) {
     if (trimmed.length < 18) {
       context.fail(`${key} must contain a non-empty Basic Auth credential`);
     }
+    const decoded = decodeBasicAuthCredential(trimmed);
+    if (decoded && looksLikeLocalCredential(decoded)) {
+      context.fail(`${key} must not use local dev/test credentials in production`);
+    }
     return;
   }
   if (!trimmed.includes(":") || trimmed.length < 8) {
     context.fail(`${key} must be user:password or a pre-encoded Basic header value`);
   }
+  if (looksLikeLocalCredential(trimmed)) {
+    context.fail(`${key} must not use local dev/test credentials in production`);
+  }
+}
+
+function decodeBasicAuthCredential(value) {
+  const encoded = String(value).slice("Basic ".length).trim();
+  try {
+    return Buffer.from(encoded, "base64").toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+function looksLikeLocalCredential(value) {
+  return String(value)
+    .split(":")
+    .some((part) => /^(dev|test)[_-]/i.test(part.trim()));
 }
 
 function detectSingleTossConsolePair(files, dir) {
