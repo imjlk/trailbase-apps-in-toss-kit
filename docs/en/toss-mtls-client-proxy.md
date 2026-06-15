@@ -84,6 +84,7 @@ order visible before the application decides whether to grant or defer the purch
 
 - `POST /internal/mtls/request`: generic mTLS JSON relay.
 - `POST /internal/apps-in-toss/toss-login/complete`: Toss Login adapter.
+- `POST /internal/apps-in-toss/toss-login/remove-by-user-key`: Toss Login unlink adapter.
 - `POST /internal/apps-in-toss/iap/order/status`: in-app purchase order status adapter.
 - `POST /internal/apps-in-toss/promotion/reward/grant`: promotion reward adapter.
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
@@ -152,6 +153,17 @@ Adapter request bodies:
     "referrer": "SANDBOX"
   }
   ```
+
+- Toss Login unlink by `userKey`:
+
+  ```json
+  {
+    "tossUserKey": "toss-user-key"
+  }
+  ```
+
+  The adapter forwards the official remove-by-user-key request to Toss, then normalizes the response
+  to `ok`, `providerStatus`, and `resultType` without echoing the raw Toss `userKey`.
 
 - IAP order status:
 

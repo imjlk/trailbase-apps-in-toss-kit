@@ -130,6 +130,97 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.referrer).toBe("SANDBOX");
   });
 
+  test("stub login unlink response does not expose the Toss user key", async () => {
+    const req = request("POST", PROXY_ENDPOINTS.tossLoginRemoveByUserKey, {
+      userKey: "sensitive-toss-user-key",
+    });
+    const res = await handleRequest(req, { mode: "stub", internalToken: "" });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.providerStatus).toBe("REMOVED");
+    expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
+  });
+
+  test("forward login unlink targets the Toss remove-by-user-key API", async () => {
+    const seen = [];
+    const upstreamServer = http.createServer(async (req, res) => {
+      seen.push({
+        url: req.url,
+        tossUserKeyHeader: req.headers["x-toss-user-key"],
+        body: await readRequestJson(req),
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          success: {
+            userKey: "sensitive-toss-user-key",
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
+        {
+          tossUserKey: "sensitive-toss-user-key",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(seen).toEqual([
+        {
+          url: TOSS_ENDPOINTS.loginRemoveByUserKey,
+          tossUserKeyHeader: "sensitive-toss-user-key",
+          body: { userKey: "sensitive-toss-user-key" },
+        },
+      ]);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("REMOVED");
+      expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
+    });
+  });
+
+  test("forward login unlink redacts the Toss user key from failure reasons", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(
+        JSON.stringify({
+          resultType: "FAIL",
+          error: {
+            errorCode: "USER_KEY_NOT_FOUND",
+            reason: "cannot unlink sensitive-toss-user-key",
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
+        {
+          userKey: "sensitive-toss-user-key",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.failureReason).toBe("cannot unlink [redacted]");
+      expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
+    });
+  });
+
   test("forward login failure reads Toss error reason instead of object text", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
@@ -798,12 +889,16 @@ describe("toss-mtls-client-proxy", () => {
   });
 
   test("message adapter targets the Toss messenger API", () => {
+    expect(TOSS_ENDPOINTS.loginRemoveByUserKey).toBe(
+      "/api-partner/v1/apps-in-toss/user/oauth2/access/remove-by-user-key",
+    );
     expect(TOSS_ENDPOINTS.messageSend).toBe("/api-partner/v1/apps-in-toss/messenger/send-message");
     expect(TOSS_ENDPOINTS.messageBulkSend).toBe("/api-partner/v1/apps-in-toss/messenger/send-bulk-message");
   });
 
   test("adapter routes use Apps in Toss feature names", () => {
     expect(PROXY_ENDPOINTS.tossLoginComplete).toBe("/internal/apps-in-toss/toss-login/complete");
+    expect(PROXY_ENDPOINTS.tossLoginRemoveByUserKey).toBe("/internal/apps-in-toss/toss-login/remove-by-user-key");
     expect(PROXY_ENDPOINTS.iapOrderStatus).toBe("/internal/apps-in-toss/iap/order/status");
     expect(PROXY_ENDPOINTS.promotionRewardGrant).toBe("/internal/apps-in-toss/promotion/reward/grant");
     expect(PROXY_ENDPOINTS.smartMessageSend).toBe("/internal/apps-in-toss/smart-message/send");

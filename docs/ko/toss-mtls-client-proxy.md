@@ -85,6 +85,7 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 
 - `POST /internal/mtls/request`: 일반 mTLS JSON relay.
 - `POST /internal/apps-in-toss/toss-login/complete`: Toss Login 어댑터.
+- `POST /internal/apps-in-toss/toss-login/remove-by-user-key`: Toss Login 연결 해제 어댑터.
 - `POST /internal/apps-in-toss/iap/order/status`: 인앱 결제 주문 상태 어댑터.
 - `POST /internal/apps-in-toss/promotion/reward/grant`: 프로모션 리워드 어댑터.
 - `POST /internal/apps-in-toss/smart-message/send`: 스마트 메시지 어댑터.
@@ -154,6 +155,17 @@ export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
     "referrer": "SANDBOX"
   }
   ```
+
+- `userKey`로 Toss Login 연결 해제:
+
+  ```json
+  {
+    "tossUserKey": "toss-user-key"
+  }
+  ```
+
+  이 어댑터는 공식 remove-by-user-key 요청을 Toss로 전달한 뒤, raw Toss `userKey`를 되돌려주지
+  않고 `ok`, `providerStatus`, `resultType` 중심으로 응답을 정규화합니다.
 
 - IAP 주문 상태:
 
