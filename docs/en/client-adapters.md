@@ -62,6 +62,36 @@ storage, without forwarding the raw SDK event payload.
 The kit does not depend on `@apps-in-toss/*`; WebView and React Native apps own
 the official SDK import.
 
+For session persistence, wrap the official Apps in Toss `Storage` API and pass
+it to `createAppsInTossSessionManager`. Apps in Toss documents this native
+storage as persistent across app restarts and warns against `AsyncStorage` in
+the mini-app runtime.
+
+```ts
+import { Storage } from "@apps-in-toss/framework";
+import {
+  createAppsInTossKeyValueStorage,
+  createAppsInTossSessionManager,
+} from "@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss";
+
+const sessionStorage = createAppsInTossKeyValueStorage({
+  storage: Storage,
+  env: "production",
+});
+
+const sessionManager = createAppsInTossSessionManager({
+  storage: sessionStorage,
+  appLogin,
+  loadSession,
+  bootstrap,
+  completeTossLogin,
+});
+```
+
+Local tests can pass `createMemoryKeyValueStorage()` or a localStorage-backed
+adapter as `fallbackStorage`. Production builds should not enable fallback when
+`Storage` is unavailable.
+
 ## TanStack DB
 
 The TanStack DB adapter is intentionally thin. It helps build TrailBase Record

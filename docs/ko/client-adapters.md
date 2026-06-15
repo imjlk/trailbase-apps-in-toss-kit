@@ -57,6 +57,35 @@ await api.saveNotificationAgreement(agreement);
 kit는 `@apps-in-toss/*`에 의존하지 않습니다. WebView와 React Native 앱이 공식 SDK import를
 소유합니다.
 
+세션 영속성에는 공식 Apps in Toss `Storage` API를 감싸서 `createAppsInTossSessionManager`에
+전달하세요. Apps in Toss 문서는 이 네이티브 저장소가 앱 재시작 후에도 유지된다고 안내하며,
+mini-app 런타임에서 `AsyncStorage` 사용은 피하라고 설명합니다.
+
+```ts
+import { Storage } from "@apps-in-toss/framework";
+import {
+  createAppsInTossKeyValueStorage,
+  createAppsInTossSessionManager,
+} from "@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss";
+
+const sessionStorage = createAppsInTossKeyValueStorage({
+  storage: Storage,
+  env: "production",
+});
+
+const sessionManager = createAppsInTossSessionManager({
+  storage: sessionStorage,
+  appLogin,
+  loadSession,
+  bootstrap,
+  completeTossLogin,
+});
+```
+
+로컬 테스트에서는 `createMemoryKeyValueStorage()`나 localStorage 기반 adapter를
+`fallbackStorage`로 넘길 수 있습니다. 운영 빌드에서는 `Storage`가 없을 때 fallback을 켜지
+마세요.
+
 ## TanStack DB
 
 TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에서 쓰기 쉬운 SSE 브리지,

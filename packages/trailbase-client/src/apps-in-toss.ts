@@ -7,6 +7,15 @@ export {
   normalizeAppsInTossReferrer,
   requestAppsInTossLogin,
 } from "./index";
+export {
+  AppsInTossStorageUnavailableError,
+  createAppsInTossKeyValueStorage,
+  createMemoryKeyValueStorage,
+  createWebLocalStorageKeyValueStorage,
+  type AppsInTossStorageBridge,
+  type CreateAppsInTossKeyValueStorageOptions,
+  type WebStorageLike,
+} from "./storage";
 
 export const APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE = "apps_in_toss_sdk";
 
