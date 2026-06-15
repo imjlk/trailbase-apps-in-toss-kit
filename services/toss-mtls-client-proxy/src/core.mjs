@@ -14,6 +14,7 @@ export const SMART_MESSAGE_BULK_MAX_CONTEXTS = 2_500;
 export const TOSS_ENDPOINTS = Object.freeze({
   loginGenerateToken: "/api-partner/v1/apps-in-toss/user/oauth2/generate-token",
   loginMe: "/api-partner/v1/apps-in-toss/user/oauth2/login-me",
+  loginRemoveByUserKey: "/api-partner/v1/apps-in-toss/user/oauth2/access/remove-by-user-key",
   promotionGetKey: "/api-partner/v1/apps-in-toss/promotion/execute-promotion/get-key",
   promotionExecute: "/api-partner/v1/apps-in-toss/promotion/execute-promotion",
   promotionResult: "/api-partner/v1/apps-in-toss/promotion/execution-result",
@@ -26,6 +27,7 @@ export const PROXY_ENDPOINTS = Object.freeze({
   health: "/internal/apps-in-toss/health",
   genericMtlRequest: "/internal/mtls/request",
   tossLoginComplete: "/internal/apps-in-toss/toss-login/complete",
+  tossLoginRemoveByUserKey: "/internal/apps-in-toss/toss-login/remove-by-user-key",
   iapOrderStatus: "/internal/apps-in-toss/iap/order/status",
   promotionRewardGrant: "/internal/apps-in-toss/promotion/reward/grant",
   smartMessageSend: "/internal/apps-in-toss/smart-message/send",
@@ -188,6 +190,14 @@ export async function handleRequest(req, config = createConfig()) {
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.tossLoginComplete) {
     const body = await readJson(req, requestBodyLimitBytes(config));
     return response(200, config.mode === "forward" ? await completeTossLogin(body, config) : stubLoginResponse(body));
+  }
+
+  if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.tossLoginRemoveByUserKey) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    return response(
+      200,
+      config.mode === "forward" ? await removeTossLoginByUserKey(body, config) : stubLoginRemoveByUserKey(body),
+    );
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.iapOrderStatus) {
@@ -399,6 +409,24 @@ async function getIapOrderStatus(request, config) {
     }
   }
   return normalized;
+}
+
+async function removeTossLoginByUserKey(request, config) {
+  const tossUserKey = unlinkTossUserKey(request);
+  if (!tossUserKey) {
+    return { ok: false, error: "MISSING_TOSS_USER_KEY", providerStatus: "ERROR" };
+  }
+
+  const upstream = await forwardJson(
+    {
+      method: "POST",
+      path: TOSS_ENDPOINTS.loginRemoveByUserKey,
+      body: { userKey: tossUserKey },
+      tossUserKey,
+    },
+    config,
+  );
+  return normalizeTossLoginRemoveByUserKeyResponse(upstream.body, upstream.status, tossUserKey);
 }
 
 async function grantPromotionReward(request, config) {
@@ -691,6 +719,17 @@ function stubIapOrderStatus(body) {
   };
 }
 
+function stubLoginRemoveByUserKey(body) {
+  if (!unlinkTossUserKey(body)) {
+    return { ok: false, error: "MISSING_TOSS_USER_KEY", providerStatus: "ERROR" };
+  }
+  return {
+    ok: true,
+    providerStatus: "REMOVED",
+    resultType: "SUCCESS",
+  };
+}
+
 function stubSmartMessageResponse(body, msgCount) {
   return {
     ok: true,
@@ -772,6 +811,10 @@ function normalizeScopes(value) {
   return ["user_key"];
 }
 
+function unlinkTossUserKey(value) {
+  return stringOrUndefined(value?.tossUserKey ?? value?.userKey ?? value?.user_key);
+}
+
 function readPathString(value, paths) {
   const found = readPathValue(value, paths);
   if (found === undefined || found === null || found === "") return undefined;
@@ -793,6 +836,25 @@ function readPathValue(value, paths) {
     if (found) return current;
   }
   return undefined;
+}
+
+function normalizeTossLoginRemoveByUserKeyResponse(upstream, upstreamStatus = 200, tossUserKey = "") {
+  const resultType = readPathString(upstream, ["resultType", "success.resultType", "data.resultType"]);
+  if (!httpStatusOk(upstreamStatus) || isUpstreamFailure(upstream)) {
+    return {
+      ok: false,
+      providerStatus: "FAILED",
+      resultType,
+      failureReason: redactSensitiveValue(upstreamFailureReason(upstream), tossUserKey),
+      providerErrorCode: upstreamFailureCode(upstream),
+      upstreamStatus,
+    };
+  }
+  return {
+    ok: true,
+    providerStatus: "REMOVED",
+    resultType: resultType ?? "SUCCESS",
+  };
 }
 
 function normalizeMessageResponse(request, upstream, upstreamStatus = 200) {
@@ -1022,6 +1084,17 @@ function upstreamFailureCode(value) {
     "data.errorCode",
     "data.code",
   ]);
+}
+
+function redactSensitiveValue(value, sensitive) {
+  if (value === undefined || value === null) {
+    return value;
+  }
+  const secret = String(sensitive || "");
+  if (!secret) {
+    return String(value);
+  }
+  return String(value).split(secret).join("[redacted]");
 }
 
 function parsePositiveInteger(value, fallback) {

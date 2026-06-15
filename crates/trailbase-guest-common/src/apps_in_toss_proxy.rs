@@ -3,6 +3,8 @@ use serde_json::{Value as JsonValue, json};
 use crate::{CommonResult, join_url, post_json_with_optional_bearer, read_string_path};
 
 pub const TOSS_LOGIN_COMPLETE_PATH: &str = "/internal/apps-in-toss/toss-login/complete";
+pub const TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH: &str =
+    "/internal/apps-in-toss/toss-login/remove-by-user-key";
 pub const IAP_ORDER_STATUS_PATH: &str = "/internal/apps-in-toss/iap/order/status";
 pub const PROMOTION_REWARD_GRANT_PATH: &str = "/internal/apps-in-toss/promotion/reward/grant";
 pub const SMART_MESSAGE_SEND_PATH: &str = "/internal/apps-in-toss/smart-message/send";
@@ -19,6 +21,21 @@ pub async fn toss_login_complete(
         json!({
           "authorizationCode": authorization_code,
           "referrer": referrer,
+        }),
+        bearer_token,
+    )
+    .await
+}
+
+pub async fn toss_login_remove_by_user_key(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    toss_user_key: &str,
+) -> CommonResult<JsonValue> {
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH),
+        json!({
+          "tossUserKey": toss_user_key,
         }),
         bearer_token,
     )
@@ -190,6 +207,10 @@ mod tests {
         assert_eq!(
             TOSS_LOGIN_COMPLETE_PATH,
             "/internal/apps-in-toss/toss-login/complete"
+        );
+        assert_eq!(
+            TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH,
+            "/internal/apps-in-toss/toss-login/remove-by-user-key"
         );
         assert_eq!(
             IAP_ORDER_STATUS_PATH,
