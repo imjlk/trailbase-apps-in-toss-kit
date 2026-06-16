@@ -31,11 +31,13 @@ pub async fn toss_login_remove_by_user_key(
     proxy_url: &str,
     bearer_token: Option<&str>,
     toss_user_key: &str,
+    access_token: &str,
 ) -> CommonResult<JsonValue> {
     post_json_with_optional_bearer(
         &join_url(proxy_url, TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH),
         json!({
           "tossUserKey": toss_user_key,
+          "accessToken": access_token,
         }),
         bearer_token,
     )
