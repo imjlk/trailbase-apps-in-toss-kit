@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./analytics": "./src/analytics.ts",
     "./apps-in-toss": "./src/apps-in-toss.ts",
+    "./storage": "./src/storage.ts",
     "./tanstack-db": "./src/tanstack-db.ts",
     "./tanstack-query": "./src/tanstack-query.ts"
   },

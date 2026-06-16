@@ -23,6 +23,16 @@ export {
   type DetailAnalyticsConfig,
 } from "./analytics";
 
+export {
+  AppsInTossStorageUnavailableError,
+  createAppsInTossKeyValueStorage,
+  createMemoryKeyValueStorage,
+  createWebLocalStorageKeyValueStorage,
+  type AppsInTossStorageBridge,
+  type CreateAppsInTossKeyValueStorageOptions,
+  type WebStorageLike,
+} from "./storage";
+
 type PortableBodyInit = NonNullable<RequestInit["body"]>;
 
 export interface RequestJsonOptions {
