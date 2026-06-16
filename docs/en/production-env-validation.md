@@ -38,7 +38,7 @@ only needs Toss Login and IAP.
 Production should use exact SemVer or, when intentional, a minor SemVer tag:
 
 ```text
-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.7
+ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.8
 ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1
 ```
 

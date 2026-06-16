@@ -40,7 +40,7 @@ secret(placeholder secret), 로컬 URL, 움직이는 이미지 태그, 실수로
 SemVer 태그를 사용할 수 있습니다.
 
 ```text
-ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.7
+ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.8
 ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1
 ```
 

@@ -42,9 +42,9 @@ that the tag version matches the proxy package version.
 - `sha-<shortsha>`: source commit tag for audit and rollback. Scheduled rebuilds can repush
   this tag when the base image changes.
 - `latest`: latest intentional release, useful for manual testing but not preferred for production.
-- `0.1.7`, `0.1`, `0`: SemVer release aliases.
+- `0.1.8`, `0.1`, `0`: SemVer release aliases.
 
-For Coolify production, prefer an exact `0.1.7` tag or a minor tag such as `0.1`. Use `latest` or
+For Coolify production, prefer an exact `0.1.8` tag or a minor tag such as `0.1`. Use `latest` or
 `edge` only when you deliberately want to track moving image builds.
 
 ## Versioning

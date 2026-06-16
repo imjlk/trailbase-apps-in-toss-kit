@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.8 — 2026-06-16
+
+### Patch changes
+
+- [4c7fa37](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/4c7fa37c6cee245e02cf51f5d5b63163ae09f175) Add `--health-only`, `--full`, and expected-mode checks to the reusable Toss mTLS proxy smoke
+  script. The default mode now verifies forward proxy health for production pre-QA, while full adapter
+  payload smoke tests stay available only for local stub environments via `--full`. — Thanks @imjlk!
+
 ## 0.1.7 — 2026-06-16
 
 ### Patch changes
