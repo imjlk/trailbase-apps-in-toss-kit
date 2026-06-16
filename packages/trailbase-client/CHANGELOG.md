@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 0.4.1 — 2026-06-16
+
+### Patch changes
+
+- [a2f2362](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/a2f2362bb8ea239b218a6d21457dfa9c00902296) Add an Apps in Toss Storage-backed `KeyValueStorage` adapter for React Native and WebView mini-apps.
+  Consumers can inject the official `Storage` bridge for production session persistence while keeping
+  memory or localStorage fallbacks limited to local tests. — Thanks @imjlk!
+
 ## 0.4.0 — 2026-06-09
 
 ### Minor changes
