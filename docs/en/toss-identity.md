@@ -83,13 +83,15 @@ anonymous alias and return fresh tokens for it.
 
 AppsInToss can call a public callback URL when a user disconnects Toss Login from the Toss app. The
 callback is an inbound request to the app backend, not a request through the outbound mTLS proxy.
+Calling the service-side remove-by-user-key API from your backend does not trigger this callback;
+handle that local revoke path separately in the consumer app.
 
-Use `trailbase-toss-identity` helpers to:
+Use `trailbase-guest-common::toss_unlink` helpers to:
 
 - Deserialize `userKey` or `user_key` callback bodies without logging the raw key.
 - Validate the Basic Auth header against the console value.
 - Normalize unlink referrers such as `UNLINK`, `WITHDRAWAL_TERMS`, and `WITHDRAWAL_TOSS`.
-- Validate the `userKey` shape before deriving `toss_user_key_hmac`.
+- Validate the `userKey` shape and derive `toss_user_key_hmac` for lookup.
 
 Keep app-specific database updates in the consumer app. Typical handling is to look up
 `toss_identities.toss_user_key_hmac`, mark the matching row `REVOKED`, and record an audit/event row

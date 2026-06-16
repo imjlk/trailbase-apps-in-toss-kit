@@ -4,12 +4,15 @@ use serde::{Deserialize, Serialize};
 use trailbase_wasm::http::{Method, Request, StatusCode};
 use url::form_urlencoded;
 
-use crate::responses::{ApiError, ApiResult, bad_request, unauthorized};
+use crate::hmac_sha256_hex;
+use crate::responses::{ApiError, ApiResult, bad_request, internal, unauthorized};
 use crate::settings;
 
 pub const DEFAULT_UNLINK_CALLBACK_METHODS: &str = "POST";
 pub const TOSS_LOGIN_UNLINK_BASIC_AUTH_KEY: &str = "TOSS_LOGIN_UNLINK_BASIC_AUTH";
 pub const TOSS_UNLINK_CALLBACK_BASIC_AUTH_KEY: &str = "TOSS_UNLINK_CALLBACK_BASIC_AUTH";
+pub const TOSS_UNLINK_CALLBACK_METHODS_KEY: &str = "TOSS_UNLINK_CALLBACK_METHODS";
+pub const TOSS_USER_KEY_HMAC_SECRET_KEY: &str = "TOSS_USER_KEY_HMAC_SECRET";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TossUnlinkCallbackMethod {
@@ -22,6 +25,13 @@ pub enum TossUnlinkCallbackMethod {
 pub struct TossUnlinkCallback {
     pub user_key: String,
     pub referrer: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerifiedTossUnlinkCallback {
+    pub callback: TossUnlinkCallback,
+    pub user_key_hmac: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +107,15 @@ pub async fn parse_callback(req: &mut Request) -> ApiResult<TossUnlinkCallback> 
     parse_callback_body(&body, content_type.as_str())
 }
 
+pub async fn parse_verified_callback_from_settings(
+    req: &mut Request,
+) -> ApiResult<VerifiedTossUnlinkCallback> {
+    ensure_allowed_method_from_settings(req, TOSS_UNLINK_CALLBACK_METHODS_KEY)?;
+    verify_basic_auth_from_settings(req)?;
+    let callback = parse_callback(req).await?;
+    verified_callback_with_hmac_from_settings(callback)
+}
+
 pub fn parse_callback_body(body: &[u8], content_type: &str) -> ApiResult<TossUnlinkCallback> {
     if body.is_empty() {
         return Err(bad_request("MISSING_USER_KEY", "Missing userKey"));
@@ -122,6 +141,25 @@ pub fn parse_callback_body(body: &[u8], content_type: &str) -> ApiResult<TossUnl
             }
         }),
     }
+}
+
+pub fn verified_callback_with_hmac_from_settings(
+    callback: TossUnlinkCallback,
+) -> ApiResult<VerifiedTossUnlinkCallback> {
+    let secret = settings::required(TOSS_USER_KEY_HMAC_SECRET_KEY)?;
+    verified_callback_with_hmac(callback, secret.as_str())
+}
+
+pub fn verified_callback_with_hmac(
+    callback: TossUnlinkCallback,
+    hmac_secret: &str,
+) -> ApiResult<VerifiedTossUnlinkCallback> {
+    let user_key_hmac = hmac_sha256_hex(hmac_secret, callback.user_key.as_str())
+        .map_err(|err| internal(format!("Failed to derive Toss userKey HMAC: {err}")))?;
+    Ok(VerifiedTossUnlinkCallback {
+        callback,
+        user_key_hmac,
+    })
 }
 
 pub fn callback_from_fields(
@@ -318,5 +356,20 @@ mod tests {
         assert!(is_withdrawal_referrer("WITHDRAWAL_TERMS"));
         assert!(is_withdrawal_referrer("withdrawal_toss"));
         assert!(!is_withdrawal_referrer("UNLINK"));
+    }
+
+    #[test]
+    fn derives_verified_callback_hmac_without_changing_callback() {
+        let callback = TossUnlinkCallback {
+            user_key: "uk_1".to_string(),
+            referrer: "UNLINK".to_string(),
+        };
+        let verified = verified_callback_with_hmac(callback.clone(), "secret").unwrap();
+
+        assert_eq!(verified.callback, callback);
+        assert_eq!(
+            verified.user_key_hmac,
+            "948f7ea37fc104cd328cec936bbd882d1c803e4349239360f2817000377971ca"
+        );
     }
 }

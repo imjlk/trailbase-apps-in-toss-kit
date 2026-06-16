@@ -20,6 +20,7 @@ AppsInToss services:
 - validate `TRAILBASE_DEV_ADMIN_*` is not enabled in production
 - reject moving mTLS proxy image tags such as `latest` and `edge`
 - validate `MTLS_PROXY_*` and `COMPOSE_PROFILES` combinations
+- optionally validate Toss Login unlink callback Basic Auth and allowed methods
 - optionally validate that a local or mounted mTLS certificate directory has a usable cert/key pair
 
 Consumers should keep wrapper scripts for app-specific keys and policies. For
@@ -85,6 +86,11 @@ allowed in a given environment.
 Consumer wrappers should import the shared validator and add app-specific rules
 as small functions. Keep wrapper output human-readable and deterministic so it
 is useful in CI, local shells, and deployment runbooks.
+
+For Toss Login unlink callbacks, add `applyTossLoginUnlinkRules` to the wrapper rules when the app
+exposes a callback route. The shared rule validates `TOSS_LOGIN_UNLINK_BASIC_AUTH`, accepts the
+legacy `TOSS_UNLINK_CALLBACK_BASIC_AUTH` key with a warning, and limits
+`TOSS_UNLINK_CALLBACK_METHODS` to `GET` and `POST`.
 
 When a production check can see the proxy certificate directory, pass
 `mtlsCertificatePairDir` to validate that it contains either one Toss Console

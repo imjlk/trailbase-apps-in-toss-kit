@@ -160,4 +160,50 @@ describe("dev runner helpers", () => {
       "https://example.com:4000",
     ]);
   });
+
+  test("shell Toss unlink callback guard validates production settings", () => {
+    const root = new URL("../../..", import.meta.url).pathname;
+    const ok = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && TOSS_LOGIN_UNLINK_BASIC_AUTH="console-user:console-password" TOSS_USER_KEY_HMAC_SECRET="12345678901234567890123456789012" TOSS_UNLINK_CALLBACK_METHODS="GET,POST" trailbase_runtime_require_toss_unlink_callback_settings production',
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(ok.status).toBe(0);
+
+    const bad = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && TOSS_LOGIN_UNLINK_BASIC_AUTH="console-user:console-password" TOSS_USER_KEY_HMAC_SECRET="12345678901234567890123456789012" TOSS_UNLINK_CALLBACK_METHODS="PUT" trailbase_runtime_require_toss_unlink_callback_settings production',
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(bad.status).toBe(1);
+    expect(bad.stderr).toContain("TOSS_UNLINK_CALLBACK_METHODS supports only GET and POST");
+
+    const missingHmac = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && TOSS_LOGIN_UNLINK_BASIC_AUTH="console-user:console-password" trailbase_runtime_require_toss_unlink_callback_settings production',
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(missingHmac.status).toBe(1);
+    expect(missingHmac.stderr).toContain("refusing placeholder production environment variable: TOSS_USER_KEY_HMAC_SECRET");
+
+    const localCredential = spawnSync(
+      "sh",
+      [
+        "-c",
+        '. packages/trailbase-runtime/entrypoint/lib.sh && TOSS_LOGIN_UNLINK_BASIC_AUTH="dev-user:dev-password" TOSS_USER_KEY_HMAC_SECRET="12345678901234567890123456789012" trailbase_runtime_require_toss_unlink_callback_settings production',
+      ],
+      { cwd: root, encoding: "utf8" },
+    );
+    expect(localCredential.status).toBe(1);
+    expect(localCredential.stderr).toContain("TOSS_LOGIN_UNLINK_BASIC_AUTH must not use local dev/test credentials in production");
+  });
 });

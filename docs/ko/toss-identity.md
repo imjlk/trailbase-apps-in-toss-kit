@@ -88,13 +88,15 @@ anonymous alias를 기록하고 canonical user용 token을 반환할 수 있습�
 AppsInToss는 사용자가 Toss 앱에서 Toss Login 연결을 해제할 때 앱의 공개 콜백(callback) URL을
 호출할 수 있습니다. 이 콜백은 앱 백엔드로 들어오는 요청(inbound request)입니다. 외부 Toss
 API를 호출하기 위한 외부 연결용(outbound) mTLS 프록시를 거치지 않습니다.
+백엔드가 service-side remove-by-user-key API를 직접 호출해 연결을 해제해도 이 콜백은 호출되지
+않으므로, 그 local revoke 경로는 도입 앱에서 별도로 처리하세요.
 
-`trailbase-toss-identity` 헬퍼로 다음을 처리하세요.
+`trailbase-guest-common::toss_unlink` 헬퍼로 다음을 처리하세요.
 
 - 원본 key를 log하지 않고 `userKey` 또는 `user_key` 콜백 본문을 역직렬화(deserialize)합니다.
 - Basic Auth header를 console에 설정한 값과 비교합니다.
 - `UNLINK`, `WITHDRAWAL_TERMS`, `WITHDRAWAL_TOSS` 같은 unlink referrer를 정규화합니다.
-- `toss_user_key_hmac`을 만들기 전에 `userKey` 형식을 검증합니다.
+- `userKey` 형식을 검증하고 lookup용 `toss_user_key_hmac`을 만듭니다.
 
 앱별 데이터베이스 업데이트는 도입 앱에 둡니다. 일반적인 처리는
 `toss_identities.toss_user_key_hmac`으로 레코드를 찾고, 일치하는 레코드를 `REVOKED`로 바꾸며,
