@@ -216,7 +216,7 @@ Image tag policy:
 - `edge`: latest successful main or scheduled build.
 - `sha-<shortsha>`: source commit tag for audit and rollback. Scheduled
   rebuilds can repush this tag when the base image changes.
-- `latest`, `0.1.6`, `0.1`, `0`: intentional SemVer image release tags.
+- `latest`, `0.1.7`, `0.1`, `0`: intentional SemVer image release tags.
 
 Prefer exact SemVer or minor tags for production. Use `latest` or `edge` only
 when a consumer app deliberately wants moving image builds.
