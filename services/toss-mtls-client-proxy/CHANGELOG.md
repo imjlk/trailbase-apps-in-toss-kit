@@ -1,5 +1,17 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.9 — 2026-06-16
+
+### Patch changes
+
+- [2e9f71b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2e9f71b5cc3d5ef01cf989a5b24e5915adf4cff3) Require Toss Login AccessToken forwarding for the remove-by-user-key proxy adapter and treat
+  top-level Toss error bodies as unlink failures. The adapter still keeps the internal proxy bearer
+  token separate from Toss upstream authorization and does not echo raw user keys or access tokens.
+  The Rust guest helper now requires the Toss Login AccessToken argument so consumers cannot call the
+  unlink adapter without the upstream credential required by Toss. The proxy complete adapter also
+  returns backend-only token metadata so proxy-mode consumers have a supported path for service-side
+  unlink without bypassing the adapter. — Thanks @imjlk!
+
 ## 0.1.8 — 2026-06-16
 
 ### Patch changes
