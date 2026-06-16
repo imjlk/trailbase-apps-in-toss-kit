@@ -66,7 +66,7 @@ describe("compare-consumer-templates", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("0.1.5");
       expect(result.stdout).toContain(
-        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.6",
+        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.7",
       );
       expect(result.stdout).toContain(
         "+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.5",

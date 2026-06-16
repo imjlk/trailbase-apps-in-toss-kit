@@ -68,8 +68,8 @@ tag)가 프록시 패키지 버전(proxy package version)과 일치하지 않으
 - `sha-<shortsha>`: 감사와 rollback을 위한 소스 커밋 태그(source commit tag). 정기 재빌드는
   기반 이미지가 바뀌면 이 태그를 다시 push할 수 있습니다.
 - `latest`: 의도적으로 만든 최신 프록시 이미지 릴리스(proxy image release).
-- `0.1.6`, `0.1`, `0`: SemVer 릴리스 별칭(release alias).
+- `0.1.7`, `0.1`, `0`: SemVer 릴리스 별칭(release alias).
 
-운영 배포에서는 `0.1.6` 같은 정확한 SemVer 태그를 우선 사용하세요. 의도적으로 마이너
+운영 배포에서는 `0.1.7` 같은 정확한 SemVer 태그를 우선 사용하세요. 의도적으로 마이너
 범위(minor range)를 따라가려면 `0.1` 같은 태그를 사용할 수 있습니다. 움직이는 이미지 빌드를
 따라가고 싶을 때만 `latest` 또는 `edge`를 사용하세요.
