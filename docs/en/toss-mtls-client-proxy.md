@@ -166,6 +166,12 @@ Adapter request bodies:
   }
   ```
 
+  Forward mode returns the resolved Toss `userKey` plus token metadata such as `accessToken`,
+  `refreshToken`, `tokenType`, and `expiresIn`. Treat those token fields as backend-only secrets:
+  do not send them to the RN client, logs, analytics, public tables, or audit metadata. If an app
+  supports service-side unlink later, store the token material in the app's private identity storage
+  using its own encryption/retention policy.
+
 - Toss Login unlink by `userKey`:
 
   ```json
@@ -288,6 +294,9 @@ Forward the SDK `referrer` value as-is. In sandbox RN builds this can be `SANDBO
 casing can make Toss reject the one-time authorization code as `invalid_grant`.
 TrailBase WASM consumers should use `trailbase_guest_common::apps_in_toss_login::normalize_login_referrer`
 when preparing the proxy/forward request instead of hand-rolled uppercase/lowercase normalization.
+In proxy mode, the complete adapter also returns Toss token metadata so the backend has a supported
+path for later service-side unlink. Keep that metadata inside the backend identity boundary and seal
+it before persistence when reversible access is needed.
 
 Consumer app servers should not treat `referrer=SANDBOX` as a local stub signal. An
 `authorizationCode` from the real AppsInToss sandbox app still needs to be exchanged server-side for

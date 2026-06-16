@@ -331,7 +331,7 @@ async function completeTossLogin(body, config) {
     {
       method: "GET",
       path: TOSS_ENDPOINTS.loginMe,
-      headers: { authorization: `Bearer ${accessToken}` },
+      headers: { authorization: bearerAuthorization(accessToken) },
     },
     config,
   );
@@ -369,6 +369,31 @@ async function completeTossLogin(body, config) {
         readPathValue(tokenResponse.body, ["success.scope", "scope", "data.scope", "success.scopes", "scopes", "data.scopes"]),
     ),
     agreedTerms: readPathValue(userResponse.body, ["success.agreedTerms", "agreedTerms", "data.agreedTerms"]) ?? [],
+    accessToken,
+    refreshToken: readPathString(tokenResponse.body, [
+      "success.refreshToken",
+      "refreshToken",
+      "data.refreshToken",
+      "success.refresh_token",
+      "refresh_token",
+      "data.refresh_token",
+    ]),
+    tokenType: readPathString(tokenResponse.body, [
+      "success.tokenType",
+      "tokenType",
+      "data.tokenType",
+      "success.token_type",
+      "token_type",
+      "data.token_type",
+    ]),
+    expiresIn: readPathValue(tokenResponse.body, [
+      "success.expiresIn",
+      "expiresIn",
+      "data.expiresIn",
+      "success.expires_in",
+      "expires_in",
+      "data.expires_in",
+    ]),
   };
 }
 
@@ -824,7 +849,7 @@ function unlinkTossUserKey(value) {
 }
 
 function tossLoginAccessToken(value) {
-  return stringOrUndefined(
+  return bearerTokenValue(
     value?.accessToken ??
       value?.tossAccessToken ??
       value?.tossLoginAccessToken ??
@@ -833,9 +858,16 @@ function tossLoginAccessToken(value) {
 }
 
 function bearerAuthorization(accessToken) {
-  const token = stringOrUndefined(accessToken);
+  const token = bearerTokenValue(accessToken);
   if (!token) return "";
-  return /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+  return `Bearer ${token}`;
+}
+
+function bearerTokenValue(value) {
+  const token = stringOrUndefined(value);
+  if (!token) return "";
+  const match = token.match(/^Bearer\s+(.+)$/i);
+  return stringOrUndefined(match ? match[1] : token) || "";
 }
 
 function readPathString(value, paths) {
@@ -866,7 +898,8 @@ function normalizeTossLoginRemoveByUserKeyResponse(upstream, upstreamStatus = 20
   if (
     !httpStatusOk(upstreamStatus) ||
     isUpstreamFailure(upstream) ||
-    hasTopLevelUpstreamError(upstream)
+    hasTopLevelUpstreamError(upstream) ||
+    hasTopLevelUpstreamErrorCode(upstream)
   ) {
     return {
       ok: false,
@@ -1089,6 +1122,15 @@ function hasTopLevelUpstreamError(value) {
     return false;
   }
   return typeof error !== "object" || Object.keys(error).length > 0;
+}
+
+function hasTopLevelUpstreamErrorCode(value) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      Object.hasOwn(value, "errorCode") &&
+      stringOrUndefined(value.errorCode),
+  );
 }
 
 function upstreamFailureReason(value) {

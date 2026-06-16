@@ -167,6 +167,12 @@ export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
   }
   ```
 
+  forward 모드에서는 해석된 Toss `userKey`와 함께 `accessToken`, `refreshToken`,
+  `tokenType`, `expiresIn` 같은 token metadata를 반환합니다. 이 token 필드는 backend-only
+  secret으로 취급하세요. RN client, log, analytics, public table, audit metadata로 보내지
+  마세요. 나중에 service-side 연결 해제를 지원하는 앱은 앱별 암호화/보존 정책에 맞춰 private
+  identity storage에 token material을 보관하세요.
+
 - `userKey`로 Toss Login 연결 해제:
 
   ```json
@@ -291,6 +297,9 @@ Toss Login 어댑터는 `appLogin()`이 반환한 `authorizationCode`와 `referr
 `invalid_grant`로 거부할 수 있습니다.
 TrailBase WASM 소비 앱은 프록시/forward 요청을 만들 때 자체 uppercase/lowercase 정규화를 하지
 말고 `trailbase_guest_common::apps_in_toss_login::normalize_login_referrer`를 사용하세요.
+proxy 모드에서 complete adapter는 나중에 service-side 연결 해제에 쓸 수 있도록 Toss token
+metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만 두고, 복호화가 필요한
+형태로 저장해야 한다면 저장 전에 seal 처리하세요.
 
 소비 앱 서버는 `referrer=SANDBOX`를 로컬 stub 신호로 취급하지 마세요. 실제 AppsInToss
 샌드박스 앱에서 받은 `authorizationCode`도 서버에서 Toss Login 토큰 교환을 거쳐 실제 sandbox

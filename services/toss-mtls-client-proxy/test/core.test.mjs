@@ -130,6 +130,86 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.referrer).toBe("SANDBOX");
   });
 
+  test("forward login complete returns backend-only token metadata for later unlink", async () => {
+    const seen = [];
+    const upstreamServer = http.createServer(async (req, res) => {
+      seen.push({
+        url: req.url,
+        method: req.method,
+        authorization: req.headers.authorization,
+        body: req.method === "POST" ? await readRequestJson(req) : undefined,
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === TOSS_ENDPOINTS.loginGenerateToken) {
+        res.end(
+          JSON.stringify({
+            resultType: "SUCCESS",
+            success: {
+              accessToken: "toss-access-token",
+              refreshToken: "toss-refresh-token",
+              tokenType: "Bearer",
+              expiresIn: 3599,
+              scope: "user_key user_name",
+            },
+          }),
+        );
+        return;
+      }
+      res.end(
+        JSON.stringify({
+          resultType: "SUCCESS",
+          success: {
+            userKey: "sensitive-toss-user-key",
+            scope: "user_key",
+            agreedTerms: ["terms-1"],
+          },
+        }),
+      );
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.tossLoginComplete,
+        {
+          authorizationCode: "code",
+          referrer: "SANDBOX",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+
+      expect(seen).toEqual([
+        {
+          url: TOSS_ENDPOINTS.loginGenerateToken,
+          method: "POST",
+          authorization: undefined,
+          body: { authorizationCode: "code", referrer: "SANDBOX" },
+        },
+        {
+          url: TOSS_ENDPOINTS.loginMe,
+          method: "GET",
+          authorization: "Bearer toss-access-token",
+          body: undefined,
+        },
+      ]);
+      expect(res.body).toMatchObject({
+        ok: true,
+        userKey: "sensitive-toss-user-key",
+        referrer: "SANDBOX",
+        scopes: ["user_key"],
+        agreedTerms: ["terms-1"],
+        accessToken: "toss-access-token",
+        refreshToken: "toss-refresh-token",
+        tokenType: "Bearer",
+        expiresIn: 3599,
+      });
+    });
+  });
+
   test("stub login unlink response does not expose the Toss user key", async () => {
     const req = request("POST", PROXY_ENDPOINTS.tossLoginRemoveByUserKey, {
       userKey: "sensitive-toss-user-key",
@@ -231,7 +311,7 @@ describe("toss-mtls-client-proxy", () => {
         PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
         {
           userKey: "sensitive-toss-user-key",
-          accessToken: "expired-access-token",
+          accessToken: "Bearer expired-access-token",
         },
         { authorization: "Bearer secret" },
       );
@@ -245,6 +325,34 @@ describe("toss-mtls-client-proxy", () => {
       expect(res.body.failureReason).toBe("cannot unlink [redacted] using [redacted]");
       expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
       expect(JSON.stringify(res.body)).not.toContain("expired-access-token");
+    });
+  });
+
+  test("forward login unlink treats top-level Toss error codes as failures", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ errorCode: "USER_KEY_NOT_FOUND", message: "missing user key" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
+        {
+          userKey: "sensitive-toss-user-key",
+          accessToken: "expired-access-token",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.failureReason).toBe("missing user key");
+      expect(res.body.providerErrorCode).toBe("USER_KEY_NOT_FOUND");
     });
   });
 
