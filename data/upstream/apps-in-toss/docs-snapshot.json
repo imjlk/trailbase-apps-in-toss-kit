@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-11T02:02:41.508Z",
+  "fetchedAt": "2026-06-16T02:05:58.493Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,8 +12,8 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "b8b2a849d61fd7ab1bb22c2ef9fc09678a13cee3a755bfe0c820a0ee7c89993a",
-      "bytes": 58670
+      "sha256": "9b364262d77326f0b3b6486b3a4214f75b1b86bab92ffb9a68e8d947b301dbe3",
+      "bytes": 53840
     },
     {
       "key": "react-native-tutorial",
@@ -26,8 +26,8 @@
       "key": "sdk-overview",
       "title": "SDK overview",
       "url": "https://developers-apps-in-toss.toss.im/bedrock/reference/framework/시작하기/intro.md",
-      "sha256": "bc59d3a430e03bdbfc0016f916a4a433a9a77a828c60088a267affddad0f0b0f",
-      "bytes": 4004
+      "sha256": "e5ebc055439c944cad1dbcd78f05a5206b3c03de19739d63d09c99a97a825978",
+      "bytes": 4130
     },
     {
       "key": "api-overview",
@@ -47,8 +47,8 @@
       "key": "login-develop",
       "title": "Toss Login development",
       "url": "https://developers-apps-in-toss.toss.im/login/develop.md",
-      "sha256": "8512a45a38afee7d6944716a02bf0b5000f512c89ce222a8ee9a0c43045a4fb4",
-      "bytes": 18590
+      "sha256": "4a8cfd907463bc7f4e9cfbb34c8a25794be69fdec553d695b7480c7861bec3b1",
+      "bytes": 18605
     },
     {
       "key": "iap-develop",
@@ -68,8 +68,8 @@
       "key": "smart-message-develop",
       "title": "Smart Message development",
       "url": "https://developers-apps-in-toss.toss.im/smart-message/develop.md",
-      "sha256": "c0d96a9f3c434b61f32b76569f877823cb5538ff348d544d7be07e1a99c5d642",
-      "bytes": 11967
+      "sha256": "f66832aa303508966b1967acf775537a633eb5c1b2e107277613768e411a5d7b",
+      "bytes": 17378
     },
     {
       "key": "smart-message-intro",
@@ -82,8 +82,8 @@
       "key": "notification-agreement-sdk",
       "title": "Notification agreement SDK requestNotificationAgreement",
       "url": "https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md",
-      "sha256": "50eff54430c5b2c5ab77f6fa944802af0e002f82db41fec1a9af88eb3cea1339",
-      "bytes": 5565
+      "sha256": "ca981f04b3d9995223cf04a77bb5fa2a6b6e6d0aaf3278a7ed3ef07a773ccc75",
+      "bytes": 5682
     },
     {
       "key": "tds-react-native",
@@ -96,7 +96,7 @@
   "packages": [
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.6.2",
+      "version": "2.8.0",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
@@ -110,14 +110,14 @@
     },
     {
       "packageName": "create-granite-app",
-      "version": "1.0.31",
+      "version": "1.0.32",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
     },
     {
       "packageName": "@granite-js/react-native",
-      "version": "1.0.31",
+      "version": "1.0.32",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"
