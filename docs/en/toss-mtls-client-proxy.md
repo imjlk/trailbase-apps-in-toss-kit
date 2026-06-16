@@ -121,6 +121,18 @@ curl -sS "$MTLS_PROXY_URL/internal/apps-in-toss/health" \
   -H "Authorization: Bearer $MTLS_PROXY_TOKEN"
 ```
 
+Template smoke script:
+
+```bash
+templates/trailbase/scripts/toss-proxy-smoke.sh --health-only
+templates/trailbase/scripts/toss-proxy-smoke.sh --full
+```
+
+Use `--health-only` for production pre-QA because it checks internal reachability and requires the
+health response to report `mode: "forward"` by default. Use `--full --expect-mode stub` only in
+local stub environments where fake adapter payloads are safe. Running the script without arguments
+uses health-only mode.
+
 Minimal Node/Fetch helper:
 
 ```ts

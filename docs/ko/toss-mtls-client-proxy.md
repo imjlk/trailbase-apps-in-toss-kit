@@ -123,6 +123,17 @@ curl -sS "$MTLS_PROXY_URL/internal/apps-in-toss/health" \
   -H "Authorization: Bearer $MTLS_PROXY_TOKEN"
 ```
 
+템플릿 smoke 스크립트는 다음처럼 사용할 수 있습니다.
+
+```bash
+templates/trailbase/scripts/toss-proxy-smoke.sh --health-only
+templates/trailbase/scripts/toss-proxy-smoke.sh --full
+```
+
+운영 pre-QA에서는 내부 연결을 확인하고 health 응답이 기본적으로 `mode: "forward"`인지 검증하는
+`--health-only`를 사용하세요. 가짜 어댑터 payload가 안전한 로컬 stub 환경에서만
+`--full --expect-mode stub`을 사용합니다. 인자 없이 실행하면 health-only mode로 동작합니다.
+
 최소 Node/Fetch 헬퍼는 다음과 같습니다.
 
 ```ts
