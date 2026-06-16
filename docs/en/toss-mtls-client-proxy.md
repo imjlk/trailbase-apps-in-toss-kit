@@ -125,7 +125,7 @@ Template smoke script:
 
 ```bash
 templates/trailbase/scripts/toss-proxy-smoke.sh --health-only
-templates/trailbase/scripts/toss-proxy-smoke.sh --full
+templates/trailbase/scripts/toss-proxy-smoke.sh --full --expect-mode stub
 ```
 
 Use `--health-only` for production pre-QA because it checks internal reachability and requires the
@@ -170,12 +170,16 @@ Adapter request bodies:
 
   ```json
   {
-    "tossUserKey": "toss-user-key"
+    "tossUserKey": "toss-user-key",
+    "accessToken": "toss-login-access-token"
   }
   ```
 
   The adapter forwards the official remove-by-user-key request to Toss, then normalizes the response
-  to `ok`, `providerStatus`, and `resultType` without echoing the raw Toss `userKey`.
+  to `ok`, `providerStatus`, and `resultType` without echoing the raw Toss `userKey`. The internal
+  request still uses `Authorization: Bearer <MTLS_PROXY_TOKEN>` for the proxy itself; pass the Toss
+  Login AccessToken in the JSON body so the proxy can send it upstream as Toss's
+  `Authorization: Bearer <AccessToken>` header.
 
 - IAP order status:
 

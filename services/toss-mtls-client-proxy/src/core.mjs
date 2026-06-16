@@ -416,17 +416,25 @@ async function removeTossLoginByUserKey(request, config) {
   if (!tossUserKey) {
     return { ok: false, error: "MISSING_TOSS_USER_KEY", providerStatus: "ERROR" };
   }
+  const accessToken = tossLoginAccessToken(request);
+  if (!accessToken) {
+    return { ok: false, error: "MISSING_TOSS_ACCESS_TOKEN", providerStatus: "ERROR" };
+  }
 
   const upstream = await forwardJson(
     {
       method: "POST",
       path: TOSS_ENDPOINTS.loginRemoveByUserKey,
+      headers: { authorization: bearerAuthorization(accessToken) },
       body: { userKey: tossUserKey },
       tossUserKey,
     },
     config,
   );
-  return normalizeTossLoginRemoveByUserKeyResponse(upstream.body, upstream.status, tossUserKey);
+  return normalizeTossLoginRemoveByUserKeyResponse(upstream.body, upstream.status, [
+    tossUserKey,
+    accessToken,
+  ]);
 }
 
 async function grantPromotionReward(request, config) {
@@ -815,6 +823,21 @@ function unlinkTossUserKey(value) {
   return stringOrUndefined(value?.tossUserKey ?? value?.userKey ?? value?.user_key);
 }
 
+function tossLoginAccessToken(value) {
+  return stringOrUndefined(
+    value?.accessToken ??
+      value?.tossAccessToken ??
+      value?.tossLoginAccessToken ??
+      value?.access_token,
+  );
+}
+
+function bearerAuthorization(accessToken) {
+  const token = stringOrUndefined(accessToken);
+  if (!token) return "";
+  return /^Bearer\s+/i.test(token) ? token : `Bearer ${token}`;
+}
+
 function readPathString(value, paths) {
   const found = readPathValue(value, paths);
   if (found === undefined || found === null || found === "") return undefined;
@@ -838,14 +861,18 @@ function readPathValue(value, paths) {
   return undefined;
 }
 
-function normalizeTossLoginRemoveByUserKeyResponse(upstream, upstreamStatus = 200, tossUserKey = "") {
+function normalizeTossLoginRemoveByUserKeyResponse(upstream, upstreamStatus = 200, sensitiveValues = []) {
   const resultType = readPathString(upstream, ["resultType", "success.resultType", "data.resultType"]);
-  if (!httpStatusOk(upstreamStatus) || isUpstreamFailure(upstream)) {
+  if (
+    !httpStatusOk(upstreamStatus) ||
+    isUpstreamFailure(upstream) ||
+    hasTopLevelUpstreamError(upstream)
+  ) {
     return {
       ok: false,
       providerStatus: "FAILED",
       resultType,
-      failureReason: redactSensitiveValue(upstreamFailureReason(upstream), tossUserKey),
+      failureReason: redactSensitiveValues(upstreamFailureReason(upstream), sensitiveValues),
       providerErrorCode: upstreamFailureCode(upstream),
       upstreamStatus,
     };
@@ -1053,6 +1080,17 @@ function isUpstreamFailure(value) {
   return resultType === "FAIL" || resultType === "FAILED" || resultType === "ERROR";
 }
 
+function hasTopLevelUpstreamError(value) {
+  if (!value || typeof value !== "object" || !Object.hasOwn(value, "error")) {
+    return false;
+  }
+  const error = value.error;
+  if (error === undefined || error === null || error === "") {
+    return false;
+  }
+  return typeof error !== "object" || Object.keys(error).length > 0;
+}
+
 function upstreamFailureReason(value) {
   return (
     readPathString(value, [
@@ -1095,6 +1133,11 @@ function redactSensitiveValue(value, sensitive) {
     return String(value);
   }
   return String(value).split(secret).join("[redacted]");
+}
+
+function redactSensitiveValues(value, sensitiveValues) {
+  const values = Array.isArray(sensitiveValues) ? sensitiveValues : [sensitiveValues];
+  return values.reduce((current, sensitive) => redactSensitiveValue(current, sensitive), value);
 }
 
 function parsePositiveInteger(value, fallback) {

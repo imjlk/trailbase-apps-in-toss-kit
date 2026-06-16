@@ -127,7 +127,7 @@ curl -sS "$MTLS_PROXY_URL/internal/apps-in-toss/health" \
 
 ```bash
 templates/trailbase/scripts/toss-proxy-smoke.sh --health-only
-templates/trailbase/scripts/toss-proxy-smoke.sh --full
+templates/trailbase/scripts/toss-proxy-smoke.sh --full --expect-mode stub
 ```
 
 운영 pre-QA에서는 내부 연결을 확인하고 health 응답이 기본적으로 `mode: "forward"`인지 검증하는
@@ -171,12 +171,16 @@ export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
 
   ```json
   {
-    "tossUserKey": "toss-user-key"
+    "tossUserKey": "toss-user-key",
+    "accessToken": "toss-login-access-token"
   }
   ```
 
   이 어댑터는 공식 remove-by-user-key 요청을 Toss로 전달한 뒤, raw Toss `userKey`를 되돌려주지
-  않고 `ok`, `providerStatus`, `resultType` 중심으로 응답을 정규화합니다.
+  않고 `ok`, `providerStatus`, `resultType` 중심으로 응답을 정규화합니다. 내부 요청의
+  `Authorization: Bearer <MTLS_PROXY_TOKEN>`는 proxy 인증용으로 계속 쓰고, Toss Login
+  AccessToken은 JSON body에 넣어 주세요. proxy가 이를 Toss upstream의
+  `Authorization: Bearer <AccessToken>` 헤더로 전달합니다.
 
 - IAP 주문 상태:
 

@@ -146,6 +146,7 @@ describe("toss-mtls-client-proxy", () => {
     const upstreamServer = http.createServer(async (req, res) => {
       seen.push({
         url: req.url,
+        authorization: req.headers.authorization,
         tossUserKeyHeader: req.headers["x-toss-user-key"],
         body: await readRequestJson(req),
       });
@@ -165,6 +166,7 @@ describe("toss-mtls-client-proxy", () => {
         PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
         {
           tossUserKey: "sensitive-toss-user-key",
+          accessToken: "toss-access-token",
         },
         { authorization: "Bearer secret" },
       );
@@ -176,6 +178,7 @@ describe("toss-mtls-client-proxy", () => {
       expect(seen).toEqual([
         {
           url: TOSS_ENDPOINTS.loginRemoveByUserKey,
+          authorization: "Bearer toss-access-token",
           tossUserKeyHeader: "sensitive-toss-user-key",
           body: { userKey: "sensitive-toss-user-key" },
         },
@@ -183,6 +186,28 @@ describe("toss-mtls-client-proxy", () => {
       expect(res.body.ok).toBe(true);
       expect(res.body.providerStatus).toBe("REMOVED");
       expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
+      expect(JSON.stringify(res.body)).not.toContain("toss-access-token");
+    });
+  });
+
+  test("forward login unlink requires a Toss access token in the request body", async () => {
+    const req = request(
+      "POST",
+      PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
+      {
+        tossUserKey: "sensitive-toss-user-key",
+      },
+      { authorization: "Bearer secret" },
+    );
+    const res = await handleRequest(req, {
+      mode: "forward",
+      internalToken: "secret",
+      upstreamBaseUrl: "http://upstream.test",
+    });
+    expect(res.body).toEqual({
+      ok: false,
+      error: "MISSING_TOSS_ACCESS_TOKEN",
+      providerStatus: "ERROR",
     });
   });
 
@@ -195,7 +220,7 @@ describe("toss-mtls-client-proxy", () => {
           resultType: "FAIL",
           error: {
             errorCode: "USER_KEY_NOT_FOUND",
-            reason: "cannot unlink sensitive-toss-user-key",
+            reason: "cannot unlink sensitive-toss-user-key using expired-access-token",
           },
         }),
       );
@@ -206,6 +231,7 @@ describe("toss-mtls-client-proxy", () => {
         PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
         {
           userKey: "sensitive-toss-user-key",
+          accessToken: "expired-access-token",
         },
         { authorization: "Bearer secret" },
       );
@@ -216,8 +242,39 @@ describe("toss-mtls-client-proxy", () => {
       });
       expect(res.body.ok).toBe(false);
       expect(res.body.providerStatus).toBe("FAILED");
-      expect(res.body.failureReason).toBe("cannot unlink [redacted]");
+      expect(res.body.failureReason).toBe("cannot unlink [redacted] using [redacted]");
       expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
+      expect(JSON.stringify(res.body)).not.toContain("expired-access-token");
+    });
+  });
+
+  test("forward login unlink treats top-level Toss errors as failures", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "invalid_grant" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.tossLoginRemoveByUserKey,
+        {
+          userKey: "sensitive-toss-user-key",
+          accessToken: "expired-access-token",
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.failureReason).toBe("invalid_grant");
+      expect(res.body.providerErrorCode).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toContain("sensitive-toss-user-key");
+      expect(JSON.stringify(res.body)).not.toContain("expired-access-token");
     });
   });
 
