@@ -1,5 +1,11 @@
 # trailbase-toss-identity
 
+## 0.4.1 — 2026-06-16
+
+### Patch changes
+
+- Updated dependencies: trailbase-guest-common (Cargo)@0.4.1
+
 ## 0.4.0 — 2026-06-08
 
 ### Patch changes

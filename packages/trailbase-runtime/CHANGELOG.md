@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.2.3 — 2026-06-16
+
+### Patch changes
+
+- [942e06c](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/942e06c83ddd2018a6fa42b6192e4bb85b0ddab1) Add shared Toss Login unlink callback guards for TrailBase apps. Consumers can validate callback
+  Basic Auth and allowed methods through the runtime production checks, use an entrypoint guard in
+  production, and derive callback `toss_user_key_hmac` values through `toss_unlink` helpers without
+  logging raw Toss user keys. — Thanks @imjlk!
+
 ## 0.2.2 — 2026-06-13
 
 ### Patch changes

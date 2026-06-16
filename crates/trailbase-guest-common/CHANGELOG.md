@@ -1,5 +1,17 @@
 # trailbase-guest-common
 
+## 0.4.1 — 2026-06-16
+
+### Patch changes
+
+- [be480a6](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/be480a604107776c5a798ac78098aa95caf04fa9) Add a dedicated Toss Login remove-by-user-key proxy adapter and Rust helper. Consumer WASM guests no
+  longer need to call the generic mTLS relay with the official Toss path, and the proxy normalizes
+  unlink responses without echoing raw Toss user keys. — Thanks @imjlk!
+- [942e06c](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/942e06c83ddd2018a6fa42b6192e4bb85b0ddab1) Add shared Toss Login unlink callback guards for TrailBase apps. Consumers can validate callback
+  Basic Auth and allowed methods through the runtime production checks, use an entrypoint guard in
+  production, and derive callback `toss_user_key_hmac` values through `toss_unlink` helpers without
+  logging raw Toss user keys. — Thanks @imjlk!
+
 ## 0.4.0 — 2026-06-08
 
 ### Minor changes
