@@ -43,9 +43,9 @@ rebuild)에서 실행됩니다. 정기 재빌드는 upstream Bun 기반 이미�
 - `sha-<shortsha>`: 감사와 rollback을 위한 소스 커밋 태그(source commit tag). 정기 재빌드는
   기반 이미지가 바뀌면 이 태그를 다시 push할 수 있습니다.
 - `latest`: 의도적으로 만든 최신 릴리스(release). 수동 테스트에는 편하지만 운영에는 권장하지 않습니다.
-- `0.1.7`, `0.1`, `0`: SemVer 릴리스 별칭(release alias).
+- `0.1.8`, `0.1`, `0`: SemVer 릴리스 별칭(release alias).
 
-Coolify 운영 환경에서는 `0.1.7` 같은 정확한 태그 또는 `0.1` 같은 마이너 태그(minor tag)를 우선
+Coolify 운영 환경에서는 `0.1.8` 같은 정확한 태그 또는 `0.1` 같은 마이너 태그(minor tag)를 우선
 사용하세요. 움직이는 이미지 빌드를 의도적으로 따라가고 싶을 때만 `latest` 또는 `edge`를 사용합니다.
 
 ## 버전 관리
