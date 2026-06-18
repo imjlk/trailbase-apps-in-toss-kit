@@ -70,7 +70,7 @@ SDK의 `getAnonymousKey()`가 반환한 `{ type: "HASH", hash }` 값을 기준�
 작은 storage wrapper를 제공합니다.
 
 ```ts
-import { Storage } from "@apps-in-toss/native-modules";
+import { Storage } from "@apps-in-toss/framework";
 import { createAppsInTossIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
 import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
 

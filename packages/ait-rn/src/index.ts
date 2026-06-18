@@ -72,7 +72,9 @@ export async function resolveAppsInTossAnonymousHash({
     const result = (await getAnonymousKey()) as AppsInTossAnonymousKeyResult;
     const normalizedHash = anonymousHashFromResult(result);
     if (normalizedHash) {
-      return `${APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX}${normalizedHash}`;
+      return isAppsInTossAnonymousHash(normalizedHash)
+        ? normalizedHash
+        : `${APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX}${normalizedHash}`;
     }
     if (production) {
       throw identityErrorFromResult(result);

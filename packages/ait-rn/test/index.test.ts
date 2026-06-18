@@ -17,6 +17,15 @@ describe("AppsInToss RN identity helpers", () => {
     ).resolves.toBe("ait:user-key");
   });
 
+  test("preserves already-prefixed getAnonymousKey HASH responses", async () => {
+    await expect(
+      resolveAppsInTossAnonymousHash({
+        getAnonymousKey: async () => ({ type: "HASH", hash: " ait:user-key " }),
+        production: true,
+      }),
+    ).resolves.toBe("ait:user-key");
+  });
+
   test("rejects unsupported anonymous keys in production", async () => {
     await expect(
       resolveAppsInTossAnonymousHash({
@@ -115,6 +124,20 @@ describe("AppsInToss RN identity helpers", () => {
       "ait:user-key",
     );
     expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:user-key");
+  });
+
+  test("preserves legacy random anonymous hashes outside production", async () => {
+    const storage = mapStorage([["poll-maker.anonymousHash", "anon_legacy"]]);
+    const identityStorage = createAppsInTossIdentityStorage(storage, {
+      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
+      production: false,
+    });
+
+    await expect(identityStorage.getItem("poll-maker.anonymousHash")).resolves.toBe(
+      "anon_legacy",
+    );
+    expect(storage.map.get("poll-maker.anonymousHash")).toBe("anon_legacy");
   });
 
   test("delegates non-anonymous storage keys", async () => {

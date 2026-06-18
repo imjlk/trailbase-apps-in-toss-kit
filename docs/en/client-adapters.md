@@ -76,7 +76,7 @@ normalizes that value to `ait:${hash}` and provides a small storage wrapper that
 replaces legacy `anon_...` values with the Apps in Toss key in production.
 
 ```ts
-import { Storage } from "@apps-in-toss/native-modules";
+import { Storage } from "@apps-in-toss/framework";
 import { createAppsInTossIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
 import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
 
