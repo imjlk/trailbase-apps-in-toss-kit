@@ -481,12 +481,19 @@ describe("AppsInToss full-screen ad bridge", () => {
         operationalEnvironment: "sandbox",
         rewardMode: "auto",
       }),
-    ).toBe(false);
+    ).toBe(true);
     expect(
       shouldUseAppsInTossMockAd({
         isDev: true,
         operationalEnvironment: "sandbox",
         rewardMode: "auto",
+      }),
+    ).toBe(true);
+    expect(
+      shouldUseAppsInTossMockAd({
+        isDev: true,
+        operationalEnvironment: "sandbox",
+        rewardMode: "live",
       }),
     ).toBe(false);
     expect(

@@ -238,10 +238,10 @@ export function shouldUseAppsInTossMockAd({
   if (rewardMode === "mock") {
     return true;
   }
-  if (
-    operationalEnvironment === "sandbox" ||
-    operationalEnvironment === "toss"
-  ) {
+  if (operationalEnvironment === "sandbox") {
+    return true;
+  }
+  if (operationalEnvironment === "toss") {
     return false;
   }
   return isDev;

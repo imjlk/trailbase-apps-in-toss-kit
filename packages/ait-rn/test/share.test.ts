@@ -30,6 +30,13 @@ describe("AppsInToss share helpers", () => {
         deepLink: "polls/poll_123",
       }),
     ).toBe("intoss://my-app/polls/poll_123");
+    expect(
+      resolveAppsInTossDeepLink({
+        appName: "my-app",
+        deepLink: "   ",
+        path: "/from-path-fallback",
+      }),
+    ).toBe("intoss://my-app/from-path-fallback");
 
     const privateLink = resolveAppsInTossDeepLink({
       deepLink: "intoss-private://appsintoss?_deploymentId=dep_123",

@@ -164,7 +164,7 @@ export function resolveAppsInTossDeepLink({
       ? normalizedDeepLink
       : buildAppsInTossDeepLink({
           appName,
-          path: normalizedDeepLink ?? path,
+          path: normalizedDeepLink || path,
         });
 
   return appendAppsInTossDeepLinkQuery(base, query);
