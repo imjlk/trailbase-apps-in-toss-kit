@@ -26,6 +26,11 @@ Shared client utilities include:
 - SSE parsing
 - XMLHttpRequest-backed stream helpers for React Native runtimes
 
+`createAnonymousHash()` is a local/dev/test fallback helper. Do not use it as a
+production identity seed for Apps in Toss React Native non-game apps; use the
+`@trailbase-apps-in-toss-kit/ait-rn` helpers backed by the mini-app scoped
+`getAnonymousKey()` value instead.
+
 Consumers should keep domain-specific client methods in their app packages. The
 kit should only provide reusable transport and adapter pieces.
 
@@ -59,8 +64,41 @@ The helper maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
 `agreementRejected` to `OPTED_OUT`, and sets `source` to `apps_in_toss_sdk`.
 It returns the functional notification template as `template_code` for backend
 storage, without forwarding the raw SDK event payload.
-The kit does not depend on `@apps-in-toss/*`; WebView and React Native apps own
-the official SDK import.
+The shared `trailbase-client` package does not depend on `@apps-in-toss/*`;
+WebView and React Native apps own the official SDK import.
+
+## Apps in Toss React Native Identity
+
+For React Native non-game mini-apps, bootstrap anonymous TrailBase `_user`
+records from the `{ type: "HASH", hash }` value returned by the Apps in Toss
+SDK's `getAnonymousKey()`. The `@trailbase-apps-in-toss-kit/ait-rn` package
+normalizes that value to `ait:${hash}` and provides a small storage wrapper that
+replaces legacy `anon_...` values with the Apps in Toss key in production.
+
+```ts
+import { Storage } from "@apps-in-toss/native-modules";
+import { createAppsInTossRnIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
+import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
+
+const identityStorage = createAppsInTossRnIdentityStorage(Storage, {
+  anonymousHashStorageKey: "my-app.anonymousHash",
+  production: true,
+});
+
+// appLogin, bootstrap, completeTossLogin, and loadSession are app-owned callbacks.
+export const sessionManager = createAppsInTossSessionManager({
+  storage: identityStorage,
+  anonymousHashStorageKey: "my-app.anonymousHash",
+  appLogin,
+  bootstrap,
+  completeTossLogin,
+  loadSession,
+});
+```
+
+In production, the helper throws `AppsInTossRnIdentityError` instead of creating
+a random value when the Apps in Toss SDK cannot return a `{ type: "HASH" }`
+result. In dev/test, local runs can opt into the `dev-anon_...` fallback.
 
 For session persistence, wrap the official Apps in Toss `Storage` API and pass
 it to `createAppsInTossSessionManager`. Apps in Toss documents this native
