@@ -5,7 +5,13 @@
   "type": "module",
   "description": "React Native Apps in Toss SDK bridge helpers for TrailBase consumer apps.",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./ads": "./src/ads.ts",
+    "./haptics": "./src/haptics.ts",
+    "./identity": "./src/identity.ts",
+    "./login": "./src/login.ts",
+    "./share": "./src/share.ts",
+    "./storage": "./src/storage.ts"
   },
   "peerDependencies": {
     "@apps-in-toss/framework": ">=2.4.5",

@@ -190,6 +190,68 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 });
 ```
 
+The `ait-rn` package also exposes focused subpaths for apps that want smaller
+imports: `./identity`, `./storage`, `./login`, `./haptics`, `./ads`, and
+`./share`. The root import continues to reexport the same public APIs.
+
+For full-screen Apps in Toss ads, keep placement names, env variables, reward
+granting, and server idempotency in the app. The kit only adapts the SDK's
+callback API into a predictable `load -> show` Promise flow with per-`adGroupId`
+preload dedupe and cleanup:
+
+```ts
+import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/framework";
+import {
+  createAppsInTossFullScreenAdBridge,
+  getAppsInTossTestAdGroupId,
+  shouldUseAppsInTossMockAd,
+} from "@trailbase-apps-in-toss-kit/ait-rn/ads";
+
+const ads = createAppsInTossFullScreenAdBridge({
+  loadFullScreenAd,
+  showFullScreenAd,
+});
+
+const adGroupId = isDev
+  ? getAppsInTossTestAdGroupId("rewarded")
+  : env.REWARDED_AD_GROUP_ID;
+
+if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
+  await grantLocalMockReward();
+} else {
+  const result = await ads.preloadAndShow({
+    adFormat: "rewarded",
+    adGroupId,
+    preloadNext: true,
+  });
+  if (result.earned) {
+    await grantRewardOnServer(result);
+  }
+}
+```
+
+For Apps in Toss share links, keep the copy and OG image selection in the app.
+The share bridge only normalizes `intoss://` links, optionally prewarms a valid
+OG image URL, calls `getTossShareLink()`, and passes the final message to
+`share()`:
+
+```ts
+import { getTossShareLink, share } from "@apps-in-toss/framework";
+import { createAppsInTossShareBridge } from "@trailbase-apps-in-toss-kit/ait-rn/share";
+
+const shareBridge = createAppsInTossShareBridge({
+  getTossShareLink,
+  share,
+});
+
+const tossLink = await shareBridge.shareLink({
+  appName: "my-app",
+  message: "Try this round in Toss.",
+  ogImageUrl: "https://example.com/og/round.png",
+  path: "/rounds/current",
+});
+```
+
 ## TanStack DB
 
 The TanStack DB adapter is intentionally thin. It helps build TrailBase Record
