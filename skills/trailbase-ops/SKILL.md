@@ -69,9 +69,10 @@ symlinks by default.
 - If an app tracks `profiles.auth_state` or another domain auth-state field, enforce `disabled` in
   custom WASM endpoints as well as in bootstrap alias handling.
 - For TrailBase-backed React Native apps, prefer kit client adapters over app-local SDK wrappers for
-  anonymous identity, Apps in Toss storage, session management, login normalization, notification
-  agreement normalization, and any future helper category exported by the kit. Do not import planned
-  helper names until they exist; first inspect package exports and client-adapter docs.
+  anonymous identity, Apps in Toss storage, session management, login normalization, login bridge
+  adapters, notification agreement normalization, haptic fallbacks, small persistent JSON storage
+  atoms, and any future helper category exported by the kit. Do not import planned helper names until
+  they exist; first inspect package exports and client-adapter docs.
 - mTLS certificates mount only into the proxy container, never into TrailBase or app containers.
 - Secrets, production env files, certs, raw Toss user keys, HMACs, sealed values, and real logs are
   never committed.
