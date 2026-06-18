@@ -203,7 +203,7 @@ export function shouldUseAppsInTossMockAd({
   if (rewardMode === "mock") {
     return true;
   }
-  return isDev || operationalEnvironment === "sandbox";
+  return isDev;
 }
 
 export function getAppsInTossTestAdGroupId(kind: AppsInTossTestAdGroupKind) {
@@ -388,7 +388,19 @@ async function showFullScreenAdAsync({
             );
             return;
           }
-          if (type === "clicked" && adFormat === "interstitial") {
+          if (
+            type === "impression" &&
+            adFormat === "interstitial" &&
+            events.includes("clicked")
+          ) {
+            settleResolve();
+            return;
+          }
+          if (
+            type === "clicked" &&
+            adFormat === "interstitial" &&
+            events.includes("impression")
+          ) {
             settleResolve();
             return;
           }

@@ -171,6 +171,39 @@ describe("AppsInToss full-screen ad bridge", () => {
     });
   });
 
+  test("waits for an impression when interstitial clicks arrive early", async () => {
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({ showFullScreenAd });
+
+    const showPromise = bridge.show({
+      adFormat: "interstitial",
+      adGroupId: "interstitial",
+    });
+    const sentinel = Symbol("pending");
+    showCalls[0].onEvent({ type: "clicked" });
+    await expect(
+      Promise.race([
+        showPromise,
+        new Promise((resolve) => setTimeout(() => resolve(sentinel), 0)),
+      ]),
+    ).resolves.toBe(sentinel);
+
+    showCalls[0].onEvent({ type: "impression" });
+    await expect(showPromise).resolves.toMatchObject({
+      completed: true,
+      events: ["clicked", "impression"],
+    });
+  });
+
   test("cleans up when SDK callbacks settle synchronously", async () => {
     let loadCleanupCalls = 0;
     let showCleanupCalls = 0;
@@ -368,7 +401,7 @@ describe("AppsInToss full-screen ad bridge", () => {
         operationalEnvironment: "sandbox",
         rewardMode: "auto",
       }),
-    ).toBe(true);
+    ).toBe(false);
 
     await expect(
       safeGetAppsInTossOperationalEnvironment({

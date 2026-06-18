@@ -187,7 +187,8 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 
 Apps in Toss 전면형/보상형 광고에서는 placement 이름, env 변수, 리워드 지급, 서버
 idempotency를 앱에 남기세요. kit는 SDK callback API를 `load -> show` Promise 흐름으로
-바꾸고, `adGroupId`별 preload 중복 제거와 cleanup만 담당합니다.
+바꾸고, `adGroupId`별 preload 중복 제거와 cleanup만 담당합니다. mock 리워드는 명시 모드나
+로컬 dev에서만 쓰고, Apps in Toss sandbox 앱은 test 광고 ID로 SDK 경로를 검증하세요.
 
 ```ts
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/framework";
@@ -202,7 +203,7 @@ const ads = createAppsInTossFullScreenAdBridge({
   showFullScreenAd,
 });
 
-const adGroupId = isDev
+const adGroupId = isDev || operationalEnvironment === "sandbox"
   ? getAppsInTossTestAdGroupId("rewarded")
   : env.REWARDED_AD_GROUP_ID;
 

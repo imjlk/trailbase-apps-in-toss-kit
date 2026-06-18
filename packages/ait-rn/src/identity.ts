@@ -8,6 +8,8 @@ import {
 } from "./internal/framework";
 import { isProductionRuntime } from "./internal/runtime";
 
+export type { AppsInTossGetAnonymousKey } from "./internal/framework";
+
 export const APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX = "ait:";
 export const DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY =
   "trailbase.anonymousHash";

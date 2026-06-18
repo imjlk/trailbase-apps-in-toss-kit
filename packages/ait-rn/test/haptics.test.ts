@@ -11,9 +11,35 @@ describe("AppsInToss RN haptic fallback", () => {
     expect(nativeModules.GraniteModule.generateHapticFeedback).toBe(
       generateHapticFeedback,
     );
+    expect(typeof nativeModules.BedrockModule?.generateHapticFeedback).toBe(
+      "function",
+    );
+
+    const bedrockOnlyGenerateHapticFeedback = () => undefined;
+    const bedrockOnlyNativeModules = {
+      BedrockModule: {
+        generateHapticFeedback: bedrockOnlyGenerateHapticFeedback,
+      },
+    };
+    expect(
+      ensureAppsInTossHapticFallback({
+        nativeModules: bedrockOnlyNativeModules,
+      }),
+    ).toBe(true);
+    expect(
+      bedrockOnlyNativeModules.BedrockModule.generateHapticFeedback,
+    ).toBe(bedrockOnlyGenerateHapticFeedback);
+    expect(
+      typeof bedrockOnlyNativeModules.GraniteModule?.generateHapticFeedback,
+    ).toBe("function");
 
     const missingNativeModules: {
       GraniteModule?: {
+        generateHapticFeedback?: (
+          options: { type: string },
+        ) => void | Promise<void>;
+      };
+      BedrockModule?: {
         generateHapticFeedback?: (
           options: { type: string },
         ) => void | Promise<void>;
@@ -25,6 +51,9 @@ describe("AppsInToss RN haptic fallback", () => {
     const installedHapticFallback =
       missingNativeModules.GraniteModule?.generateHapticFeedback;
     expect(typeof installedHapticFallback).toBe("function");
+    expect(typeof missingNativeModules.BedrockModule?.generateHapticFeedback).toBe(
+      "function",
+    );
     if (!installedHapticFallback) {
       throw new Error("Expected haptic fallback to be installed.");
     }
@@ -62,4 +91,3 @@ describe("AppsInToss RN haptic fallback", () => {
     ).toBe(false);
   });
 });
-

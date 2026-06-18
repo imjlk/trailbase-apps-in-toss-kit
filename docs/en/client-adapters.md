@@ -197,7 +197,8 @@ imports: `./identity`, `./storage`, `./login`, `./haptics`, `./ads`, and
 For full-screen Apps in Toss ads, keep placement names, env variables, reward
 granting, and server idempotency in the app. The kit only adapts the SDK's
 callback API into a predictable `load -> show` Promise flow with per-`adGroupId`
-preload dedupe and cleanup:
+preload dedupe and cleanup. Keep mock rewards explicit or local-dev only; the
+Apps in Toss sandbox app should still exercise the SDK path with test ad IDs:
 
 ```ts
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/framework";
@@ -212,7 +213,7 @@ const ads = createAppsInTossFullScreenAdBridge({
   showFullScreenAd,
 });
 
-const adGroupId = isDev
+const adGroupId = isDev || operationalEnvironment === "sandbox"
   ? getAppsInTossTestAdGroupId("rewarded")
   : env.REWARDED_AD_GROUP_ID;
 

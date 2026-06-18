@@ -28,30 +28,25 @@ export function ensureAppsInTossHapticFallback({
 
     const graniteModule = nativeModules.GraniteModule;
     const bedrockModule = nativeModules.BedrockModule;
-    if (
-      typeof graniteModule?.generateHapticFeedback === "function" ||
-      typeof bedrockModule?.generateHapticFeedback === "function"
-    ) {
-      return true;
-    }
-
-    const hapticModule = graniteModule ?? bedrockModule ?? {};
     const fallbackGenerateHapticFeedback = async () => undefined;
-    Object.defineProperty(nativeModules, "GraniteModule", {
-      configurable: true,
-      enumerable: true,
-      value: {
-        ...hapticModule,
-        generateHapticFeedback: fallbackGenerateHapticFeedback,
-      },
-      writable: true,
-    });
-    if (bedrockModule) {
+
+    if (typeof graniteModule?.generateHapticFeedback !== "function") {
+      Object.defineProperty(nativeModules, "GraniteModule", {
+        configurable: true,
+        enumerable: true,
+        value: {
+          ...(graniteModule ?? {}),
+          generateHapticFeedback: fallbackGenerateHapticFeedback,
+        },
+        writable: true,
+      });
+    }
+    if (typeof bedrockModule?.generateHapticFeedback !== "function") {
       Object.defineProperty(nativeModules, "BedrockModule", {
         configurable: true,
         enumerable: true,
         value: {
-          ...bedrockModule,
+          ...(bedrockModule ?? {}),
           generateHapticFeedback: fallbackGenerateHapticFeedback,
         },
         writable: true,
@@ -62,4 +57,3 @@ export function ensureAppsInTossHapticFallback({
     return false;
   }
 }
-

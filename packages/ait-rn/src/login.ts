@@ -6,6 +6,11 @@ import {
 } from "./internal/framework";
 import { isProductionEnv, resolveRuntimeEnv } from "./internal/runtime";
 
+export type {
+  AppsInTossAppLogin,
+  AppsInTossGetIsTossLoginIntegratedService,
+} from "./internal/framework";
+
 export type AppsInTossLoginResult = Awaited<ReturnType<AppsInTossAppLogin>>;
 
 export type AppsInTossLoginBridgeErrorCode =

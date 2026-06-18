@@ -334,10 +334,13 @@ function appendAppsInTossPrivateDeepLinkQueryParams(
 ) {
   try {
     const url = new URL(deepLink);
+    const privateTopLevelQueryParams =
+      extractAppsInTossPrivateTopLevelQueryParams(url.searchParams);
     url.searchParams.set(
       "queryParams",
       JSON.stringify({
         ...parsePrivateQueryParams(url.searchParams.get("queryParams")),
+        ...privateTopLevelQueryParams,
         ...searchParamsToQueryParamsObject(searchParams),
       }),
     );
@@ -359,6 +362,24 @@ function parsePrivateQueryParams(value: string | null) {
   } catch {
     return {};
   }
+}
+
+function extractAppsInTossPrivateTopLevelQueryParams(
+  searchParams: URLSearchParams,
+) {
+  const routeParams = new URLSearchParams();
+  for (const [key, value] of Array.from(searchParams)) {
+    if (isAppsInTossPrivateReservedQueryParam(key)) {
+      continue;
+    }
+    routeParams.append(key, value);
+    searchParams.delete(key);
+  }
+  return searchParamsToQueryParamsObject(routeParams);
+}
+
+function isAppsInTossPrivateReservedQueryParam(key: string) {
+  return key === "queryParams" || key.startsWith("_");
 }
 
 function searchParamsToQueryParamsObject(searchParams: URLSearchParams) {
