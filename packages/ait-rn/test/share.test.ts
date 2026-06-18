@@ -30,6 +30,19 @@ describe("AppsInToss share helpers", () => {
         deepLink: "polls/poll_123",
       }),
     ).toBe("intoss://my-app/polls/poll_123");
+
+    const privateLink = resolveAppsInTossDeepLink({
+      deepLink: "intoss-private://appsintoss?_deploymentId=dep_123",
+      query: { categoryKey: "daily", tag: ["a", "b"] },
+    });
+    const privateUrl = new URL(privateLink);
+    expect(privateUrl.searchParams.get("_deploymentId")).toBe("dep_123");
+    expect(
+      JSON.parse(privateUrl.searchParams.get("queryParams") ?? "{}"),
+    ).toEqual({
+      categoryKey: "daily",
+      tag: ["a", "b"],
+    });
   });
 
   test("normalizes OG image URLs with explicit dev/local allowances", () => {
@@ -109,7 +122,8 @@ describe("AppsInToss share helpers", () => {
       share,
     });
 
-    const tossLink = await bridge.shareLink({
+    const { shareLink } = bridge;
+    const tossLink = await shareLink({
       appName: "my-app",
       message: "play now",
       ogImageUrl: "https://example.com/og.png",
@@ -129,4 +143,3 @@ describe("AppsInToss share helpers", () => {
     );
   });
 });
-

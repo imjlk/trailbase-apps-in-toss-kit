@@ -27,6 +27,17 @@ describe("AppsInToss RN identity helpers", () => {
     ).resolves.toBe("ait:user-key");
   });
 
+  test("rejects malformed pre-prefixed anonymous hashes in production", async () => {
+    await expect(
+      resolveAppsInTossAnonymousHash({
+        getAnonymousKey: async () => ({ type: "HASH", hash: " ait: " }),
+        production: true,
+      }),
+    ).rejects.toMatchObject({
+      code: "ANONYMOUS_KEY_INVALID_RESPONSE",
+    });
+  });
+
   test("rejects unsupported anonymous keys in production", async () => {
     await expect(
       resolveAppsInTossAnonymousHash({
@@ -267,4 +278,3 @@ describe("AppsInToss RN identity helpers", () => {
     expect(bootstrapAnonymousHash).toBe("ait:user-key");
   });
 });
-

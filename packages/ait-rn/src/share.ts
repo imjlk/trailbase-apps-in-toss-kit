@@ -98,27 +98,47 @@ export function createAppsInTossShareBridge({
   ogPrewarmTimeoutMs = DEFAULT_OG_PREWARM_TIMEOUT_MS,
   share,
 }: CreateAppsInTossShareBridgeOptions = {}): AppsInTossShareBridge {
-  return {
-    async createShareLink(options) {
-      const resolvedGetTossShareLink =
-        getTossShareLink ?? (await defaultFrameworkFunction("getTossShareLink"));
-      if (!resolvedGetTossShareLink) {
-        throw new Error("Apps in Toss getTossShareLink is not available.");
-      }
+  const createShareLink = async (options: CreateAppsInTossShareLinkOptions) => {
+    const resolvedGetTossShareLink =
+      getTossShareLink ?? (await defaultFrameworkFunction("getTossShareLink"));
+    if (!resolvedGetTossShareLink) {
+      throw new Error("Apps in Toss getTossShareLink is not available.");
+    }
 
-      const deepLink = resolveAppsInTossDeepLink(options);
-      const normalizedOgImageUrl = normalizeAppsInTossOgImageUrl(
-        options.ogImageUrl,
-        options,
-      );
-      if (normalizedOgImageUrl && options.prewarmOgImage !== false) {
-        await prewarmAppsInTossOgImage(normalizedOgImageUrl, {
-          fetcher,
-          timeoutMs: ogPrewarmTimeoutMs,
-        });
-      }
-      return resolvedGetTossShareLink(deepLink, normalizedOgImageUrl);
-    },
+    const deepLink = resolveAppsInTossDeepLink(options);
+    const normalizedOgImageUrl = normalizeAppsInTossOgImageUrl(
+      options.ogImageUrl,
+      options,
+    );
+    if (normalizedOgImageUrl && options.prewarmOgImage !== false) {
+      await prewarmAppsInTossOgImage(normalizedOgImageUrl, {
+        fetcher,
+        timeoutMs: ogPrewarmTimeoutMs,
+      });
+    }
+    return resolvedGetTossShareLink(deepLink, normalizedOgImageUrl);
+  };
+
+  const shareLink = async (options: ShareAppsInTossLinkOptions) => {
+    const resolvedShare = share ?? (await defaultFrameworkFunction("share"));
+    if (!resolvedShare) {
+      throw new Error("Apps in Toss share is not available.");
+    }
+
+    const tossLink = options.tossLink ?? (await createShareLink(options));
+    await resolvedShare({
+      message: buildAppsInTossShareMessage({
+        message: options.message,
+        messageLines: options.messageLines,
+        separator: options.separator,
+        tossLink,
+      }),
+    });
+    return tossLink;
+  };
+
+  return {
+    createShareLink,
     async safeGetSchemeUri() {
       const resolvedGetSchemeUri =
         getSchemeUri ?? (await defaultFrameworkFunction("getSchemeUri"));
@@ -128,24 +148,7 @@ export function createAppsInTossShareBridge({
         return null;
       }
     },
-    async shareLink(options) {
-      const resolvedShare = share ?? (await defaultFrameworkFunction("share"));
-      if (!resolvedShare) {
-        throw new Error("Apps in Toss share is not available.");
-      }
-
-      const tossLink =
-        options.tossLink ?? (await this.createShareLink(options));
-      await resolvedShare({
-        message: buildAppsInTossShareMessage({
-          message: options.message,
-          messageLines: options.messageLines,
-          separator: options.separator,
-          tossLink,
-        }),
-      });
-      return tossLink;
-    },
+    shareLink,
   };
 }
 
@@ -303,6 +306,16 @@ function appendAppsInTossDeepLinkQuery(
     return deepLink;
   }
 
+  if (isAppsInTossPrivateDeepLink(deepLink)) {
+    const privateDeepLink = appendAppsInTossPrivateDeepLinkQueryParams(
+      deepLink,
+      searchParams,
+    );
+    if (privateDeepLink) {
+      return privateDeepLink;
+    }
+  }
+
   try {
     const url = new URL(deepLink);
     for (const [key, value] of searchParams) {
@@ -313,6 +326,56 @@ function appendAppsInTossDeepLinkQuery(
     const separator = deepLink.includes("?") ? "&" : "?";
     return `${deepLink}${separator}${searchParams.toString()}`;
   }
+}
+
+function appendAppsInTossPrivateDeepLinkQueryParams(
+  deepLink: string,
+  searchParams: URLSearchParams,
+) {
+  try {
+    const url = new URL(deepLink);
+    url.searchParams.set(
+      "queryParams",
+      JSON.stringify({
+        ...parsePrivateQueryParams(url.searchParams.get("queryParams")),
+        ...searchParamsToQueryParamsObject(searchParams),
+      }),
+    );
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function parsePrivateQueryParams(value: string | null) {
+  if (!value) {
+    return {};
+  }
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? parsed
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function searchParamsToQueryParamsObject(searchParams: URLSearchParams) {
+  const result: Record<string, string | string[]> = {};
+  for (const [key, value] of searchParams) {
+    const existing = result[key];
+    if (existing === undefined) {
+      result[key] = value;
+      continue;
+    }
+    if (Array.isArray(existing)) {
+      existing.push(value);
+      continue;
+    }
+    result[key] = [existing, value];
+  }
+  return result;
 }
 
 function createSearchParams(query?: AppsInTossDeepLinkQuery) {
@@ -340,7 +403,11 @@ function createSearchParams(query?: AppsInTossDeepLinkQuery) {
 }
 
 function isAppsInTossDeepLink(value: string) {
-  return value.startsWith("intoss://") || value.startsWith("intoss-private://");
+  return value.startsWith("intoss://") || isAppsInTossPrivateDeepLink(value);
+}
+
+function isAppsInTossPrivateDeepLink(value: string) {
+  return value.startsWith("intoss-private://");
 }
 
 function isLocalHttpUrl(url: URL) {

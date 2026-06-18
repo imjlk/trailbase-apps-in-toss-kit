@@ -138,13 +138,18 @@ export function createAppsInTossFullScreenAdBridge({
   }
 
   async function show(options: AppsInTossShowFullScreenAdOptions) {
-    return showFullScreenAdAsync({
-      ...options,
-      adGroupId: normalizeAdGroupId(options.adGroupId),
-      rewardFallbackMs,
-      showFullScreenAd,
-      timeoutMs: showTimeoutMs,
-    });
+    const adGroupId = normalizeAdGroupId(options.adGroupId);
+    try {
+      return await showFullScreenAdAsync({
+        ...options,
+        adGroupId,
+        rewardFallbackMs,
+        showFullScreenAd,
+        timeoutMs: showTimeoutMs,
+      });
+    } finally {
+      clear(adGroupId);
+    }
   }
 
   return {
@@ -381,6 +386,10 @@ async function showFullScreenAdAsync({
                 message: "Apps in Toss full-screen ad failed to show.",
               }),
             );
+            return;
+          }
+          if (type === "clicked" && adFormat === "interstitial") {
+            settleResolve();
             return;
           }
           if (type === "dismissed") {

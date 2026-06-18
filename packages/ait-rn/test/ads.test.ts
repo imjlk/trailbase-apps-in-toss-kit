@@ -142,6 +142,35 @@ describe("AppsInToss full-screen ad bridge", () => {
     });
   });
 
+  test("resolves interstitial ads when the user clicks after impression", async () => {
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({ showFullScreenAd });
+
+    const showPromise = bridge.show({
+      adFormat: "interstitial",
+      adGroupId: "interstitial",
+    });
+    showCalls[0].onEvent({ type: "requested" });
+    showCalls[0].onEvent({ type: "show" });
+    showCalls[0].onEvent({ type: "impression" });
+    showCalls[0].onEvent({ type: "clicked" });
+
+    await expect(showPromise).resolves.toMatchObject({
+      adFormat: "interstitial",
+      completed: true,
+      events: ["requested", "show", "impression", "clicked"],
+    });
+  });
+
   test("cleans up when SDK callbacks settle synchronously", async () => {
     let loadCleanupCalls = 0;
     let showCleanupCalls = 0;
@@ -175,6 +204,51 @@ describe("AppsInToss full-screen ad bridge", () => {
     ).resolves.toMatchObject({ earned: true });
     expect(loadCleanupCalls).toBe(1);
     expect(showCleanupCalls).toBe(1);
+  });
+
+  test("clears consumed preload state when show is called separately", async () => {
+    const loadCalls: Array<{
+      onEvent: (event: AppsInTossLoadFullScreenAdEvent) => void;
+    }> = [];
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const loadFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        loadCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossLoadFullScreenAd;
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+      showFullScreenAd,
+    });
+
+    const preloadPromise = bridge.preload({ adGroupId: "interstitial" });
+    loadCalls[0].onEvent({ type: "loaded" });
+    await expect(preloadPromise).resolves.toBeUndefined();
+
+    const showPromise = bridge.show({
+      adFormat: "interstitial",
+      adGroupId: "interstitial",
+    });
+    showCalls[0].onEvent({ type: "show" });
+    showCalls[0].onEvent({ type: "impression" });
+    showCalls[0].onEvent({ type: "dismissed" });
+    await expect(showPromise).resolves.toMatchObject({ completed: true });
+
+    const nextPreloadPromise = bridge.preload({ adGroupId: "interstitial" });
+    expect(loadCalls).toHaveLength(2);
+    loadCalls[1].onEvent({ type: "loaded" });
+    await expect(nextPreloadPromise).resolves.toBeUndefined();
   });
 
   test("rejects failedToShow and show timeouts while cleaning up once", async () => {
