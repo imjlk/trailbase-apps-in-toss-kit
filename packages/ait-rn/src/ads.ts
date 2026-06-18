@@ -11,8 +11,10 @@ export type {
   AppsInTossFullScreenAdParams,
   AppsInTossLoadFullScreenAd,
   AppsInTossLoadFullScreenAdEvent,
+  AppsInTossLoadFullScreenAdParams,
   AppsInTossShowFullScreenAd,
   AppsInTossShowFullScreenAdEvent,
+  AppsInTossShowFullScreenAdParams,
 } from "./internal/framework";
 
 export type AppsInTossAdBridgeErrorCode =

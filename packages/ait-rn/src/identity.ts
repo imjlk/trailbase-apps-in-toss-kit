@@ -2,7 +2,10 @@ import {
   createAnonymousHash,
   type KeyValueStorage,
 } from "@trailbase-apps-in-toss-kit/trailbase-client";
-import { defaultFrameworkFunction } from "./internal/framework";
+import {
+  defaultFrameworkFunction,
+  type AppsInTossGetAnonymousKey,
+} from "./internal/framework";
 import { isProductionRuntime } from "./internal/runtime";
 
 export const APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX = "ait:";
@@ -12,12 +15,8 @@ export const DEFAULT_APPS_IN_TOSS_APP_SESSION_STORAGE_KEY =
   "trailbase.appSession";
 
 export type AppsInTossAnonymousKeyResult =
-  | { type: "HASH"; hash: string }
-  | "ERROR"
-  | "INVALID_CATEGORY"
-  | undefined;
-
-export type AppsInTossGetAnonymousKey = () => Promise<unknown>;
+  | Awaited<ReturnType<AppsInTossGetAnonymousKey>>
+  | "INVALID_CATEGORY";
 
 export type AppsInTossIdentityErrorCode =
   | "ANONYMOUS_KEY_ERROR"
@@ -197,4 +196,3 @@ async function defaultGetAnonymousKey() {
   const getAnonymousKey = await defaultFrameworkFunction("getAnonymousKey");
   return getAnonymousKey?.();
 }
-

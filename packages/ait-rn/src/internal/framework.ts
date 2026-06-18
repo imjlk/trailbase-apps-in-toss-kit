@@ -1,66 +1,52 @@
-export type AppsInTossFrameworkCleanup = () => void;
+import type * as AppsInTossFramework from "@apps-in-toss/framework";
 
-export interface AppsInTossFullScreenAdOptions {
-  adGroupId: string;
-}
+export type AppsInTossAppLogin = typeof AppsInTossFramework.appLogin;
+export type AppsInTossGetAnonymousKey =
+  typeof AppsInTossFramework.getAnonymousKey;
+export type AppsInTossGetIsTossLoginIntegratedService =
+  typeof AppsInTossFramework.getIsTossLoginIntegratedService;
+export type AppsInTossGetOperationalEnvironment =
+  typeof AppsInTossFramework.getOperationalEnvironment;
+export type AppsInTossGetSchemeUri = typeof AppsInTossFramework.getSchemeUri;
+export type AppsInTossGetTossShareLink =
+  typeof AppsInTossFramework.getTossShareLink;
+export type AppsInTossShare = typeof AppsInTossFramework.share;
 
-export interface AppsInTossFullScreenAdParams<TEvent = { type: string }> {
-  onError: (error: unknown) => void;
-  onEvent: (event: TEvent) => void;
-  options: AppsInTossFullScreenAdOptions;
-}
-
-export type AppsInTossLoadFullScreenAdEvent = { type: "loaded" };
-
+export type AppsInTossFrameworkCleanup = ReturnType<
+  typeof AppsInTossFramework.loadFullScreenAd
+>;
+export type AppsInTossFullScreenAdOptions =
+  AppsInTossFramework.LoadFullScreenAdOptions;
+export type AppsInTossFullScreenAdParams =
+  | AppsInTossFramework.LoadFullScreenAdParams
+  | AppsInTossFramework.ShowFullScreenAdParams;
+export type AppsInTossLoadFullScreenAd =
+  typeof AppsInTossFramework.loadFullScreenAd;
+export type AppsInTossLoadFullScreenAdEvent =
+  AppsInTossFramework.LoadFullScreenAdEvent;
+export type AppsInTossLoadFullScreenAdParams =
+  AppsInTossFramework.LoadFullScreenAdParams;
+export type AppsInTossShowFullScreenAd =
+  typeof AppsInTossFramework.showFullScreenAd;
 export type AppsInTossShowFullScreenAdEvent =
-  | { type: "requested" }
-  | { type: "show" }
-  | { type: "impression" }
-  | { type: "clicked" }
-  | { type: "dismissed" }
-  | { type: "failedToShow" }
-  | {
-      data?: {
-        unitAmount?: unknown;
-        unitType?: unknown;
-      };
-      type: "userEarnedReward";
-    }
-  | { data?: unknown; type: string };
+  AppsInTossFramework.ShowFullScreenAdEvent;
+export type AppsInTossShowFullScreenAdParams =
+  AppsInTossFramework.ShowFullScreenAdParams;
 
-export type AppsInTossLoadFullScreenAd = ((
-  params: AppsInTossFullScreenAdParams<AppsInTossLoadFullScreenAdEvent>,
-) => AppsInTossFrameworkCleanup | void) & {
-  isSupported?: () => boolean;
-};
-
-export type AppsInTossShowFullScreenAd = ((
-  params: AppsInTossFullScreenAdParams<AppsInTossShowFullScreenAdEvent>,
-) => AppsInTossFrameworkCleanup | void) & {
-  isSupported?: () => boolean;
-};
-
-export type AppsInTossGetOperationalEnvironment = () => unknown;
-export type AppsInTossGetTossShareLink = (
-  url: string,
-  ogImageUrl?: string,
-) => Promise<string>;
-export type AppsInTossShare = (options: {
-  message: string;
-}) => Promise<void> | void;
-export type AppsInTossGetSchemeUri = () => string | null | undefined;
-
-export type AppsInTossFrameworkModule = {
-  appLogin?: () => Promise<unknown>;
-  getAnonymousKey?: () => Promise<unknown>;
-  getIsTossLoginIntegratedService?: () => Promise<unknown>;
-  getOperationalEnvironment?: AppsInTossGetOperationalEnvironment;
-  getSchemeUri?: AppsInTossGetSchemeUri;
-  getTossShareLink?: AppsInTossGetTossShareLink;
-  loadFullScreenAd?: AppsInTossLoadFullScreenAd;
-  share?: AppsInTossShare;
-  showFullScreenAd?: AppsInTossShowFullScreenAd;
-};
+export type AppsInTossFrameworkModule = Partial<
+  Pick<
+    typeof AppsInTossFramework,
+    | "appLogin"
+    | "getAnonymousKey"
+    | "getIsTossLoginIntegratedService"
+    | "getOperationalEnvironment"
+    | "getSchemeUri"
+    | "getTossShareLink"
+    | "loadFullScreenAd"
+    | "share"
+    | "showFullScreenAd"
+  >
+>;
 
 export async function defaultFrameworkFunction<
   K extends keyof AppsInTossFrameworkModule,
@@ -74,4 +60,3 @@ export async function defaultFrameworkFunction<
     return undefined;
   }
 }
-

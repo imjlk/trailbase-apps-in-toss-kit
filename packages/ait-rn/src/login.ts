@@ -1,10 +1,12 @@
 import { createAnonymousHash } from "@trailbase-apps-in-toss-kit/trailbase-client";
-import { defaultFrameworkFunction } from "./internal/framework";
+import {
+  defaultFrameworkFunction,
+  type AppsInTossAppLogin,
+  type AppsInTossGetIsTossLoginIntegratedService,
+} from "./internal/framework";
 import { isProductionEnv, resolveRuntimeEnv } from "./internal/runtime";
 
-export type AppsInTossAppLogin = () => Promise<unknown>;
-export type AppsInTossGetIsTossLoginIntegratedService =
-  () => Promise<unknown>;
+export type AppsInTossLoginResult = Awaited<ReturnType<AppsInTossAppLogin>>;
 
 export type AppsInTossLoginBridgeErrorCode =
   | "APP_LOGIN_UNAVAILABLE"
@@ -31,7 +33,9 @@ export class AppsInTossLoginBridgeError extends Error {
 
 export interface CreateAppsInTossLoginBridgeOptions {
   appLogin?: AppsInTossAppLogin;
-  createDevFallback?: () => unknown | Promise<unknown>;
+  createDevFallback?: () =>
+    | AppsInTossLoginResult
+    | Promise<AppsInTossLoginResult>;
   env?: string;
   getIsTossLoginIntegratedService?: AppsInTossGetIsTossLoginIntegratedService;
   production?: boolean;
@@ -122,7 +126,6 @@ async function handleLoginBridgeUnavailable({
 function createDefaultLoginFallback() {
   return {
     authorizationCode: createAnonymousHash({ prefix: "dev-auth" }),
-    referrer: "SANDBOX",
+    referrer: "SANDBOX" as const,
   };
 }
-
