@@ -453,6 +453,102 @@ describe("AppsInToss full-screen ad bridge", () => {
     expect(loadCalls).toHaveLength(2);
   });
 
+  test("shares overlapping preloadAndShow calls for the same adGroupId", async () => {
+    const loadCalls: Array<{
+      onEvent: (event: AppsInTossLoadFullScreenAdEvent) => void;
+    }> = [];
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const loadFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        loadCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossLoadFullScreenAd;
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+      showFullScreenAd,
+    });
+
+    const firstShow = bridge.preloadAndShow({
+      adFormat: "rewarded",
+      adGroupId: "rewarded",
+      preloadNext: true,
+    });
+    const secondShow = bridge.preloadAndShow({
+      adFormat: "rewarded",
+      adGroupId: "rewarded",
+      preloadNext: true,
+    });
+
+    expect(loadCalls).toHaveLength(1);
+    loadCalls[0].onEvent({ type: "loaded" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(showCalls).toHaveLength(1);
+
+    showCalls[0].onEvent({ type: "userEarnedReward" });
+    showCalls[0].onEvent({ type: "dismissed" });
+    await expect(Promise.all([firstShow, secondShow])).resolves.toEqual([
+      expect.objectContaining({ earned: true }),
+      expect.objectContaining({ earned: true }),
+    ]);
+    expect(loadCalls).toHaveLength(2);
+  });
+
+  test("does not preload the next ad when show settles before dismissal", async () => {
+    const loadCalls: Array<{
+      onEvent: (event: AppsInTossLoadFullScreenAdEvent) => void;
+    }> = [];
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const loadFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        loadCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossLoadFullScreenAd;
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+      showFullScreenAd,
+      showTimeoutMs: 1_000,
+    });
+
+    const showPromise = bridge.preloadAndShow({
+      adFormat: "interstitial",
+      adGroupId: "interstitial",
+      interstitialCompletionFallbackMs: 1,
+      preloadNext: true,
+    });
+    loadCalls[0].onEvent({ type: "loaded" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    showCalls[0].onEvent({ type: "show" });
+    showCalls[0].onEvent({ type: "impression" });
+
+    await expect(showPromise).resolves.toMatchObject({
+      completed: true,
+      events: ["show", "impression"],
+    });
+    expect(loadCalls).toHaveLength(1);
+  });
+
   test("exposes mock mode and safe environment helpers", async () => {
     expect(
       shouldUseAppsInTossMockAd({

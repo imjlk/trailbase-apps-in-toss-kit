@@ -102,6 +102,11 @@ interface AppsInTossPreloadedFullScreenAdState {
   settled: boolean;
 }
 
+interface AppsInTossShowingFullScreenAdState {
+  preloadNextScheduled: boolean;
+  result: Promise<AppsInTossFullScreenAdShowResult>;
+}
+
 export function createAppsInTossFullScreenAdBridge({
   loadFullScreenAd,
   loadTimeoutMs = 15_000,
@@ -113,6 +118,7 @@ export function createAppsInTossFullScreenAdBridge({
     string,
     AppsInTossPreloadedFullScreenAdState
   >();
+  const showingAds = new Map<string, AppsInTossShowingFullScreenAdState>();
 
   async function preload({ adGroupId }: AppsInTossPreloadFullScreenAdOptions) {
     const normalizedAdGroupId = normalizeAdGroupId(adGroupId);
@@ -172,19 +178,34 @@ export function createAppsInTossFullScreenAdBridge({
     state.clearAfterSettle = true;
   }
 
-  async function show(options: AppsInTossShowFullScreenAdOptions) {
+  function startShow(
+    options: AppsInTossShowFullScreenAdOptions,
+  ): AppsInTossShowingFullScreenAdState {
     const adGroupId = normalizeAdGroupId(options.adGroupId);
-    try {
-      return await showFullScreenAdAsync({
+    const existing = showingAds.get(adGroupId);
+    if (existing) {
+      return existing;
+    }
+
+    const state: AppsInTossShowingFullScreenAdState = {
+      preloadNextScheduled: false,
+      result: showFullScreenAdAsync({
         ...options,
         adGroupId,
         rewardFallbackMs,
         showFullScreenAd,
         timeoutMs: showTimeoutMs,
-      });
-    } finally {
-      clear(adGroupId);
-    }
+      }).finally(() => {
+        clear(adGroupId);
+        showingAds.delete(adGroupId);
+      }),
+    };
+    showingAds.set(adGroupId, state);
+    return state;
+  }
+
+  async function show(options: AppsInTossShowFullScreenAdOptions) {
+    return startShow(options).result;
   }
 
   return {
@@ -193,14 +214,17 @@ export function createAppsInTossFullScreenAdBridge({
     async preloadAndShow(options) {
       const adGroupId = normalizeAdGroupId(options.adGroupId);
       await preload({ adGroupId });
-      try {
-        return await show({ ...options, adGroupId });
-      } finally {
-        clear(adGroupId);
-        if (options.preloadNext === true) {
-          void preload({ adGroupId }).catch(() => undefined);
-        }
+      const showingAd = startShow({ ...options, adGroupId });
+      const result = await showingAd.result;
+      if (
+        options.preloadNext === true &&
+        result.events.includes("dismissed") &&
+        !showingAd.preloadNextScheduled
+      ) {
+        showingAd.preloadNextScheduled = true;
+        void preload({ adGroupId }).catch(() => undefined);
       }
+      return result;
     },
     show,
   };
