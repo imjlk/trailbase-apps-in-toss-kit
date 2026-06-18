@@ -300,6 +300,14 @@ describe("AppsInToss RN identity helpers", () => {
         env: "production",
       }),
     ).toThrow("Apps in Toss Storage is required");
+    expect(() =>
+      createAppsInTossSessionStorage({
+        appKey: "poll-maker",
+        env: "development",
+        fallbackStorage: mapStorage(),
+        production: true,
+      }),
+    ).toThrow("Apps in Toss Storage is required");
   });
 
   test("allows fallback session storage outside production", async () => {
@@ -372,12 +380,14 @@ describe("AppsInToss RN identity helpers", () => {
     await expect(
       devBridge.getIsTossLoginIntegratedService(),
     ).resolves.toBeUndefined();
-    await expect(prodBridge.getIsTossLoginIntegratedService()).rejects.toMatchObject({
+    await expect(
+      prodBridge.getIsTossLoginIntegratedService(),
+    ).rejects.toMatchObject({
       code: "TOSS_LOGIN_INTEGRATION_CHECK_THROWN",
     });
-    await expect(disabledBridge.getIsTossLoginIntegratedService()).resolves.toBe(
-      false,
-    );
+    await expect(
+      disabledBridge.getIsTossLoginIntegratedService(),
+    ).resolves.toBeUndefined();
   });
 
   test("installs haptic fallbacks only when native modules need one", async () => {
@@ -410,11 +420,31 @@ describe("AppsInToss RN identity helpers", () => {
       Promise.resolve(installedHapticFallback({ type: "tap" })),
     ).resolves.toBeUndefined();
 
+    const legacyNativeModules: {
+      BedrockModule: {
+        appVersion: string;
+        generateHapticFeedback?: (
+          options: { type: string },
+        ) => void | Promise<void>;
+      };
+      GraniteModule?: {
+        appVersion?: string;
+        generateHapticFeedback?: (
+          options: { type: string },
+        ) => void | Promise<void>;
+      };
+    } = { BedrockModule: { appVersion: "legacy" } };
     expect(
       ensureAppsInTossHapticFallback({
-        nativeModules: { BedrockModule: { appVersion: "legacy" } },
+        nativeModules: legacyNativeModules,
       }),
     ).toBe(true);
+    expect(typeof legacyNativeModules.BedrockModule.generateHapticFeedback).toBe(
+      "function",
+    );
+    expect(typeof legacyNativeModules.GraniteModule?.generateHapticFeedback).toBe(
+      "function",
+    );
     expect(
       ensureAppsInTossHapticFallback({ nativeModules: Object.freeze({}) }),
     ).toBe(false);

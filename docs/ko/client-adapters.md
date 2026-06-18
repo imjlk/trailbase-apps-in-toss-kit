@@ -79,7 +79,6 @@ kit의 표준 key 형태를 쓸 수 있는 앱은 `createAppsInTossSessionStorag
 import {
   Storage,
   appLogin,
-  getIsTossLoginIntegratedService,
 } from "@apps-in-toss/framework";
 import {
   createAppsInTossLoginBridge,
@@ -96,7 +95,6 @@ const sessionStorage = createAppsInTossSessionStorage({
 const loginBridge = createAppsInTossLoginBridge({
   appLogin,
   env,
-  getIsTossLoginIntegratedService,
 });
 
 // bootstrap, completeTossLogin, loadSession은 앱이 구현한 API callback입니다.
@@ -121,7 +119,10 @@ export const sessionManager = createAppsInTossSessionManager({
 `createAppsInTossLoginBridge()`는 bridge adapter만 담당합니다. 운영 환경에서 SDK bridge가
 없거나 실패하면 fail-closed로 처리하고, dev/test에는 명시적인 fallback authorization code를
 제공합니다. `appLogin` 결과 shape 정규화는 공유 `createAppsInTossSessionManager`와
-`requestAppsInTossLogin` 경로에 맡깁니다.
+`requestAppsInTossLogin` 경로에 맡깁니다. Apps in Toss의
+`getIsTossLoginIntegratedService()` API는 현재 유저가 이미 연동된 유저인지 migration 용도로
+확인하는 함수입니다. 따라서 raw migration check는 앱 UX나 데이터 migration 코드에 남기고,
+`false` 값을 첫 `appLogin` flow를 막는 sign-in preflight로 쓰지 마세요.
 
 lower-level 세션 영속성이 필요하면 공식 Apps in Toss `Storage` API를 감싸서
 `createAppsInTossSessionManager`에 전달하세요. Apps in Toss 문서는 이 네이티브 저장소가 앱

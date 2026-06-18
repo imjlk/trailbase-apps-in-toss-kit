@@ -266,9 +266,9 @@ export function createAppsInTossSessionStorage({
   const tossSessionStorageKey = `${normalizedAppKey}.tossSession`;
   const keyValueStorage = createAppsInTossKeyValueStorage({
     allowFallback,
-    env: resolvedEnv,
+    env: production ? "production" : resolvedEnv,
     fallbackStorage,
-    productionRequired,
+    productionRequired: production ? true : productionRequired,
     storage,
   });
 
@@ -330,7 +330,8 @@ export function createAppsInTossLoginBridge({
       }
 
       try {
-        return await resolvedCheck();
+        const result = await resolvedCheck();
+        return result === false ? undefined : result;
       } catch (error) {
         if (resolvedProduction) {
           throw new AppsInTossLoginBridgeError({
@@ -353,21 +354,37 @@ export function ensureAppsInTossHapticFallback({
       return false;
     }
 
-    const hapticModule =
-      nativeModules.GraniteModule ?? nativeModules.BedrockModule ?? {};
-    if (typeof hapticModule.generateHapticFeedback === "function") {
+    const graniteModule = nativeModules.GraniteModule;
+    const bedrockModule = nativeModules.BedrockModule;
+    if (
+      typeof graniteModule?.generateHapticFeedback === "function" ||
+      typeof bedrockModule?.generateHapticFeedback === "function"
+    ) {
       return true;
     }
 
+    const hapticModule = graniteModule ?? bedrockModule ?? {};
+    const fallbackGenerateHapticFeedback = async () => undefined;
     Object.defineProperty(nativeModules, "GraniteModule", {
       configurable: true,
       enumerable: true,
       value: {
         ...hapticModule,
-        generateHapticFeedback: async () => undefined,
+        generateHapticFeedback: fallbackGenerateHapticFeedback,
       },
       writable: true,
     });
+    if (bedrockModule) {
+      Object.defineProperty(nativeModules, "BedrockModule", {
+        configurable: true,
+        enumerable: true,
+        value: {
+          ...bedrockModule,
+          generateHapticFeedback: fallbackGenerateHapticFeedback,
+        },
+        writable: true,
+      });
+    }
     return true;
   } catch {
     return false;

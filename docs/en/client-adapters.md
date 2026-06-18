@@ -86,7 +86,6 @@ lower-level helpers until they plan a storage-key migration.
 import {
   Storage,
   appLogin,
-  getIsTossLoginIntegratedService,
 } from "@apps-in-toss/framework";
 import {
   createAppsInTossLoginBridge,
@@ -103,7 +102,6 @@ const sessionStorage = createAppsInTossSessionStorage({
 const loginBridge = createAppsInTossLoginBridge({
   appLogin,
   env,
-  getIsTossLoginIntegratedService,
 });
 
 // bootstrap, completeTossLogin, and loadSession are app-owned API callbacks.
@@ -129,7 +127,11 @@ refreshes the stored anonymous hash.
 `createAppsInTossLoginBridge()` is intentionally only a bridge adapter. It makes
 production SDK unavailability fail closed and gives dev/test a clear fallback
 authorization code, but it leaves `appLogin` result normalization to the shared
-`createAppsInTossSessionManager` and `requestAppsInTossLogin` path.
+`createAppsInTossSessionManager` and `requestAppsInTossLogin` path. The Apps in
+Toss `getIsTossLoginIntegratedService()` API reports whether the current user is
+already linked for migration purposes, so keep raw migration checks in app UX or
+data-migration code instead of using `false` to block first-time `appLogin`
+flows.
 
 For lower-level session persistence, wrap the official Apps in Toss `Storage`
 API and pass it to `createAppsInTossSessionManager`. Apps in Toss documents this
