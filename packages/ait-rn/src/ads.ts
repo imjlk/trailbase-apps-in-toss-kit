@@ -48,11 +48,6 @@ export class AppsInTossAdBridgeError extends Error {
 export type AppsInTossOperationalEnvironment = "sandbox" | "toss" | "unknown";
 export type AppsInTossAdRewardMode = "auto" | "live" | "mock";
 export type AppsInTossFullScreenAdFormat = "interstitial" | "rewarded";
-export type AppsInTossTestAdGroupKind =
-  | "banner"
-  | "interstitial"
-  | "native-image"
-  | "rewarded";
 
 export interface CreateAppsInTossFullScreenAdBridgeOptions {
   loadFullScreenAd?: AppsInTossLoadFullScreenAd;
@@ -101,6 +96,12 @@ export interface AppsInTossFullScreenAdBridge {
   ): Promise<AppsInTossFullScreenAdShowResult>;
 }
 
+interface AppsInTossPreloadedFullScreenAdState {
+  clearAfterSettle: boolean;
+  promise: Promise<void>;
+  settled: boolean;
+}
+
 export function createAppsInTossFullScreenAdBridge({
   loadFullScreenAd,
   loadTimeoutMs = 15_000,
@@ -108,33 +109,67 @@ export function createAppsInTossFullScreenAdBridge({
   showFullScreenAd,
   showTimeoutMs = 60_000,
 }: CreateAppsInTossFullScreenAdBridgeOptions = {}): AppsInTossFullScreenAdBridge {
-  const preloadedAds = new Map<string, Promise<void>>();
+  const preloadedAds = new Map<
+    string,
+    AppsInTossPreloadedFullScreenAdState
+  >();
 
   async function preload({ adGroupId }: AppsInTossPreloadFullScreenAdOptions) {
     const normalizedAdGroupId = normalizeAdGroupId(adGroupId);
     const existing = preloadedAds.get(normalizedAdGroupId);
     if (existing) {
-      return existing;
+      return existing.promise;
     }
 
-    const loadPromise = loadFullScreenAdAsync({
+    const state: AppsInTossPreloadedFullScreenAdState = {
+      clearAfterSettle: false,
+      promise: Promise.resolve(),
+      settled: false,
+    };
+    state.promise = loadFullScreenAdAsync({
       adGroupId: normalizedAdGroupId,
       loadFullScreenAd,
       timeoutMs: loadTimeoutMs,
-    }).catch((error) => {
-      preloadedAds.delete(normalizedAdGroupId);
-      throw error;
-    });
-    preloadedAds.set(normalizedAdGroupId, loadPromise);
-    return loadPromise;
+    }).then(
+      () => {
+        state.settled = true;
+        if (state.clearAfterSettle) {
+          preloadedAds.delete(normalizedAdGroupId);
+        }
+      },
+      (error) => {
+        state.settled = true;
+        preloadedAds.delete(normalizedAdGroupId);
+        throw error;
+      },
+    );
+    preloadedAds.set(normalizedAdGroupId, state);
+    return state.promise;
   }
 
   function clear(adGroupId?: string) {
     if (adGroupId === undefined) {
-      preloadedAds.clear();
+      for (const [normalizedAdGroupId, state] of preloadedAds) {
+        clearPreloadState(normalizedAdGroupId, state);
+      }
       return;
     }
-    preloadedAds.delete(normalizeAdGroupId(adGroupId));
+    const normalizedAdGroupId = normalizeAdGroupId(adGroupId);
+    const state = preloadedAds.get(normalizedAdGroupId);
+    if (state) {
+      clearPreloadState(normalizedAdGroupId, state);
+    }
+  }
+
+  function clearPreloadState(
+    normalizedAdGroupId: string,
+    state: AppsInTossPreloadedFullScreenAdState,
+  ) {
+    if (state.settled) {
+      preloadedAds.delete(normalizedAdGroupId);
+      return;
+    }
+    state.clearAfterSettle = true;
   }
 
   async function show(options: AppsInTossShowFullScreenAdOptions) {
@@ -210,19 +245,6 @@ export function shouldUseAppsInTossMockAd({
     return false;
   }
   return isDev;
-}
-
-export function getAppsInTossTestAdGroupId(kind: AppsInTossTestAdGroupKind) {
-  switch (kind) {
-    case "banner":
-      return "ait-ad-test-banner-id";
-    case "interstitial":
-      return "ait-ad-test-interstitial-id";
-    case "native-image":
-      return "ait-ad-test-native-image-id";
-    case "rewarded":
-      return "ait-ad-test-rewarded-id";
-  }
 }
 
 async function loadFullScreenAdAsync({
@@ -368,6 +390,9 @@ async function showFullScreenAdAsync({
             }),
           ),
         onEvent: (event) => {
+          if (settled) {
+            return;
+          }
           const type = normalizeAdEventType(event);
           events.push(type);
           if (type === "requested") {

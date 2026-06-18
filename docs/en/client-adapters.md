@@ -204,7 +204,6 @@ Apps in Toss sandbox app should still exercise the SDK path with test ad IDs:
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/framework";
 import {
   createAppsInTossFullScreenAdBridge,
-  getAppsInTossTestAdGroupId,
   shouldUseAppsInTossMockAd,
 } from "@trailbase-apps-in-toss-kit/ait-rn/ads";
 
@@ -213,9 +212,12 @@ const ads = createAppsInTossFullScreenAdBridge({
   showFullScreenAd,
 });
 
-const adGroupId = isDev || operationalEnvironment === "sandbox"
-  ? getAppsInTossTestAdGroupId("rewarded")
-  : env.REWARDED_AD_GROUP_ID;
+// Keep sandbox/test ad IDs in app-owned dev or sandbox config, not in the
+// reusable kit import graph or a production release bundle.
+const adGroupId =
+  operationalEnvironment === "sandbox"
+    ? env.REWARDED_SANDBOX_AD_GROUP_ID
+    : env.REWARDED_AD_GROUP_ID;
 
 if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
   await grantLocalMockReward();

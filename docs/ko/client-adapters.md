@@ -194,7 +194,6 @@ idempotency를 앱에 남기세요. kit는 SDK callback API를 `load -> show` Pr
 import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/framework";
 import {
   createAppsInTossFullScreenAdBridge,
-  getAppsInTossTestAdGroupId,
   shouldUseAppsInTossMockAd,
 } from "@trailbase-apps-in-toss-kit/ait-rn/ads";
 
@@ -203,9 +202,12 @@ const ads = createAppsInTossFullScreenAdBridge({
   showFullScreenAd,
 });
 
-const adGroupId = isDev || operationalEnvironment === "sandbox"
-  ? getAppsInTossTestAdGroupId("rewarded")
-  : env.REWARDED_AD_GROUP_ID;
+// sandbox/test 광고 ID는 재사용 kit import graph나 production release bundle이 아니라
+// 앱이 소유한 dev 또는 sandbox 설정에만 두세요.
+const adGroupId =
+  operationalEnvironment === "sandbox"
+    ? env.REWARDED_SANDBOX_AD_GROUP_ID
+    : env.REWARDED_AD_GROUP_ID;
 
 if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
   await grantLocalMockReward();

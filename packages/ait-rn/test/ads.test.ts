@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   createAppsInTossFullScreenAdBridge,
-  getAppsInTossTestAdGroupId,
   safeGetAppsInTossOperationalEnvironment,
   shouldUseAppsInTossMockAd,
   type AppsInTossLoadFullScreenAd,
@@ -34,6 +33,35 @@ describe("AppsInToss full-screen ad bridge", () => {
     ]);
 
     bridge.clear("rewarded");
+    const third = bridge.preload({ adGroupId: "rewarded" });
+    expect(loadCalls).toHaveLength(2);
+    loadCalls[1].onEvent({ type: "loaded" });
+    await expect(third).resolves.toBeUndefined();
+  });
+
+  test("keeps in-flight preloads deduped when clear is called before settle", async () => {
+    const loadCalls: Array<{
+      onEvent: (event: AppsInTossLoadFullScreenAdEvent) => void;
+    }> = [];
+    const loadFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        loadCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossLoadFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({ loadFullScreenAd });
+
+    const first = bridge.preload({ adGroupId: "rewarded" });
+    bridge.clear("rewarded");
+    const second = bridge.preload({ adGroupId: "rewarded" });
+    expect(loadCalls).toHaveLength(1);
+    loadCalls[0].onEvent({ type: "loaded" });
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      undefined,
+      undefined,
+    ]);
+
     const third = bridge.preload({ adGroupId: "rewarded" });
     expect(loadCalls).toHaveLength(2);
     loadCalls[1].onEvent({ type: "loaded" });
@@ -236,6 +264,37 @@ describe("AppsInToss full-screen ad bridge", () => {
     });
   });
 
+  test("ignores late show callbacks after an ad result has settled", async () => {
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd,
+      showTimeoutMs: 1_000,
+    });
+
+    const showPromise = bridge.show({
+      adFormat: "interstitial",
+      adGroupId: "interstitial",
+      interstitialCompletionFallbackMs: 1,
+    });
+    showCalls[0].onEvent({ type: "requested" });
+    showCalls[0].onEvent({ type: "show" });
+    showCalls[0].onEvent({ type: "impression" });
+    const result = await showPromise;
+
+    showCalls[0].onEvent({ type: "dismissed" });
+    showCalls[0].onEvent({ type: "clicked" });
+    expect(result.events).toEqual(["requested", "show", "impression"]);
+  });
+
   test("cleans up when SDK callbacks settle synchronously", async () => {
     let loadCleanupCalls = 0;
     let showCleanupCalls = 0;
@@ -394,18 +453,7 @@ describe("AppsInToss full-screen ad bridge", () => {
     expect(loadCalls).toHaveLength(2);
   });
 
-  test("exposes test ad group IDs, mock mode, and safe environment helpers", async () => {
-    expect(getAppsInTossTestAdGroupId("rewarded")).toBe(
-      "ait-ad-test-rewarded-id",
-    );
-    expect(getAppsInTossTestAdGroupId("interstitial")).toBe(
-      "ait-ad-test-interstitial-id",
-    );
-    expect(getAppsInTossTestAdGroupId("banner")).toBe("ait-ad-test-banner-id");
-    expect(getAppsInTossTestAdGroupId("native-image")).toBe(
-      "ait-ad-test-native-image-id",
-    );
-
+  test("exposes mock mode and safe environment helpers", async () => {
     expect(
       shouldUseAppsInTossMockAd({
         isDev: false,
