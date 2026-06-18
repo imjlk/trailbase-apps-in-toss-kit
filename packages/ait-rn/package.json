@@ -11,9 +11,6 @@
     "@apps-in-toss/framework": ">=2.4.5",
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
   },
-  "devDependencies": {
-    "@apps-in-toss/framework": "2.6.1"
-  },
   "scripts": {
     "test": "bun test"
   }

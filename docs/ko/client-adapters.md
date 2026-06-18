@@ -76,6 +76,7 @@ import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trai
 
 const identityStorage = createAppsInTossIdentityStorage(Storage, {
   anonymousHashStorageKey: "my-app.anonymousHash",
+  appSessionStorageKey: "my-app.appSession",
   production: true,
 });
 
@@ -83,6 +84,7 @@ const identityStorage = createAppsInTossIdentityStorage(Storage, {
 export const sessionManager = createAppsInTossSessionManager({
   storage: identityStorage,
   anonymousHashStorageKey: "my-app.anonymousHash",
+  appSessionStorageKey: "my-app.appSession",
   appLogin,
   bootstrap,
   completeTossLogin,
@@ -93,6 +95,8 @@ export const sessionManager = createAppsInTossSessionManager({
 운영 환경에서 Apps in Toss SDK가 `{ type: "HASH" }` 값을 반환하지 못하면 helper는 랜덤 값을
 만들지 않고 `AppsInTossIdentityError`를 던집니다. dev/test에서는 SDK가 없는 로컬 실행을
 위해 `dev-anon_...` fallback을 허용할 수 있습니다.
+앱 세션 storage key를 커스텀했다면 identity storage wrapper에도 같은 key를 전달하세요.
+그래야 저장된 익명 hash를 갱신한 뒤 legacy 익명 세션을 재사용하지 않고 다시 bootstrap합니다.
 
 세션 영속성에는 공식 Apps in Toss `Storage` API를 감싸서 `createAppsInTossSessionManager`에
 전달하세요. Apps in Toss 문서는 이 네이티브 저장소가 앱 재시작 후에도 유지된다고 안내하며,

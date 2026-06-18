@@ -6,6 +6,8 @@ import {
 export const APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX = "ait:";
 export const DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY =
   "trailbase.anonymousHash";
+export const DEFAULT_APPS_IN_TOSS_APP_SESSION_STORAGE_KEY =
+  "trailbase.appSession";
 
 export type AppsInTossAnonymousKeyResult =
   | { type: "HASH"; hash: string }
@@ -53,6 +55,7 @@ export interface ResolveAppsInTossAnonymousHashOptions {
 export interface CreateAppsInTossIdentityStorageOptions
   extends ResolveAppsInTossAnonymousHashOptions {
   anonymousHashStorageKey?: string;
+  appSessionStorageKey?: string | readonly string[];
 }
 
 export function isAppsInTossAnonymousHash(value: unknown): value is string {
@@ -99,28 +102,40 @@ export function createAppsInTossIdentityStorage(
   storage: KeyValueStorage,
   {
     anonymousHashStorageKey = DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY,
+    appSessionStorageKey = DEFAULT_APPS_IN_TOSS_APP_SESSION_STORAGE_KEY,
     ...resolverOptions
   }: CreateAppsInTossIdentityStorageOptions = {},
 ): KeyValueStorage {
   const production = resolverOptions.production ?? isProductionRuntime();
 
+  async function resolveStoredAnonymousHash() {
+    const existing = await storage.getItem(anonymousHashStorageKey);
+    if (existing && (!production || isAppsInTossAnonymousHash(existing))) {
+      return { refreshed: false, value: existing };
+    }
+
+    const next = await resolveAppsInTossAnonymousHash({
+      ...resolverOptions,
+      production,
+    });
+    await storage.setItem(anonymousHashStorageKey, next);
+    return { refreshed: existing !== next, value: next };
+  }
+
   return {
     async getItem(key) {
-      if (key !== anonymousHashStorageKey) {
-        return storage.getItem(key);
+      if (key === anonymousHashStorageKey) {
+        return (await resolveStoredAnonymousHash()).value;
       }
 
-      const existing = await storage.getItem(key);
-      if (existing && (!production || isAppsInTossAnonymousHash(existing))) {
-        return existing;
+      if (production && isAppSessionStorageKey(key, appSessionStorageKey)) {
+        const { refreshed } = await resolveStoredAnonymousHash();
+        if (refreshed) {
+          return null;
+        }
       }
 
-      const next = await resolveAppsInTossAnonymousHash({
-        ...resolverOptions,
-        production,
-      });
-      await storage.setItem(key, next);
-      return next;
+      return storage.getItem(key);
     },
     setItem: (key, value) => storage.setItem(key, value),
   };
@@ -181,7 +196,17 @@ function readEnv(name: string) {
   if (typeof process === "undefined") {
     return undefined;
   }
-  return process.env?.[name]?.trim();
+  return process.env?.[name]?.trim().toLowerCase();
+}
+
+function isAppSessionStorageKey(
+  key: string,
+  appSessionStorageKey: string | readonly string[],
+) {
+  if (Array.isArray(appSessionStorageKey)) {
+    return appSessionStorageKey.includes(key);
+  }
+  return key === appSessionStorageKey;
 }
 
 async function defaultGetAnonymousKey() {

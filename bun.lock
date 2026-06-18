@@ -8,9 +8,6 @@
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
       "version": "0.0.0",
-      "devDependencies": {
-        "@apps-in-toss/framework": "2.6.1",
-      },
       "peerDependencies": {
         "@apps-in-toss/framework": ">=2.4.5",
         "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
@@ -18,7 +15,7 @@
     },
     "packages/trailbase-client": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-client",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "dependencies": {
         "@tanstack/react-db": "0.1.85",
       },
@@ -33,14 +30,14 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "bin": {
         "trailbase-prod-env-validate": "./bin/validate-production-env.mjs",
       },
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.1.6",
+      "version": "0.1.9",
     },
   },
   "packages": {

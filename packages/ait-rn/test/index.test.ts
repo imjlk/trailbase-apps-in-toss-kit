@@ -92,6 +92,23 @@ describe("AppsInToss RN identity helpers", () => {
     ).resolves.toBe("dev-anon_test");
   });
 
+  test("detects production env values case-insensitively", async () => {
+    const previous = process.env.PM_APP_ENV;
+    process.env.PM_APP_ENV = " PRODUCTION ";
+
+    try {
+      await expect(
+        resolveAppsInTossAnonymousHash({
+          getAnonymousKey: async () => "ERROR",
+        }),
+      ).rejects.toMatchObject({
+        code: "ANONYMOUS_KEY_ERROR",
+      });
+    } finally {
+      restoreEnv("PM_APP_ENV", previous);
+    }
+  });
+
   test("detects Apps in Toss RN anonymous hashes", () => {
     expect(isAppsInTossAnonymousHash("ait:user-key")).toBe(true);
     expect(isAppsInTossAnonymousHash("ait: ")).toBe(false);
@@ -140,6 +157,23 @@ describe("AppsInToss RN identity helpers", () => {
     expect(storage.map.get("poll-maker.anonymousHash")).toBe("anon_legacy");
   });
 
+  test("invalidates stored app sessions when production refreshes a legacy hash", async () => {
+    const storage = mapStorage([
+      ["poll-maker.anonymousHash", "anon_legacy"],
+      ["poll-maker.appSession", "session"],
+    ]);
+    const identityStorage = createAppsInTossIdentityStorage(storage, {
+      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      appSessionStorageKey: "poll-maker.appSession",
+      getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
+      production: true,
+    });
+
+    await expect(identityStorage.getItem("poll-maker.appSession")).resolves.toBeNull();
+    expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:user-key");
+    expect(storage.map.get("poll-maker.appSession")).toBe("session");
+  });
+
   test("delegates non-anonymous storage keys", async () => {
     const storage = mapStorage([["poll-maker.appSession", "session"]]);
     const identityStorage = createAppsInTossIdentityStorage(storage, {
@@ -181,7 +215,65 @@ describe("AppsInToss RN identity helpers", () => {
 
     expect(bootstrapAnonymousHash).toBe("ait:user-key");
   });
+
+  test("migrates legacy hashes before restoring stored app sessions", async () => {
+    const storage = createAppsInTossIdentityStorage(
+      mapStorage([
+        ["poll-maker.anonymousHash", "anon_legacy"],
+        [
+          "poll-maker.appSession",
+          JSON.stringify({
+            authProvider: "anonymous",
+            sessionToken: "legacy-session",
+            user: { id: "legacy" },
+          }),
+        ],
+      ]),
+      {
+        anonymousHashStorageKey: "poll-maker.anonymousHash",
+        appSessionStorageKey: "poll-maker.appSession",
+        getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
+        production: true,
+      },
+    );
+    let bootstrapAnonymousHash = "";
+    let loadSessionCalls = 0;
+    const manager = createAppsInTossSessionManager({
+      storage,
+      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      appSessionStorageKey: "poll-maker.appSession",
+      appLogin: async () => ({ authorizationCode: "code", referrer: "DEFAULT" }),
+      bootstrap: async (anonymousHash) => {
+        bootstrapAnonymousHash = anonymousHash;
+        return { sessionToken: "anonymous-session", user: { id: "user-1" } };
+      },
+      completeTossLogin: async () => ({
+        sessionToken: "toss-session",
+        user: { id: "user-1" },
+      }),
+      loadSession: async ({ sessionToken }) => {
+        loadSessionCalls += 1;
+        return { sessionToken, user: { id: "legacy" } };
+      },
+    });
+
+    await expect(manager.getOrCreateAppSession()).resolves.toMatchObject({
+      authProvider: "anonymous",
+      sessionToken: "anonymous-session",
+    });
+
+    expect(loadSessionCalls).toBe(0);
+    expect(bootstrapAnonymousHash).toBe("ait:user-key");
+  });
 });
+
+function restoreEnv(name: string, value: string | undefined) {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
 
 function mapStorage(entries: Array<[string, string]> = []) {
   const map = new Map<string, string>(entries);

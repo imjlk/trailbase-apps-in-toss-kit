@@ -82,6 +82,7 @@ import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trai
 
 const identityStorage = createAppsInTossIdentityStorage(Storage, {
   anonymousHashStorageKey: "my-app.anonymousHash",
+  appSessionStorageKey: "my-app.appSession",
   production: true,
 });
 
@@ -89,6 +90,7 @@ const identityStorage = createAppsInTossIdentityStorage(Storage, {
 export const sessionManager = createAppsInTossSessionManager({
   storage: identityStorage,
   anonymousHashStorageKey: "my-app.anonymousHash",
+  appSessionStorageKey: "my-app.appSession",
   appLogin,
   bootstrap,
   completeTossLogin,
@@ -99,6 +101,9 @@ export const sessionManager = createAppsInTossSessionManager({
 In production, the helper throws `AppsInTossIdentityError` instead of creating
 a random value when the Apps in Toss SDK cannot return a `{ type: "HASH" }`
 result. In dev/test, local runs can opt into the `dev-anon_...` fallback.
+When using a custom app-session storage key, pass the same key to the identity
+storage wrapper so legacy anonymous sessions are ignored after the helper
+refreshes the stored anonymous hash.
 
 For session persistence, wrap the official Apps in Toss `Storage` API and pass
 it to `createAppsInTossSessionManager`. Apps in Toss documents this native
