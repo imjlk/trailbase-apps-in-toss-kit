@@ -3,86 +3,86 @@ import {
   type KeyValueStorage,
 } from "@trailbase-apps-in-toss-kit/trailbase-client";
 
-export const APPS_IN_TOSS_RN_ANONYMOUS_HASH_PREFIX = "ait:";
-export const DEFAULT_APPS_IN_TOSS_RN_ANONYMOUS_HASH_STORAGE_KEY =
+export const APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX = "ait:";
+export const DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY =
   "trailbase.anonymousHash";
 
-export type AppsInTossRnAnonymousKeyResult =
+export type AppsInTossAnonymousKeyResult =
   | { type: "HASH"; hash: string }
   | "ERROR"
   | "INVALID_CATEGORY"
   | undefined;
 
-export type AppsInTossRnGetAnonymousKey = () => Promise<unknown>;
+export type AppsInTossGetAnonymousKey = () => Promise<unknown>;
 
 type AppsInTossFrameworkModule = {
-  getAnonymousKey?: AppsInTossRnGetAnonymousKey;
+  getAnonymousKey?: AppsInTossGetAnonymousKey;
 };
 
-export type AppsInTossRnIdentityErrorCode =
+export type AppsInTossIdentityErrorCode =
   | "ANONYMOUS_KEY_ERROR"
   | "ANONYMOUS_KEY_INVALID_CATEGORY"
   | "ANONYMOUS_KEY_INVALID_RESPONSE"
   | "ANONYMOUS_KEY_THROWN"
   | "ANONYMOUS_KEY_UNSUPPORTED";
 
-export interface AppsInTossRnIdentityErrorOptions {
+export interface AppsInTossIdentityErrorOptions {
   cause?: unknown;
-  code: AppsInTossRnIdentityErrorCode;
+  code: AppsInTossIdentityErrorCode;
   message: string;
 }
 
-export class AppsInTossRnIdentityError extends Error {
-  code: AppsInTossRnIdentityErrorCode;
+export class AppsInTossIdentityError extends Error {
+  code: AppsInTossIdentityErrorCode;
   override cause?: unknown;
 
-  constructor({ cause, code, message }: AppsInTossRnIdentityErrorOptions) {
+  constructor({ cause, code, message }: AppsInTossIdentityErrorOptions) {
     super(message);
-    this.name = "AppsInTossRnIdentityError";
+    this.name = "AppsInTossIdentityError";
     this.code = code;
     this.cause = cause;
   }
 }
 
-export interface ResolveAppsInTossRnAnonymousHashOptions {
+export interface ResolveAppsInTossAnonymousHashOptions {
   createDevFallback?: () => string;
-  getAnonymousKey?: AppsInTossRnGetAnonymousKey;
+  getAnonymousKey?: AppsInTossGetAnonymousKey;
   production?: boolean;
 }
 
-export interface CreateAppsInTossRnIdentityStorageOptions
-  extends ResolveAppsInTossRnAnonymousHashOptions {
+export interface CreateAppsInTossIdentityStorageOptions
+  extends ResolveAppsInTossAnonymousHashOptions {
   anonymousHashStorageKey?: string;
 }
 
-export function isAppsInTossRnAnonymousHash(value: unknown): value is string {
+export function isAppsInTossAnonymousHash(value: unknown): value is string {
   return (
     typeof value === "string" &&
-    value.startsWith(APPS_IN_TOSS_RN_ANONYMOUS_HASH_PREFIX) &&
-    value.slice(APPS_IN_TOSS_RN_ANONYMOUS_HASH_PREFIX.length).trim().length > 0
+    value.startsWith(APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX) &&
+    value.slice(APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX.length).trim().length > 0
   );
 }
 
-export async function resolveAppsInTossRnAnonymousHash({
+export async function resolveAppsInTossAnonymousHash({
   createDevFallback = () => createAnonymousHash({ prefix: "dev-anon" }),
   getAnonymousKey = defaultGetAnonymousKey,
   production = isProductionRuntime(),
-}: ResolveAppsInTossRnAnonymousHashOptions = {}): Promise<string> {
+}: ResolveAppsInTossAnonymousHashOptions = {}): Promise<string> {
   try {
-    const result = (await getAnonymousKey()) as AppsInTossRnAnonymousKeyResult;
+    const result = (await getAnonymousKey()) as AppsInTossAnonymousKeyResult;
     const normalizedHash = anonymousHashFromResult(result);
     if (normalizedHash) {
-      return `${APPS_IN_TOSS_RN_ANONYMOUS_HASH_PREFIX}${normalizedHash}`;
+      return `${APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX}${normalizedHash}`;
     }
     if (production) {
       throw identityErrorFromResult(result);
     }
   } catch (error) {
     if (production) {
-      if (error instanceof AppsInTossRnIdentityError) {
+      if (error instanceof AppsInTossIdentityError) {
         throw error;
       }
-      throw new AppsInTossRnIdentityError({
+      throw new AppsInTossIdentityError({
         cause: error,
         code: "ANONYMOUS_KEY_THROWN",
         message: "Apps in Toss anonymous key request failed.",
@@ -93,12 +93,12 @@ export async function resolveAppsInTossRnAnonymousHash({
   return createDevFallback();
 }
 
-export function createAppsInTossRnIdentityStorage(
+export function createAppsInTossIdentityStorage(
   storage: KeyValueStorage,
   {
-    anonymousHashStorageKey = DEFAULT_APPS_IN_TOSS_RN_ANONYMOUS_HASH_STORAGE_KEY,
+    anonymousHashStorageKey = DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY,
     ...resolverOptions
-  }: CreateAppsInTossRnIdentityStorageOptions = {},
+  }: CreateAppsInTossIdentityStorageOptions = {},
 ): KeyValueStorage {
   const production = resolverOptions.production ?? isProductionRuntime();
 
@@ -109,11 +109,11 @@ export function createAppsInTossRnIdentityStorage(
       }
 
       const existing = await storage.getItem(key);
-      if (existing && (!production || isAppsInTossRnAnonymousHash(existing))) {
+      if (existing && (!production || isAppsInTossAnonymousHash(existing))) {
         return existing;
       }
 
-      const next = await resolveAppsInTossRnAnonymousHash({
+      const next = await resolveAppsInTossAnonymousHash({
         ...resolverOptions,
         production,
       });
@@ -125,7 +125,7 @@ export function createAppsInTossRnIdentityStorage(
 }
 
 function anonymousHashFromResult(
-  result: AppsInTossRnAnonymousKeyResult,
+  result: AppsInTossAnonymousKeyResult,
 ): string | null {
   if (
     result &&
@@ -140,27 +140,27 @@ function anonymousHashFromResult(
 }
 
 function identityErrorFromResult(
-  result: AppsInTossRnAnonymousKeyResult,
-): AppsInTossRnIdentityError {
+  result: AppsInTossAnonymousKeyResult,
+): AppsInTossIdentityError {
   if (result === undefined) {
-    return new AppsInTossRnIdentityError({
+    return new AppsInTossIdentityError({
       code: "ANONYMOUS_KEY_UNSUPPORTED",
       message: "Apps in Toss anonymous key is not supported in this runtime.",
     });
   }
   if (result === "ERROR") {
-    return new AppsInTossRnIdentityError({
+    return new AppsInTossIdentityError({
       code: "ANONYMOUS_KEY_ERROR",
       message: "Apps in Toss anonymous key request returned ERROR.",
     });
   }
   if (result === "INVALID_CATEGORY") {
-    return new AppsInTossRnIdentityError({
+    return new AppsInTossIdentityError({
       code: "ANONYMOUS_KEY_INVALID_CATEGORY",
       message: "Apps in Toss anonymous key is only available for non-game mini-apps.",
     });
   }
-  return new AppsInTossRnIdentityError({
+  return new AppsInTossIdentityError({
     cause: result,
     code: "ANONYMOUS_KEY_INVALID_RESPONSE",
     message: "Apps in Toss anonymous key response was invalid.",

@@ -71,10 +71,10 @@ SDK의 `getAnonymousKey()`가 반환한 `{ type: "HASH", hash }` 값을 기준�
 
 ```ts
 import { Storage } from "@apps-in-toss/native-modules";
-import { createAppsInTossRnIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
+import { createAppsInTossIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
 import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
 
-const identityStorage = createAppsInTossRnIdentityStorage(Storage, {
+const identityStorage = createAppsInTossIdentityStorage(Storage, {
   anonymousHashStorageKey: "my-app.anonymousHash",
   production: true,
 });
@@ -91,7 +91,7 @@ export const sessionManager = createAppsInTossSessionManager({
 ```
 
 운영 환경에서 Apps in Toss SDK가 `{ type: "HASH" }` 값을 반환하지 못하면 helper는 랜덤 값을
-만들지 않고 `AppsInTossRnIdentityError`를 던집니다. dev/test에서는 SDK가 없는 로컬 실행을
+만들지 않고 `AppsInTossIdentityError`를 던집니다. dev/test에서는 SDK가 없는 로컬 실행을
 위해 `dev-anon_...` fallback을 허용할 수 있습니다.
 
 세션 영속성에는 공식 Apps in Toss `Storage` API를 감싸서 `createAppsInTossSessionManager`에

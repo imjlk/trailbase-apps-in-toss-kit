@@ -77,10 +77,10 @@ replaces legacy `anon_...` values with the Apps in Toss key in production.
 
 ```ts
 import { Storage } from "@apps-in-toss/native-modules";
-import { createAppsInTossRnIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
+import { createAppsInTossIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
 import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
 
-const identityStorage = createAppsInTossRnIdentityStorage(Storage, {
+const identityStorage = createAppsInTossIdentityStorage(Storage, {
   anonymousHashStorageKey: "my-app.anonymousHash",
   production: true,
 });
@@ -96,7 +96,7 @@ export const sessionManager = createAppsInTossSessionManager({
 });
 ```
 
-In production, the helper throws `AppsInTossRnIdentityError` instead of creating
+In production, the helper throws `AppsInTossIdentityError` instead of creating
 a random value when the Apps in Toss SDK cannot return a `{ type: "HASH" }`
 result. In dev/test, local runs can opt into the `dev-anon_...` fallback.
 
