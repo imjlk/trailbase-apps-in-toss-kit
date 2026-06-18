@@ -78,8 +78,11 @@ surfaces include:
 - `requestAppsInTossNotificationAgreement` for functional Smart Message agreement result
   normalization.
 - `@trailbase-apps-in-toss-kit/ait-rn` helpers such as `createAppsInTossIdentityStorage`,
+  `createAppsInTossSessionStorage`, `createAppsInTossLoginBridge`,
+  `ensureAppsInTossHapticFallback`, `createPersistentJsonAtom`,
   `resolveAppsInTossAnonymousHash`, and `isAppsInTossAnonymousHash` for RN non-game anonymous
-  identity seeding from Apps in Toss `getAnonymousKey()`.
+  identity seeding, session storage composition, Toss Login bridge injection, TDS haptic runtime
+  compatibility, and tiny app-local JSON state.
 
 Future helper categories should follow the same rule: once the kit exports a reusable helper, use it
 for new app bootstrap or migration work instead of preserving divergent app-local copies. If a helper

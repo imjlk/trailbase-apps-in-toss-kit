@@ -67,7 +67,7 @@ storage, without forwarding the raw SDK event payload.
 The shared `trailbase-client` package does not depend on `@apps-in-toss/*`;
 WebView and React Native apps own the official SDK import.
 
-## Apps in Toss React Native Identity
+## Apps in Toss React Native Session Utilities
 
 For React Native non-game mini-apps, bootstrap anonymous TrailBase `_user`
 records from the `{ type: "HASH", hash }` value returned by the Apps in Toss
@@ -75,23 +75,44 @@ SDK's `getAnonymousKey()`. The `@trailbase-apps-in-toss-kit/ait-rn` package
 normalizes that value to `ait:${hash}` and provides a small storage wrapper that
 replaces legacy `anon_...` values with the Apps in Toss key in production.
 
+Apps that can use the kit's standard key shape should start with
+`createAppsInTossSessionStorage({ appKey })`. For `appKey: "my-app"`, it creates
+`my-app.anonymousHash`, `my-app.appSession`, and `my-app.tossSession`, wraps the
+official Apps in Toss `Storage` API, and applies the anonymous identity wrapper.
+Apps that must keep existing colon or versioned keys should keep using the
+lower-level helpers until they plan a storage-key migration.
+
 ```ts
-import { Storage } from "@apps-in-toss/framework";
-import { createAppsInTossIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
+import {
+  Storage,
+  appLogin,
+  getIsTossLoginIntegratedService,
+} from "@apps-in-toss/framework";
+import {
+  createAppsInTossLoginBridge,
+  createAppsInTossSessionStorage,
+} from "@trailbase-apps-in-toss-kit/ait-rn";
 import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
 
-const identityStorage = createAppsInTossIdentityStorage(Storage, {
-  anonymousHashStorageKey: "my-app.anonymousHash",
-  appSessionStorageKey: "my-app.appSession",
-  production: true,
+const env = process.env.APP_ENV ?? process.env.NODE_ENV;
+const sessionStorage = createAppsInTossSessionStorage({
+  appKey: "my-app",
+  env,
+  storage: Storage,
+});
+const loginBridge = createAppsInTossLoginBridge({
+  appLogin,
+  env,
+  getIsTossLoginIntegratedService,
 });
 
-// appLogin, bootstrap, completeTossLogin, and loadSession are app-owned callbacks.
+// bootstrap, completeTossLogin, and loadSession are app-owned API callbacks.
 export const sessionManager = createAppsInTossSessionManager({
-  storage: identityStorage,
-  anonymousHashStorageKey: "my-app.anonymousHash",
-  appSessionStorageKey: "my-app.appSession",
-  appLogin,
+  storage: sessionStorage.storage,
+  anonymousHashStorageKey: sessionStorage.anonymousHashStorageKey,
+  appSessionStorageKey: sessionStorage.appSessionStorageKey,
+  tossSessionStorageKey: sessionStorage.tossSessionStorageKey,
+  ...loginBridge,
   bootstrap,
   completeTossLogin,
   loadSession,
@@ -105,10 +126,15 @@ When using a custom app-session storage key, pass the same key to the identity
 storage wrapper so legacy anonymous sessions are ignored after the helper
 refreshes the stored anonymous hash.
 
-For session persistence, wrap the official Apps in Toss `Storage` API and pass
-it to `createAppsInTossSessionManager`. Apps in Toss documents this native
-storage as persistent across app restarts and warns against `AsyncStorage` in
-the mini-app runtime.
+`createAppsInTossLoginBridge()` is intentionally only a bridge adapter. It makes
+production SDK unavailability fail closed and gives dev/test a clear fallback
+authorization code, but it leaves `appLogin` result normalization to the shared
+`createAppsInTossSessionManager` and `requestAppsInTossLogin` path.
+
+For lower-level session persistence, wrap the official Apps in Toss `Storage`
+API and pass it to `createAppsInTossSessionManager`. Apps in Toss documents this
+native storage as persistent across app restarts and warns against
+`AsyncStorage` in the mini-app runtime.
 
 ```ts
 import { Storage } from "@apps-in-toss/framework";
@@ -134,6 +160,33 @@ const sessionManager = createAppsInTossSessionManager({
 Local tests can pass `createMemoryKeyValueStorage()` or a localStorage-backed
 adapter as `fallbackStorage`. Production builds should not enable fallback when
 `Storage` is unavailable.
+
+Some runtimes do not expose `GraniteModule.generateHapticFeedback` or
+`BedrockModule.generateHapticFeedback`, which can break TDS components that call
+haptics internally. Install the no-op fallback once from the app entrypoint, and
+keep the React Native import in the app:
+
+```ts
+import { NativeModules } from "react-native";
+import { ensureAppsInTossHapticFallback } from "@trailbase-apps-in-toss-kit/ait-rn";
+
+ensureAppsInTossHapticFallback({ nativeModules: NativeModules });
+```
+
+For tiny app-local JSON state such as intro flags, visit sessions, or counters,
+use `createPersistentJsonAtom()` with the same storage adapter. It provides
+`read`, `write`, and `clear` without adding a React hook or subscription model:
+
+```ts
+import { createPersistentJsonAtom } from "@trailbase-apps-in-toss-kit/ait-rn";
+
+export const introSeenAtom = createPersistentJsonAtom<boolean>({
+  fallback: false,
+  key: "my-app.introSeen",
+  normalize: (value) => (typeof value === "boolean" ? value : null),
+  storage: sessionStorage.storage,
+});
+```
 
 ## TanStack DB
 

@@ -1,5 +1,8 @@
 import {
+  createAppsInTossKeyValueStorage,
   createAnonymousHash,
+  type AppsInTossStorageBridge,
+  type CreateAppsInTossKeyValueStorageOptions,
   type KeyValueStorage,
 } from "@trailbase-apps-in-toss-kit/trailbase-client";
 
@@ -16,9 +19,13 @@ export type AppsInTossAnonymousKeyResult =
   | undefined;
 
 export type AppsInTossGetAnonymousKey = () => Promise<unknown>;
+export type AppsInTossAppLogin = () => Promise<unknown>;
+export type AppsInTossGetIsTossLoginIntegratedService = () => Promise<unknown>;
 
 type AppsInTossFrameworkModule = {
+  appLogin?: AppsInTossAppLogin;
   getAnonymousKey?: AppsInTossGetAnonymousKey;
+  getIsTossLoginIntegratedService?: AppsInTossGetIsTossLoginIntegratedService;
 };
 
 export type AppsInTossIdentityErrorCode =
@@ -46,6 +53,29 @@ export class AppsInTossIdentityError extends Error {
   }
 }
 
+export type AppsInTossLoginBridgeErrorCode =
+  | "APP_LOGIN_UNAVAILABLE"
+  | "APP_LOGIN_THROWN"
+  | "TOSS_LOGIN_INTEGRATION_CHECK_THROWN";
+
+export interface AppsInTossLoginBridgeErrorOptions {
+  cause?: unknown;
+  code: AppsInTossLoginBridgeErrorCode;
+  message: string;
+}
+
+export class AppsInTossLoginBridgeError extends Error {
+  code: AppsInTossLoginBridgeErrorCode;
+  override cause?: unknown;
+
+  constructor({ cause, code, message }: AppsInTossLoginBridgeErrorOptions) {
+    super(message);
+    this.name = "AppsInTossLoginBridgeError";
+    this.code = code;
+    this.cause = cause;
+  }
+}
+
 export interface ResolveAppsInTossAnonymousHashOptions {
   createDevFallback?: () => string;
   getAnonymousKey?: AppsInTossGetAnonymousKey;
@@ -56,6 +86,77 @@ export interface CreateAppsInTossIdentityStorageOptions
   extends ResolveAppsInTossAnonymousHashOptions {
   anonymousHashStorageKey?: string;
   appSessionStorageKey?: string | readonly string[];
+}
+
+export interface CreateAppsInTossSessionStorageOptions
+  extends ResolveAppsInTossAnonymousHashOptions,
+    Pick<
+      CreateAppsInTossKeyValueStorageOptions,
+      "allowFallback" | "fallbackStorage" | "productionRequired"
+    > {
+  appKey: string;
+  env?: string;
+  storage?: AppsInTossStorageBridge | null;
+}
+
+export interface AppsInTossSessionStorage {
+  anonymousHashStorageKey: string;
+  appSessionStorageKey: string;
+  storage: KeyValueStorage;
+  tossSessionStorageKey: string;
+}
+
+export interface CreateAppsInTossLoginBridgeOptions {
+  appLogin?: AppsInTossAppLogin;
+  createDevFallback?: () => unknown | Promise<unknown>;
+  env?: string;
+  getIsTossLoginIntegratedService?: AppsInTossGetIsTossLoginIntegratedService;
+  production?: boolean;
+}
+
+export interface AppsInTossLoginBridge {
+  appLogin: AppsInTossAppLogin;
+  getIsTossLoginIntegratedService: AppsInTossGetIsTossLoginIntegratedService;
+}
+
+export interface AppsInTossHapticFeedbackOptions {
+  type: string;
+}
+
+export interface AppsInTossHapticNativeModule {
+  generateHapticFeedback?: (
+    options: AppsInTossHapticFeedbackOptions,
+  ) => void | Promise<void>;
+  [key: string]: unknown;
+}
+
+export interface AppsInTossNativeModulesWithHaptics {
+  BedrockModule?: AppsInTossHapticNativeModule | null;
+  GraniteModule?: AppsInTossHapticNativeModule | null;
+}
+
+export interface EnsureAppsInTossHapticFallbackOptions {
+  nativeModules?: AppsInTossNativeModulesWithHaptics | null;
+}
+
+export type PersistentJsonFallback<T> = T | (() => T);
+
+export interface PersistentJsonAtomStorage extends KeyValueStorage {
+  removeItem?(key: string): void | Promise<void>;
+}
+
+export interface CreatePersistentJsonAtomOptions<T> {
+  fallback: PersistentJsonFallback<T>;
+  key: string;
+  normalize?: (value: unknown) => T | null | undefined;
+  storage: PersistentJsonAtomStorage;
+}
+
+export interface PersistentJsonAtom<T> {
+  clear(): Promise<void>;
+  key: string;
+  read(): Promise<T>;
+  write(value: T): Promise<void>;
 }
 
 export function isAppsInTossAnonymousHash(value: unknown): value is string {
@@ -141,6 +242,195 @@ export function createAppsInTossIdentityStorage(
   };
 }
 
+export function createAppsInTossSessionStorage({
+  appKey,
+  env,
+  storage,
+  fallbackStorage,
+  allowFallback,
+  productionRequired,
+  ...resolverOptions
+}: CreateAppsInTossSessionStorageOptions): AppsInTossSessionStorage {
+  const normalizedAppKey = appKey.trim();
+  if (!normalizedAppKey) {
+    throw new TypeError("Apps in Toss appKey is required.");
+  }
+
+  const resolvedEnv = resolveRuntimeEnv({
+    env,
+    production: resolverOptions.production,
+  });
+  const production = resolverOptions.production ?? isProductionEnv(resolvedEnv);
+  const anonymousHashStorageKey = `${normalizedAppKey}.anonymousHash`;
+  const appSessionStorageKey = `${normalizedAppKey}.appSession`;
+  const tossSessionStorageKey = `${normalizedAppKey}.tossSession`;
+  const keyValueStorage = createAppsInTossKeyValueStorage({
+    allowFallback,
+    env: resolvedEnv,
+    fallbackStorage,
+    productionRequired,
+    storage,
+  });
+
+  return {
+    anonymousHashStorageKey,
+    appSessionStorageKey,
+    storage: createAppsInTossIdentityStorage(keyValueStorage, {
+      ...resolverOptions,
+      anonymousHashStorageKey,
+      appSessionStorageKey,
+      production,
+    }),
+    tossSessionStorageKey,
+  };
+}
+
+export function createAppsInTossLoginBridge({
+  appLogin,
+  createDevFallback = createDefaultLoginFallback,
+  env,
+  getIsTossLoginIntegratedService,
+  production,
+}: CreateAppsInTossLoginBridgeOptions = {}): AppsInTossLoginBridge {
+  const resolvedProduction =
+    production ?? isProductionEnv(resolveRuntimeEnv({ env, production }));
+
+  return {
+    async appLogin() {
+      const resolvedAppLogin =
+        appLogin ?? (await defaultFrameworkFunction("appLogin"));
+
+      if (!resolvedAppLogin) {
+        return handleLoginBridgeUnavailable({
+          createDevFallback,
+          production: resolvedProduction,
+        });
+      }
+
+      try {
+        return await resolvedAppLogin();
+      } catch (error) {
+        if (resolvedProduction) {
+          throw new AppsInTossLoginBridgeError({
+            cause: error,
+            code: "APP_LOGIN_THROWN",
+            message: "Apps in Toss appLogin request failed.",
+          });
+        }
+        return createDevFallback();
+      }
+    },
+    async getIsTossLoginIntegratedService() {
+      const resolvedCheck =
+        getIsTossLoginIntegratedService ??
+        (await defaultFrameworkFunction("getIsTossLoginIntegratedService"));
+
+      if (!resolvedCheck) {
+        return undefined;
+      }
+
+      try {
+        return await resolvedCheck();
+      } catch (error) {
+        if (resolvedProduction) {
+          throw new AppsInTossLoginBridgeError({
+            cause: error,
+            code: "TOSS_LOGIN_INTEGRATION_CHECK_THROWN",
+            message: "Apps in Toss login integration check failed.",
+          });
+        }
+        return undefined;
+      }
+    },
+  };
+}
+
+export function ensureAppsInTossHapticFallback({
+  nativeModules,
+}: EnsureAppsInTossHapticFallbackOptions = {}): boolean {
+  try {
+    if (!nativeModules) {
+      return false;
+    }
+
+    const hapticModule =
+      nativeModules.GraniteModule ?? nativeModules.BedrockModule ?? {};
+    if (typeof hapticModule.generateHapticFeedback === "function") {
+      return true;
+    }
+
+    Object.defineProperty(nativeModules, "GraniteModule", {
+      configurable: true,
+      enumerable: true,
+      value: {
+        ...hapticModule,
+        generateHapticFeedback: async () => undefined,
+      },
+      writable: true,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function createPersistentJsonAtom<T>({
+  fallback,
+  key,
+  normalize,
+  storage,
+}: CreatePersistentJsonAtomOptions<T>): PersistentJsonAtom<T> {
+  const atom: PersistentJsonAtom<T> = {
+    async clear() {
+      try {
+        if (typeof storage.removeItem === "function") {
+          await storage.removeItem(key);
+          return;
+        }
+        await storage.setItem(key, "");
+      } catch {
+        // Best-effort local state cleanup should never break app bootstrap.
+      }
+    },
+    key,
+    async read() {
+      let raw: string | null;
+      try {
+        raw = await storage.getItem(key);
+      } catch {
+        return resolveFallback(fallback);
+      }
+
+      if (!raw) {
+        return resolveFallback(fallback);
+      }
+
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (!normalize) {
+          return parsed as T;
+        }
+        const normalized = normalize(parsed);
+        if (normalized === null || normalized === undefined) {
+          throw new Error("Persistent JSON atom value failed normalization.");
+        }
+        return normalized;
+      } catch {
+        await atom.clear();
+        return resolveFallback(fallback);
+      }
+    },
+    async write(value) {
+      try {
+        await storage.setItem(key, JSON.stringify(value));
+      } catch {
+        // Persisted UI state is optional; callers can continue with memory state.
+      }
+    },
+  };
+  return atom;
+}
+
 function anonymousHashFromResult(
   result: AppsInTossAnonymousKeyResult,
 ): string | null {
@@ -185,13 +475,34 @@ function identityErrorFromResult(
 }
 
 function isProductionRuntime() {
-  if (typeof process === "undefined") {
-    return false;
+  return isProductionEnv(readRuntimeEnv());
+}
+
+function isProductionEnv(env: string | undefined) {
+  return env?.trim().toLowerCase() === "production";
+}
+
+function readRuntimeEnv() {
+  return readEnv("APP_ENV") ?? readEnv("NODE_ENV");
+}
+
+function resolveRuntimeEnv({
+  env,
+  production,
+}: {
+  env?: string;
+  production?: boolean;
+}) {
+  if (env !== undefined) {
+    return env;
   }
-  return (
-    readEnv("APP_ENV") === "production" ||
-    readEnv("NODE_ENV") === "production"
-  );
+  if (production === true) {
+    return "production";
+  }
+  if (production === false) {
+    return "development";
+  }
+  return readRuntimeEnv() ?? "";
 }
 
 function readEnv(name: string) {
@@ -209,6 +520,46 @@ function isAppSessionStorageKey(
     return appSessionStorageKey.includes(key);
   }
   return key === appSessionStorageKey;
+}
+
+async function handleLoginBridgeUnavailable({
+  createDevFallback,
+  production,
+}: {
+  createDevFallback: () => unknown | Promise<unknown>;
+  production: boolean;
+}) {
+  if (production) {
+    throw new AppsInTossLoginBridgeError({
+      code: "APP_LOGIN_UNAVAILABLE",
+      message: "Apps in Toss appLogin is not available in this runtime.",
+    });
+  }
+  return createDevFallback();
+}
+
+function createDefaultLoginFallback() {
+  return {
+    authorizationCode: createAnonymousHash({ prefix: "dev-auth" }),
+    referrer: "SANDBOX",
+  };
+}
+
+function resolveFallback<T>(fallback: PersistentJsonFallback<T>) {
+  return typeof fallback === "function" ? (fallback as () => T)() : fallback;
+}
+
+async function defaultFrameworkFunction<
+  K extends keyof AppsInTossFrameworkModule,
+>(key: K): Promise<AppsInTossFrameworkModule[K] | undefined> {
+  try {
+    const framework = (await import(
+      "@apps-in-toss/framework"
+    )) as AppsInTossFrameworkModule;
+    return framework[key];
+  } catch {
+    return undefined;
+  }
 }
 
 async function defaultGetAnonymousKey() {

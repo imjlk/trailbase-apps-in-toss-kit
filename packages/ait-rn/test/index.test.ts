@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
   AppsInTossIdentityError,
+  createAppsInTossLoginBridge,
   createAppsInTossIdentityStorage,
+  createAppsInTossSessionStorage,
+  createPersistentJsonAtom,
+  ensureAppsInTossHapticFallback,
   isAppsInTossAnonymousHash,
   resolveAppsInTossAnonymousHash,
 } from "../src/index";
@@ -265,6 +269,216 @@ describe("AppsInToss RN identity helpers", () => {
     expect(loadSessionCalls).toBe(0);
     expect(bootstrapAnonymousHash).toBe("ait:user-key");
   });
+
+  test("creates app-scoped session storage and invalidates legacy sessions", async () => {
+    const storage = mapStorage([
+      ["poll-maker.anonymousHash", "anon_legacy"],
+      ["poll-maker.appSession", "session"],
+    ]);
+    const sessionStorage = createAppsInTossSessionStorage({
+      appKey: "poll-maker",
+      env: "production",
+      getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
+      storage,
+    });
+
+    expect(sessionStorage.anonymousHashStorageKey).toBe(
+      "poll-maker.anonymousHash",
+    );
+    expect(sessionStorage.appSessionStorageKey).toBe("poll-maker.appSession");
+    expect(sessionStorage.tossSessionStorageKey).toBe("poll-maker.tossSession");
+    await expect(
+      sessionStorage.storage.getItem("poll-maker.appSession"),
+    ).resolves.toBeNull();
+    expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:user-key");
+  });
+
+  test("requires native Apps in Toss storage in production session storage", () => {
+    expect(() =>
+      createAppsInTossSessionStorage({
+        appKey: "poll-maker",
+        env: "production",
+      }),
+    ).toThrow("Apps in Toss Storage is required");
+  });
+
+  test("allows fallback session storage outside production", async () => {
+    const sessionStorage = createAppsInTossSessionStorage({
+      appKey: "poll-maker",
+      createDevFallback: () => "dev-anon_local",
+      env: "development",
+    });
+
+    await expect(
+      sessionStorage.storage.getItem("poll-maker.anonymousHash"),
+    ).resolves.toBe("dev-anon_local");
+  });
+
+  test("fails closed when production appLogin is unavailable", async () => {
+    const bridge = createAppsInTossLoginBridge({ production: true });
+
+    await expect(bridge.appLogin()).rejects.toMatchObject({
+      code: "APP_LOGIN_UNAVAILABLE",
+      name: "AppsInTossLoginBridgeError",
+    });
+  });
+
+  test("wraps production appLogin throws", async () => {
+    const bridge = createAppsInTossLoginBridge({
+      appLogin: async () => {
+        throw new Error("bridge failed");
+      },
+      production: true,
+    });
+
+    await expect(bridge.appLogin()).rejects.toMatchObject({
+      code: "APP_LOGIN_THROWN",
+    });
+  });
+
+  test("returns explicit dev appLogin fallbacks outside production", async () => {
+    const bridge = createAppsInTossLoginBridge({
+      createDevFallback: () => ({
+        authorizationCode: "dev-auth-code",
+        referrer: "SANDBOX",
+      }),
+      production: false,
+    });
+
+    await expect(bridge.appLogin()).resolves.toEqual({
+      authorizationCode: "dev-auth-code",
+      referrer: "SANDBOX",
+    });
+  });
+
+  test("normalizes login integration check failures by runtime", async () => {
+    const devBridge = createAppsInTossLoginBridge({
+      getIsTossLoginIntegratedService: async () => {
+        throw new Error("not configured");
+      },
+      production: false,
+    });
+    const prodBridge = createAppsInTossLoginBridge({
+      getIsTossLoginIntegratedService: async () => {
+        throw new Error("not configured");
+      },
+      production: true,
+    });
+    const disabledBridge = createAppsInTossLoginBridge({
+      getIsTossLoginIntegratedService: async () => false,
+      production: true,
+    });
+
+    await expect(
+      devBridge.getIsTossLoginIntegratedService(),
+    ).resolves.toBeUndefined();
+    await expect(prodBridge.getIsTossLoginIntegratedService()).rejects.toMatchObject({
+      code: "TOSS_LOGIN_INTEGRATION_CHECK_THROWN",
+    });
+    await expect(disabledBridge.getIsTossLoginIntegratedService()).resolves.toBe(
+      false,
+    );
+  });
+
+  test("installs haptic fallbacks only when native modules need one", async () => {
+    const generateHapticFeedback = () => undefined;
+    const nativeModules = {
+      GraniteModule: { generateHapticFeedback },
+    };
+    expect(ensureAppsInTossHapticFallback({ nativeModules })).toBe(true);
+    expect(nativeModules.GraniteModule.generateHapticFeedback).toBe(
+      generateHapticFeedback,
+    );
+
+    const missingNativeModules: {
+      GraniteModule?: {
+        generateHapticFeedback?: (
+          options: { type: string },
+        ) => void | Promise<void>;
+      };
+    } = {};
+    expect(
+      ensureAppsInTossHapticFallback({ nativeModules: missingNativeModules }),
+    ).toBe(true);
+    const installedHapticFallback =
+      missingNativeModules.GraniteModule?.generateHapticFeedback;
+    expect(typeof installedHapticFallback).toBe("function");
+    if (!installedHapticFallback) {
+      throw new Error("Expected haptic fallback to be installed.");
+    }
+    await expect(
+      Promise.resolve(installedHapticFallback({ type: "tap" })),
+    ).resolves.toBeUndefined();
+
+    expect(
+      ensureAppsInTossHapticFallback({
+        nativeModules: { BedrockModule: { appVersion: "legacy" } },
+      }),
+    ).toBe(true);
+    expect(
+      ensureAppsInTossHapticFallback({ nativeModules: Object.freeze({}) }),
+    ).toBe(false);
+  });
+
+  test("reads, writes, and clears persistent JSON atoms", async () => {
+    const storage = mapStorage([
+      ["settings", JSON.stringify({ enabled: true })],
+      ["invalid", "not-json"],
+    ]);
+    const settingsAtom = createPersistentJsonAtom<{ enabled: boolean }>({
+      fallback: { enabled: false },
+      key: "settings",
+      normalize: (value) =>
+        value &&
+        typeof value === "object" &&
+        typeof (value as { enabled?: unknown }).enabled === "boolean"
+          ? { enabled: (value as { enabled: boolean }).enabled }
+          : null,
+      storage,
+    });
+    const invalidAtom = createPersistentJsonAtom({
+      fallback: () => ({ enabled: false }),
+      key: "invalid",
+      normalize: () => null,
+      storage,
+    });
+    const countAtom = createPersistentJsonAtom<number>({
+      fallback: 0,
+      key: "count",
+      storage,
+    });
+
+    await expect(settingsAtom.read()).resolves.toEqual({ enabled: true });
+    await expect(invalidAtom.read()).resolves.toEqual({ enabled: false });
+    expect(storage.map.has("invalid")).toBe(false);
+    await countAtom.write(3);
+    expect(storage.map.get("count")).toBe("3");
+    await expect(countAtom.read()).resolves.toBe(3);
+    await countAtom.clear();
+    expect(storage.map.has("count")).toBe(false);
+  });
+
+  test("falls back when persistent JSON storage fails", async () => {
+    const atom = createPersistentJsonAtom<number>({
+      fallback: 7,
+      key: "count",
+      storage: {
+        getItem: () => {
+          throw new Error("read failed");
+        },
+        removeItem: () => {
+          throw new Error("remove failed");
+        },
+        setItem: () => {
+          throw new Error("write failed");
+        },
+      },
+    });
+
+    await expect(atom.read()).resolves.toBe(7);
+    await expect(atom.write(8)).resolves.toBeUndefined();
+    await expect(atom.clear()).resolves.toBeUndefined();
+  });
 });
 
 function restoreEnv(name: string, value: string | undefined) {
@@ -280,6 +494,9 @@ function mapStorage(entries: Array<[string, string]> = []) {
   return {
     getItem: (key: string) => map.get(key) ?? null,
     map,
+    removeItem: (key: string) => {
+      map.delete(key);
+    },
     setItem: (key: string, value: string) => {
       map.set(key, value);
     },
