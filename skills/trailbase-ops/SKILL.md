@@ -1,18 +1,18 @@
 ---
 name: trailbase-ops
-description: Use when working on TrailBase-backed AppsInToss services, including SQL migrations, baseline reset decisions, Record API ACL/config.textproto changes, Rust WASM guests, Coolify deployments, production checks, fresh-start handling, or mTLS proxy operations.
+description: Use when working on TrailBase-backed AppsInToss services, including SQL migrations, baseline reset decisions, Record API ACL/config.textproto changes, Rust WASM guests, React Native client bootstrap adapters, Coolify deployments, production checks, fresh-start handling, or mTLS proxy operations.
 ---
 
 # TrailBase Ops
 
 ## Overview
 
-Use this skill to keep TrailBase schema, WASM, Record API, deployment, and mTLS proxy work safe
-across AppsInToss services.
+Use this skill to keep TrailBase schema, WASM, Record API, client bootstrap, deployment, and mTLS
+proxy work safe across AppsInToss services.
 
 For detailed guardrails, load [references/trailbase-ops.md](references/trailbase-ops.md) when a task
-touches migrations, production data, auth principal mapping, `config.textproto`, Coolify deployment,
-or mTLS certificates.
+touches migrations, production data, auth principal mapping, React Native client/session bootstrap,
+`config.textproto`, Coolify deployment, or mTLS certificates.
 
 This skill is not the source of truth for Apps in Toss SDK/API documentation.
 For Apps in Toss, Toss Login, IAP, Promotion, Smart Message, notification agreement,
@@ -30,8 +30,11 @@ templates, deployment, or the mTLS proxy boundary.
 4. If Record API exposure changes, update `config.textproto` and run the repo ACL/prod checks.
 5. If auth flow changes, preserve the TrailBase `_user` principal path and official auth token flow;
    do not add custom app-owned `users` auth tables.
-6. If Rust WASM changes, run the repo's `wasm32-wasip2` check.
-7. If deployment or proxy settings change, verify production env, Compose shape, and mTLS certificate
+6. If React Native client bootstrap changes, inspect existing kit client adapters before writing
+   app-local SDK/storage/login wrappers. Prefer exported kit helpers and update this skill/reference
+   when new reusable helper APIs are added.
+7. If Rust WASM changes, run the repo's `wasm32-wasip2` check.
+8. If deployment or proxy settings change, verify production env, Compose shape, and mTLS certificate
    mount boundaries.
 
 ## TrailBase CLI
@@ -65,6 +68,10 @@ symlinks by default.
   referrer; do not hand-roll uppercase/lowercase normalization.
 - If an app tracks `profiles.auth_state` or another domain auth-state field, enforce `disabled` in
   custom WASM endpoints as well as in bootstrap alias handling.
+- For TrailBase-backed React Native apps, prefer kit client adapters over app-local SDK wrappers for
+  anonymous identity, Apps in Toss storage, session management, login normalization, notification
+  agreement normalization, and any future helper category exported by the kit. Do not import planned
+  helper names until they exist; first inspect package exports and client-adapter docs.
 - mTLS certificates mount only into the proxy container, never into TrailBase or app containers.
 - Secrets, production env files, certs, raw Toss user keys, HMACs, sealed values, and real logs are
   never committed.

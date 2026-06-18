@@ -1,4 +1,4 @@
 interface:
   display_name: "TrailBase Ops"
-  short_description: "TrailBase auth, migration, and ops guardrails"
-  default_prompt: "Use $trailbase-ops to plan a safe TrailBase auth, migration, WASM, production check, or mTLS proxy operation."
+  short_description: "TrailBase auth, RN bootstrap, migration, and ops guardrails"
+  default_prompt: "Use $trailbase-ops to plan a safe TrailBase auth, React Native client bootstrap, migration, WASM, production check, or mTLS proxy operation."
