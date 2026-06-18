@@ -181,6 +181,71 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 });
 ```
 
+`ait-rn` 패키지는 작은 import를 원하는 앱을 위해 `./identity`, `./storage`, `./login`,
+`./haptics`, `./ads`, `./share` 하위 경로도 노출합니다. 기존 root import는 같은 public API를
+계속 reexport합니다.
+
+Apps in Toss 전면형/보상형 광고에서는 placement 이름, env 변수, 리워드 지급, 서버
+idempotency를 앱에 남기세요. kit는 SDK callback API를 `load -> show` Promise 흐름으로
+바꾸고, `adGroupId`별 preload 중복 제거와 cleanup만 담당합니다. `auto` 모드에서는 sandbox와
+로컬 dev 흐름을 mock 리워드로 처리하고, 앱이 SDK 경로를 의도적으로 검증해야 할 때만
+`rewardMode: "live"`와 앱 소유 sandbox/test 광고 ID를 사용하세요.
+
+```ts
+import { loadFullScreenAd, showFullScreenAd } from "@apps-in-toss/framework";
+import {
+  createAppsInTossFullScreenAdBridge,
+  shouldUseAppsInTossMockAd,
+} from "@trailbase-apps-in-toss-kit/ait-rn/ads";
+
+const ads = createAppsInTossFullScreenAdBridge({
+  loadFullScreenAd,
+  showFullScreenAd,
+});
+
+// sandbox/test 광고 ID는 재사용 kit import graph나 production release bundle이 아니라
+// 앱이 소유한 dev 또는 sandbox 설정에만 두세요. 이 값은 rewardMode가 SDK 경로를
+// 의도적으로 강제할 때만 사용됩니다.
+const adGroupId =
+  operationalEnvironment === "sandbox"
+    ? env.REWARDED_SANDBOX_AD_GROUP_ID
+    : env.REWARDED_AD_GROUP_ID;
+
+if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
+  await grantLocalMockReward();
+} else {
+  const result = await ads.preloadAndShow({
+    adFormat: "rewarded",
+    adGroupId,
+    preloadNext: true,
+  });
+  if (result.earned) {
+    await grantRewardOnServer(result);
+  }
+}
+```
+
+Apps in Toss 공유 링크에서는 문구와 OG 이미지 선택을 앱에 남기세요. share bridge는
+`intoss://` 링크를 정규화하고, 유효한 OG 이미지 URL을 선택적으로 prewarm한 뒤,
+`getTossShareLink()`와 `share()`를 호출하는 얇은 adapter입니다.
+
+```ts
+import { getTossShareLink, share } from "@apps-in-toss/framework";
+import { createAppsInTossShareBridge } from "@trailbase-apps-in-toss-kit/ait-rn/share";
+
+const shareBridge = createAppsInTossShareBridge({
+  getTossShareLink,
+  share,
+});
+
+const tossLink = await shareBridge.shareLink({
+  appName: "my-app",
+  message: "토스에서 이번 라운드에 도전해보세요.",
+  ogImageUrl: "https://example.com/og/round.png",
+  path: "/rounds/current",
+});
+```
+
 ## TanStack DB
 
 TanStack DB 어댑터는 의도적으로 얇게 유지합니다. React Native에서 쓰기 쉬운 SSE 브리지,

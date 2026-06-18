@@ -1,0 +1,62 @@
+import type * as AppsInTossFramework from "@apps-in-toss/framework";
+
+export type AppsInTossAppLogin = typeof AppsInTossFramework.appLogin;
+export type AppsInTossGetAnonymousKey =
+  typeof AppsInTossFramework.getAnonymousKey;
+export type AppsInTossGetIsTossLoginIntegratedService =
+  typeof AppsInTossFramework.getIsTossLoginIntegratedService;
+export type AppsInTossGetOperationalEnvironment =
+  typeof AppsInTossFramework.getOperationalEnvironment;
+export type AppsInTossGetSchemeUri = typeof AppsInTossFramework.getSchemeUri;
+export type AppsInTossGetTossShareLink =
+  typeof AppsInTossFramework.getTossShareLink;
+export type AppsInTossShare = typeof AppsInTossFramework.share;
+
+export type AppsInTossFrameworkCleanup = ReturnType<
+  typeof AppsInTossFramework.loadFullScreenAd
+>;
+export type AppsInTossFullScreenAdOptions =
+  AppsInTossFramework.LoadFullScreenAdOptions;
+export type AppsInTossFullScreenAdParams =
+  | AppsInTossFramework.LoadFullScreenAdParams
+  | AppsInTossFramework.ShowFullScreenAdParams;
+export type AppsInTossLoadFullScreenAd =
+  typeof AppsInTossFramework.loadFullScreenAd;
+export type AppsInTossLoadFullScreenAdEvent =
+  AppsInTossFramework.LoadFullScreenAdEvent;
+export type AppsInTossLoadFullScreenAdParams =
+  AppsInTossFramework.LoadFullScreenAdParams;
+export type AppsInTossShowFullScreenAd =
+  typeof AppsInTossFramework.showFullScreenAd;
+export type AppsInTossShowFullScreenAdEvent =
+  AppsInTossFramework.ShowFullScreenAdEvent;
+export type AppsInTossShowFullScreenAdParams =
+  AppsInTossFramework.ShowFullScreenAdParams;
+
+export type AppsInTossFrameworkModule = Partial<
+  Pick<
+    typeof AppsInTossFramework,
+    | "appLogin"
+    | "getAnonymousKey"
+    | "getIsTossLoginIntegratedService"
+    | "getOperationalEnvironment"
+    | "getSchemeUri"
+    | "getTossShareLink"
+    | "loadFullScreenAd"
+    | "share"
+    | "showFullScreenAd"
+  >
+>;
+
+export async function defaultFrameworkFunction<
+  K extends keyof AppsInTossFrameworkModule,
+>(key: K): Promise<AppsInTossFrameworkModule[K] | undefined> {
+  try {
+    const framework = (await import(
+      "@apps-in-toss/framework"
+    )) as AppsInTossFrameworkModule;
+    return framework[key];
+  } catch {
+    return undefined;
+  }
+}
