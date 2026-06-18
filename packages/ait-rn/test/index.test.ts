@@ -93,8 +93,8 @@ describe("AppsInToss RN identity helpers", () => {
   });
 
   test("detects production env values case-insensitively", async () => {
-    const previous = process.env.PM_APP_ENV;
-    process.env.PM_APP_ENV = " PRODUCTION ";
+    const previous = process.env.APP_ENV;
+    process.env.APP_ENV = " PRODUCTION ";
 
     try {
       await expect(
@@ -105,7 +105,7 @@ describe("AppsInToss RN identity helpers", () => {
         code: "ANONYMOUS_KEY_ERROR",
       });
     } finally {
-      restoreEnv("PM_APP_ENV", previous);
+      restoreEnv("APP_ENV", previous);
     }
   });
 

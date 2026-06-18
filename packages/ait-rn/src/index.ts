@@ -185,8 +185,10 @@ function identityErrorFromResult(
 }
 
 function isProductionRuntime() {
+  if (typeof process === "undefined") {
+    return false;
+  }
   return (
-    readEnv("PM_APP_ENV") === "production" ||
     readEnv("APP_ENV") === "production" ||
     readEnv("NODE_ENV") === "production"
   );
