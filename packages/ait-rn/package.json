@@ -1,0 +1,17 @@
+{
+  "name": "@trailbase-apps-in-toss-kit/ait-rn",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "React Native Apps in Toss SDK bridge helpers for TrailBase consumer apps.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "peerDependencies": {
+    "@apps-in-toss/framework": ">=2.4.5",
+    "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

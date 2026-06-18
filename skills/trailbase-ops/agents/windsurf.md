@@ -7,8 +7,9 @@ globs: "AGENTS.md,apps/trailbase/**,vendor/trailbase-apps-in-toss-kit/**,skills/
 
 Use `skills/trailbase-ops/SKILL.md` as the canonical source. For detailed
 policy, read `skills/trailbase-ops/references/trailbase-ops.md` when changing
-TrailBase migrations, auth principal mapping, Record API ACL, Rust WASM guests,
-Coolify deployment, fresh-start behavior, or mTLS proxy settings.
+TrailBase migrations, auth principal mapping, React Native client bootstrap,
+Record API ACL, Rust WASM guests, Coolify deployment, fresh-start behavior, or
+mTLS proxy settings.
 
 Default behavior:
 
@@ -16,6 +17,8 @@ Default behavior:
 - Do not change baseline SQL for production-like data.
 - Keep anonymous AppsInToss users mapped to TrailBase `_user` via official auth
   tokens and enforce disabled app auth states in WASM endpoints.
+- For React Native client bootstrap, inspect kit client adapter exports and docs
+  before adding app-local SDK/storage/login/session wrappers.
 - Check `config.textproto` whenever Record API exposure changes.
 - Run the repo's `wasm32-wasip2` check after WASM edits.
 - Mount mTLS certificates only into the proxy service.

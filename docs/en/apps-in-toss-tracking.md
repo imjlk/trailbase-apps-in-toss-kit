@@ -19,6 +19,7 @@ only after app-level smoke tests.
 - Smart Message: https://developers-apps-in-toss.toss.im/smart-message/develop.md
 - Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/smart-message/intro.md
 - Notification agreement SDK: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
+- Non-game user identity key: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/비게임/getAnonymousKey.md
 - TDS React Native docs: https://tossmini-docs.toss.im/tds-react-native/
 
 ## Compatibility Policy
@@ -26,6 +27,10 @@ only after app-level smoke tests.
 - Consumer SDK, Granite, and TDS package versions are app-owned.
 - Do not add `@apps-in-toss/framework`, `@granite-js/react-native`, or TDS packages
   to this kit's runtime dependencies just to track upstream.
+- React Native non-game mini-apps should seed anonymous TrailBase principals from
+  the `{ type: "HASH", hash }` result returned by Apps in Toss `getAnonymousKey()`.
+- Random local hashes and `createAnonymousHash()` results are local/dev/test
+  fallbacks, not production identity seeds.
 - Non-game mini-apps must use TDS. TDS is optional for games.
 - New React Native mini-apps should use Granite terminology and framework 1.0 or
   newer.

@@ -18,6 +18,7 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - Smart Message: https://developers-apps-in-toss.toss.im/smart-message/develop.md
 - Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/smart-message/intro.md
 - Notification agreement SDK: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
+- Non-game user identity key: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/비게임/getAnonymousKey.md
 - TDS React Native docs: https://tossmini-docs.toss.im/tds-react-native/
 
 ## 호환성 정책
@@ -25,6 +26,10 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - 컨슈머 SDK, Granite, TDS package version은 앱이 소유합니다.
 - 업스트림 추적만을 위해 이 kit의 runtime dependency에 `@apps-in-toss/framework`,
   `@granite-js/react-native`, TDS package를 추가하지 않습니다.
+- React Native 비게임 mini-app의 익명 TrailBase principal seed는 Apps in Toss
+  `getAnonymousKey()`의 `{ type: "HASH", hash }` 결과를 기준으로 합니다.
+- 랜덤 local hash나 `createAnonymousHash()` 결과는 local/dev/test fallback이며 production
+  identity seed가 아닙니다.
 - 비게임 mini-app은 TDS를 반드시 사용해야 합니다. 게임에서는 TDS가 선택 사항입니다.
 - 신규 React Native mini-app은 Granite 용어와 framework 1.0 이상을 기준으로 합니다.
 - Framework 1.0 이상에서는 `@toss/tds-react-native`를 사용합니다. Legacy framework에서는

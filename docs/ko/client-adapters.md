@@ -23,6 +23,10 @@ kit는 AppsInToss bootstrap endpoint가 반환한 token payload를 정규화하�
 - SSE 파싱
 - React Native 런타임을 위한 `XMLHttpRequest` 기반 스트림 헬퍼
 
+`createAnonymousHash()`는 local/dev/test fallback용 helper입니다. 운영 환경의 Apps in Toss
+React Native 비게임 앱에서는 production identity seed로 쓰지 말고, mini-app scoped
+`getAnonymousKey()` 값을 사용하는 `@trailbase-apps-in-toss-kit/ait-rn` helper를 쓰세요.
+
 도메인별 클라이언트 함수는 앱 패키지에 남기세요. kit는 재사용 가능한 전송 계층과 어댑터
 조각만 제공합니다.
 
@@ -54,8 +58,45 @@ await api.saveNotificationAgreement(agreement);
 이 헬퍼는 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로, `agreementRejected`를
 `OPTED_OUT`으로 바꾸고 `source`를 `apps_in_toss_sdk`로 설정합니다. 기능성 알림 템플릿은
 백엔드 저장용 `template_code`로 반환하되, 원본 SDK 이벤트 payload는 전달하지 않습니다.
-kit는 `@apps-in-toss/*`에 의존하지 않습니다. WebView와 React Native 앱이 공식 SDK import를
-소유합니다.
+공용 `trailbase-client` 패키지는 `@apps-in-toss/*`에 의존하지 않습니다. WebView와 React
+Native 앱이 공식 SDK import를 소유합니다.
+
+## Apps in Toss React Native identity
+
+React Native 비게임 mini-app에서 익명 TrailBase `_user`를 bootstrap할 때는 Apps in Toss
+SDK의 `getAnonymousKey()`가 반환한 `{ type: "HASH", hash }` 값을 기준으로 삼으세요.
+`@trailbase-apps-in-toss-kit/ait-rn` 패키지는 이 값을 `ait:${hash}` 형태로 정규화하고,
+기존 storage에 남아 있던 legacy `anon_...` 값을 운영 환경에서 Apps in Toss key로 교체하는
+작은 storage wrapper를 제공합니다.
+
+```ts
+import { Storage } from "@apps-in-toss/framework";
+import { createAppsInTossIdentityStorage } from "@trailbase-apps-in-toss-kit/ait-rn";
+import { createAppsInTossSessionManager } from "@trailbase-apps-in-toss-kit/trailbase-client";
+
+const identityStorage = createAppsInTossIdentityStorage(Storage, {
+  anonymousHashStorageKey: "my-app.anonymousHash",
+  appSessionStorageKey: "my-app.appSession",
+  production: true,
+});
+
+// appLogin, bootstrap, completeTossLogin, loadSession은 앱이 구현한 callback입니다.
+export const sessionManager = createAppsInTossSessionManager({
+  storage: identityStorage,
+  anonymousHashStorageKey: "my-app.anonymousHash",
+  appSessionStorageKey: "my-app.appSession",
+  appLogin,
+  bootstrap,
+  completeTossLogin,
+  loadSession,
+});
+```
+
+운영 환경에서 Apps in Toss SDK가 `{ type: "HASH" }` 값을 반환하지 못하면 helper는 랜덤 값을
+만들지 않고 `AppsInTossIdentityError`를 던집니다. dev/test에서는 SDK가 없는 로컬 실행을
+위해 `dev-anon_...` fallback을 허용할 수 있습니다.
+앱 세션 storage key를 커스텀했다면 identity storage wrapper에도 같은 key를 전달하세요.
+그래야 저장된 익명 hash를 갱신한 뒤 legacy 익명 세션을 재사용하지 않고 다시 bootstrap합니다.
 
 세션 영속성에는 공식 Apps in Toss `Storage` API를 감싸서 `createAppsInTossSessionManager`에
 전달하세요. Apps in Toss 문서는 이 네이티브 저장소가 앱 재시작 후에도 유지된다고 안내하며,

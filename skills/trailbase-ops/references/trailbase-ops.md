@@ -53,6 +53,52 @@
   the `_user` password to the current secret after a successful previous-secret login.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
 
+## React Native Client Bootstrap And Helpers
+
+When initializing or refactoring a TrailBase-backed AppsInToss React Native app, do not start by
+copying app-local wrappers for SDK identity, storage, login, or session state. First inspect the
+current kit exports and docs:
+
+- `packages/trailbase-client/src/index.ts`
+- `packages/trailbase-client/src/apps-in-toss.ts`
+- `packages/trailbase-client/src/storage.ts`
+- `packages/ait-rn/src/index.ts`
+- `docs/en/client-adapters.md` and `docs/ko/client-adapters.md`
+
+Use helpers that exist in the checked-out kit before writing app-specific code. Current helper
+surfaces include:
+
+- `createAppsInTossSessionManager` for app session restore, anonymous bootstrap, and Toss login
+  upgrade flows while preserving TrailBase `_user` as the authenticated principal.
+- `createAppsInTossKeyValueStorage`, `createMemoryKeyValueStorage`, and
+  `createWebLocalStorageKeyValueStorage` for Apps in Toss `Storage` persistence with explicit
+  dev/test fallbacks.
+- `requestAppsInTossLogin` and `normalizeAppsInTossLoginResult` for Toss Login result normalization
+  and user-facing SDK error messages.
+- `requestAppsInTossNotificationAgreement` for functional Smart Message agreement result
+  normalization.
+- `@trailbase-apps-in-toss-kit/ait-rn` helpers such as `createAppsInTossIdentityStorage`,
+  `resolveAppsInTossAnonymousHash`, and `isAppsInTossAnonymousHash` for RN non-game anonymous
+  identity seeding from Apps in Toss `getAnonymousKey()`.
+
+Future helper categories should follow the same rule: once the kit exports a reusable helper, use it
+for new app bootstrap or migration work instead of preserving divergent app-local copies. If a helper
+is planned but not exported yet, do not import a guessed name. Keep any temporary app-local adapter
+small, document the intended migration, and prefer adding the helper to the kit in a separate PR.
+
+When adding a new reusable helper to the kit, update these in the same PR:
+
+- package exports and tests
+- `docs/en/client-adapters.md` and `docs/ko/client-adapters.md`
+- this `trailbase-ops` skill/reference when the helper affects app bootstrap, auth/session behavior,
+  storage, login, notification agreement, haptics/runtime compatibility, or another repeated
+  AppsInToss integration concern
+- a Sampo changeset when the helper changes package behavior or public API
+
+Do not let this skill replace official Apps in Toss SDK/API documentation. Use official docs tooling
+for SDK signatures and availability, then apply the kit helper preference only after confirming the
+helper exists in the checked-out package.
+
 ## WASM And Runtime Settings
 
 - Run `cargo check --manifest-path apps/trailbase/wasm/Cargo.toml --workspace --target wasm32-wasip2`
