@@ -62,7 +62,7 @@ export function createAppsInTossLoginBridge({
     production ?? isProductionEnv(resolveRuntimeEnv({ env, production }));
 
   return {
-    async appLogin() {
+    async appLogin(): Promise<AppsInTossLoginResult> {
       const resolvedAppLogin =
         appLogin ?? (await defaultFrameworkFunction("appLogin"));
 
@@ -116,9 +116,11 @@ async function handleLoginBridgeUnavailable({
   createDevFallback,
   production,
 }: {
-  createDevFallback: () => unknown | Promise<unknown>;
+  createDevFallback: () =>
+    | AppsInTossLoginResult
+    | Promise<AppsInTossLoginResult>;
   production: boolean;
-}) {
+}): Promise<AppsInTossLoginResult> {
   if (production) {
     throw new AppsInTossLoginBridgeError({
       code: "APP_LOGIN_UNAVAILABLE",
