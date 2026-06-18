@@ -203,6 +203,12 @@ export function shouldUseAppsInTossMockAd({
   if (rewardMode === "mock") {
     return true;
   }
+  if (
+    operationalEnvironment === "sandbox" ||
+    operationalEnvironment === "toss"
+  ) {
+    return false;
+  }
   return isDev;
 }
 
@@ -334,6 +340,8 @@ async function showFullScreenAdAsync({
   return new Promise<AppsInTossFullScreenAdShowResult>((resolve, reject) => {
     let settled = false;
     let cleanup = onceCleanup();
+    let interstitialFallbackTimeout: ReturnType<typeof setTimeout> | null =
+      null;
     let rewardFallbackTimeout: ReturnType<typeof setTimeout> | null = null;
     let requestedAt: number | null = null;
     let shownAt: number | null = null;
@@ -396,6 +404,10 @@ async function showFullScreenAdAsync({
             settleResolve();
             return;
           }
+          if (type === "impression" && adFormat === "interstitial") {
+            scheduleInterstitialFallback();
+            return;
+          }
           if (
             type === "clicked" &&
             adFormat === "interstitial" &&
@@ -440,6 +452,9 @@ async function showFullScreenAdAsync({
             });
       settled = true;
       clearTimeout(timeout);
+      if (interstitialFallbackTimeout != null) {
+        clearTimeout(interstitialFallbackTimeout);
+      }
       if (rewardFallbackTimeout != null) {
         clearTimeout(rewardFallbackTimeout);
       }
@@ -464,11 +479,23 @@ async function showFullScreenAdAsync({
       }
       settled = true;
       clearTimeout(timeout);
+      if (interstitialFallbackTimeout != null) {
+        clearTimeout(interstitialFallbackTimeout);
+      }
       if (rewardFallbackTimeout != null) {
         clearTimeout(rewardFallbackTimeout);
       }
       cleanup();
       reject(error);
+    }
+
+    function scheduleInterstitialFallback() {
+      if (interstitialFallbackTimeout != null) {
+        return;
+      }
+      interstitialFallbackTimeout = setTimeout(() => {
+        settleResolve();
+      }, interstitialCompletionFallbackMs);
     }
   });
 }

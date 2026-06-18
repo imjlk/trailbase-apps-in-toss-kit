@@ -302,18 +302,18 @@ function appendAppsInTossDeepLinkQuery(
   query?: AppsInTossDeepLinkQuery,
 ) {
   const searchParams = createSearchParams(query);
-  if (!searchParams || Array.from(searchParams).length === 0) {
-    return deepLink;
-  }
-
   if (isAppsInTossPrivateDeepLink(deepLink)) {
     const privateDeepLink = appendAppsInTossPrivateDeepLinkQueryParams(
       deepLink,
-      searchParams,
+      searchParams ?? new URLSearchParams(),
     );
     if (privateDeepLink) {
       return privateDeepLink;
     }
+  }
+
+  if (!searchParams || Array.from(searchParams).length === 0) {
+    return deepLink;
   }
 
   try {
@@ -336,14 +336,17 @@ function appendAppsInTossPrivateDeepLinkQueryParams(
     const url = new URL(deepLink);
     const privateTopLevelQueryParams =
       extractAppsInTossPrivateTopLevelQueryParams(url.searchParams);
-    url.searchParams.set(
-      "queryParams",
-      JSON.stringify({
-        ...parsePrivateQueryParams(url.searchParams.get("queryParams")),
-        ...privateTopLevelQueryParams,
-        ...searchParamsToQueryParamsObject(searchParams),
-      }),
-    );
+    const mergedQueryParams = {
+      ...parsePrivateQueryParams(url.searchParams.get("queryParams")),
+      ...privateTopLevelQueryParams,
+      ...searchParamsToQueryParamsObject(searchParams),
+    };
+    if (
+      url.searchParams.has("queryParams") ||
+      Object.keys(mergedQueryParams).length > 0
+    ) {
+      url.searchParams.set("queryParams", JSON.stringify(mergedQueryParams));
+    }
     return url.toString();
   } catch {
     return null;

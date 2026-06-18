@@ -58,6 +58,23 @@ describe("AppsInToss share helpers", () => {
       categoryKey: "daily",
       mode: "preview",
     });
+
+    const normalizedPrivateLink = resolveAppsInTossDeepLink({
+      deepLink:
+        "intoss-private://appsintoss?_deploymentId=dep_123&categoryKey=weekly&tag=a&tag=b",
+    });
+    const normalizedPrivateUrl = new URL(normalizedPrivateLink);
+    expect(normalizedPrivateUrl.searchParams.get("_deploymentId")).toBe(
+      "dep_123",
+    );
+    expect(normalizedPrivateUrl.searchParams.get("categoryKey")).toBeNull();
+    expect(normalizedPrivateUrl.searchParams.get("tag")).toBeNull();
+    expect(
+      JSON.parse(normalizedPrivateUrl.searchParams.get("queryParams") ?? "{}"),
+    ).toEqual({
+      categoryKey: "weekly",
+      tag: ["a", "b"],
+    });
   });
 
   test("normalizes OG image URLs with explicit dev/local allowances", () => {
