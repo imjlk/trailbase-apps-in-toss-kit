@@ -1,5 +1,12 @@
 # trailbase-guest-common
 
+## 0.6.0 — 2026-06-19
+
+### Minor changes
+
+- [8724a22](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/8724a22b6665e9dea5c01869283c1a2a8e3a279f) Add AppsInToss IAP bridge helpers, app-owned grant client utilities, and Rust
+  order-status normalization helpers for TrailBase guest ledgers. — Thanks @imjlk!
+
 ## 0.5.0 — 2026-06-16
 
 ### Minor changes
