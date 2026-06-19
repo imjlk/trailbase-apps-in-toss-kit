@@ -1,10 +1,33 @@
 import {
   defaultFrameworkFunction,
-  type AppsInTossGetOperationalEnvironment,
   type AppsInTossLoadFullScreenAd,
   type AppsInTossShowFullScreenAd,
   type AppsInTossShowFullScreenAdEvent,
 } from "./internal/framework";
+import {
+  createCleanupOnce,
+  isAppsInTossBridgeSupported,
+  withBridgeTimeout,
+} from "./internal/event-bridge";
+import type { AppsInTossOperationalEnvironment } from "./runtime";
+
+export {
+  isAppsInTossProductionRuntime,
+  isAppsInTossRuntimeSupported,
+  isAppsInTossSandbox,
+  safeGetAppsInTossAppVersion,
+  safeGetAppsInTossOperationalEnvironment,
+  safeGetAppsInTossPlatformOS,
+} from "./runtime";
+export type {
+  AppsInTossMinVersionRequirement,
+  AppsInTossOperationalEnvironment,
+  AppsInTossPlatformOS,
+  IsAppsInTossRuntimeSupportedOptions,
+  SafeGetAppsInTossAppVersionOptions,
+  SafeGetAppsInTossOperationalEnvironmentOptions,
+  SafeGetAppsInTossPlatformOSOptions,
+} from "./runtime";
 
 export type {
   AppsInTossFullScreenAdOptions,
@@ -45,7 +68,6 @@ export class AppsInTossAdBridgeError extends Error {
   }
 }
 
-export type AppsInTossOperationalEnvironment = "sandbox" | "toss" | "unknown";
 export type AppsInTossAdRewardMode = "auto" | "live" | "mock";
 export type AppsInTossFullScreenAdFormat = "interstitial" | "rewarded";
 
@@ -230,23 +252,6 @@ export function createAppsInTossFullScreenAdBridge({
   };
 }
 
-export async function safeGetAppsInTossOperationalEnvironment({
-  getOperationalEnvironment,
-}: {
-  getOperationalEnvironment?: AppsInTossGetOperationalEnvironment;
-} = {}): Promise<AppsInTossOperationalEnvironment> {
-  const resolvedGetOperationalEnvironment =
-    getOperationalEnvironment ??
-    (await defaultFrameworkFunction("getOperationalEnvironment"));
-
-  try {
-    const result = resolvedGetOperationalEnvironment?.();
-    return result === "sandbox" || result === "toss" ? result : "unknown";
-  } catch {
-    return "unknown";
-  }
-}
-
 export function shouldUseAppsInTossMockAd({
   isDev,
   operationalEnvironment = "unknown",
@@ -295,15 +300,18 @@ async function loadFullScreenAdAsync({
 
   return new Promise<void>((resolve, reject) => {
     let settled = false;
-    let cleanup = onceCleanup();
-    const timeout = setTimeout(() => {
-      settleReject(
-        new AppsInTossAdBridgeError({
-          code: "AD_LOAD_TIMEOUT",
-          message: "Apps in Toss full-screen ad load timed out.",
-        }),
-      );
-    }, timeoutMs);
+    let cleanup = createCleanupOnce();
+    const clearLoadTimeout = withBridgeTimeout({
+      timeoutMs,
+      onTimeout: () => {
+        settleReject(
+          new AppsInTossAdBridgeError({
+            code: "AD_LOAD_TIMEOUT",
+            message: "Apps in Toss full-screen ad load timed out.",
+          }),
+        );
+      },
+    });
 
     try {
       const nextCleanup = resolvedLoadFullScreenAd({
@@ -322,7 +330,7 @@ async function loadFullScreenAdAsync({
         },
         options: { adGroupId },
       });
-      cleanup = onceCleanup(nextCleanup);
+      cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
         cleanup();
       }
@@ -341,7 +349,7 @@ async function loadFullScreenAdAsync({
         return;
       }
       settled = true;
-      clearTimeout(timeout);
+      clearLoadTimeout();
       cleanup();
       resolve();
     }
@@ -351,7 +359,7 @@ async function loadFullScreenAdAsync({
         return;
       }
       settled = true;
-      clearTimeout(timeout);
+      clearLoadTimeout();
       cleanup();
       reject(error);
     }
@@ -385,7 +393,7 @@ async function showFullScreenAdAsync({
 
   return new Promise<AppsInTossFullScreenAdShowResult>((resolve, reject) => {
     let settled = false;
-    let cleanup = onceCleanup();
+    let cleanup = createCleanupOnce();
     let interstitialFallbackTimeout: ReturnType<typeof setTimeout> | null =
       null;
     let rewardFallbackTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -394,14 +402,17 @@ async function showFullScreenAdAsync({
     let unitAmount: number | undefined;
     let unitType: string | undefined;
     const events: string[] = [];
-    const timeout = setTimeout(() => {
-      settleReject(
-        new AppsInTossAdBridgeError({
-          code: "AD_SHOW_TIMEOUT",
-          message: "Apps in Toss full-screen ad show timed out.",
-        }),
-      );
-    }, timeoutMs);
+    const clearShowTimeout = withBridgeTimeout({
+      timeoutMs,
+      onTimeout: () => {
+        settleReject(
+          new AppsInTossAdBridgeError({
+            code: "AD_SHOW_TIMEOUT",
+            message: "Apps in Toss full-screen ad show timed out.",
+          }),
+        );
+      },
+    });
 
     try {
       const nextCleanup = resolvedShowFullScreenAd({
@@ -471,7 +482,7 @@ async function showFullScreenAdAsync({
         },
         options: { adGroupId },
       });
-      cleanup = onceCleanup(nextCleanup);
+      cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
         cleanup();
       }
@@ -500,7 +511,7 @@ async function showFullScreenAdAsync({
               thresholdMs: interstitialCompletionFallbackMs,
             });
       settled = true;
-      clearTimeout(timeout);
+      clearShowTimeout();
       if (interstitialFallbackTimeout != null) {
         clearTimeout(interstitialFallbackTimeout);
       }
@@ -527,7 +538,7 @@ async function showFullScreenAdAsync({
         return;
       }
       settled = true;
-      clearTimeout(timeout);
+      clearShowTimeout();
       if (interstitialFallbackTimeout != null) {
         clearTimeout(interstitialFallbackTimeout);
       }
@@ -561,31 +572,9 @@ function assertAdSupported(
   sdkFunction: { isSupported?: () => boolean },
   error: { code: AppsInTossAdBridgeErrorCode; message: string },
 ) {
-  if (!safeIsSupported(sdkFunction.isSupported)) {
+  if (!isAppsInTossBridgeSupported(sdkFunction)) {
     throw new AppsInTossAdBridgeError(error);
   }
-}
-
-function safeIsSupported(isSupported: (() => boolean) | undefined) {
-  if (!isSupported) {
-    return true;
-  }
-  try {
-    return isSupported();
-  } catch {
-    return false;
-  }
-}
-
-function onceCleanup(cleanup?: (() => void) | void) {
-  let called = false;
-  return () => {
-    if (called || typeof cleanup !== "function") {
-      return;
-    }
-    called = true;
-    cleanup();
-  };
 }
 
 function normalizeAdEventType(event: AppsInTossShowFullScreenAdEvent) {

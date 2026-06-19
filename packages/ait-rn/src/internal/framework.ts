@@ -7,9 +7,14 @@ export type AppsInTossGetIsTossLoginIntegratedService =
   typeof AppsInTossFramework.getIsTossLoginIntegratedService;
 export type AppsInTossGetOperationalEnvironment =
   typeof AppsInTossFramework.getOperationalEnvironment;
+export type AppsInTossGetPlatformOS = typeof AppsInTossFramework.getPlatformOS;
 export type AppsInTossGetSchemeUri = typeof AppsInTossFramework.getSchemeUri;
+export type AppsInTossGetTossAppVersion =
+  typeof AppsInTossFramework.getTossAppVersion;
 export type AppsInTossGetTossShareLink =
   typeof AppsInTossFramework.getTossShareLink;
+export type AppsInTossIsMinVersionSupported =
+  typeof AppsInTossFramework.isMinVersionSupported;
 export type AppsInTossShare = typeof AppsInTossFramework.share;
 
 export type AppsInTossFrameworkCleanup = ReturnType<
@@ -40,8 +45,11 @@ export type AppsInTossFrameworkModule = Partial<
     | "getAnonymousKey"
     | "getIsTossLoginIntegratedService"
     | "getOperationalEnvironment"
+    | "getPlatformOS"
     | "getSchemeUri"
+    | "getTossAppVersion"
     | "getTossShareLink"
+    | "isMinVersionSupported"
     | "loadFullScreenAd"
     | "share"
     | "showFullScreenAd"
