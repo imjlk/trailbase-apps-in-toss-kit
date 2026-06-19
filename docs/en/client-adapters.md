@@ -42,30 +42,88 @@ future alert, call `requestNotificationAgreement({ options: { templateCode } })`
 from `@apps-in-toss/framework` or `@apps-in-toss/web-framework`, then send the
 result to the app backend so it can persist the agreement before dispatch.
 
-The `./apps-in-toss` subpath reexports the shared Toss Login/session helpers and
-adds a thin notification agreement adapter. Import the official SDK function in
-the app and inject it into the kit helper:
+React Native apps should use the `ait-rn` notification helpers. Import the
+official SDK function in the app and inject it into the bridge:
 
 ```ts
-import { requestNotificationAgreement } from "@apps-in-toss/web-framework";
 import {
-  requestAppsInTossNotificationAgreement,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss";
-
-const agreement = await requestAppsInTossNotificationAgreement({
   requestNotificationAgreement,
-  templateCode: "ORDER_READY",
+} from "@apps-in-toss/framework";
+import {
+  createAppsInTossFunctionalMessageClient,
+  createAppsInTossNotificationAgreementBridge,
+} from "@trailbase-apps-in-toss-kit/ait-rn/notifications";
+
+const notifications = createAppsInTossNotificationAgreementBridge({
+  requestNotificationAgreement,
+});
+const messages = createAppsInTossFunctionalMessageClient({
+  baseUrl: apiBaseUrl,
+  endpoints: {
+    requestMessage: "/api/app/v1/messages/request",
+    syncAgreement: "/api/app/v1/notification-agreements",
+  },
+  getAuthHeaders,
 });
 
-await api.saveNotificationAgreement(agreement);
+const agreement = await notifications.requestAgreement({
+  templateCode: "ORDER_READY_AGREEMENT",
+});
+
+await messages.syncAgreement({
+  result: agreement.result,
+  templateCode: agreement.templateCode,
+});
+
+await messages.requestMessage({
+  agreementTemplateCode: "ORDER_READY_AGREEMENT",
+  context: { orderName: "Sample order" },
+  providerRequestId: "order-ready:order-123",
+  templateSetCode: "ORDER_READY",
+});
 ```
 
-The helper maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
-`agreementRejected` to `OPTED_OUT`, and sets `source` to `apps_in_toss_sdk`.
-It returns the functional notification template as `template_code` for backend
-storage, without forwarding the raw SDK event payload.
-The shared `trailbase-client` package does not depend on `@apps-in-toss/*`;
-WebView and React Native apps own the official SDK import.
+The bridge maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
+`agreementRejected` to `OPTED_OUT`, calls the SDK cleanup once, and fails closed
+in production when the SDK bridge is unavailable. `templateCode` is the
+notification agreement code passed to the SDK. `templateSetCode` is the
+functional message send code used by the backend/proxy. They may be the same in
+simple one-to-one flows, but shared agreement prompts should keep them separate.
+
+The functional message client only calls app-owned backend endpoints. It must
+not call Toss Smart Message APIs, the mTLS proxy, or certificate-backed services
+directly from React Native. The older
+`@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss`
+`requestAppsInTossNotificationAgreement` helper is kept for compatibility but
+is deprecated for new React Native code.
+
+## Apps in Toss Promotion Claims
+
+Use `@trailbase-apps-in-toss-kit/ait-rn/promotion` when RN code needs a generic
+campaign claim client. The client sends an app/backend `campaignId`; it never
+accepts or forwards Toss Console promotion codes, raw Toss user keys, proxy
+tokens, or certificate material.
+
+```ts
+import { createAppsInTossPromotionCampaignClient } from "@trailbase-apps-in-toss-kit/ait-rn/promotion";
+
+const promotions = createAppsInTossPromotionCampaignClient({
+  baseUrl: apiBaseUrl,
+  claimEndpoint: "/api/app/v1/promotions/claim",
+  getAuthHeaders,
+});
+
+const claim = await promotions.claim({
+  campaignId: "daily-attendance",
+  eligibilityId: "attendance-2026-06-19",
+  requestId: "daily-attendance:user-123:2026-06-19",
+});
+```
+
+The backend owns eligibility, idempotency, budget checks, campaign activation,
+Toss promotion code selection, and the mTLS proxy call. The RN helper only
+normalizes common claim results such as `GRANTED`, `ALREADY_GRANTED`,
+`PENDING`, `FAILED`, `NOT_ELIGIBLE`, and `EXHAUSTED`.
 
 ## Apps in Toss React Native Session Utilities
 
@@ -191,8 +249,9 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 ```
 
 The `ait-rn` package also exposes focused subpaths for apps that want smaller
-imports: `./identity`, `./storage`, `./login`, `./haptics`, `./ads`, and
-`./share`. The root import continues to reexport the same public APIs.
+imports: `./identity`, `./storage`, `./login`, `./haptics`, `./ads`,
+`./share`, `./notifications`, and `./promotion`. The root import continues to
+reexport the same public APIs.
 
 For full-screen Apps in Toss ads, keep placement names, env variables, reward
 granting, and server idempotency in the app. The kit only adapts the SDK's

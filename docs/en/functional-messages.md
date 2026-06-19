@@ -70,12 +70,14 @@ Manage Apps in Toss console codes by their role in the app DB:
 1. RN or WebView calls
    `requestNotificationAgreement({ options: { templateCode } })` when a template
    requires prior agreement. Here `templateCode` is the notification agreement
-   code, not the send-template code. Call the cleanup function from `onEvent`
-   and `onError`.
+   code, not the send-template code. React Native apps can use
+   `@trailbase-apps-in-toss-kit/ait-rn/notifications` to wrap the SDK cleanup
+   and normalize the result.
 2. The app stores `newAgreement` and `alreadyAgreed` as `OPTED_IN`, and
    `agreementRejected` as `OPTED_OUT`. TrailBase WASM handlers can use
    `upsert_notification_template_agreement_tx` with the `templateCode` value
-   used by the app-side flow.
+   used by the app-side flow. The same `ait-rn` subpath also provides a generic
+   functional-message client for calling app-owned sync/request endpoints.
 3. The job loads the active Toss identity, checks template status and consent,
    applies idempotency and cooldown rules, then calls
    `/internal/apps-in-toss/smart-message/send` or

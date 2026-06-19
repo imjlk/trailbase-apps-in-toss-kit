@@ -38,28 +38,86 @@ Apps in Toss SDK 호출은 mini-app 런타임 안에서 실행되므로 앱이 �
 `requestNotificationAgreement({ options: { templateCode } })`를 호출한 뒤, 그 결과를 앱
 백엔드로 보내 동의 상태를 저장하고 나서 발송하세요.
 
-`./apps-in-toss` 하위 경로는 공유 Toss Login/session 헬퍼를 다시 내보내고, 얇은 알림 동의
-어댑터를 제공합니다. 공식 SDK 함수는 앱에서 import한 뒤 kit 헬퍼에 주입하세요.
+React Native 앱은 `ait-rn` 알림 helper를 사용하세요. 공식 SDK 함수는 앱에서 import한 뒤
+bridge에 주입합니다.
 
 ```ts
-import { requestNotificationAgreement } from "@apps-in-toss/web-framework";
 import {
-  requestAppsInTossNotificationAgreement,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss";
-
-const agreement = await requestAppsInTossNotificationAgreement({
   requestNotificationAgreement,
-  templateCode: "ORDER_READY",
+} from "@apps-in-toss/framework";
+import {
+  createAppsInTossFunctionalMessageClient,
+  createAppsInTossNotificationAgreementBridge,
+} from "@trailbase-apps-in-toss-kit/ait-rn/notifications";
+
+const notifications = createAppsInTossNotificationAgreementBridge({
+  requestNotificationAgreement,
+});
+const messages = createAppsInTossFunctionalMessageClient({
+  baseUrl: apiBaseUrl,
+  endpoints: {
+    requestMessage: "/api/app/v1/messages/request",
+    syncAgreement: "/api/app/v1/notification-agreements",
+  },
+  getAuthHeaders,
 });
 
-await api.saveNotificationAgreement(agreement);
+const agreement = await notifications.requestAgreement({
+  templateCode: "ORDER_READY_AGREEMENT",
+});
+
+await messages.syncAgreement({
+  result: agreement.result,
+  templateCode: agreement.templateCode,
+});
+
+await messages.requestMessage({
+  agreementTemplateCode: "ORDER_READY_AGREEMENT",
+  context: { orderName: "Sample order" },
+  providerRequestId: "order-ready:order-123",
+  templateSetCode: "ORDER_READY",
+});
 ```
 
-이 헬퍼는 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로, `agreementRejected`를
-`OPTED_OUT`으로 바꾸고 `source`를 `apps_in_toss_sdk`로 설정합니다. 기능성 알림 템플릿은
-백엔드 저장용 `template_code`로 반환하되, 원본 SDK 이벤트 payload는 전달하지 않습니다.
-공용 `trailbase-client` 패키지는 `@apps-in-toss/*`에 의존하지 않습니다. WebView와 React
-Native 앱이 공식 SDK import를 소유합니다.
+bridge는 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로,
+`agreementRejected`를 `OPTED_OUT`으로 바꾸고 SDK cleanup을 한 번만 호출합니다. 운영 환경에서
+SDK bridge가 없으면 fail-closed로 실패합니다. `templateCode`는 SDK에 전달하는 알림 동의문
+코드입니다. `templateSetCode`는 백엔드/proxy가 사용하는 기능성 메시지 발송 코드입니다.
+단순한 1:1 흐름에서는 두 코드가 같을 수 있지만, 여러 발송 템플릿이 하나의 동의문을 공유하는
+경우에는 분리해서 관리하세요.
+
+기능성 메시지 client는 앱이 소유한 백엔드 endpoint만 호출합니다. React Native에서 Toss Smart
+Message API, mTLS proxy, 인증서 기반 서비스를 직접 호출하지 마세요. 기존
+`@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss`의
+`requestAppsInTossNotificationAgreement` helper는 호환을 위해 남아 있지만, 새 React Native
+코드에서는 deprecated입니다.
+
+## Apps in Toss 프로모션 claim
+
+RN 코드에서 campaign claim client가 필요하면
+`@trailbase-apps-in-toss-kit/ait-rn/promotion`을 사용하세요. 이 client는 앱/백엔드
+`campaignId`만 전송합니다. Toss Console promotion code, raw Toss user key, proxy token,
+인증서 자료는 받거나 전달하지 않습니다.
+
+```ts
+import { createAppsInTossPromotionCampaignClient } from "@trailbase-apps-in-toss-kit/ait-rn/promotion";
+
+const promotions = createAppsInTossPromotionCampaignClient({
+  baseUrl: apiBaseUrl,
+  claimEndpoint: "/api/app/v1/promotions/claim",
+  getAuthHeaders,
+});
+
+const claim = await promotions.claim({
+  campaignId: "daily-attendance",
+  eligibilityId: "attendance-2026-06-19",
+  requestId: "daily-attendance:user-123:2026-06-19",
+});
+```
+
+eligibility, idempotency, budget check, campaign 활성화, Toss promotion code 선택, mTLS proxy
+호출은 백엔드가 소유합니다. RN helper는 `GRANTED`, `ALREADY_GRANTED`, `PENDING`, `FAILED`,
+`NOT_ELIGIBLE`, `EXHAUSTED` 같은 공통 claim 결과만 정규화합니다.
 
 ## Apps in Toss React Native 세션 유틸리티
 
@@ -182,8 +240,8 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 ```
 
 `ait-rn` 패키지는 작은 import를 원하는 앱을 위해 `./identity`, `./storage`, `./login`,
-`./haptics`, `./ads`, `./share` 하위 경로도 노출합니다. 기존 root import는 같은 public API를
-계속 reexport합니다.
+`./haptics`, `./ads`, `./share`, `./notifications`, `./promotion` 하위 경로도 노출합니다.
+기존 root import는 같은 public API를 계속 reexport합니다.
 
 Apps in Toss 전면형/보상형 광고에서는 placement 이름, env 변수, 리워드 지급, 서버
 idempotency를 앱에 남기세요. kit는 SDK callback API를 `load -> show` Promise 흐름으로

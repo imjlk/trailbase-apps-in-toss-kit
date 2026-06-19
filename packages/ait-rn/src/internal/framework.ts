@@ -17,6 +17,12 @@ export type AppsInTossIsMinVersionSupported =
   typeof AppsInTossFramework.isMinVersionSupported;
 export type AppsInTossShare = typeof AppsInTossFramework.share;
 
+export type AppsInTossRequestNotificationAgreement = (params: {
+  options: { templateCode: string };
+  onEvent: (event: unknown) => void;
+  onError: (error: unknown) => void | Promise<void>;
+}) => void | (() => void);
+
 export type AppsInTossFrameworkCleanup = ReturnType<
   typeof AppsInTossFramework.loadFullScreenAd
 >;
@@ -54,7 +60,9 @@ export type AppsInTossFrameworkModule = Partial<
     | "share"
     | "showFullScreenAd"
   >
->;
+> & {
+  requestNotificationAgreement?: AppsInTossRequestNotificationAgreement;
+};
 
 export async function defaultFrameworkFunction<
   K extends keyof AppsInTossFrameworkModule,
