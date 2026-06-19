@@ -150,8 +150,21 @@ pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStat
             ],
         ),
         provider_status,
-        reason: read_string_path(response, &["reason", "success.reason", "data.reason"]),
-        sku: read_string_path(response, &["sku", "success.sku", "data.sku"]),
+        reason: read_string_path(
+            response,
+            &["reason", "success.reason", "data.reason", "result.reason"],
+        ),
+        sku: read_string_path(
+            response,
+            &[
+                "sku",
+                "success.sku",
+                "data.sku",
+                "result.sku",
+                "result.productId",
+                "result.product_id",
+            ],
+        ),
         status_determined_at: read_string_path(
             response,
             &[
@@ -159,6 +172,7 @@ pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStat
                 "status_determined_at",
                 "success.statusDeterminedAt",
                 "data.statusDeterminedAt",
+                "result.statusDeterminedAt",
             ],
         ),
         terminal: ledger_status.terminal(),
@@ -253,6 +267,23 @@ mod tests {
         assert_eq!(status.order_id.as_deref(), Some("order-1"));
         assert_eq!(status.ledger_status, IapLedgerStatus::Granted);
         assert!(status.terminal);
+    }
+
+    #[test]
+    fn reads_result_wrapped_order_ids_and_skus() {
+        let status = normalize_iap_order_status_response(&json!({
+            "ok": true,
+            "result": {
+                "orderId": "order-1",
+                "sku": "coins.100",
+                "status": "PAYMENT_COMPLETED"
+            }
+        }));
+
+        assert_eq!(status.order_id.as_deref(), Some("order-1"));
+        assert_eq!(status.sku.as_deref(), Some("coins.100"));
+        assert_eq!(status.ledger_status, IapLedgerStatus::PendingGrant);
+        assert!(status.grant_required);
     }
 
     #[test]

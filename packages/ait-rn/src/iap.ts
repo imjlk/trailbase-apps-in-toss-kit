@@ -168,6 +168,7 @@ export interface AppsInTossIapRestorePendingOrdersOptions {
 
 export interface AppsInTossIapRestoredOrderResult {
   completed: boolean;
+  completionDeferred?: boolean;
   error?: unknown;
   granted: boolean;
   hookError?: unknown;
@@ -200,7 +201,7 @@ export function createAppsInTossIapBridge({
   getPendingOrdersTimeoutMs = 15_000,
   getProductsTimeoutMs = 15_000,
   processProductGrantTimeoutMs = 25_000,
-  purchaseTimeoutMs = 60_000,
+  purchaseTimeoutMs,
 }: CreateAppsInTossIapBridgeOptions = {}): AppsInTossIapBridge {
   async function getIap() {
     const resolvedIap = IAP ?? (await defaultIapSdk());
@@ -368,6 +369,7 @@ export function createAppsInTossIapBridge({
           timeoutMs: grantTimeoutMs,
         });
         let completed = false;
+        const completionDeferred = granted && !completeAfterGrant;
         if (granted && completeAfterGrant) {
           completed = await completeProductGrant({ orderId: order.orderId });
         }
@@ -386,6 +388,7 @@ export function createAppsInTossIapBridge({
         }
         results.push({
           completed,
+          ...(completionDeferred ? { completionDeferred } : {}),
           granted,
           ...(hookError === undefined ? {} : { hookError }),
           order,
@@ -405,9 +408,9 @@ export function createAppsInTossIapBridge({
     }
 
     return {
-      failed: results.filter((result) => !result.granted || !result.completed),
+      failed: results.filter((result) => !restoreResultSucceeded(result)),
       orders,
-      restored: results.filter((result) => result.granted && result.completed),
+      restored: results.filter(restoreResultSucceeded),
       results,
     };
   }
@@ -572,23 +575,26 @@ function requestOneTimePurchase({
   createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder;
   processProductGrant: AppsInTossIapProcessProductGrant;
   processProductGrantTimeoutMs: number;
-  purchaseTimeoutMs: number;
+  purchaseTimeoutMs?: number;
   sku: string;
 }) {
   return new Promise<AppsInTossIapPurchaseResult>((resolve, reject) => {
     let cleanup = createCleanupOnce();
     let settled = false;
-    const clearPurchaseTimeout = withBridgeTimeout({
-      onTimeout: () => {
-        settleReject(
-          new AppsInTossIapBridgeError({
-            code: "IAP_PURCHASE_TIMEOUT",
-            message: "Apps in Toss one-time purchase timed out.",
-          }),
-        );
-      },
-      timeoutMs: purchaseTimeoutMs,
-    });
+    const clearPurchaseTimeout =
+      purchaseTimeoutMs && purchaseTimeoutMs > 0
+        ? withBridgeTimeout({
+            onTimeout: () => {
+              settleReject(
+                new AppsInTossIapBridgeError({
+                  code: "IAP_PURCHASE_TIMEOUT",
+                  message: "Apps in Toss one-time purchase timed out.",
+                }),
+              );
+            },
+            timeoutMs: purchaseTimeoutMs,
+          })
+        : () => undefined;
 
     try {
       const nextCleanup = createOneTimePurchaseOrder({
@@ -855,6 +861,10 @@ function productGrantSucceeded(outcome: AppsInTossIapProductGrantOutcome) {
     return true;
   }
   return outcome.ok === true && !status;
+}
+
+function restoreResultSucceeded(result: AppsInTossIapRestoredOrderResult) {
+  return result.granted && (result.completed || result.completionDeferred === true);
 }
 
 function assertIapAvailable(iap?: AppsInTossIapSdk) {

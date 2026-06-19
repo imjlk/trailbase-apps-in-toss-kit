@@ -130,6 +130,39 @@ describe("AppsInToss IAP bridge", () => {
     expect(cleanupCalls).toBe(1);
   });
 
+  test("does not install a hard checkout timeout by default", async () => {
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    let timeoutCalls = 0;
+    globalThis.setTimeout = ((..._args: Parameters<typeof setTimeout>) => {
+      timeoutCalls += 1;
+      return 0 as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+    globalThis.clearTimeout = (() => undefined) as typeof clearTimeout;
+
+    try {
+      const bridge = createAppsInTossIapBridge({
+        IAP: {
+          createOneTimePurchaseOrder: ({ onError }) => {
+            onError(new Error("purchase canceled"));
+            return () => undefined;
+          },
+        },
+      });
+
+      await expect(
+        bridge.purchaseOneTime({
+          processProductGrant: () => true,
+          sku: "coins.100",
+        }),
+      ).rejects.toThrow("purchase canceled");
+      expect(timeoutCalls).toBe(0);
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  });
+
   test("fails closed when the SDK or method is unavailable or unsupported", async () => {
     const missingBridge = createAppsInTossIapBridge({ IAP: undefined });
     await expect(missingBridge.getProducts()).rejects.toMatchObject({
@@ -219,6 +252,35 @@ describe("AppsInToss IAP bridge", () => {
       hookError,
       order: { orderId: "order-1", sku: "coins.100" },
     });
+  });
+
+  test("classifies deferred restore completion as restored instead of failed", async () => {
+    let completeCalls = 0;
+    const bridge = createAppsInTossIapBridge({
+      IAP: {
+        completeProductGrant: async () => {
+          completeCalls += 1;
+          return true;
+        },
+        getPendingOrders: async () => ({
+          orders: [{ orderId: "order-1", sku: "coins.100" }],
+        }),
+      },
+    });
+
+    const result = await bridge.restorePendingOrders({
+      completeAfterGrant: false,
+      processProductGrant: () => true,
+    });
+
+    expect(result.restored).toHaveLength(1);
+    expect(result.failed).toHaveLength(0);
+    expect(result.results[0]).toMatchObject({
+      completed: false,
+      completionDeferred: true,
+      granted: true,
+    });
+    expect(completeCalls).toBe(0);
   });
 
   test("normalizes SDK errors into user-facing bridge errors", async () => {
