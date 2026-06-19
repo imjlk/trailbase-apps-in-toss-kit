@@ -73,6 +73,25 @@ a safe public projection. Never expose Toss promotion codes, raw Toss user keys,
 provider request ids, transaction keys, or internal error details in public
 Record API views.
 
+## React Native Claim Client
+
+React Native apps can use
+`@trailbase-apps-in-toss-kit/ait-rn/promotion` to call app-owned campaign claim
+endpoints with a generic `campaignId`:
+
+```ts
+await promotions.claim({
+  campaignId: "daily-attendance",
+  eligibilityId: "attendance-2026-06-19",
+  requestId: "daily-attendance:user-123:2026-06-19",
+});
+```
+
+The client normalizes common claim statuses but does not know Toss promotion
+codes, campaign budgets, raw Toss user keys, or proxy tokens. Treat `campaignId`
+as the RN-to-backend contract; the backend resolves that value to campaign
+configuration and ledger state before calling the proxy.
+
 ## Claim Idempotency
 
 Promotion claims should be idempotent at the app ledger layer.

@@ -66,6 +66,23 @@ TOSS_PROMOTION_AMOUNT=50
 흐름에만 노출하세요. Toss 프로모션 코드, 원본 Toss user key, 제공자 요청 ID(provider request
 id), 거래 키(transaction key), 내부 오류 상세를 공개 Record API view에 노출하면 안 됩니다.
 
+## React Native Claim Client
+
+React Native 앱은 `@trailbase-apps-in-toss-kit/ait-rn/promotion`으로 앱이 소유한 campaign
+claim endpoint를 generic `campaignId` 기준으로 호출할 수 있습니다.
+
+```ts
+await promotions.claim({
+  campaignId: "daily-attendance",
+  eligibilityId: "attendance-2026-06-19",
+  requestId: "daily-attendance:user-123:2026-06-19",
+});
+```
+
+이 client는 공통 claim status만 정규화하고 Toss promotion code, 캠페인 예산, 원본 Toss user
+key, proxy token은 알지 않습니다. `campaignId`를 RN과 백엔드 사이의 계약으로 보고, 백엔드는
+이 값을 campaign 설정과 ledger 상태로 해석한 뒤 proxy를 호출하세요.
+
 ## 지급 요청 멱등성
 
 프로모션 지급 요청(claim)은 앱 지급 원장 계층에서 멱등(idempotent)해야 합니다. 즉 같은

@@ -61,11 +61,14 @@ Toss 콘솔 코드는 역할을 분리해서 앱별 DB에서 관리하세요.
 
 1. RN 또는 WebView는 템플릿에 사전 동의가 필요할 때
    `requestNotificationAgreement({ options: { templateCode } })`를 호출합니다. 여기서
-   `templateCode`는 발송 템플릿 코드가 아니라 알림 동의문 코드입니다. `onEvent`와
-   `onError`에서는 반환된 cleanup 함수를 호출하세요.
+   `templateCode`는 발송 템플릿 코드가 아니라 알림 동의문 코드입니다. React Native 앱은
+   `@trailbase-apps-in-toss-kit/ait-rn/notifications`로 SDK cleanup과 결과 정규화를 감쌀 수
+   있습니다.
 2. 앱은 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로, `agreementRejected`를
    `OPTED_OUT`으로 저장합니다. TrailBase WASM 핸들러에서는 앱 흐름에서 SDK에 전달한
    `templateCode` 값과 함께 `upsert_notification_template_agreement_tx`를 사용할 수 있습니다.
+   같은 `ait-rn` 하위 경로는 앱이 소유한 sync/request endpoint를 호출하는 generic 기능성
+   메시지 client도 제공합니다.
 3. 잡은 활성 Toss identity를 읽고, 템플릿 상태와 동의, 멱등 키, 쿨다운을 확인한 뒤 사설
    프록시의 `/internal/apps-in-toss/smart-message/send` 또는
    `/internal/apps-in-toss/smart-message/send-bulk`를 호출합니다. 대량 발송은 같은

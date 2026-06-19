@@ -17,15 +17,28 @@ export {
   type WebStorageLike,
 } from "./storage";
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications` for
+ * React Native Apps in Toss notification agreement helpers.
+ */
 export const APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE = "apps_in_toss_sdk";
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export type AppsInTossNotificationAgreementResult =
   | "newAgreement"
   | "alreadyAgreed"
   | "agreementRejected";
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export type AppsInTossNotificationAgreementStatus = "OPTED_IN" | "OPTED_OUT";
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export interface AppsInTossNotificationAgreementResultPayload {
   template_code: string;
   status: AppsInTossNotificationAgreementStatus;
@@ -33,17 +46,26 @@ export interface AppsInTossNotificationAgreementResultPayload {
   source: typeof APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE;
 }
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export interface AppsInTossNotificationAgreementRequestOptions {
   requestNotificationAgreement: AppsInTossRequestNotificationAgreement;
   templateCode: string;
 }
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export type AppsInTossRequestNotificationAgreement = (params: {
   options: { templateCode: string };
   onEvent: (event: unknown) => void;
   onError: (error: unknown) => void | Promise<void>;
 }) => void | (() => void);
 
+/**
+ * @deprecated Use `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export class AppsInTossNotificationAgreementError extends Error {
   constructor(message: string) {
     super(message);
@@ -51,6 +73,10 @@ export class AppsInTossNotificationAgreementError extends Error {
   }
 }
 
+/**
+ * @deprecated Use `requestAppsInTossNotificationAgreement` from
+ * `@trailbase-apps-in-toss-kit/ait-rn/notifications`.
+ */
 export function requestAppsInTossNotificationAgreement({
   requestNotificationAgreement,
   templateCode,

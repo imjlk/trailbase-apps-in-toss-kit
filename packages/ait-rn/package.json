@@ -10,6 +10,8 @@
     "./haptics": "./src/haptics.ts",
     "./identity": "./src/identity.ts",
     "./login": "./src/login.ts",
+    "./notifications": "./src/notifications.ts",
+    "./promotion": "./src/promotion.ts",
     "./share": "./src/share.ts",
     "./storage": "./src/storage.ts"
   },
