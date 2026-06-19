@@ -1,5 +1,15 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 0.4.2 — 2026-06-19
+
+### Patch changes
+
+- [24695d2](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/24695d2cfcd7efa40b804dc432543255f9e93754) Add React Native Apps in Toss notification agreement, functional-message backend,
+  and promotion campaign claim helpers. Keep the default promotion claim result to
+  public campaign status fields while allowing apps to supply their own
+  `normalizeResponse` for internal/admin projections. Mark the older TrailBase
+  client notification agreement helper as deprecated for compatibility. — Thanks @imjlk!
+
 ## 0.4.1 — 2026-06-16
 
 ### Patch changes
