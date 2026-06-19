@@ -9,6 +9,7 @@
     "./ads": "./src/ads.ts",
     "./haptics": "./src/haptics.ts",
     "./identity": "./src/identity.ts",
+    "./iap": "./src/iap.ts",
     "./login": "./src/login.ts",
     "./notifications": "./src/notifications.ts",
     "./promotion": "./src/promotion.ts",
