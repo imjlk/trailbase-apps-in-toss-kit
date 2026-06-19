@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Snapshot
 
-- Fetched at: 2026-06-16T02:05:58.493Z
+- Fetched at: 2026-06-19T02:09:08.094Z
 
 ## Documents
 
@@ -10,12 +10,12 @@
   - Bytes: 359
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `9b364262d77326f0b3b6486b3a4214f75b1b86bab92ffb9a68e8d947b301dbe3`
-  - Bytes: 53840
+  - SHA-256: `93c7bdc2512ba4b35d88dbea596658bb130b12e722629ebbb30d16ee1ea8314b`
+  - Bytes: 40797
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/tutorials/react-native.md
-  - SHA-256: `8d76e0c820cd11c0bbb89b1ffc807a2f01d3cc8f9ee7ed7b1f595249435b736e`
-  - Bytes: 12515
+  - SHA-256: `6f3ad98b130ef392780c78769965321c7641d01d60b9a0a350ce63b63100911a`
+  - Bytes: 12829
 - SDK overview
   - URL: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/시작하기/intro.md
   - SHA-256: `e5ebc055439c944cad1dbcd78f05a5206b3c03de19739d63d09c99a97a825978`
@@ -30,8 +30,8 @@
   - Bytes: 11067
 - Toss Login development
   - URL: https://developers-apps-in-toss.toss.im/login/develop.md
-  - SHA-256: `4a8cfd907463bc7f4e9cfbb34c8a25794be69fdec553d695b7480c7861bec3b1`
-  - Bytes: 18605
+  - SHA-256: `69ecca473961cd0f3a2b8954e3d321e12129d087b49370d8852b95a42151d103`
+  - Bytes: 19071
 - In-app purchase development
   - URL: https://developers-apps-in-toss.toss.im/iap/develop.md
   - SHA-256: `f72510efbedf29ce3113acf6c7d42f0a4a7a7d3a1aaa368db6deff58fc64c7ad`
@@ -42,16 +42,16 @@
   - Bytes: 3167
 - Smart Message development
   - URL: https://developers-apps-in-toss.toss.im/smart-message/develop.md
-  - SHA-256: `f66832aa303508966b1967acf775537a633eb5c1b2e107277613768e411a5d7b`
-  - Bytes: 17378
+  - SHA-256: `dbe5a64eb1b934f2e01a90bc030ab006d66d58036f1016b44d730767b09484e4`
+  - Bytes: 18004
 - Smart Message overview and notification agreement policy
   - URL: https://developers-apps-in-toss.toss.im/smart-message/intro.md
-  - SHA-256: `c823ac3ac033064798e4c8fe3b911db960b32ea38cd7f67274f2af2e67e8c52a`
-  - Bytes: 21170
+  - SHA-256: `5f184f2944c27ed5955d2c1e4c0457b39dc672a8a7087582c421718d7000feb1`
+  - Bytes: 21449
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
-  - SHA-256: `ca981f04b3d9995223cf04a77bb5fa2a6b6e6d0aaf3278a7ed3ef07a773ccc75`
-  - Bytes: 5682
+  - SHA-256: `6288cfef72004040bc46826f48fb1796a32d6fb6834e95e7045643fe33cc4005`
+  - Bytes: 5712
 - TDS React Native docs
   - URL: https://tossmini-docs.toss.im/tds-react-native/
   - SHA-256: `26f03bab074aecf12d69d2fe80f7e79b073a18fc90af511106f2db22771bbafb`
@@ -59,7 +59,7 @@
 
 ## Reference Packages
 
-- `@apps-in-toss/framework`: 2.8.0
+- `@apps-in-toss/framework`: 2.9.1
 - `@toss/tds-react-native`: 2.0.3
 - `create-granite-app`: 1.0.32
 - `@granite-js/react-native`: 1.0.32
