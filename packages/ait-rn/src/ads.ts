@@ -9,6 +9,11 @@ import {
   isAppsInTossBridgeSupported,
   withBridgeTimeout,
 } from "./internal/event-bridge";
+import {
+  type AppsInTossHeaders,
+  type AppsInTossJsonFetcher,
+  postAppsInTossJson,
+} from "./internal/http";
 import type { AppsInTossOperationalEnvironment } from "./runtime";
 
 export {
@@ -70,6 +75,17 @@ export class AppsInTossAdBridgeError extends Error {
 
 export type AppsInTossAdRewardMode = "auto" | "live" | "mock";
 export type AppsInTossFullScreenAdFormat = "interstitial" | "rewarded";
+export type AppsInTossTestAdGroupFormat =
+  | AppsInTossFullScreenAdFormat
+  | "banner"
+  | "nativeImage";
+
+export const APPS_IN_TOSS_TEST_AD_GROUP_IDS = {
+  banner: "ait-ad-test-banner-id",
+  interstitial: "ait-ad-test-interstitial-id",
+  nativeImage: "ait-ad-test-native-image-id",
+  rewarded: "ait-ad-test-rewarded-id",
+} as const satisfies Record<AppsInTossTestAdGroupFormat, string>;
 
 export interface CreateAppsInTossFullScreenAdBridgeOptions {
   loadFullScreenAd?: AppsInTossLoadFullScreenAd;
@@ -116,6 +132,32 @@ export interface AppsInTossFullScreenAdBridge {
   show(
     options: AppsInTossShowFullScreenAdOptions,
   ): Promise<AppsInTossFullScreenAdShowResult>;
+}
+
+export type AppsInTossAdRewardClaimResult =
+  | "earned"
+  | "failed"
+  | "not_earned"
+  | (string & {});
+
+export interface AppsInTossAdRewardClaimInput {
+  adPlacementId: string;
+  requestId?: string | null;
+  result: AppsInTossAdRewardClaimResult;
+  unitAmount?: number | null;
+  unitType?: string | null;
+}
+
+export interface CreateAppsInTossAdRewardClientOptions<TResult = unknown> {
+  baseUrl?: string;
+  claimEndpoint: string;
+  fetcher?: AppsInTossJsonFetcher;
+  getAuthHeaders?: () => AppsInTossHeaders | Promise<AppsInTossHeaders>;
+  normalizeResponse?: (value: unknown) => TResult;
+}
+
+export interface AppsInTossAdRewardClient<TResult = unknown> {
+  claim(input: AppsInTossAdRewardClaimInput): Promise<TResult>;
 }
 
 interface AppsInTossPreloadedFullScreenAdState {
@@ -249,6 +291,59 @@ export function createAppsInTossFullScreenAdBridge({
       return result;
     },
     show,
+  };
+}
+
+export function getAppsInTossTestAdGroupId(
+  format: AppsInTossTestAdGroupFormat,
+) {
+  const adGroupId = APPS_IN_TOSS_TEST_AD_GROUP_IDS[format];
+  if (!adGroupId) {
+    throw new TypeError("Unsupported Apps in Toss test ad group format.");
+  }
+  return adGroupId;
+}
+
+export function createAppsInTossAdRewardClient<TResult = unknown>({
+  baseUrl,
+  claimEndpoint,
+  fetcher,
+  getAuthHeaders,
+  normalizeResponse,
+}: CreateAppsInTossAdRewardClientOptions<TResult>): AppsInTossAdRewardClient<TResult> {
+  return {
+    async claim({ adPlacementId, requestId, result, unitAmount, unitType }) {
+      const normalizedRequestId = normalizeOptionalString(requestId);
+      const normalizedUnitAmount = normalizeOptionalNumber(
+        unitAmount,
+        "unitAmount",
+      );
+      const normalizedUnitType = normalizeOptionalString(unitType);
+      const payload = await postAppsInTossJson({
+        baseUrl,
+        body: {
+          adPlacementId: normalizeRequiredString(
+            adPlacementId,
+            "Apps in Toss adPlacementId is required.",
+          ),
+          ...(normalizedRequestId ? { requestId: normalizedRequestId } : {}),
+          result: normalizeRequiredString(
+            result,
+            "Apps in Toss ad reward claim result is required.",
+          ),
+          ...(normalizedUnitAmount === undefined
+            ? {}
+            : { unitAmount: normalizedUnitAmount }),
+          ...(normalizedUnitType ? { unitType: normalizedUnitType } : {}),
+        },
+        fetcher,
+        getAuthHeaders,
+        path: claimEndpoint,
+      });
+      return normalizeResponse
+        ? normalizeResponse(payload)
+        : (payload as TResult);
+    },
   };
 }
 
@@ -561,11 +656,36 @@ async function showFullScreenAdAsync({
 }
 
 function normalizeAdGroupId(adGroupId: string) {
-  const normalizedAdGroupId = adGroupId.trim();
-  if (!normalizedAdGroupId) {
-    throw new TypeError("Apps in Toss adGroupId is required.");
+  return normalizeRequiredString(
+    adGroupId,
+    "Apps in Toss adGroupId is required.",
+  );
+}
+
+function normalizeRequiredString(value: string, message: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new TypeError(message);
   }
-  return normalizedAdGroupId;
+  return normalized;
+}
+
+function normalizeOptionalString(value?: string | null) {
+  const normalized = value?.trim();
+  return normalized || undefined;
+}
+
+function normalizeOptionalNumber(
+  value: number | null | undefined,
+  field: string,
+) {
+  if (value == null) {
+    return undefined;
+  }
+  if (!Number.isFinite(value)) {
+    throw new TypeError(`Apps in Toss ${field} must be a finite number.`);
+  }
+  return value;
 }
 
 function assertAdSupported(
