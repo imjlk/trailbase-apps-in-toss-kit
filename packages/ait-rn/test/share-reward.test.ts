@@ -207,32 +207,36 @@ describe("AppsInToss contactsViral share reward bridge", () => {
     expect(called).toBe(false);
   });
 
-  test("normalizes snake_case provider payloads", () => {
-    expect(
-      normalizeAppsInTossContactsViralEvent(
-        {
-          data: {
-            close_reason: "noReward",
-            reward_unit: "coin",
-            sendable_rewards_count: "4",
-            sent_reward_amount: "30",
-            sent_rewards_count: "3",
-          },
-          type: "close",
+  test("normalizes snake_case SDK payloads without exposing raw payloads", () => {
+    const event = normalizeAppsInTossContactsViralEvent(
+      {
+        data: {
+          close_reason: "noReward",
+          reward_unit: "coin",
+          sendable_rewards_count: "4",
+          sent_reward_amount: "30",
+          sent_rewards_count: "3",
+          userKey: "raw-user-key",
         },
-        "module-1",
-      ),
-    ).toMatchObject({
+        type: "close",
+      },
+      "module-1",
+    );
+
+    expect(event).toMatchObject({
       closeReason: "noReward",
       rewardUnit: "coin",
       sendableRewardsCount: 4,
       sentRewardAmount: 30,
       sentRewardsCount: 3,
     });
+    expect(event).not.toHaveProperty("providerPayload");
   });
 
   test("exports the share-reward subpath", async () => {
-    const module = await import("../src/share-reward");
+    const module = await import(
+      "@trailbase-apps-in-toss-kit/ait-rn/share-reward"
+    );
     expect(module.createAppsInTossContactsViralBridge).toBeFunction();
     expect(module.runContactsViralReward).toBeFunction();
   });

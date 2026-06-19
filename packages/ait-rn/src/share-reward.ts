@@ -22,7 +22,6 @@ export type AppsInTossContactsViralEventType = "close" | "sendViral";
 
 export interface AppsInTossContactsViralRewardEvent {
   moduleId: string;
-  providerPayload: unknown;
   rewardAmount: number;
   rewardUnit: string;
   source: typeof APPS_IN_TOSS_CONTACTS_VIRAL_SDK_SOURCE;
@@ -32,7 +31,6 @@ export interface AppsInTossContactsViralRewardEvent {
 export interface AppsInTossContactsViralCloseEvent {
   closeReason?: string;
   moduleId: string;
-  providerPayload: unknown;
   rewardUnit?: string;
   sendableRewardsCount?: number;
   sentRewardAmount?: number;
@@ -210,7 +208,6 @@ export function normalizeAppsInTossContactsViralEvent(
     }
     return {
       moduleId: normalizedModuleId,
-      providerPayload: event,
       rewardAmount,
       rewardUnit,
       source: APPS_IN_TOSS_CONTACTS_VIRAL_SDK_SOURCE,
@@ -230,7 +227,6 @@ export function normalizeAppsInTossContactsViralEvent(
     return {
       closeReason,
       moduleId: normalizedModuleId,
-      providerPayload: event,
       rewardUnit: stringCandidate(data?.rewardUnit, data?.reward_unit),
       sendableRewardsCount: numberCandidate(
         data?.sendableRewardsCount,
