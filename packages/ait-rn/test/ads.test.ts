@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createAppsInTossAdRewardClient,
   createAppsInTossFullScreenAdBridge,
+  getAppsInTossTestAdGroupId,
   safeGetAppsInTossOperationalEnvironment,
   shouldUseAppsInTossMockAd,
   type AppsInTossLoadFullScreenAd,
@@ -612,5 +614,61 @@ describe("AppsInToss full-screen ad bridge", () => {
         },
       }),
     ).resolves.toBe("unknown");
+  });
+
+  test("returns official Apps in Toss test ad group ids", () => {
+    expect(getAppsInTossTestAdGroupId("interstitial")).toBe(
+      "ait-ad-test-interstitial-id",
+    );
+    expect(getAppsInTossTestAdGroupId("rewarded")).toBe(
+      "ait-ad-test-rewarded-id",
+    );
+    expect(getAppsInTossTestAdGroupId("banner")).toBe("ait-ad-test-banner-id");
+    expect(getAppsInTossTestAdGroupId("nativeImage")).toBe(
+      "ait-ad-test-native-image-id",
+    );
+  });
+
+  test("posts rewarded ad claims to an app-owned endpoint", async () => {
+    const requests: Array<{ body: unknown; headers: Headers; url: string }> = [];
+    const client = createAppsInTossAdRewardClient<{ ok: true }>({
+      baseUrl: "https://app.example",
+      claimEndpoint: "/api/ad-rewards/claim",
+      fetcher: async (url, init) => {
+        requests.push({
+          body: JSON.parse(String(init.body)),
+          headers: new Headers(init.headers),
+          url,
+        });
+        return new Response(JSON.stringify({ ok: true }), { status: 200 });
+      },
+      getAuthHeaders: () => ({ Authorization: "Bearer token" }),
+    });
+
+    await expect(
+      client.claim({
+        adPlacementId: " daily-reward ",
+        requestId: " request-1 ",
+        result: "earned",
+        unitAmount: 3,
+        unitType: " coin ",
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(requests).toEqual([
+      {
+        body: {
+          adPlacementId: "daily-reward",
+          requestId: "request-1",
+          result: "earned",
+          unitAmount: 3,
+          unitType: "coin",
+        },
+        headers: expect.any(Headers),
+        url: "https://app.example/api/ad-rewards/claim",
+      },
+    ]);
+    expect(requests[0].headers.get("authorization")).toBe("Bearer token");
+    expect(requests[0].headers.get("content-type")).toBe("application/json");
   });
 });

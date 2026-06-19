@@ -15,6 +15,14 @@ export type AppsInTossGetTossShareLink =
   typeof AppsInTossFramework.getTossShareLink;
 export type AppsInTossIsMinVersionSupported =
   typeof AppsInTossFramework.isMinVersionSupported;
+export type AppsInTossInlineAdComponent = ((...args: any[]) => unknown) & {
+  isSupported?: () => boolean;
+};
+export type AppsInTossInlineAd =
+  | AppsInTossInlineAdComponent
+  | {
+      isSupported: () => boolean;
+    };
 export type AppsInTossShare = typeof AppsInTossFramework.share;
 
 export type AppsInTossContactsViral = ((
@@ -72,6 +80,7 @@ export type AppsInTossFrameworkModule = Partial<
   >
 > & {
   contactsViral?: AppsInTossContactsViral;
+  InlineAd?: AppsInTossInlineAd;
   requestNotificationAgreement?: AppsInTossRequestNotificationAgreement;
 };
 
