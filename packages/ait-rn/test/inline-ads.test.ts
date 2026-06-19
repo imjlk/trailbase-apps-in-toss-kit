@@ -31,6 +31,28 @@ describe("AppsInToss inline ad helpers", () => {
       }),
     ).resolves.toBe(true);
 
+    await expect(
+      isAppsInTossInlineAdSupported({
+        InlineAd: { isSupported: () => true },
+        isMinVersionSupported: () => true,
+        operationalEnvironment: "sandbox",
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      isAppsInTossInlineAdSupported({
+        InlineAd: { isSupported: () => true },
+        getOperationalEnvironment: () => "sandbox",
+        isMinVersionSupported: () => true,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      isAppsInTossInlineAdSupported({
+        InlineAd: { isSupported: () => true },
+        isMinVersionSupported: () => true,
+        operationalEnvironment: "toss",
+      }),
+    ).resolves.toBe(true);
+
     const throwingInlineAd = {
       isSupported: () => {
         throw new Error("unsupported runtime");

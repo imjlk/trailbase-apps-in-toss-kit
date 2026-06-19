@@ -1,5 +1,6 @@
 import {
   defaultFrameworkFunction,
+  type AppsInTossGetOperationalEnvironment,
   type AppsInTossInlineAd,
   type AppsInTossIsMinVersionSupported,
 } from "./internal/framework";
@@ -7,7 +8,9 @@ import { isAppsInTossBridgeSupported } from "./internal/event-bridge";
 import { getAppsInTossTestAdGroupId } from "./ads";
 import {
   isAppsInTossRuntimeSupported,
+  safeGetAppsInTossOperationalEnvironment,
   type AppsInTossMinVersionRequirement,
+  type AppsInTossOperationalEnvironment,
 } from "./runtime";
 
 export type { AppsInTossInlineAd } from "./internal/framework";
@@ -19,9 +22,11 @@ export type AppsInTossInlineAdFormat = "banner" | "nativeImage";
 
 export interface IsAppsInTossInlineAdSupportedOptions {
   InlineAd?: AppsInTossInlineAd | null;
+  getOperationalEnvironment?: AppsInTossGetOperationalEnvironment;
   isMinVersionSupported?: AppsInTossIsMinVersionSupported;
   minAndroid?: AppsInTossMinVersionRequirement;
   minIos?: AppsInTossMinVersionRequirement;
+  operationalEnvironment?: AppsInTossOperationalEnvironment;
 }
 
 export type AppsInTossInlineAdRenderState =
@@ -53,10 +58,12 @@ export interface AppsInTossInlineAdPlaceholderDecision {
 }
 
 export async function isAppsInTossInlineAdSupported({
+  getOperationalEnvironment,
   InlineAd,
   isMinVersionSupported,
   minAndroid = APPS_IN_TOSS_INLINE_AD_MIN_VERSION,
   minIos = APPS_IN_TOSS_INLINE_AD_MIN_VERSION,
+  operationalEnvironment,
 }: IsAppsInTossInlineAdSupportedOptions = {}) {
   const resolvedInlineAd =
     InlineAd ?? (await defaultFrameworkFunction("InlineAd"));
@@ -64,6 +71,15 @@ export async function isAppsInTossInlineAdSupported({
     return false;
   }
   if (!isAppsInTossBridgeSupported(resolvedInlineAd)) {
+    return false;
+  }
+
+  const resolvedOperationalEnvironment =
+    operationalEnvironment ??
+    (await safeGetAppsInTossOperationalEnvironment({
+      getOperationalEnvironment,
+    }));
+  if (resolvedOperationalEnvironment === "sandbox") {
     return false;
   }
 
