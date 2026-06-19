@@ -359,8 +359,9 @@ export function createAppsInTossIapBridge({
     const results: AppsInTossIapRestoredOrderResult[] = [];
 
     for (const order of orders) {
+      let granted = false;
       try {
-        const granted = await runProductGrant({
+        granted = await runProductGrant({
           orderId: order.orderId,
           processProductGrant,
           providerPayload: order,
@@ -397,7 +398,7 @@ export function createAppsInTossIapBridge({
         const result = {
           completed: false,
           error,
-          granted: false,
+          granted,
           order,
         };
         results.push(result);
@@ -649,7 +650,7 @@ function requestOneTimePurchase({
       });
       cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
-        cleanup();
+        cleanupBestEffort();
       }
     } catch (error) {
       settleReject(
@@ -670,8 +671,8 @@ function requestOneTimePurchase({
       }
       settled = true;
       clearPurchaseTimeout();
-      cleanup();
       resolve(result);
+      cleanupBestEffort();
     }
 
     function settleReject(error: unknown) {
@@ -680,8 +681,16 @@ function requestOneTimePurchase({
       }
       settled = true;
       clearPurchaseTimeout();
-      cleanup();
       reject(error);
+      cleanupBestEffort();
+    }
+
+    function cleanupBestEffort() {
+      try {
+        cleanup();
+      } catch {
+        // SDK cleanup should never keep the purchase promise unsettled.
+      }
     }
   });
 }

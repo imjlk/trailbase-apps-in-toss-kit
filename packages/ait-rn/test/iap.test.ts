@@ -84,6 +84,35 @@ describe("AppsInToss IAP bridge", () => {
     expect(cleanupCalls).toBe(1);
   });
 
+  test("settles purchase promises when SDK cleanup throws", async () => {
+    const cleanupError = new Error("cleanup failed");
+    const createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder =
+      ({ onEvent, options }) => {
+        void options.processProductGrant({ orderId: "order-1" }).then(() => {
+          onEvent({
+            data: { orderId: "order-1" },
+            type: "success",
+          });
+        });
+        return () => {
+          throw cleanupError;
+        };
+      };
+    const bridge = createAppsInTossIapBridge({
+      IAP: { createOneTimePurchaseOrder },
+    });
+
+    await expect(
+      bridge.purchaseOneTime({
+        processProductGrant: () => true,
+        sku: "coins.100",
+      }),
+    ).resolves.toMatchObject({
+      orderId: "order-1",
+      sku: "coins.100",
+    });
+  });
+
   test("rejects and cleans up when product grant times out", async () => {
     let cleanupCalls = 0;
     const createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder =
@@ -250,6 +279,33 @@ describe("AppsInToss IAP bridge", () => {
       completed: true,
       granted: true,
       hookError,
+      order: { orderId: "order-1", sku: "coins.100" },
+    });
+  });
+
+  test("preserves grant state when pending order completion fails", async () => {
+    const completionError = new Error("completion failed");
+    const bridge = createAppsInTossIapBridge({
+      IAP: {
+        completeProductGrant: async () => {
+          throw completionError;
+        },
+        getPendingOrders: async () => ({
+          orders: [{ orderId: "order-1", sku: "coins.100" }],
+        }),
+      },
+    });
+
+    const result = await bridge.restorePendingOrders({
+      processProductGrant: () => true,
+    });
+
+    expect(result.restored).toHaveLength(0);
+    expect(result.failed).toHaveLength(1);
+    expect(result.results[0]).toMatchObject({
+      completed: false,
+      error: completionError,
+      granted: true,
       order: { orderId: "order-1", sku: "coins.100" },
     });
   });
