@@ -77,7 +77,7 @@ pub struct IdempotentIapRestoreResponse {
 pub fn iap_ledger_status_for_provider_status(provider_status: &str) -> IapLedgerStatus {
     match provider_status.trim().to_ascii_uppercase().as_str() {
         "PAYMENT_COMPLETED" => IapLedgerStatus::PendingGrant,
-        "PURCHASED" => IapLedgerStatus::Granted,
+        "PURCHASED" | "GRANTED" | "ALREADY_GRANTED" | "COMPLETED" => IapLedgerStatus::Granted,
         "REFUNDED" => IapLedgerStatus::Refunded,
         "FAILED" | "ERROR" | "MINIAPP_MISMATCH" => IapLedgerStatus::Failed,
         "NOT_FOUND" => IapLedgerStatus::NotFound,
@@ -113,9 +113,8 @@ pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStat
         }
     });
     let ledger_status = iap_ledger_status_for_provider_status(&provider_status);
-
-    IapOrderStatus {
-        failure_reason: read_string_path(
+    let failure_reason = if ledger_status == IapLedgerStatus::Failed {
+        read_string_path(
             response,
             &[
                 "failureReason",
@@ -124,11 +123,32 @@ pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStat
                 "error",
                 "reason",
             ],
-        ),
+        )
+    } else {
+        read_string_path(
+            response,
+            &["failureReason", "failure_reason", "message", "error"],
+        )
+    };
+
+    IapOrderStatus {
+        failure_reason,
         grant_required: ledger_status.grant_required(),
         ledger_status,
         ok,
-        order_id: read_string_path(response, &["orderId", "order_id", "success.orderId"]),
+        order_id: read_string_path(
+            response,
+            &[
+                "orderId",
+                "order_id",
+                "success.orderId",
+                "success.order_id",
+                "data.orderId",
+                "data.order_id",
+                "result.orderId",
+                "result.order_id",
+            ],
+        ),
         provider_status,
         reason: read_string_path(response, &["reason", "success.reason", "data.reason"]),
         sku: read_string_path(response, &["sku", "success.sku", "data.sku"]),
@@ -182,6 +202,10 @@ mod tests {
             IapLedgerStatus::Granted
         );
         assert_eq!(
+            iap_ledger_status_for_provider_status("GRANTED"),
+            IapLedgerStatus::Granted
+        );
+        assert_eq!(
             iap_ledger_status_for_provider_status("REFUNDED"),
             IapLedgerStatus::Refunded
         );
@@ -209,8 +233,26 @@ mod tests {
         assert_eq!(status.order_id.as_deref(), Some("order-1"));
         assert_eq!(status.sku.as_deref(), Some("coins.100"));
         assert_eq!(status.ledger_status, IapLedgerStatus::PendingGrant);
+        assert_eq!(status.failure_reason, None);
+        assert_eq!(status.reason.as_deref(), Some("paid"));
         assert!(status.grant_required);
         assert!(!status.terminal);
+    }
+
+    #[test]
+    fn reads_nested_order_ids_from_wrapped_status_responses() {
+        let status = normalize_iap_order_status_response(&json!({
+            "ok": true,
+            "data": {
+                "orderId": "order-1",
+                "sku": "coins.100",
+                "status": "PURCHASED"
+            }
+        }));
+
+        assert_eq!(status.order_id.as_deref(), Some("order-1"));
+        assert_eq!(status.ledger_status, IapLedgerStatus::Granted);
+        assert!(status.terminal);
     }
 
     #[test]

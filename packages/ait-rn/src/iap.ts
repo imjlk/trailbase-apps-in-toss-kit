@@ -170,6 +170,7 @@ export interface AppsInTossIapRestoredOrderResult {
   completed: boolean;
   error?: unknown;
   granted: boolean;
+  hookError?: unknown;
   order: AppsInTossIapPendingOrder;
 }
 
@@ -370,15 +371,25 @@ export function createAppsInTossIapBridge({
         if (granted && completeAfterGrant) {
           completed = await completeProductGrant({ orderId: order.orderId });
         }
+        let hookError: unknown;
         if (granted && completed) {
-          await onProductGrantCompleted?.({
-            orderId: order.orderId,
-            providerPayload: order,
-            sku: order.sku,
-            source: "restore",
-          });
+          try {
+            await onProductGrantCompleted?.({
+              orderId: order.orderId,
+              providerPayload: order,
+              sku: order.sku,
+              source: "restore",
+            });
+          } catch (error) {
+            hookError = error;
+          }
         }
-        results.push({ completed, granted, order });
+        results.push({
+          completed,
+          granted,
+          ...(hookError === undefined ? {} : { hookError }),
+          order,
+        });
       } catch (error) {
         const result = {
           completed: false,
@@ -830,6 +841,9 @@ function productGrantSucceeded(outcome: AppsInTossIapProductGrantOutcome) {
   }
   if (outcome.granted === true || outcome.alreadyGranted === true) {
     return true;
+  }
+  if (outcome.granted === false || outcome.alreadyGranted === false) {
+    return false;
   }
   const status = outcome.status?.trim().toUpperCase();
   if (

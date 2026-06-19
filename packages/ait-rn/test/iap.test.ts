@@ -108,6 +108,28 @@ describe("AppsInToss IAP bridge", () => {
     expect(cleanupCalls).toBe(1);
   });
 
+  test("rejects explicit product grant denial responses", async () => {
+    let cleanupCalls = 0;
+    const createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder =
+      ({ options }) => {
+        void options.processProductGrant({ orderId: "order-1" });
+        return () => {
+          cleanupCalls += 1;
+        };
+      };
+    const bridge = createAppsInTossIapBridge({
+      IAP: { createOneTimePurchaseOrder },
+    });
+
+    await expect(
+      bridge.purchaseOneTime({
+        processProductGrant: () => ({ granted: false, ok: true }),
+        sku: "coins.100",
+      }),
+    ).rejects.toMatchObject({ code: "IAP_PRODUCT_GRANT_FAILED" });
+    expect(cleanupCalls).toBe(1);
+  });
+
   test("fails closed when the SDK or method is unavailable or unsupported", async () => {
     const missingBridge = createAppsInTossIapBridge({ IAP: undefined });
     await expect(missingBridge.getProducts()).rejects.toMatchObject({
@@ -169,6 +191,34 @@ describe("AppsInToss IAP bridge", () => {
         source: "restore",
       },
     ]);
+  });
+
+  test("preserves restored order success when the completion hook throws", async () => {
+    const hookError = new Error("cache write failed");
+    const bridge = createAppsInTossIapBridge({
+      IAP: {
+        completeProductGrant: async () => true,
+        getPendingOrders: async () => ({
+          orders: [{ orderId: "order-1", sku: "coins.100" }],
+        }),
+      },
+    });
+
+    const result = await bridge.restorePendingOrders({
+      onProductGrantCompleted: () => {
+        throw hookError;
+      },
+      processProductGrant: () => true,
+    });
+
+    expect(result.restored).toHaveLength(1);
+    expect(result.failed).toHaveLength(0);
+    expect(result.results[0]).toMatchObject({
+      completed: true,
+      granted: true,
+      hookError,
+      order: { orderId: "order-1", sku: "coins.100" },
+    });
   });
 
   test("normalizes SDK errors into user-facing bridge errors", async () => {
