@@ -1,6 +1,7 @@
 export * from "./ads";
 export * from "./haptics";
 export * from "./identity";
+export * from "./iap";
 export * from "./login";
 export * from "./notifications";
 export * from "./promotion";
