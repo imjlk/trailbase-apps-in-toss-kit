@@ -52,6 +52,20 @@ describe("AppsInToss inline ad helpers", () => {
         operationalEnvironment: "toss",
       }),
     ).resolves.toBe(true);
+    await expect(
+      isAppsInTossInlineAdSupported({
+        InlineAd: (() => undefined) satisfies AppsInTossInlineAd,
+        isMinVersionSupported: () => true,
+        operationalEnvironment: "toss",
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      isAppsInTossInlineAdSupported({
+        InlineAd: null,
+        isMinVersionSupported: () => true,
+        operationalEnvironment: "toss",
+      }),
+    ).resolves.toBe(false);
 
     const throwingInlineAd = {
       isSupported: () => {

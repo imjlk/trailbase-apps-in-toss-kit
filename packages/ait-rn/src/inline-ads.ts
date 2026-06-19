@@ -66,7 +66,9 @@ export async function isAppsInTossInlineAdSupported({
   operationalEnvironment,
 }: IsAppsInTossInlineAdSupportedOptions = {}) {
   const resolvedInlineAd =
-    InlineAd ?? (await defaultFrameworkFunction("InlineAd"));
+    InlineAd === undefined
+      ? await defaultFrameworkFunction("InlineAd")
+      : InlineAd;
   if (!resolvedInlineAd) {
     return false;
   }

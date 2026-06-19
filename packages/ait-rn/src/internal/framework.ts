@@ -15,9 +15,14 @@ export type AppsInTossGetTossShareLink =
   typeof AppsInTossFramework.getTossShareLink;
 export type AppsInTossIsMinVersionSupported =
   typeof AppsInTossFramework.isMinVersionSupported;
-export type AppsInTossInlineAd = {
+export type AppsInTossInlineAdComponent = ((...args: any[]) => unknown) & {
   isSupported?: () => boolean;
 };
+export type AppsInTossInlineAd =
+  | AppsInTossInlineAdComponent
+  | {
+      isSupported: () => boolean;
+    };
 export type AppsInTossShare = typeof AppsInTossFramework.share;
 
 export type AppsInTossContactsViral = ((
