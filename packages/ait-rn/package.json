@@ -12,6 +12,7 @@
     "./login": "./src/login.ts",
     "./notifications": "./src/notifications.ts",
     "./promotion": "./src/promotion.ts",
+    "./runtime": "./src/runtime.ts",
     "./share": "./src/share.ts",
     "./storage": "./src/storage.ts"
   },

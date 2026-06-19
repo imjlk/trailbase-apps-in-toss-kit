@@ -317,6 +317,8 @@ function isForbiddenPromotionClientKey(key: string) {
     "rawtossuserkey",
     "tosspromotioncode",
     "tossuserkey",
+    "tossuserkeyhmac",
+    "tossuserkeysealed",
     "userkey",
   ].includes(normalized);
 }

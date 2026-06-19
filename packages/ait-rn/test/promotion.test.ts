@@ -41,8 +41,15 @@ describe("AppsInToss promotion helpers", () => {
           raw_toss_user_key: "raw-user-key",
           "raw-toss-user-key": "raw-user-key",
           TOSS_USER_KEY: "raw-user-key",
+          toss_user_key_hmac: "hmac-user-key",
+          tossUserKeySealed: "sealed-user-key",
           userKey: "raw-user-key",
-          nested: { tossUserKey: "raw-user-key", visible: true },
+          nested: {
+            tossUserKey: "raw-user-key",
+            toss_user_key_hmac: "hmac-user-key",
+            tossUserKeySealed: "sealed-user-key",
+            visible: true,
+          },
         },
         eligibilityId: "eligibility-1",
         requestId: "claim-1",
@@ -74,7 +81,9 @@ describe("AppsInToss promotion helpers", () => {
       },
     ]);
     expect(JSON.stringify(calls[0]?.body)).not.toContain("promotionCode");
+    expect(JSON.stringify(calls[0]?.body)).not.toContain("hmac-user-key");
     expect(JSON.stringify(calls[0]?.body)).not.toContain("raw-user-key");
+    expect(JSON.stringify(calls[0]?.body)).not.toContain("sealed-user-key");
     expect(JSON.stringify(calls[0]?.body)).not.toContain("tossUserKey");
     expect(JSON.stringify(calls[0]?.body)).not.toContain("userKey");
     expect(JSON.stringify(calls[0]?.body)).not.toContain("MTLS_PROXY_TOKEN");
