@@ -113,6 +113,45 @@ describe("AppsInToss IAP bridge", () => {
     });
   });
 
+  test("waits for product grant before resolving early purchase success events", async () => {
+    let resolveGrant: (() => void) | undefined;
+    let purchaseSettled = false;
+    const createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder =
+      ({ onEvent, options }) => {
+        void options.processProductGrant({ orderId: "order-1" });
+        onEvent({
+          data: { orderId: "order-1" },
+          type: "success",
+        });
+        return () => undefined;
+      };
+    const bridge = createAppsInTossIapBridge({
+      IAP: { createOneTimePurchaseOrder },
+    });
+
+    const purchase = bridge.purchaseOneTime({
+      processProductGrant: () =>
+        new Promise<boolean>((resolve) => {
+          resolveGrant = () => resolve(true);
+        }),
+      sku: "coins.100",
+    });
+    void purchase.then(() => {
+      purchaseSettled = true;
+    });
+
+    await Promise.resolve();
+    expect(purchaseSettled).toBe(false);
+
+    resolveGrant?.();
+    await expect(purchase).resolves.toMatchObject({
+      orderId: "order-1",
+      sku: "coins.100",
+    });
+    await Promise.resolve();
+    expect(purchaseSettled).toBe(true);
+  });
+
   test("rejects and cleans up when product grant times out", async () => {
     let cleanupCalls = 0;
     const createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder =
@@ -184,7 +223,7 @@ describe("AppsInToss IAP bridge", () => {
           processProductGrant: () => true,
           sku: "coins.100",
         }),
-      ).rejects.toThrow("purchase canceled");
+      ).rejects.toThrow("Apps in Toss one-time purchase failed.");
       expect(timeoutCalls).toBe(0);
     } finally {
       globalThis.setTimeout = originalSetTimeout;
@@ -343,24 +382,25 @@ describe("AppsInToss IAP bridge", () => {
     const bridge = createAppsInTossIapBridge({
       IAP: {
         createOneTimePurchaseOrder: ({ onError }) => {
-          onError({ error: { message: "purchase canceled" } });
+          onError({ error: { message: "raw-toss-user-key-secret" } });
           return () => undefined;
         },
       },
     });
 
-    await expect(
-      bridge.purchaseOneTime({
+    try {
+      await bridge.purchaseOneTime({
         processProductGrant: () => true,
         sku: "coins.100",
-      }),
-    ).rejects.toThrow(AppsInTossIapBridgeError);
-    await expect(
-      bridge.purchaseOneTime({
-        processProductGrant: () => true,
-        sku: "coins.100",
-      }),
-    ).rejects.toThrow("purchase canceled");
+      });
+      throw new Error("Expected purchase to fail");
+    } catch (error) {
+      expect(error).toBeInstanceOf(AppsInTossIapBridgeError);
+      expect((error as Error).message).toBe(
+        "Apps in Toss one-time purchase failed.",
+      );
+      expect((error as Error).message).not.toContain("raw-toss-user-key-secret");
+    }
   });
 });
 

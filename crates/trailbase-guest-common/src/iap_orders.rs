@@ -231,6 +231,14 @@ mod tests {
             iap_ledger_status_for_provider_status("NOT_FOUND"),
             IapLedgerStatus::NotFound
         );
+        assert_eq!(
+            iap_ledger_status_for_provider_status(" purchased "),
+            IapLedgerStatus::Granted
+        );
+        assert_eq!(
+            iap_ledger_status_for_provider_status("payment_completed"),
+            IapLedgerStatus::PendingGrant
+        );
     }
 
     #[test]

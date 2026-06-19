@@ -1,4 +1,3 @@
-import { normalizeAppsInTossErrorMessage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
   createCleanupOnce,
   isAppsInTossBridgeSupported,
@@ -244,10 +243,7 @@ export function createAppsInTossIapBridge({
       throw new AppsInTossIapBridgeError({
         cause: error,
         code: "IAP_GET_PRODUCTS_FAILED",
-        message: normalizeAppsInTossErrorMessage(
-          error,
-          "Apps in Toss product list request failed.",
-        ),
+        message: "Apps in Toss product list request failed.",
       });
     }
   }
@@ -334,10 +330,7 @@ export function createAppsInTossIapBridge({
       throw new AppsInTossIapBridgeError({
         cause: error,
         code: "IAP_COMPLETE_PRODUCT_GRANT_FAILED",
-        message: normalizeAppsInTossErrorMessage(
-          error,
-          "Apps in Toss product grant completion failed.",
-        ),
+        message: "Apps in Toss product grant completion failed.",
       });
     }
   }
@@ -450,10 +443,7 @@ export function createAppsInTossIapBridge({
       throw new AppsInTossIapBridgeError({
         cause: error,
         code: "IAP_GET_PENDING_ORDERS_FAILED",
-        message: normalizeAppsInTossErrorMessage(
-          error,
-          "Apps in Toss pending order restore failed.",
-        ),
+        message: "Apps in Toss pending order restore failed.",
       });
     }
   }
@@ -581,6 +571,8 @@ function requestOneTimePurchase({
 }) {
   return new Promise<AppsInTossIapPurchaseResult>((resolve, reject) => {
     let cleanup = createCleanupOnce();
+    let productGrantCompleted = false;
+    let purchaseResult: AppsInTossIapPurchaseResult | undefined;
     let settled = false;
     const clearPurchaseTimeout =
       purchaseTimeoutMs && purchaseTimeoutMs > 0
@@ -604,10 +596,7 @@ function requestOneTimePurchase({
             new AppsInTossIapBridgeError({
               cause: error,
               code: "IAP_PURCHASE_FAILED",
-              message: normalizeAppsInTossErrorMessage(
-                error,
-                "Apps in Toss one-time purchase failed.",
-              ),
+              message: "Apps in Toss one-time purchase failed.",
             }),
           );
         },
@@ -624,7 +613,8 @@ function requestOneTimePurchase({
             return;
           }
           try {
-            settleResolve(normalizePurchaseResult(event, sku));
+            purchaseResult = normalizePurchaseResult(event, sku);
+            resolvePurchaseIfReady();
           } catch (error) {
             settleReject(error);
           }
@@ -632,7 +622,7 @@ function requestOneTimePurchase({
         options: {
           processProductGrant: async ({ orderId }) => {
             try {
-              return await runProductGrant({
+              const granted = await runProductGrant({
                 orderId: normalizeRequiredOrderId(orderId),
                 processProductGrant,
                 providerPayload: { orderId },
@@ -640,6 +630,9 @@ function requestOneTimePurchase({
                 source: "purchase",
                 timeoutMs: processProductGrantTimeoutMs,
               });
+              productGrantCompleted = granted;
+              resolvePurchaseIfReady();
+              return granted;
             } catch (error) {
               settleReject(error);
               return false;
@@ -657,12 +650,15 @@ function requestOneTimePurchase({
         new AppsInTossIapBridgeError({
           cause: error,
           code: "IAP_PURCHASE_FAILED",
-          message: normalizeAppsInTossErrorMessage(
-            error,
-            "Apps in Toss one-time purchase failed.",
-          ),
+          message: "Apps in Toss one-time purchase failed.",
         }),
       );
+    }
+
+    function resolvePurchaseIfReady() {
+      if (purchaseResult && productGrantCompleted) {
+        settleResolve(purchaseResult);
+      }
     }
 
     function settleResolve(result: AppsInTossIapPurchaseResult) {
@@ -737,10 +733,7 @@ async function runProductGrant({
     throw new AppsInTossIapBridgeError({
       cause: error,
       code: "IAP_PRODUCT_GRANT_FAILED",
-      message: normalizeAppsInTossErrorMessage(
-        error,
-        "Apps in Toss product grant failed.",
-      ),
+      message: "Apps in Toss product grant failed.",
     });
   }
 }
