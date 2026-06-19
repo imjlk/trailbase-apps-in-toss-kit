@@ -219,8 +219,16 @@ export function normalizeAppsInTossContactsViralEvent(
   }
 
   if (type === "close") {
+    const closeReason = stringCandidate(data?.closeReason, data?.close_reason);
+    const sentRewardsCount = numberCandidate(
+      data?.sentRewardsCount,
+      data?.sent_rewards_count,
+    );
+    if (!closeReason || sentRewardsCount === undefined) {
+      return null;
+    }
     return {
-      closeReason: stringCandidate(data?.closeReason, data?.close_reason),
+      closeReason,
       moduleId: normalizedModuleId,
       providerPayload: event,
       rewardUnit: stringCandidate(data?.rewardUnit, data?.reward_unit),
@@ -232,10 +240,7 @@ export function normalizeAppsInTossContactsViralEvent(
         data?.sentRewardAmount,
         data?.sent_reward_amount,
       ),
-      sentRewardsCount: numberCandidate(
-        data?.sentRewardsCount,
-        data?.sent_rewards_count,
-      ),
+      sentRewardsCount,
       source: APPS_IN_TOSS_CONTACTS_VIRAL_SDK_SOURCE,
       type: "close",
     };
@@ -311,6 +316,15 @@ function requestContactsViralReward({
           },
           options: { moduleId },
         });
+        if (!settled && typeof nextCleanup !== "function") {
+          settleReject(
+            new AppsInTossContactsViralBridgeError({
+              code: "CONTACTS_VIRAL_UNSUPPORTED",
+              message: "Apps in Toss contactsViral is not supported in this runtime.",
+            }),
+          );
+          return;
+        }
         cleanup = createCleanupOnce(nextCleanup);
         if (settled) {
           cleanupBestEffort();
@@ -365,7 +379,7 @@ function resultFromCloseEvent(
     close,
     events: [...events],
     moduleId: close.moduleId,
-    rewardUnit: close.rewardUnit ?? rewards.at(-1)?.rewardUnit,
+    rewardUnit: close.rewardUnit ?? rewards[rewards.length - 1]?.rewardUnit,
     rewards: [...rewards],
     sendableRewardsCount: close.sendableRewardsCount,
     sentRewardAmount:

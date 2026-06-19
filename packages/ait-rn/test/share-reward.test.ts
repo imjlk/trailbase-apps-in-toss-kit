@@ -105,6 +105,16 @@ describe("AppsInToss contactsViral share reward bridge", () => {
       unsupportedBridge.runContactsViralReward({ moduleId: "module-1" }),
     ).rejects.toMatchObject({ code: "CONTACTS_VIRAL_UNSUPPORTED" });
 
+    const unsupportedReturnBridge = createAppsInTossContactsViralBridge({
+      contactsViral: (() => undefined) as AppsInTossContactsViral,
+    });
+    await expect(
+      unsupportedReturnBridge.runContactsViralReward({
+        moduleId: "module-1",
+        timeoutMs: 10,
+      }),
+    ).rejects.toMatchObject({ code: "CONTACTS_VIRAL_UNSUPPORTED" });
+
     let called = false;
     const versionBridge = createAppsInTossContactsViralBridge({
       contactsViral: (() => {
@@ -147,6 +157,26 @@ describe("AppsInToss contactsViral share reward bridge", () => {
       }),
     ).rejects.toMatchObject({ code: "CONTACTS_VIRAL_INVALID_EVENT" });
     expect(invalidCleanupCalls).toBe(1);
+
+    let invalidCloseCleanupCalls = 0;
+    await expect(
+      runContactsViralReward({
+        contactsViral: ({ onEvent }) => {
+          onEvent({ data: { closeReason: "noReward" }, type: "close" });
+          return () => {
+            invalidCloseCleanupCalls += 1;
+          };
+        },
+        moduleId: "module-1",
+      }),
+    ).rejects.toMatchObject({ code: "CONTACTS_VIRAL_INVALID_EVENT" });
+    expect(invalidCloseCleanupCalls).toBe(1);
+    expect(
+      normalizeAppsInTossContactsViralEvent(
+        { data: { sentRewardsCount: 0 }, type: "close" },
+        "module-1",
+      ),
+    ).toBeNull();
 
     let timeoutCleanupCalls = 0;
     await expect(
