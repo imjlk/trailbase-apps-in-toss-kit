@@ -41,6 +41,7 @@ kit 저장소 루트에서 Bun으로 실행합니다.
 ```bash
 bun run skills:validate
 bun run skills:sync
+bun run skills:check
 ```
 
 | 도구 | 명령 | 기본 설치 위치 |
@@ -53,6 +54,15 @@ bun run skills:sync
 | Windsurf | `bun run skills:sync:agent -- --target windsurf --project <repo> --all --mode copy` | `<repo>/.windsurf/rules` |
 | GitHub Copilot | `bun run skills:sync:agent -- --target github-copilot --project <repo> --all --mode copy` | `<repo>/.github/instructions` |
 | Gemini CLI | `bun run skills:sync:agent -- --target gemini --project <repo> --all --mode copy` | `<repo>/.gemini/commands` |
+
+`bun run skills:check`는 설치된 Codex/OpenAI 스킬 파일이 현재 checkout의 원본과
+byte-for-byte로 같은지 비교합니다. 오래된 복사본이나 다른 kit checkout을 계속 가리키는
+symlink를 찾을 때 사용하세요. 다른 도구는 generic checker를 사용합니다.
+
+```bash
+bun run skills:check:agent -- --target claude-code --all
+bun run skills:check:agent -- --target cursor --project <repo> --all
+```
 
 이 저장소에서 스킬을 개발하는 동안에는 `link` 모드를 쓰는 편이 좋습니다. 수정 내용이 대상
 도구에 바로 반영됩니다. 다른 저장소에 커밋할 안정된 복사본이나 프로젝트별 규칙 파일이
@@ -67,6 +77,7 @@ bun run skills:sync
 
 ```bash
 bun run skills:sync -- --force
+bun run skills:check
 ```
 
 기존 설치본을 덮어쓸 때는 `--force`를 스크립트에 직접 전달합니다.

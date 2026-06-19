@@ -108,7 +108,9 @@ export function normalizeHeaders(headers: Record<string, string | undefined>) {
   return normalized;
 }
 
-function headersToRecord(headers?: AppsInTossHeaders) {
+function headersToRecord(
+  headers?: AppsInTossHeaders,
+): Record<string, string | undefined> {
   const record: Record<string, string | undefined> = {};
   if (!headers) {
     return record;
@@ -120,12 +122,15 @@ function headersToRecord(headers?: AppsInTossHeaders) {
     return record;
   }
   if (Array.isArray(headers)) {
-    for (const [key, value] of headers) {
+    for (const [key, value] of headers as readonly (readonly [
+      string,
+      string,
+    ])[]) {
       record[key] = value;
     }
     return record;
   }
-  return { ...headers };
+  return { ...(headers as Record<string, string | undefined>) };
 }
 
 function parseJsonResponseText(text: string) {
@@ -142,7 +147,7 @@ function parseJsonResponseText(text: string) {
 function normalizeClientRequestError(
   payload: unknown,
   fallback = "Apps in Toss client request failed.",
-) {
+): string {
   if (!payload) {
     return fallback;
   }

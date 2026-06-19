@@ -43,6 +43,7 @@ Use Bun from the kit repo root:
 ```bash
 bun run skills:validate
 bun run skills:sync
+bun run skills:check
 ```
 
 | Tool | Command | Default destination |
@@ -55,6 +56,15 @@ bun run skills:sync
 | Windsurf | `bun run skills:sync:agent -- --target windsurf --project <repo> --all --mode copy` | `<repo>/.windsurf/rules` |
 | GitHub Copilot | `bun run skills:sync:agent -- --target github-copilot --project <repo> --all --mode copy` | `<repo>/.github/instructions` |
 | Gemini CLI | `bun run skills:sync:agent -- --target gemini --project <repo> --all --mode copy` | `<repo>/.gemini/commands` |
+
+Use `bun run skills:check` to compare the installed Codex/OpenAI skill files
+against this checkout byte-for-byte. It reports stale copies and symlinks that
+still point at another kit checkout. For other tools, use the generic checker:
+
+```bash
+bun run skills:check:agent -- --target claude-code --all
+bun run skills:check:agent -- --target cursor --project <repo> --all
+```
 
 Use `link` while developing this repo so local edits are visible immediately in
 the target tool. Use `copy` for stable snapshots or project-scoped files that
@@ -69,6 +79,7 @@ canonical kit checkout and restart Codex:
 
 ```bash
 bun run skills:sync -- --force
+bun run skills:check
 ```
 
 Pass `--force` directly to the script when replacing an existing install:
