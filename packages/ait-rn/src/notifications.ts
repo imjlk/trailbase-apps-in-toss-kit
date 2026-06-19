@@ -384,6 +384,11 @@ export function createAppsInTossFunctionalMessageClient<
           message: "Apps in Toss notification agreement result was invalid.",
         });
       }
+      const normalizedTemplateCode = normalizeRequiredCode(
+        templateCode,
+        "REQUEST_NOTIFICATION_AGREEMENT_TEMPLATE_CODE_REQUIRED",
+        "Apps in Toss notification agreement templateCode is required.",
+      );
       const payload = await postAppsInTossJson({
         baseUrl,
         body: {
@@ -391,11 +396,7 @@ export function createAppsInTossFunctionalMessageClient<
           source: source ?? APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,
           status:
             status ?? appsInTossNotificationAgreementStatus(normalizedResult),
-          templateCode: normalizeRequiredCode(
-            templateCode,
-            "REQUEST_NOTIFICATION_AGREEMENT_TEMPLATE_CODE_REQUIRED",
-            "Apps in Toss notification agreement templateCode is required.",
-          ),
+          template_code: normalizedTemplateCode,
         },
         fetcher,
         getAuthHeaders,

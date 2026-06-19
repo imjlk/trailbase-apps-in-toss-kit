@@ -38,6 +38,10 @@ describe("AppsInToss promotion helpers", () => {
         context: {
           publicReason: "attendance",
           promotionCode: "do-not-send",
+          raw_toss_user_key: "raw-user-key",
+          "raw-toss-user-key": "raw-user-key",
+          TOSS_USER_KEY: "raw-user-key",
+          userKey: "raw-user-key",
           nested: { tossUserKey: "raw-user-key", visible: true },
         },
         eligibilityId: "eligibility-1",
@@ -70,25 +74,39 @@ describe("AppsInToss promotion helpers", () => {
       },
     ]);
     expect(JSON.stringify(calls[0]?.body)).not.toContain("promotionCode");
+    expect(JSON.stringify(calls[0]?.body)).not.toContain("raw-user-key");
     expect(JSON.stringify(calls[0]?.body)).not.toContain("tossUserKey");
+    expect(JSON.stringify(calls[0]?.body)).not.toContain("userKey");
     expect(JSON.stringify(calls[0]?.body)).not.toContain("MTLS_PROXY_TOKEN");
   });
 
   test("rejects empty campaign ids", async () => {
+    let fetcherCalled = false;
     const client = createAppsInTossPromotionCampaignClient({
       claimEndpoint: "/claim",
-      fetcher: async () => Response.json({}),
+      fetcher: async () => {
+        fetcherCalled = true;
+        return Response.json({});
+      },
     });
 
-    await expect(client.claim({ campaignId: "  " })).rejects.toThrow(
-      AppsInTossPromotionCampaignClientError,
-    );
+    let error: unknown;
+    try {
+      await client.claim({ campaignId: "  " });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(AppsInTossPromotionCampaignClientError);
+    expect(error).toMatchObject({
+      code: "PROMOTION_CAMPAIGN_ID_REQUIRED",
+    });
+    expect(fetcherCalled).toBe(false);
   });
 
   test("normalizes claim response statuses and snake/camel provider fields", () => {
     expect(
       normalizeAppsInTossPromotionClaimResult({
-        alreadyGranted: true,
+        already_granted: true,
         campaign_id: "invite",
         provider_error_code: "4112",
         provider_request_id: "provider-1",
@@ -102,6 +120,17 @@ describe("AppsInToss promotion helpers", () => {
       providerRequestId: "provider-1",
       rewardAmount: 100,
       status: "ALREADY_GRANTED",
+    });
+
+    expect(
+      normalizeAppsInTossPromotionClaimResult({
+        campaign_id: "provider-campaign",
+        provider_status: "success",
+      }),
+    ).toMatchObject({
+      campaignId: "provider-campaign",
+      granted: true,
+      status: "GRANTED",
     });
 
     expect(
@@ -138,7 +167,10 @@ describe("AppsInToss promotion helpers", () => {
         MTLS_PROXY_TOKEN: "secret",
         keep: "value",
         list: [{ provider_promotion_code: "secret", safe: 1 }],
+        "raw-toss-user-key": "raw",
         raw_toss_user_key: "raw",
+        TOSS_USER_KEY: "raw",
+        userKey: "raw",
       }),
     ).toEqual({
       keep: "value",

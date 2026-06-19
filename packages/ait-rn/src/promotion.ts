@@ -78,9 +78,12 @@ export function createAppsInTossPromotionCampaignClient<
   fetcher,
   getAuthHeaders,
   normalizeResponse,
-}: CreateAppsInTossPromotionCampaignClientOptions<TResult>) {
+}: CreateAppsInTossPromotionCampaignClientOptions<TResult>): AppsInTossPromotionCampaignClient<
+  TResult
+> {
   return {
-    async claim({ campaignId, context, eligibilityId, requestId }) {
+    async claim(input: AppsInTossPromotionClaimInput) {
+      const { campaignId, context, eligibilityId, requestId } = input;
       const normalizedCampaignId = normalizeRequiredCampaignId(campaignId);
       const sanitizedContext = sanitizePromotionClaimContext(context);
       const normalizedEligibilityId = normalizeOptionalString(eligibilityId);
@@ -127,19 +130,47 @@ export function normalizeAppsInTossPromotionClaimResult(
     nestedReward?.campaignId,
     nestedReward?.campaign_id,
   );
+  const alreadyGranted = booleanCandidate(
+    record?.alreadyGranted,
+    record?.already_granted,
+    nestedGrant?.alreadyGranted,
+    nestedGrant?.already_granted,
+    nestedPromotion?.alreadyGranted,
+    nestedPromotion?.already_granted,
+    nestedReward?.alreadyGranted,
+    nestedReward?.already_granted,
+  );
+  const granted = booleanCandidate(
+    record?.granted,
+    record?.isGranted,
+    record?.is_granted,
+    nestedGrant?.granted,
+    nestedGrant?.isGranted,
+    nestedGrant?.is_granted,
+    nestedPromotion?.granted,
+    nestedPromotion?.isGranted,
+    nestedPromotion?.is_granted,
+    nestedReward?.granted,
+    nestedReward?.isGranted,
+    nestedReward?.is_granted,
+  );
   const status = normalizePromotionClaimStatus(
     record?.status,
     record?.rewardStatus,
     record?.reward_status,
+    record?.providerStatus,
+    record?.provider_status,
     nestedGrant?.status,
+    nestedGrant?.providerStatus,
+    nestedGrant?.provider_status,
     nestedPromotion?.status,
+    nestedPromotion?.providerStatus,
+    nestedPromotion?.provider_status,
     nestedReward?.status,
-    booleanCandidate(record?.alreadyGranted, nestedGrant?.alreadyGranted)
-      ? "ALREADY_GRANTED"
-      : undefined,
-    booleanCandidate(record?.granted, nestedGrant?.granted)
-      ? "GRANTED"
-      : undefined,
+    nestedReward?.providerStatus,
+    nestedReward?.provider_status,
+    alreadyGranted ? "ALREADY_GRANTED" : undefined,
+    granted ? "GRANTED" : undefined,
   );
 
   if (!campaignId || !status) {
@@ -151,10 +182,7 @@ export function normalizeAppsInTossPromotionClaimResult(
   }
 
   return {
-    alreadyGranted:
-      status === "ALREADY_GRANTED" ||
-      booleanCandidate(record?.alreadyGranted, nestedGrant?.alreadyGranted) ===
-        true,
+    alreadyGranted: status === "ALREADY_GRANTED" || alreadyGranted === true,
     campaignId,
     failureReason: stringCandidate(
       record?.failureReason,
@@ -169,7 +197,7 @@ export function normalizeAppsInTossPromotionClaimResult(
     granted:
       status === "GRANTED" ||
       status === "ALREADY_GRANTED" ||
-      booleanCandidate(record?.granted, nestedGrant?.granted) === true,
+      granted === true,
     providerErrorCode: stringCandidate(
       record?.providerErrorCode,
       record?.provider_error_code,
@@ -281,21 +309,16 @@ function normalizeRequiredCampaignId(value: string) {
 }
 
 function isForbiddenPromotionClientKey(key: string) {
+  const normalized = key.replace(/[^a-z0-9]/gi, "").toLowerCase();
   return [
-    "mtlsProxyToken",
-    "mtls_proxy_token",
-    "MTLS_PROXY_TOKEN",
-    "promotionCode",
-    "promotion_code",
-    "providerPromotionCode",
-    "provider_promotion_code",
-    "rawTossUserKey",
-    "raw_toss_user_key",
-    "tossPromotionCode",
-    "toss_promotion_code",
-    "tossUserKey",
-    "toss_user_key",
-  ].includes(key);
+    "mtlsproxytoken",
+    "promotioncode",
+    "providerpromotioncode",
+    "rawtossuserkey",
+    "tosspromotioncode",
+    "tossuserkey",
+    "userkey",
+  ].includes(normalized);
 }
 
 function objectCandidate(value: unknown): Record<string, unknown> | null {

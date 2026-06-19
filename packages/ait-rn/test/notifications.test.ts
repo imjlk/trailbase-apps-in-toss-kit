@@ -142,7 +142,7 @@ describe("AppsInToss notification helpers", () => {
           result: "newAgreement",
           source: "apps_in_toss_sdk",
           status: "OPTED_IN",
-          templateCode: "mission-status-agreement",
+          template_code: "mission-status-agreement",
         },
         headers: {
           Authorization: "Bearer session-token",
