@@ -17,6 +17,16 @@ export type AppsInTossIsMinVersionSupported =
   typeof AppsInTossFramework.isMinVersionSupported;
 export type AppsInTossShare = typeof AppsInTossFramework.share;
 
+export type AppsInTossContactsViral = ((
+  params: {
+    options: { moduleId: string };
+    onError: (error: unknown) => void | Promise<void>;
+    onEvent: (event: unknown) => void | Promise<void>;
+  },
+) => void | (() => void)) & {
+  isSupported?: () => boolean;
+};
+
 export type AppsInTossRequestNotificationAgreement = (params: {
   options: { templateCode: string };
   onEvent: (event: unknown) => void;
@@ -61,6 +71,7 @@ export type AppsInTossFrameworkModule = Partial<
     | "showFullScreenAd"
   >
 > & {
+  contactsViral?: AppsInTossContactsViral;
   requestNotificationAgreement?: AppsInTossRequestNotificationAgreement;
 };
 
