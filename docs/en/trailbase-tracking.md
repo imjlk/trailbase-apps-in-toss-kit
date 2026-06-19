@@ -19,8 +19,8 @@ These values are policy values for this kit.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.28.5`
 - Last verified TrailBase release date: `2026-06-12`
-- Upstream latest TrailBase server: `0.28.5`
-- Upstream latest TrailBase release date: `2026-06-12`
+- Upstream latest TrailBase server: `0.28.6`
+- Upstream latest TrailBase release date: `2026-06-17`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -31,6 +31,8 @@ The manual server compatibility values are mirrored in
 `data/trailbase-compat-policy.json`. That file is intentionally not generated
 from the upstream latest release, because latest upstream and supported-by-this-kit
 are different signals.
+TrailBase `0.28.6` is currently tracked as upstream latest, but the last verified
+kit policy remains `0.28.5` until kit and consumer smoke tests pass.
 
 Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
 `mise` is the preferred developer entrypoint for installing the repo toolchain,
@@ -43,7 +45,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.28.5`
+- `trailbase-server-github-release`: `0.28.6`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.5.1`

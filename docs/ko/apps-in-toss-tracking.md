@@ -26,6 +26,9 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - 컨슈머 SDK, Granite, TDS package version은 앱이 소유합니다.
 - 업스트림 추적만을 위해 이 kit의 runtime dependency에 `@apps-in-toss/framework`,
   `@granite-js/react-native`, TDS package를 추가하지 않습니다.
+- 저장소 root는 lockfile/reference 검증을 위해 `@apps-in-toss/framework`를 dev dependency로
+  고정할 수 있지만, publish/private kit package는 Apps in Toss SDK package를 peer 또는
+  주입 dependency로 유지해야 합니다.
 - React Native 비게임 mini-app의 익명 TrailBase principal seed는 Apps in Toss
   `getAnonymousKey()`의 `{ type: "HASH", hash }` 결과를 기준으로 합니다.
 - 랜덤 local hash나 `createAnonymousHash()` 결과는 local/dev/test fallback이며 production
@@ -47,16 +50,16 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 ## Renovate가 추적하는 reference version
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.6.1`
+- `apps-in-toss-framework`: `2.9.1`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.29`
+- `create-granite-app`: `1.0.32`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.29`
+- `granite-js-react-native`: `1.0.32`
 
 - `@toss-design-system/react-native`: framework 1.0 이전 프로젝트에서 쓰던 legacy package
   name입니다. 초기 tracking snapshot 시점에는 public npm `latest` metadata를 확인할 수

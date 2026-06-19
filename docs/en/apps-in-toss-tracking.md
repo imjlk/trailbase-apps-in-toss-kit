@@ -27,6 +27,9 @@ only after app-level smoke tests.
 - Consumer SDK, Granite, and TDS package versions are app-owned.
 - Do not add `@apps-in-toss/framework`, `@granite-js/react-native`, or TDS packages
   to this kit's runtime dependencies just to track upstream.
+- The repository root may pin `@apps-in-toss/framework` as a dev dependency for
+  lockfile/reference validation, but published/private kit packages must keep
+  Apps in Toss SDK packages as peer or injected dependencies.
 - React Native non-game mini-apps should seed anonymous TrailBase principals from
   the `{ type: "HASH", hash }` result returned by Apps in Toss `getAnonymousKey()`.
 - Random local hashes and `createAnonymousHash()` results are local/dev/test
@@ -51,16 +54,16 @@ only after app-level smoke tests.
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.6.1`
+- `apps-in-toss-framework`: `2.9.1`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.29`
+- `create-granite-app`: `1.0.32`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.29`
+- `granite-js-react-native`: `1.0.32`
 
 - `@toss-design-system/react-native`: legacy package name for pre-1.0 framework
   projects. No public npm `latest` metadata was available during the initial

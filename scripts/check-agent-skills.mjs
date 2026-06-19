@@ -116,6 +116,12 @@ if (failures.length > 0) {
 
 console.log(`Agent skill install check passed for ${selectedSkills.length} ${target} skill(s).`);
 
+/**
+ * Check whether one installed skill is present and matches the repository copy.
+ *
+ * @param {string} skillName
+ * @param {(typeof targetConfigs)[keyof typeof targetConfigs]} targetConfig
+ */
 function checkSkill(skillName, targetConfig) {
   const source = targetConfig.source(skillName);
   const destination = path.join(destinationRoot, targetConfig.destinationName(skillName));
@@ -150,6 +156,14 @@ function checkSkill(skillName, targetConfig) {
   failures.push(`${skillName}: installed files differ (${differences.slice(0, 5).join("; ")})`);
 }
 
+/**
+ * Recursively compare a source skill entry with its installed destination.
+ *
+ * @param {string} source
+ * @param {string} destination
+ * @param {string} [relativePath]
+ * @returns {string[]}
+ */
 function compareEntries(source, destination, relativePath = "") {
   const sourceStat = lstatSync(source);
   const destinationStat = lstatSync(destination);
@@ -184,6 +198,11 @@ function compareEntries(source, destination, relativePath = "") {
   return [];
 }
 
+/**
+ * List repository-managed skill directories.
+ *
+ * @returns {string[]}
+ */
 function listSkills() {
   return readdirSync(skillsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
@@ -191,6 +210,12 @@ function listSkills() {
     .sort();
 }
 
+/**
+ * List non-hidden child entries for stable directory comparisons.
+ *
+ * @param {string} directory
+ * @returns {string[]}
+ */
 function entryNames(directory) {
   return readdirSync(directory, { withFileTypes: true })
     .filter((entry) => !entry.name.startsWith("."))
@@ -198,6 +223,13 @@ function entryNames(directory) {
     .sort();
 }
 
+/**
+ * Check whether an installed symlink resolves to the expected source path.
+ *
+ * @param {string} destination
+ * @param {string} source
+ * @returns {boolean}
+ */
 function isSameLink(destination, source) {
   try {
     const targetPath = path.resolve(path.dirname(destination), readlinkSync(destination));
@@ -207,6 +239,12 @@ function isSameLink(destination, source) {
   }
 }
 
+/**
+ * Parse command line flags for a skill install check run.
+ *
+ * @param {string[]} rawArgs
+ * @returns {{all: boolean, skills: string[], target?: string, dest?: string, project?: string}}
+ */
 function parseArgs(rawArgs) {
   const parsed = {
     all: false,
@@ -240,6 +278,12 @@ function parseArgs(rawArgs) {
   return parsed;
 }
 
+/**
+ * Print an error and terminate with a non-zero exit code.
+ *
+ * @param {string} message
+ * @returns {never}
+ */
 function die(message) {
   console.error(message);
   process.exit(1);

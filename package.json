@@ -26,5 +26,8 @@
     "skills:check": "bun scripts/check-agent-skills.mjs --target codex --all",
     "skills:check:agent": "bun scripts/check-agent-skills.mjs",
     "skills:validate": "bun scripts/validate-agent-skills.mjs"
+  },
+  "devDependencies": {
+    "@apps-in-toss/framework": "2.9.1"
   }
 }
