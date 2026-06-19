@@ -15,6 +15,7 @@
     "./promotion": "./src/promotion.ts",
     "./runtime": "./src/runtime.ts",
     "./share": "./src/share.ts",
+    "./share-reward": "./src/share-reward.ts",
     "./storage": "./src/storage.ts"
   },
   "peerDependencies": {
