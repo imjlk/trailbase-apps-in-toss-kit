@@ -15,10 +15,7 @@ export type AppsInTossPromotionClaimStatus =
 export interface AppsInTossPromotionClaimResult {
   alreadyGranted: boolean;
   campaignId: string;
-  failureReason?: string;
   granted: boolean;
-  providerErrorCode?: string;
-  providerRequestId?: string;
   rewardAmount?: number;
   status: AppsInTossPromotionClaimStatus;
 }
@@ -108,13 +105,16 @@ export function createAppsInTossPromotionCampaignClient<
       });
       return normalizeResponse
         ? normalizeResponse(payload)
-        : (normalizeAppsInTossPromotionClaimResult(payload) as TResult);
+        : (normalizeAppsInTossPromotionClaimResult(payload, {
+            campaignId: normalizedCampaignId,
+          }) as TResult);
     },
   };
 }
 
 export function normalizeAppsInTossPromotionClaimResult(
   value: unknown,
+  options: { campaignId?: string } = {},
 ): AppsInTossPromotionClaimResult {
   const record = objectCandidate(value);
   const nestedGrant = objectCandidate(record?.grant);
@@ -129,6 +129,7 @@ export function normalizeAppsInTossPromotionClaimResult(
     nestedPromotion?.campaign_id,
     nestedReward?.campaignId,
     nestedReward?.campaign_id,
+    options.campaignId,
   );
   const alreadyGranted = booleanCandidate(
     record?.alreadyGranted,
@@ -181,55 +182,27 @@ export function normalizeAppsInTossPromotionClaimResult(
     });
   }
 
+  const rewardAmount = numberCandidate(
+    record?.rewardAmount,
+    record?.reward_amount,
+    record?.amount,
+    nestedGrant?.rewardAmount,
+    nestedGrant?.reward_amount,
+    nestedGrant?.amount,
+    nestedPromotion?.rewardAmount,
+    nestedPromotion?.reward_amount,
+    nestedReward?.rewardAmount,
+    nestedReward?.reward_amount,
+  );
+
   return {
     alreadyGranted: status === "ALREADY_GRANTED" || alreadyGranted === true,
     campaignId,
-    failureReason: stringCandidate(
-      record?.failureReason,
-      record?.failure_reason,
-      nestedGrant?.failureReason,
-      nestedGrant?.failure_reason,
-      nestedPromotion?.failureReason,
-      nestedPromotion?.failure_reason,
-      nestedReward?.failureReason,
-      nestedReward?.failure_reason,
-    ),
     granted:
       status === "GRANTED" ||
       status === "ALREADY_GRANTED" ||
       granted === true,
-    providerErrorCode: stringCandidate(
-      record?.providerErrorCode,
-      record?.provider_error_code,
-      nestedGrant?.providerErrorCode,
-      nestedGrant?.provider_error_code,
-      nestedPromotion?.providerErrorCode,
-      nestedPromotion?.provider_error_code,
-      nestedReward?.providerErrorCode,
-      nestedReward?.provider_error_code,
-    ),
-    providerRequestId: stringCandidate(
-      record?.providerRequestId,
-      record?.provider_request_id,
-      nestedGrant?.providerRequestId,
-      nestedGrant?.provider_request_id,
-      nestedPromotion?.providerRequestId,
-      nestedPromotion?.provider_request_id,
-      nestedReward?.providerRequestId,
-      nestedReward?.provider_request_id,
-    ),
-    rewardAmount: numberCandidate(
-      record?.rewardAmount,
-      record?.reward_amount,
-      record?.amount,
-      nestedGrant?.rewardAmount,
-      nestedGrant?.reward_amount,
-      nestedGrant?.amount,
-      nestedPromotion?.rewardAmount,
-      nestedPromotion?.reward_amount,
-      nestedReward?.rewardAmount,
-      nestedReward?.reward_amount,
-    ),
+    ...(rewardAmount === undefined ? {} : { rewardAmount }),
     status,
   };
 }

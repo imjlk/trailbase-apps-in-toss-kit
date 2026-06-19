@@ -75,12 +75,14 @@ await messages.syncAgreement({
   templateCode: agreement.templateCode,
 });
 
-await messages.requestMessage({
-  agreementTemplateCode: "ORDER_READY_AGREEMENT",
-  context: { orderName: "Sample order" },
-  providerRequestId: "order-ready:order-123",
-  templateSetCode: "ORDER_READY",
-});
+if (agreement.status === "OPTED_IN") {
+  await messages.requestMessage({
+    agreementTemplateCode: "ORDER_READY_AGREEMENT",
+    context: { orderName: "Sample order" },
+    providerRequestId: "order-ready:order-123",
+    templateSetCode: "ORDER_READY",
+  });
+}
 ```
 
 The bridge maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
@@ -89,6 +91,8 @@ in production when the SDK bridge is unavailable. `templateCode` is the
 notification agreement code passed to the SDK. `templateSetCode` is the
 functional message send code used by the backend/proxy. They may be the same in
 simple one-to-one flows, but shared agreement prompts should keep them separate.
+Only enqueue or request the functional message when the synced agreement is
+`OPTED_IN`; an `OPTED_OUT` result should be persisted without dispatch.
 
 The functional message client only calls app-owned backend endpoints. It must
 not call Toss Smart Message APIs, the mTLS proxy, or certificate-backed services

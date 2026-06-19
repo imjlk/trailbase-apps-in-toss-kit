@@ -23,41 +23,40 @@ describe("AppsInToss promotion helpers", () => {
           url,
         });
         return Response.json({
-          campaignId: "daily-attendance",
-          providerRequestId: "provider-request-1",
+          providerRequestId: "internal-provider-request-1",
+          providerStatus: "SUCCESS",
           rewardAmount: 50,
-          status: "GRANTED",
         });
       },
       getAuthHeaders: () => ({ Authorization: "Bearer session-token" }),
     });
 
-    await expect(
-      client.claim({
-        campaignId: " daily-attendance ",
-        context: {
-          publicReason: "attendance",
-          promotionCode: "do-not-send",
-          raw_toss_user_key: "raw-user-key",
-          "raw-toss-user-key": "raw-user-key",
-          TOSS_USER_KEY: "raw-user-key",
+    const result = await client.claim({
+      campaignId: " daily-attendance ",
+      context: {
+        publicReason: "attendance",
+        promotionCode: "do-not-send",
+        raw_toss_user_key: "raw-user-key",
+        "raw-toss-user-key": "raw-user-key",
+        TOSS_USER_KEY: "raw-user-key",
+        toss_user_key_hmac: "hmac-user-key",
+        tossUserKeySealed: "sealed-user-key",
+        userKey: "raw-user-key",
+        nested: {
+          tossUserKey: "raw-user-key",
           toss_user_key_hmac: "hmac-user-key",
           tossUserKeySealed: "sealed-user-key",
-          userKey: "raw-user-key",
-          nested: {
-            tossUserKey: "raw-user-key",
-            toss_user_key_hmac: "hmac-user-key",
-            tossUserKeySealed: "sealed-user-key",
-            visible: true,
-          },
+          visible: true,
         },
-        eligibilityId: "eligibility-1",
-        requestId: "claim-1",
-      }),
-    ).resolves.toMatchObject({
+      },
+      eligibilityId: "eligibility-1",
+      requestId: "claim-1",
+    });
+
+    expect(result).toEqual({
+      alreadyGranted: false,
       campaignId: "daily-attendance",
       granted: true,
-      providerRequestId: "provider-request-1",
       rewardAmount: 50,
       status: "GRANTED",
     });
@@ -112,7 +111,7 @@ describe("AppsInToss promotion helpers", () => {
     expect(fetcherCalled).toBe(false);
   });
 
-  test("normalizes claim response statuses and snake/camel provider fields", () => {
+  test("normalizes claim response statuses without exposing provider details", () => {
     expect(
       normalizeAppsInTossPromotionClaimResult({
         already_granted: true,
@@ -125,8 +124,6 @@ describe("AppsInToss promotion helpers", () => {
       alreadyGranted: true,
       campaignId: "invite",
       granted: true,
-      providerErrorCode: "4112",
-      providerRequestId: "provider-1",
       rewardAmount: 100,
       status: "ALREADY_GRANTED",
     });
@@ -136,21 +133,24 @@ describe("AppsInToss promotion helpers", () => {
         campaign_id: "provider-campaign",
         provider_status: "success",
       }),
-    ).toMatchObject({
+    ).toEqual({
+      alreadyGranted: false,
       campaignId: "provider-campaign",
       granted: true,
       status: "GRANTED",
     });
 
     expect(
-      normalizeAppsInTossPromotionClaimResult({
-        campaignId: "daily",
-        failure_reason: "budget exhausted",
-        status: "budget-exhausted",
-      }),
-    ).toMatchObject({
+      normalizeAppsInTossPromotionClaimResult(
+        {
+          failure_reason: "budget exhausted",
+          status: "budget-exhausted",
+        },
+        { campaignId: "daily" },
+      ),
+    ).toEqual({
+      alreadyGranted: false,
       campaignId: "daily",
-      failureReason: "budget exhausted",
       granted: false,
       status: "EXHAUSTED",
     });
@@ -163,9 +163,10 @@ describe("AppsInToss promotion helpers", () => {
           status: "notEligible",
         },
       }),
-    ).toMatchObject({
+    ).toEqual({
+      alreadyGranted: false,
       campaignId: "mission",
-      providerErrorCode: "4109",
+      granted: false,
       status: "NOT_ELIGIBLE",
     });
   });
