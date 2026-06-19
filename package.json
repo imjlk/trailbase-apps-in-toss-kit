@@ -23,6 +23,8 @@
     "skills:sync:cline": "bun scripts/sync-agent-skills.mjs --target cline --all --mode link",
     "skills:sync:claude": "bun scripts/sync-agent-skills.mjs --target claude-code --all --mode link",
     "skills:sync:agent": "bun scripts/sync-agent-skills.mjs",
+    "skills:check": "bun scripts/check-agent-skills.mjs --target codex --all",
+    "skills:check:agent": "bun scripts/check-agent-skills.mjs",
     "skills:validate": "bun scripts/validate-agent-skills.mjs"
   }
 }
