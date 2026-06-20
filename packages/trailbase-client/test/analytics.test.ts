@@ -1,5 +1,14 @@
 import { describe, expect, test } from "bun:test";
-import { createAnalyticsRouter, type AnalyticsEvent } from "../src/analytics";
+import {
+  AnalyticsSinkRequestError,
+  configureAnalyticsRouterFromBootstrap,
+  createAnalyticsRouter,
+  createBufferedAnalyticsSink,
+  createTrailBaseAnalyticsEventClient,
+  normalizeAnalyticsBootstrapPolicy,
+  sanitizeAnalyticsPayload,
+  type AnalyticsEvent,
+} from "../src/analytics";
 
 describe("analytics router", () => {
   test("defaults to disabled sinks", async () => {
@@ -141,6 +150,48 @@ describe("analytics router", () => {
     expect(errors).toEqual(["appsInToss:init boom"]);
   });
 
+  test("does not reinitialize AppsInToss analytics after config updates", () => {
+    const initCalls: string[] = [];
+    const dispatched: string[] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      appsInToss: {
+        enabled: true,
+        analyticsModule: {
+          init: () => initCalls.push("init"),
+        },
+        mapEvent: (event) => ({
+          name: event.eventName,
+          type: "custom",
+          params: event.eventPayload,
+        }),
+        dispatch: (event) => {
+          dispatched.push(`first:${event.name}`);
+        },
+      },
+    });
+
+    router.configure({
+      appsInToss: {
+        enabled: true,
+        analyticsModule: {
+          init: () => initCalls.push("second-init"),
+        },
+        mapEvent: (event) => ({
+          name: event.eventName,
+          type: "custom",
+          params: event.eventPayload,
+        }),
+        dispatch: (event) => {
+          dispatched.push(`second:${event.name}`);
+        },
+      },
+    });
+    router.track("screen_view");
+
+    expect(initCalls).toEqual(["init"]);
+    expect(dispatched).toEqual(["second:screen_view"]);
+  });
+
   test("dispatches mapped AppsInToss events only when a mapper includes them", async () => {
     const dispatched: string[] = [];
     const router = createAnalyticsRouter<"answer_submit_tapped" | "answer_input_changed">({
@@ -208,4 +259,455 @@ describe("analytics router", () => {
 
     expect(errors).toEqual(["detail:sync boom"]);
   });
+
+  test("flush waits for detail sink flush callbacks", async () => {
+    const calls: string[] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      detail: {
+        enabled: true,
+        enqueueBatch: (events) => {
+          calls.push(`enqueue:${events[0]?.eventName}`);
+        },
+        flush: async () => {
+          calls.push("flush");
+        },
+      },
+    });
+
+    router.track("screen_view");
+    await router.flush();
+
+    expect(calls).toEqual(["enqueue:screen_view", "flush"]);
+  });
+
+  test("flush drains async detail enqueues before sink flush callbacks", async () => {
+    const staged: string[] = [];
+    const flushed: string[][] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      detail: {
+        enabled: true,
+        enqueueBatch: async (events) => {
+          await delay(1);
+          staged.push(...events.map((event) => event.eventName));
+        },
+        flush: async () => {
+          flushed.push([...staged]);
+          staged.length = 0;
+        },
+      },
+    });
+
+    router.track("screen_view");
+    await router.flush();
+
+    expect(flushed).toEqual([["screen_view"]]);
+    expect(staged).toEqual([]);
+  });
+
+  test("normalizes missing and disabled bootstrap policy to disabled sinks", async () => {
+    expect(normalizeAnalyticsBootstrapPolicy(undefined)).toMatchObject({
+      enabled: false,
+      trailbase: { enabled: false, endpoint: null },
+      appsInToss: { enabled: false },
+    });
+
+    const fetchCalls: unknown[] = [];
+    const debugCalls: string[] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      debug: {
+        enabled: true,
+        logger: (event) => {
+          debugCalls.push(event.eventName);
+        },
+      },
+    });
+    configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: { enabled: false, trailbase: { enabled: true, endpoint: "/api/events" } },
+      trailbase: {
+        fetcher: async (url, init) => {
+          fetchCalls.push({ url, init });
+          return jsonResponse({ ok: true });
+        },
+      },
+    });
+
+    router.track("screen_view");
+    await router.flush();
+
+    expect(fetchCalls).toEqual([]);
+    expect(debugCalls).toEqual([]);
+  });
+
+  test("configures a TrailBase analytics sink from bootstrap and posts batches", async () => {
+    const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
+    const router = createAnalyticsRouter<"screen_view" | "input_changed">();
+
+    configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: {
+        enabled: true,
+        trailbase: {
+          enabled: true,
+          endpoint: "/api/analytics/events",
+          allowedEvents: ["screen_view"],
+          flushIntervalMs: 0,
+          maxBatchSize: 10,
+        },
+      },
+      trailbase: {
+        baseUrl: "https://app.example",
+        fetcher: async (url, init) => {
+          fetchCalls.push({ url, init });
+          return jsonResponse({ ok: true });
+        },
+        getAuthHeaders: () => ({ Authorization: "Bearer session-token" }),
+      },
+      sessionTokenProvider: () => "session-token",
+    });
+
+    router.track("input_changed", { length: 3 });
+    router.track("screen_view", { tossUserKey: "raw-user-key", section: "main" });
+    await router.flush();
+
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0]?.url).toBe("https://app.example/api/analytics/events");
+    expect((fetchCalls[0]?.init.headers as Headers).get("Authorization")).toBe(
+      "Bearer session-token",
+    );
+    const body = parseBody(fetchCalls[0]?.init);
+    expect(body.events).toHaveLength(1);
+    expect(body.events[0]).toMatchObject({
+      eventName: "screen_view",
+      eventPayload: {
+        tossUserKey: "[REDACTED]",
+        section: "main",
+      },
+      sessionToken: "[REDACTED]",
+    });
+  });
+
+  test("honors option endpoint overrides when bootstrap enables TrailBase", async () => {
+    const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
+    const router = createAnalyticsRouter<"screen_view">();
+
+    const policy = configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: {
+        enabled: true,
+        trailbase: {
+          enabled: true,
+          flushIntervalMs: 0,
+        },
+      },
+      trailbase: {
+        endpoint: "/api/override-analytics/events",
+        fetcher: async (url, init) => {
+          fetchCalls.push({ url, init });
+          return jsonResponse({ ok: true });
+        },
+      },
+    });
+
+    router.track("screen_view");
+    await router.flush();
+
+    expect(policy.trailbase).toMatchObject({
+      enabled: true,
+      endpoint: "/api/override-analytics/events",
+    });
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0]?.url).toBe("/api/override-analytics/events");
+  });
+
+  test("clears old buffered sinks when bootstrap disables analytics", async () => {
+    const fetchCalls: unknown[] = [];
+    const router = createAnalyticsRouter<"screen_view">();
+
+    configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: {
+        enabled: true,
+        trailbase: {
+          enabled: true,
+          endpoint: "/api/analytics/events",
+          flushIntervalMs: 5,
+        },
+      },
+      trailbase: {
+        fetcher: async (url, init) => {
+          fetchCalls.push({ url, init });
+          return jsonResponse({ ok: true });
+        },
+      },
+    });
+
+    router.track("screen_view");
+    configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: { enabled: false },
+    });
+    await delay(20);
+    await router.flush();
+
+    expect(fetchCalls).toEqual([]);
+  });
+
+  test("does not retry cleared in-flight buffered sink failures", async () => {
+    const attempts: string[] = [];
+    let fail = true;
+    const sink = createBufferedAnalyticsSink({
+      enqueueBatch: async (events) => {
+        attempts.push(events.map((event) => event.eventName).join(","));
+        await delay(1);
+        if (fail) {
+          throw new Error("network down");
+        }
+      },
+      flushIntervalMs: 0,
+      maxBatchSize: 1,
+    });
+
+    const flushPromise = sink.enqueueBatch([createEvent("screen_view", {})], {
+      sink: "detail",
+    }) as Promise<void>;
+    sink.clear();
+
+    await expect(flushPromise).rejects.toThrow("network down");
+    fail = false;
+    await delay(5);
+    await sink.flush();
+
+    expect(attempts).toEqual(["screen_view"]);
+    expect(sink.getQueueSize()).toBe(0);
+  });
+
+  test("leaves AppsInToss SDK wiring to the RN analytics helper", async () => {
+    const dispatched: string[] = [];
+    const router = createAnalyticsRouter<"screen_view" | "debug_event">({
+      appsInToss: {
+        enabled: true,
+        mapEvent: (event) => ({
+          name: event.eventName,
+          type: "custom",
+          params: event.eventPayload,
+        }),
+        dispatch: async (event) => {
+          dispatched.push(event.name);
+        },
+      },
+    });
+
+    const policy = configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: {
+        enabled: true,
+        appsInToss: {
+          enabled: true,
+          allowedEvents: ["screen_view"],
+        },
+      },
+    });
+
+    router.track("debug_event");
+    router.track("screen_view");
+    await router.flush();
+
+    expect(policy.appsInToss).toMatchObject({
+      enabled: true,
+      allowedEvents: ["screen_view"],
+    });
+    expect(dispatched).toEqual([]);
+  });
+
+  test("TrailBase analytics client joins URLs, sends auth headers, and reports failures", async () => {
+    const client = createTrailBaseAnalyticsEventClient({
+      baseUrl: "https://app.example/",
+      endpoint: "api/events",
+      fetcher: async (url, init) => {
+        expect(url).toBe("https://app.example/api/events");
+        expect((init.headers as Headers).get("X-App-Session")).toBe("session");
+        return jsonResponse({ message: "bad request" }, { status: 422, statusText: "Unprocessable" });
+      },
+      getAuthHeaders: async () => [["X-App-Session", "session"]],
+    });
+
+    await expect(
+      client.enqueueBatch([
+        createEvent("screen_view", { source: "test" }),
+      ]),
+    ).rejects.toMatchObject({
+      name: "AnalyticsSinkRequestError",
+      status: 422,
+      message: "bad request",
+    } satisfies Partial<AnalyticsSinkRequestError>);
+  });
+
+  test("TrailBase analytics client surfaces fetch failures", async () => {
+    const client = createTrailBaseAnalyticsEventClient({
+      endpoint: "/api/events",
+      fetcher: async () => {
+        throw new Error("network down");
+      },
+    });
+
+    await expect(
+      client.enqueueBatch([createEvent("screen_view", {})]),
+    ).rejects.toThrow("network down");
+  });
+
+  test("buffered sink samples, batches, and flushes pending events", async () => {
+    const batches: string[][] = [];
+    const sink = createBufferedAnalyticsSink({
+      enqueueBatch: async (events) => {
+        batches.push(events.map((event) => event.eventName));
+      },
+      maxBatchSize: 2,
+      flushIntervalMs: 0,
+      sampleRate: 0.5,
+      random: (() => {
+        const values = [0.1, 0.75, 0.2];
+        return () => values.shift() ?? 0;
+      })(),
+    });
+
+    await sink.enqueueBatch([
+      createEvent("first", {}),
+      createEvent("sampled_out", {}),
+    ], { sink: "detail" });
+    expect(sink.getQueueSize()).toBe(1);
+
+    await sink.enqueueBatch([createEvent("second", {})], { sink: "detail" });
+    expect(batches).toEqual([["first", "second"]]);
+    expect(sink.getQueueSize()).toBe(0);
+  });
+
+  test("buffered sink caps queues and supports explicit clear", async () => {
+    const sink = createBufferedAnalyticsSink({
+      enqueueBatch: async () => {},
+      maxBatchSize: 10,
+      maxQueueSize: 2,
+      flushIntervalMs: 0,
+    });
+
+    sink.enqueueBatch([
+      createEvent("first", {}),
+      createEvent("second", {}),
+      createEvent("third", {}),
+    ], { sink: "detail" });
+
+    expect(sink.getQueueSize()).toBe(2);
+    sink.clear();
+    expect(sink.getQueueSize()).toBe(0);
+  });
+
+  test("buffered sink treats fractional positive limits as defaults", async () => {
+    const batches: string[][] = [];
+    const sink = createBufferedAnalyticsSink({
+      enqueueBatch: async (events) => {
+        batches.push(events.map((event) => event.eventName));
+      },
+      flushIntervalMs: 0,
+      maxBatchSize: 0.5,
+      maxQueueSize: 0.5,
+    });
+
+    sink.enqueueBatch([
+      createEvent("first", {}),
+      createEvent("second", {}),
+    ], { sink: "detail" });
+
+    expect(sink.getQueueSize()).toBe(2);
+    await sink.flush();
+    expect(batches).toEqual([["first", "second"]]);
+  });
+
+  test("sanitizes sensitive keys, unsupported values, and oversized payloads", () => {
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+
+    expect(
+      sanitizeAnalyticsPayload({
+        authToken: "secret-token",
+        nested: {
+          toss_user_key: "raw-user-key",
+          ok: true,
+        },
+        count: Number.POSITIVE_INFINITY,
+        callback: () => undefined,
+        circular,
+      }),
+    ).toEqual({
+      authToken: "[REDACTED]",
+      nested: {
+        toss_user_key: "[REDACTED]",
+        ok: true,
+      },
+      circular: {},
+    });
+
+    expect(
+      sanitizeAnalyticsPayload({ text: "x".repeat(100) }, { maxPayloadBytes: 20 }),
+    ).toMatchObject({
+      analyticsPayloadTruncated: true,
+      analyticsPayloadBytes: expect.any(Number),
+    });
+  });
+
+  test("sanitizer counts UTF-8 bytes without TextEncoder", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "TextEncoder");
+    Object.defineProperty(globalThis, "TextEncoder", {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+    try {
+      expect(
+        sanitizeAnalyticsPayload({ text: "가" }, { maxPayloadBytes: 13 }),
+      ).toMatchObject({
+        analyticsPayloadTruncated: true,
+        analyticsPayloadBytes: 14,
+      });
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(globalThis, "TextEncoder", descriptor);
+      } else {
+        delete (globalThis as { TextEncoder?: typeof TextEncoder }).TextEncoder;
+      }
+    }
+  });
 });
+
+function createEvent(
+  eventName: string,
+  eventPayload: Record<string, unknown>,
+): AnalyticsEvent<string> {
+  return {
+    eventName,
+    eventPayload: eventPayload as AnalyticsEvent<string>["eventPayload"],
+    clientCreatedAt: 1,
+  };
+}
+
+function jsonResponse(
+  body: unknown,
+  init: ResponseInit = {},
+): Response {
+  return new Response(JSON.stringify(body), {
+    status: init.status ?? 200,
+    statusText: init.statusText,
+    headers: {
+      "Content-Type": "application/json",
+      ...Object.fromEntries(new Headers(init.headers).entries()),
+    },
+  });
+}
+
+function parseBody(init: RequestInit | undefined): { events: unknown[] } {
+  expect(typeof init?.body).toBe("string");
+  return JSON.parse(init?.body as string);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}

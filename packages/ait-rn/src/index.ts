@@ -1,3 +1,4 @@
+export * from "./analytics";
 export * from "./ads";
 export * from "./haptics";
 export * from "./identity";

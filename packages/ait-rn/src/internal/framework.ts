@@ -1,5 +1,6 @@
 import type * as AppsInTossFramework from "@apps-in-toss/framework";
 
+export type AppsInTossAnalytics = typeof AppsInTossFramework.Analytics;
 export type AppsInTossAppLogin = typeof AppsInTossFramework.appLogin;
 export type AppsInTossGetAnonymousKey =
   typeof AppsInTossFramework.getAnonymousKey;
@@ -65,6 +66,7 @@ export type AppsInTossShowFullScreenAdParams =
 export type AppsInTossFrameworkModule = Partial<
   Pick<
     typeof AppsInTossFramework,
+    | "Analytics"
     | "appLogin"
     | "getAnonymousKey"
     | "getIsTossLoginIntegratedService"

@@ -19,7 +19,7 @@ Keep detailed analytics and AppsInToss Analytics separate. A detailed TrailBase 
 ## Basic setup
 
 ```ts
-import { createAnalyticsRouter } from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+import { createAnalyticsRouter } from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
   detail: false,
@@ -29,6 +29,84 @@ const analytics = createAnalyticsRouter({
 ```
 
 All sinks are disabled by default. Consumers opt in during app initialization.
+
+## Bootstrap-controlled opt-in logging
+
+For production apps, prefer enabling analytics from the app bootstrap response instead of shipping a
+hard-coded client decision. Missing or invalid policy values normalize to disabled.
+
+```json
+{
+  "enabled": true,
+  "trailbase": {
+    "enabled": true,
+    "endpoint": "/api/analytics/events",
+    "sampleRate": 1,
+    "maxBatchSize": 20,
+    "maxQueueSize": 200,
+    "flushIntervalMs": 5000,
+    "maxPayloadBytes": 4096,
+    "allowedEvents": ["screen_view", "answer_submit_tapped"]
+  },
+  "appsInToss": {
+    "enabled": true,
+    "allowedEvents": ["screen_view", "answer_submit_tapped"]
+  }
+}
+```
+
+```ts
+import { Analytics } from "@apps-in-toss/framework";
+import {
+  configureAppsInTossAnalyticsRouterFromBootstrap,
+  createAnalyticsRouter,
+} from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
+
+const analytics = createAnalyticsRouter({
+  detail: false,
+  appsInToss: false,
+});
+
+configureAppsInTossAnalyticsRouterFromBootstrap({
+  router: analytics,
+  policy: bootstrap.analytics,
+  trailbase: {
+    baseUrl: apiBaseUrl,
+    getAuthHeaders: () => ({
+      Authorization: `Bearer ${sessionTokenStore.current}`,
+    }),
+  },
+  appsInToss: {
+    analyticsModule: Analytics,
+    mapEvent: (event) => {
+      if (event.eventName !== "answer_submit_tapped") {
+        return false;
+      }
+      return {
+        name: "answer_submit",
+        type: "press",
+        params: event.eventPayload,
+      };
+    },
+    dispatch: (event) => {
+      console.debug("[apps-in-toss-analytics]", event);
+    },
+  },
+  sessionTokenProvider: () => sessionTokenStore.current,
+});
+```
+
+`trailbase.endpoint` is an app backend endpoint. The client sends `POST { events }` batches there;
+the backend decides which TrailBase table, database, or multi-db connection to use. The shared sink is
+in-memory only: it supports allowlists, sampling, queue caps, batch flushing, and payload sanitization,
+but it does not provide a persistent offline queue.
+
+Use `@trailbase-apps-in-toss-kit/ait-rn/analytics` when wiring the official AppsInToss `Analytics`
+SDK. The lower-level `trailbase-client/analytics` APIs remain framework-neutral primitives for routers,
+buffered sinks, sanitizers, and backend batch posting.
+
+AppsInToss Analytics is the official console metric source. The TrailBase mirror is for app-internal
+analysis and early operations support when teams need lower-latency or richer debugging data.
 
 ## Enable detailed analytics
 
@@ -56,10 +134,13 @@ The kit does not force a database schema or API endpoint. Consumer apps own thei
 
 ```ts
 import { Analytics } from "@apps-in-toss/framework";
+import {
+  createAnalyticsRouter,
+  createAppsInTossAnalyticsConfig,
+} from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
-  appsInToss: {
-    enabled: true,
+  appsInToss: createAppsInTossAnalyticsConfig({
     analyticsModule: Analytics,
     mapEvent: (event) => {
       if (event.eventName !== "answer_submit_tapped") {
@@ -76,7 +157,7 @@ const analytics = createAnalyticsRouter({
       // real console event surface. The router keeps the shared event mapping.
       console.debug("[apps-in-toss-analytics]", event);
     },
-  },
+  }),
 });
 ```
 
@@ -89,3 +170,6 @@ For console analytics, prefer wrapping meaningful UI surfaces with `Analytics.Pr
 - Do not send noisy debug events to AppsInToss Analytics.
 - Use detailed analytics for backend/API failures, retry paths, queue state, and temporary launch diagnostics.
 - If detailed analytics is not needed for a consumer app, set `detail: false`; the same `track()` calls become no-op for that sink.
+- Do not mix functional ledgers into the analytics sink. Notification agreement history, message outbox,
+  promotion claim/grant, IAP order/grant, and ad/share reward records should stay in their feature-owned
+  tables and docs.

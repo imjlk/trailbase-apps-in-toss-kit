@@ -6,6 +6,7 @@
   "description": "React Native Apps in Toss SDK bridge helpers for TrailBase consumer apps.",
   "exports": {
     ".": "./src/index.ts",
+    "./analytics": "./src/analytics.ts",
     "./ads": "./src/ads.ts",
     "./haptics": "./src/haptics.ts",
     "./identity": "./src/identity.ts",
