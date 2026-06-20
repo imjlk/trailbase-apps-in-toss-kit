@@ -635,6 +635,7 @@ export function createBufferedAnalyticsSink<
       return flush();
     }
     scheduleFlush();
+    return undefined;
   }
 
   async function flush() {
