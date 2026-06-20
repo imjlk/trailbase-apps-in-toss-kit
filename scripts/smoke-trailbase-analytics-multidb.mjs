@@ -183,13 +183,14 @@ function verifyAnalyticsDatabase() {
 
     db.query(
       `INSERT INTO analytics.events
-        (name, screen, source, props_json, client_at, server_at, request_id, batch_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+        (name, screen, source, props_json, user_id, client_at, server_at, request_id, batch_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
     ).run(
       "screen_view",
       "main",
       "smoke",
       JSON.stringify({ smoke: true }),
+      new Uint8Array([1, 2, 3]),
       Date.now(),
       Date.now(),
       "smoke-request",
