@@ -43,6 +43,7 @@
         "trailbase-qs",
         "trailbase-schema",
         "trailbase-wasm-common",
+        "trailbase/trailbase",
         "trailbaseio/trailbase",
         "/^trailbase[-_].*/"
       ],
@@ -61,6 +62,7 @@
         "trailbase-qs",
         "trailbase-schema",
         "trailbase-wasm-common",
+        "trailbase/trailbase",
         "trailbaseio/trailbase",
         "/^trailbase[-_].*/"
       ],

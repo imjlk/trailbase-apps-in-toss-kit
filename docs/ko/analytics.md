@@ -106,6 +106,43 @@ batch를 보내고, 실제 TrailBase table, database, multi-db 연결 선택은 
 sink는 in-memory 전용입니다. allowlist, sampling, queue cap, batch flush, payload sanitization은
 지원하지만 persistent offline queue는 제공하지 않습니다.
 
+## 선택형 TrailBase analytics database
+
+상세 분석 이벤트 양이 많다면 제품 테이블과 분석 쓰기를 `main`에 섞기보다 별도 TrailBase
+database를 권장합니다. 도입 앱의 `config.textproto`에 다음을 추가하세요.
+
+```textproto
+databases: [{
+  name: "analytics"
+}]
+```
+
+Analytics migration은 `traildepot-template/migrations/analytics/` 아래에 두고,
+[`analytics_events.sql`](../../templates/trailbase/sql/analytics_events.sql) 조각을 앱 소유
+`U<timestamp>__create_analytics_events.sql` migration으로 복사합니다. 공통 runtime migration
+copier는 이제 `main`과 `analytics`를 포함한 모든 `migrations/<database>/` 하위 디렉터리를
+복사합니다.
+
+TrailBase custom database migration은 설정된 database를 참조하는 connection이 열릴 때 적용됩니다.
+Smoke script는 `analytics` attach와 migration 적용을 확인하기 위해 임시 ACL 없는 Record API를 만들지만,
+운영 앱에서는 public analytics Record API를 노출하지 말고 앱 소유 backend/WASM endpoint 뒤에서 analytics
+write를 처리하세요.
+
+Rust WASM endpoint에서는 `trailbase_guest_common::analytics_events`를 사용해 attached
+`analytics.analytics_events` table insert를 만들 수 있습니다. 이 helper는 endpoint connection이
+analytics database를 attach한 뒤 사용하세요. API endpoint는 앱이 소유합니다. 현재 TrailBase
+user/session을 검증하고 request 또는 batch ID를 붙이되, 원본 Toss user key, auth token,
+mTLS proxy token, 기능성 ledger를 analytics payload에 저장하지 마세요.
+
+현재 검증된 TrailBase image로 템플릿을 확인하려면 다음 smoke를 실행합니다.
+
+```bash
+bun scripts/smoke-trailbase-analytics-multidb.mjs
+```
+
+다른 image를 확인하려면 `TRAILBASE_IMAGE=trailbase/trailbase:<version>`을 지정하고, 임시
+`traildepot`을 확인하려면 `KEEP_TRAILBASE_SMOKE_DIR=1`을 지정하세요.
+
 공식 AppsInToss `Analytics` SDK를 연결할 때는 `@trailbase-apps-in-toss-kit/ait-rn/analytics`를
 사용하세요. 하위 `trailbase-client/analytics` API는 router, buffered sink, sanitizer, backend
 batch posting을 위한 framework-neutral primitive로 남겨둡니다.

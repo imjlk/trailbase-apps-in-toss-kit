@@ -293,13 +293,21 @@ trailbase_runtime_copy_if_exists() {
 trailbase_runtime_copy_template_migrations() {
   template="$1"
   traildepot="$2"
-  source="$template/migrations/main"
-  target="$traildepot/migrations/main"
+  source_root="$template/migrations"
+  target_root="$traildepot/migrations"
 
-  if [ -d "$source" ]; then
-    mkdir -p "$target"
-    cp "$source"/*.sql "$target"/ 2>/dev/null || true
+  if [ ! -d "$source_root" ]; then
+    return 0
   fi
+
+  for source in "$source_root"/*; do
+    if [ -d "$source" ]; then
+      database="$(basename "$source")"
+      target="$target_root/$database"
+      mkdir -p "$target"
+      cp "$source"/*.sql "$target"/ 2>/dev/null || true
+    fi
+  done
 }
 
 trailbase_runtime_copy_components() {

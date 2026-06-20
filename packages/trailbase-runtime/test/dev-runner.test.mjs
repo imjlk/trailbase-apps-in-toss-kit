@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { createServer } from "node:net";
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import {
   buildComposeArgs,
   detectLanIp,
@@ -161,6 +164,66 @@ describe("dev runner helpers", () => {
     ]);
   });
 
+  test("shell migration copy includes each database subdirectory", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "trailbase-runtime-"));
+    try {
+      const template = path.join(root, "template");
+      const depot = path.join(root, "traildepot");
+      mkdirSync(path.join(template, "migrations", "main"), { recursive: true });
+      mkdirSync(path.join(template, "migrations", "analytics"), { recursive: true });
+      writeFileSync(path.join(template, "migrations", "main", "U1__main.sql"), "SELECT 1;");
+      writeFileSync(
+        path.join(template, "migrations", "analytics", "U2__analytics.sql"),
+        "SELECT 2;",
+      );
+      writeFileSync(path.join(template, "migrations", "U0__legacy.sql"), "SELECT 0;");
+
+      const result = spawnSync(
+        "sh",
+        [
+          "-c",
+          `. packages/trailbase-runtime/entrypoint/lib.sh && trailbase_runtime_copy_template_migrations ${shellQuote(template)} ${shellQuote(depot)}`,
+        ],
+        {
+          cwd: new URL("../../..", import.meta.url).pathname,
+          encoding: "utf8",
+        },
+      );
+
+      expect(result.status).toBe(0);
+      expect(readFileSync(path.join(depot, "migrations", "main", "U1__main.sql"), "utf8")).toBe(
+        "SELECT 1;",
+      );
+      expect(
+        readFileSync(path.join(depot, "migrations", "analytics", "U2__analytics.sql"), "utf8"),
+      ).toBe("SELECT 2;");
+      expect(existsSync(path.join(depot, "migrations", "U0__legacy.sql"))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  test("shell migration copy no-ops when source migration directory is missing", () => {
+    const root = mkdtempSync(path.join(tmpdir(), "trailbase-runtime-"));
+    try {
+      const result = spawnSync(
+        "sh",
+        [
+          "-c",
+          `. packages/trailbase-runtime/entrypoint/lib.sh && trailbase_runtime_copy_template_migrations ${shellQuote(path.join(root, "missing-template"))} ${shellQuote(path.join(root, "traildepot"))}`,
+        ],
+        {
+          cwd: new URL("../../..", import.meta.url).pathname,
+          encoding: "utf8",
+        },
+      );
+
+      expect(result.status).toBe(0);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("shell Toss unlink callback guard validates production settings", () => {
     const root = new URL("../../..", import.meta.url).pathname;
     const ok = spawnSync(
@@ -207,3 +270,7 @@ describe("dev runner helpers", () => {
     expect(localCredential.stderr).toContain("TOSS_LOGIN_UNLINK_BASIC_AUTH must not use local dev/test credentials in production");
   });
 });
+
+function shellQuote(value) {
+  return `'${value.replaceAll("'", "'\\''")}'`;
+}

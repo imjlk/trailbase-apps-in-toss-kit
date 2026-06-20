@@ -43,7 +43,7 @@
 도입 앱은 Git으로 추적하는 depot template 하나와 ignore되는 런타임 depot 하나를 둡니다.
 
 - `apps/trailbase/traildepot-template`: Git으로 추적하는 원본입니다. `config.textproto`,
-  `migrations/main`, seed SQL처럼 리뷰되어야 하는 파일만 둡니다.
+  `migrations/main`, 선택형 `migrations/analytics`, seed SQL처럼 리뷰되어야 하는 파일만 둡니다.
 - `apps/trailbase/traildepot`: 로컬 또는 컨테이너 런타임 출력입니다. DB, secret,
   upload, generated WASM, metadata를 ignore합니다. 기본값으로 symlink를 추적하지 않습니다.
 
@@ -54,7 +54,13 @@ apps/trailbase/
   traildepot-template/
     config.textproto
     migrations/main/
+    migrations/analytics/  # 별도 analytics DB migration을 쓸 때만 둡니다.
 ```
+
+`trailbase_runtime_copy_template_migrations`는 각 `migrations/<database>/` 하위 디렉터리를
+런타임 depot으로 복사합니다. 새 migration은 `main` 또는 `analytics`처럼 database별 하위
+디렉터리에 두세요. `migrations/` 바로 아래 SQL 파일을 두는 방식은 TrailBase의 deprecated
+layout이므로 이 helper가 복사하지 않습니다.
 
 repo root `.gitignore`는 런타임 depot 전체를 무시합니다.
 

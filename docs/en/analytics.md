@@ -101,6 +101,42 @@ the backend decides which TrailBase table, database, or multi-db connection to u
 in-memory only: it supports allowlists, sampling, queue caps, batch flushing, and payload sanitization,
 but it does not provide a persistent offline queue.
 
+## Optional TrailBase analytics database
+
+For higher-volume detailed analytics, prefer a separate TrailBase database instead of mixing product
+tables and analytics writes in `main`. Configure the consumer app's `config.textproto` with:
+
+```textproto
+databases: [{
+  name: "analytics"
+}]
+```
+
+Place analytics migrations under `traildepot-template/migrations/analytics/` and copy the
+[`analytics_events.sql`](../../templates/trailbase/sql/analytics_events.sql) snippet into an app-owned
+`U<timestamp>__create_analytics_events.sql` migration. The shared runtime migration copier now copies
+all `migrations/<database>/` subdirectories, including `main` and `analytics`.
+
+TrailBase applies custom database migrations when a connection references the configured database. The
+smoke script creates a temporary ACL-less Record API only to force an `analytics` attachment and verify
+the migration; production apps should keep analytics writes behind app-owned backend or WASM endpoints
+rather than exposing a public analytics Record API.
+
+Rust WASM endpoints can use `trailbase_guest_common::analytics_events` to build inserts against the
+attached `analytics.analytics_events` table after the endpoint connection has attached the analytics
+database. Keep the API endpoint app-owned: validate the current TrailBase user/session, attach request
+or batch IDs, and never store raw Toss user keys, auth tokens, mTLS proxy tokens, or feature ledgers in
+analytics payloads.
+
+To verify the template against the currently verified TrailBase image:
+
+```bash
+bun scripts/smoke-trailbase-analytics-multidb.mjs
+```
+
+Set `TRAILBASE_IMAGE=trailbase/trailbase:<version>` to test another image, or
+`KEEP_TRAILBASE_SMOKE_DIR=1` to inspect the temporary `traildepot`.
+
 Use `@trailbase-apps-in-toss-kit/ait-rn/analytics` when wiring the official AppsInToss `Analytics`
 SDK. The lower-level `trailbase-client/analytics` APIs remain framework-neutral primitives for routers,
 buffered sinks, sanitizers, and backend batch posting.

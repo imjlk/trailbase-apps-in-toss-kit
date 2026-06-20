@@ -9,13 +9,13 @@ const strict = hasFlag("--strict") || process.env.CI_STRICT === "1";
 
 function usage() {
   console.log(`Usage:
-  node scripts/check-trailbase-version-policy.mjs [--strict] [--version 0.28.5]
-  node scripts/check-trailbase-version-policy.mjs [--strict] [--image trailbaseio/trailbase:0.28.5]
+  node scripts/check-trailbase-version-policy.mjs [--strict] [--version 0.28.6]
+  node scripts/check-trailbase-version-policy.mjs [--strict] [--image trailbase/trailbase:0.28.6]
   node scripts/check-trailbase-version-policy.mjs [--strict] [--compose docker-compose.yml]
 
 Environment fallbacks:
-  TRAILBASE_SERVER_VERSION=0.28.5
-  TRAILBASE_IMAGE=trailbaseio/trailbase:0.28.5
+  TRAILBASE_SERVER_VERSION=0.28.6
+  TRAILBASE_IMAGE=trailbase/trailbase:0.28.6
   CI_STRICT=1
 `);
 }
