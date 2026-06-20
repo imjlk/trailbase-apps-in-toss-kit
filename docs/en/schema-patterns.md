@@ -77,10 +77,20 @@ Promotion campaign configuration is generic and can support missions, sharing,
 referrals, seasonal events, game rewards, or any other app feature. Keep the
 shared `promotion_campaigns` table separate from app-specific eligibility and
 grant ledgers, and make claim handlers idempotent before calling the mTLS proxy.
+New apps can start provider grant ledgers from
+`templates/trailbase/sql/promotion_reward_ledger.sql`, while existing apps
+should migrate their own ledgers forward.
 
 See [promotion-campaigns.md](promotion-campaigns.md) for the full model,
 including feature keys, env fallback, ledger ownership, claim idempotency,
 request shape, and provider error signals.
+
+## IAP Orders
+
+IAP order status checks and local product grants are functional ledgers. Use
+`templates/trailbase/sql/iap_orders.sql` when TrailBase should persist
+order/grant state, and keep product entitlement rules in app-owned WASM
+handlers. See [iap-orders.md](iap-orders.md).
 
 ## Domain Events
 

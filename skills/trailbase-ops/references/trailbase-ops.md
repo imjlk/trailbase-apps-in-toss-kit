@@ -117,6 +117,18 @@ helper exists in the checked-out package.
   attaches or otherwise opens the `analytics` database before using qualified inserts. Do not put
   functional ledgers such as notification agreement history, message outbox, promotion grants, IAP
   grants, or rewards in the analytics sink.
+- For AppsInToss functional ledgers, prefer kit templates and Rust helpers before copying
+  consumer-local SQL snippets between apps:
+  - `message_templates.sql`, `notification_template_agreements.sql`, and `message_outbox.core.sql`
+    with `trailbase_guest_common::apps_in_toss_messages` for Smart Message agreement, enqueue,
+    claim/lock, skip, fail, and completion flows.
+  - `promotion_campaigns.sql` plus optional `promotion_reward_ledger.sql` with
+    `trailbase_guest_common::promotion_campaigns` and `promotion_rewards` for campaign config,
+    provider grant ledgers, provider outcome persistence, and budget usage checks.
+  - `iap_orders.sql` with `trailbase_guest_common::iap_orders` for order-status persistence and
+    idempotent local grant marking.
+  Keep these tables in the app/product database by default, not the `analytics` database. Eligibility,
+  product grant rules, inventory/balance updates, cooldowns, and public projections stay app-owned.
 
 ## Deployment And mTLS Proxy
 

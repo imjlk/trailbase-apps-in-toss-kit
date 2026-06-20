@@ -25,6 +25,7 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 | SQL 마이그레이션과 Record API 노출 설계하기 | [schema-patterns.md](schema-patterns.md) |
 | 익명 사용자를 Toss Login 사용자와 연결하기 | [toss-identity.md](toss-identity.md) |
 | Toss 프로모션 리워드 캠페인 설계하기 | [promotion-campaigns.md](promotion-campaigns.md) |
+| 인앱 결제 주문/지급 상태 저장하기 | [iap-orders.md](iap-orders.md) |
 | 기능성 푸시/알림 메시지 붙이기 | [functional-messages.md](functional-messages.md) |
 | React Native 클라이언트 어댑터 사용하기 | [client-adapters.md](client-adapters.md) |
 | 상세 분석과 AppsInToss 분석 설정하기 | [analytics.md](analytics.md) |

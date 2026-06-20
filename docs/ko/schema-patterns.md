@@ -77,10 +77,20 @@ canonical `_user` row를 추가하거나 파생하고, 참조를 다시 연결�
 게임 리워드 같은 여러 기능을 같은 형태로 지원할 수 있습니다. 공통
 `promotion_campaigns` 테이블은 앱 고유의 자격 판정 및 지급 원장(ledger)과 분리하고, mTLS
 프록시를 호출하기 전에 지급 요청 처리기(claim handler)가 중복 실행되지 않게 만드세요.
+새 앱은 provider 지급 원장의 출발점으로
+`templates/trailbase/sql/promotion_reward_ledger.sql`을 사용할 수 있고, 기존 앱은 자체 원장을
+forward migration으로 맞춥니다.
 
 전체 모델, 기능 키(feature key), 환경 변수 대체값(fallback), 지급 원장 소유권, 지급 요청
 멱등성(claim idempotency), 요청 형태, 제공자 오류 신호(provider error signal)는
 [promotion-campaigns.md](promotion-campaigns.md)를 참고하세요.
+
+## IAP 주문
+
+IAP 주문 상태 조회와 로컬 상품 지급은 기능성 원장입니다.
+`templates/trailbase/sql/iap_orders.sql`은 TrailBase가 order/grant 상태를 저장해야 할 때
+사용하고, 상품 지급 규칙은 앱 소유 WASM handler에 둡니다. [iap-orders.md](iap-orders.md)를
+참고하세요.
 
 ## 도메인 이벤트
 

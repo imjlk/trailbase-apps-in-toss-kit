@@ -11,8 +11,9 @@
 ## 모델
 
 TrailBase가 프록시 환경 변수뿐 아니라 프로모션 설정까지 관리해야 한다면
-`templates/trailbase/sql/promotion_campaigns.sql`을 사용하세요. 이 테이블은 다음 값을
-저장합니다.
+`templates/trailbase/sql/promotion_campaigns.sql`을 사용하세요. 앱이 표준 provider 지급
+원장도 원한다면 `templates/trailbase/sql/promotion_reward_ledger.sql`을 함께 복사합니다.
+캠페인 테이블은 다음 값을 저장합니다.
 
 - `feature_key`: 앱이 정하는 프로모션 기능의 안정적인 키(key).
 - `provider`: 현재는 `TOSS`.
@@ -51,13 +52,16 @@ TOSS_PROMOTION_AMOUNT=50
 
 ## 앱별 지급 원장
 
-공통 테이블은 캠페인 설정만 담습니다. 자격 판정과 실제 지급 상태는 각 앱이 별도의 지급
-원장(ledger)으로 관리해야 합니다. 보통 다음 값을 저장합니다.
+캠페인 설정은 자격 판정 및 provider 지급 상태와 분리합니다. 새 앱은
+`templates/trailbase/sql/promotion_reward_ledger.sql`을 지급 원장의 출발점으로 복사할 수
+있습니다. 이미 앱 고유 원장이 있는 서비스는 테이블을 교체하지 말고 forward migration으로
+호환 컬럼을 추가하세요. 보통 다음 값을 저장합니다.
 
 - `promotion_campaigns`를 가리키는 NULL 허용(nullable) `campaign_id`.
 - 사용자, 주기, 미션, 이벤트 같은 앱별 자격 조건.
 - 자격이 생긴 시점에 복사한 `reward_amount`.
-- `ELIGIBLE`, `REQUESTED`, `PENDING`, `GRANTED`, `FAILED`, `CANCELLED` 같은 로컬 상태.
+- `recorded`, `pending`, `success`, `failed`, `cancelled` 같은 로컬 상태. 자체 원장을 쓰는 앱은
+  앱별 상태 이름을 유지할 수 있습니다.
 - 고유한 `provider_request_id`.
 - `provider_transaction_key`, `provider_status`, `provider_error_code`, `granted_at`,
   `failed_at`, `failure_reason`.
@@ -65,6 +69,11 @@ TOSS_PROMOTION_AMOUNT=50
 앱이 안전한 공개 뷰(projection)를 명시적으로 만들지 않는 한 이 원장은 앱 내부 또는 관리자
 흐름에만 노출하세요. Toss 프로모션 코드, 원본 Toss user key, 제공자 요청 ID(provider request
 id), 거래 키(transaction key), 내부 오류 상세를 공개 Record API view에 노출하면 안 됩니다.
+
+TrailBase WASM 핸들러는 `trailbase_guest_common::promotion_rewards`로 멱등 ledger row를
+insert하고, 정규화된 provider outcome을 반영하고, 안전한 table/column identifier로 캠페인
+사용량을 집계할 수 있습니다. 자격 판정, source dimension, 공유 캠페인 테이블을 넘어서는 예산
+정책, 로컬 보상 잔액 반영은 계속 앱이 소유합니다.
 
 ## React Native Claim Client
 
@@ -96,8 +105,8 @@ key, proxy token은 알지 않습니다. `campaignId`를 RN과 백엔드 사이�
 5. 해당 요청 ID(request id)로 mTLS 프록시를 한 번만 호출합니다.
 6. 제공자 상태(provider status)와 오류 정보를 저장합니다.
 
-재시도 시 레코드가 이미 `REQUESTED`, `PENDING`, `GRANTED` 상태라면 프록시를 다시 호출하지 말고
-현재 원장 상태를 반환하세요.
+재시도 시 레코드가 이미 `pending` 또는 `success` 같은 committed 상태라면 프록시를 다시 호출하지
+말고 현재 원장 상태를 반환하세요.
 
 ## 운영 흐름
 

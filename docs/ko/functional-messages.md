@@ -22,9 +22,10 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
    등록합니다. SDK 호출에는 발송 템플릿 코드(`templateSetCode`)가 아니라, 알림 동의문에
    등록한 코드(`templateCode`)를
    `requestNotificationAgreement({ options: { templateCode } })`로 전달합니다. 1개의
-   발송 템플릿이 1개의 동의문을 쓰는 단순한 앱은 두 코드를 같은 문자열로 운영할 수
-   있습니다. 여러 발송 템플릿이 하나의 동의문을 공유하는 앱은 앱 DB에
-   `agreement_template_code` 같은 컬럼을 두어 발송 코드와 동의문 코드를 분리하세요.
+   발송 템플릿이 1개의 동의문을 쓰는 단순한 앱은 같은 문자열을 `template_code`와
+   `agreement_template_code`에 모두 저장할 수 있습니다. 여러 발송 템플릿이 하나의
+   동의문을 공유한다면 `agreement_template_code`에 공유 동의문 코드를 저장해 발송 코드와
+   동의문 코드를 분리하세요.
 4. sandbox QA를 위해 테스트 `userKey`와 API scope를 준비합니다. 프록시는 사용자 키를
    `x-toss-user-key` 헤더로 Toss에 전달합니다.
 
@@ -42,6 +43,27 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
 
 이미 자체 `message_outbox`가 있는 앱은 테이블을 교체하지 말고 forward migration으로 provider
 응답 요약 컬럼만 추가하세요.
+이미 자체 `message_templates`가 있는 앱은 nullable `agreement_template_code`를 forward
+migration으로 추가할 수 있습니다. 새 앱은 이 컬럼이 포함된 템플릿을 처음부터 복사하세요.
+
+### 기존 템플릿 백필
+
+기존 앱에서는 nullable 컬럼을 추가하는 것만으로 마이그레이션이 끝나지 않습니다.
+이미 `requires_agreement = 1`인 row가 있다면 새 gate를 적용하기 전에 별도의 데이터
+마이그레이션으로 `agreement_template_code`를 반드시 채우세요. 동의가 필요한 템플릿 row는
+알림 동의문 코드가 null이 아니어야 한다는 제약을 전제로 동작합니다.
+
+발송 템플릿과 알림 동의문이 1:1인 단순 구성에서는 아래처럼 발송 코드를 복사할 수 있습니다.
+
+```sql
+UPDATE message_templates
+SET agreement_template_code = template_code
+WHERE requires_agreement = 1
+  AND agreement_template_code IS NULL;
+```
+
+여러 발송 템플릿이 하나의 알림 동의문을 공유한다면 `template_code`를 그대로 복사하지 말고,
+각 row를 공유 동의문 `templateCode`로 매핑하세요.
 
 Toss 콘솔 코드는 역할을 분리해서 앱별 DB에서 관리하세요.
 
@@ -51,11 +73,10 @@ Toss 콘솔 코드는 역할을 분리해서 앱별 DB에서 관리하세요.
   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`를 사용하며, 한 요청당 최대
   2,500명까지 `contextList`에 담을 수 있습니다.
 - `templateCode`: `requestNotificationAgreement`에 전달하는 SDK 옵션 이름입니다. 이 값은
-  콘솔에 등록한 알림 동의문 코드입니다. 기본 kit SQL과 헬퍼는 간단한 1:1 구성을 위해
-  `message_templates.template_code`와 `notification_template_agreements.template_code`를
-  같은 기능성 알림 코드로 사용할 수 있게 합니다. 여러 발송 템플릿이 하나의 동의문을
-  공유한다면 소비 앱 마이그레이션에서 `message_templates.agreement_template_code` 같은
-  컬럼을 추가하고, 동의 저장/검증은 그 알림 동의문 코드 기준으로 하세요.
+  콘솔에 등록한 알림 동의문 코드입니다. 공유 SQL 템플릿에는
+  `message_templates.agreement_template_code`가 포함되어 있습니다. `requires_agreement = 1`인
+  템플릿에는 이 값을 채우고, 동의 저장/검증은 그 알림 동의문 코드 기준으로 하세요. 단순
+  1:1 구성에서는 `message_templates.template_code`와 같은 문자열이어도 됩니다.
 
 ## 런타임 흐름
 
@@ -78,14 +99,17 @@ Toss 콘솔 코드는 역할을 분리해서 앱별 DB에서 관리하세요.
    `resultType`, `msgCount`, `sentPushCount`, `sentInboxCount`, `detail`, `fail`,
    `reachFailReason`을 앱이 저장하기 쉬운 형태로 정규화합니다.
 
+TrailBase WASM 핸들러는 `trailbase_guest_common::apps_in_toss_messages`로 outbox row를
+멱등 enqueue하고, ready row를 claim/lock하며, gate에서 막힌 row를 skip하고, provider 예외를
+failed로 표시하고, provider 응답을 complete할 수 있습니다. 대상자 선택, cooldown, 발송 주기와
+enqueue 정책은 계속 앱이 소유합니다.
+
 ## QA 체크리스트
 
 - 승인된 템플릿이 `message_templates`에 등록되어 있습니다.
-- 사전 동의가 필요한 기능성 템플릿은 SDK에 전달한 알림 동의문 `templateCode` 기준으로
-  동의 row가 저장되고 검증됩니다. 기본 SQL 템플릿은 단순한 1:1 구성을 위해
-  `message_templates.template_code`를 동의 검증 키로도 사용할 수 있지만, 공유 동의문을
-  쓰는 앱은 별도 `agreement_template_code` 컬럼이나 매핑 테이블로 발송 템플릿과
-  동의문을 연결하세요.
+- 사전 동의가 필요한 기능성 템플릿은 SDK에 전달한 알림 동의문 `templateCode`를
+  `message_templates.agreement_template_code`에 저장합니다. 발송 `templateSetCode`와 같은
+  문자열을 쓰는 단순 1:1 구성에서도 이 값을 명시해 둡니다.
 - 사전 동의가 필요한 기능성 템플릿은 매칭되는 동의 row가 `OPTED_IN`이 되기 전까지
   차단됩니다.
 - 마케팅 또는 재방문 유도 템플릿은 마케팅 동의 없이는 차단됩니다.

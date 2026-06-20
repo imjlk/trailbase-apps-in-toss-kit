@@ -196,6 +196,11 @@ Adapter request bodies:
   }
   ```
 
+  Store the proxy result in an app-owned order ledger before applying local
+  product grants. TrailBase apps can start from
+  `templates/trailbase/sql/iap_orders.sql` and
+  `trailbase_guest_common::iap_orders`; see [iap-orders.md](iap-orders.md).
+
 - Promotion reward grant:
 
   ```json
@@ -284,9 +289,10 @@ promotion error codes are normalized into `providerErrorCode` when Toss returns 
 `4112`, `4114`, or `4116`.
 
 For DB-backed campaigns, copy `templates/trailbase/sql/promotion_campaigns.sql` into the consumer
-app's migration set, keep eligibility and reward ledgers app-specific, and store proxy
-`providerErrorCode` values on those ledgers so operators can pause or exhaust campaigns without
-hard-coding promotion configuration in env files. See
+app's migration set. New apps can also start from
+`templates/trailbase/sql/promotion_reward_ledger.sql`; existing apps should migrate their ledgers
+forward. Store proxy `providerErrorCode` values on those ledgers so operators can pause or exhaust
+campaigns without hard-coding promotion configuration in env files. See
 [promotion-campaigns.md](promotion-campaigns.md) for the app-side campaign and ledger pattern.
 
 The Toss Login adapter expects the `authorizationCode` and `referrer` returned by `appLogin()`.
