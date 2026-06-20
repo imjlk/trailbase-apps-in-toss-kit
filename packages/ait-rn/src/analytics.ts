@@ -1,6 +1,5 @@
 import {
   configureAnalyticsRouterFromBootstrap,
-  normalizeAnalyticsBootstrapPolicy,
   type AnalyticsEvent,
   type AnalyticsPayload,
   type AnalyticsRouter,
@@ -110,8 +109,7 @@ export function configureAppsInTossAnalyticsRouterFromBootstrap<
   appsInToss,
   ...options
 }: ConfigureAppsInTossAnalyticsRouterFromBootstrapOptions<TEventName, TPayload>): NormalizedAnalyticsBootstrapPolicy {
-  const policy = normalizeAnalyticsBootstrapPolicy(options.policy);
-  configureAnalyticsRouterFromBootstrap(options);
+  const policy = configureAnalyticsRouterFromBootstrap(options);
 
   if (!policy.enabled || !policy.appsInToss.enabled) {
     return policy;

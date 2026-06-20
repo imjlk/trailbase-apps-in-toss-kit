@@ -150,6 +150,48 @@ describe("analytics router", () => {
     expect(errors).toEqual(["appsInToss:init boom"]);
   });
 
+  test("does not reinitialize AppsInToss analytics after config updates", () => {
+    const initCalls: string[] = [];
+    const dispatched: string[] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      appsInToss: {
+        enabled: true,
+        analyticsModule: {
+          init: () => initCalls.push("init"),
+        },
+        mapEvent: (event) => ({
+          name: event.eventName,
+          type: "custom",
+          params: event.eventPayload,
+        }),
+        dispatch: (event) => {
+          dispatched.push(`first:${event.name}`);
+        },
+      },
+    });
+
+    router.configure({
+      appsInToss: {
+        enabled: true,
+        analyticsModule: {
+          init: () => initCalls.push("second-init"),
+        },
+        mapEvent: (event) => ({
+          name: event.eventName,
+          type: "custom",
+          params: event.eventPayload,
+        }),
+        dispatch: (event) => {
+          dispatched.push(`second:${event.name}`);
+        },
+      },
+    });
+    router.track("screen_view");
+
+    expect(initCalls).toEqual(["init"]);
+    expect(dispatched).toEqual(["second:screen_view"]);
+  });
+
   test("dispatches mapped AppsInToss events only when a mapper includes them", async () => {
     const dispatched: string[] = [];
     const router = createAnalyticsRouter<"answer_submit_tapped" | "answer_input_changed">({
@@ -385,6 +427,35 @@ describe("analytics router", () => {
     await router.flush();
 
     expect(fetchCalls).toEqual([]);
+  });
+
+  test("does not retry cleared in-flight buffered sink failures", async () => {
+    const attempts: string[] = [];
+    let fail = true;
+    const sink = createBufferedAnalyticsSink({
+      enqueueBatch: async (events) => {
+        attempts.push(events.map((event) => event.eventName).join(","));
+        await delay(1);
+        if (fail) {
+          throw new Error("network down");
+        }
+      },
+      flushIntervalMs: 0,
+      maxBatchSize: 1,
+    });
+
+    const flushPromise = sink.enqueueBatch([createEvent("screen_view", {})], {
+      sink: "detail",
+    }) as Promise<void>;
+    sink.clear();
+
+    await expect(flushPromise).rejects.toThrow("network down");
+    fail = false;
+    await delay(5);
+    await sink.flush();
+
+    expect(attempts).toEqual(["screen_view"]);
+    expect(sink.getQueueSize()).toBe(0);
   });
 
   test("leaves AppsInToss SDK wiring to the RN analytics helper", async () => {

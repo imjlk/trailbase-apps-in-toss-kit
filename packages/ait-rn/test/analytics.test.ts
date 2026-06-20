@@ -42,13 +42,12 @@ describe("AppsInToss analytics helpers", () => {
     };
     const router = createAnalyticsRouter<"screen_view" | "debug_event">();
 
-    configureAppsInTossAnalyticsRouterFromBootstrap({
+    const policy = configureAppsInTossAnalyticsRouterFromBootstrap({
       router,
       policy: {
         enabled: true,
         trailbase: {
           enabled: true,
-          endpoint: "/api/analytics/events",
           flushIntervalMs: 0,
         },
         appsInToss: {
@@ -57,6 +56,7 @@ describe("AppsInToss analytics helpers", () => {
         },
       },
       trailbase: {
+        endpoint: "/api/analytics/events",
         fetcher: async (_url, init) => {
           posted.push(JSON.parse(init.body as string));
           return new Response(JSON.stringify({ ok: true }));
@@ -79,6 +79,10 @@ describe("AppsInToss analytics helpers", () => {
     router.track("screen_view", { section: "home" });
     await router.flush();
 
+    expect(policy.trailbase).toMatchObject({
+      enabled: true,
+      endpoint: "/api/analytics/events",
+    });
     expect(initCalls).toHaveLength(1);
     expect(dispatched).toEqual(["screen_view"]);
     expect(posted).toHaveLength(1);

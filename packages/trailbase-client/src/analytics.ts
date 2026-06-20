@@ -311,9 +311,6 @@ export function createAnalyticsRouter<
       ...config,
       ...nextConfig,
     };
-    if (nextConfig.appsInToss !== undefined) {
-      appsInTossInitialized = false;
-    }
     initializeAppsInToss();
   }
 
@@ -616,6 +613,7 @@ export function createBufferedAnalyticsSink<
   let queue: Array<AnalyticsEvent<TEventName, TPayload>> = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   let flushPromise: Promise<void> | null = null;
+  let clearVersion = 0;
 
   function enqueueBatch(events: Array<AnalyticsEvent<TEventName, TPayload>>) {
     for (const event of events) {
@@ -639,14 +637,17 @@ export function createBufferedAnalyticsSink<
       return flushPromise;
     }
     clearTimer();
+    const flushVersion = clearVersion;
     flushPromise = (async () => {
       while (queue.length > 0) {
         const batch = queue.splice(0, maxBatchSize);
         try {
           await options.enqueueBatch(batch, context);
         } catch (error) {
-          queue = [...batch, ...queue].slice(0, maxQueueSize);
-          scheduleFlush();
+          if (flushVersion === clearVersion) {
+            queue = [...batch, ...queue].slice(0, maxQueueSize);
+            scheduleFlush();
+          }
           throw error;
         }
       }
@@ -662,6 +663,7 @@ export function createBufferedAnalyticsSink<
   }
 
   function clear() {
+    clearVersion += 1;
     queue = [];
     clearTimer();
   }
