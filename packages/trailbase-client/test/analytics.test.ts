@@ -280,6 +280,30 @@ describe("analytics router", () => {
     expect(calls).toEqual(["enqueue:screen_view", "flush"]);
   });
 
+  test("flush drains async detail enqueues before sink flush callbacks", async () => {
+    const staged: string[] = [];
+    const flushed: string[][] = [];
+    const router = createAnalyticsRouter<"screen_view">({
+      detail: {
+        enabled: true,
+        enqueueBatch: async (events) => {
+          await delay(1);
+          staged.push(...events.map((event) => event.eventName));
+        },
+        flush: async () => {
+          flushed.push([...staged]);
+          staged.length = 0;
+        },
+      },
+    });
+
+    router.track("screen_view");
+    await router.flush();
+
+    expect(flushed).toEqual([["screen_view"]]);
+    expect(staged).toEqual([]);
+  });
+
   test("normalizes missing and disabled bootstrap policy to disabled sinks", async () => {
     expect(normalizeAnalyticsBootstrapPolicy(undefined)).toMatchObject({
       enabled: false,
@@ -577,6 +601,27 @@ describe("analytics router", () => {
     expect(sink.getQueueSize()).toBe(0);
   });
 
+  test("buffered sink treats fractional positive limits as defaults", async () => {
+    const batches: string[][] = [];
+    const sink = createBufferedAnalyticsSink({
+      enqueueBatch: async (events) => {
+        batches.push(events.map((event) => event.eventName));
+      },
+      flushIntervalMs: 0,
+      maxBatchSize: 0.5,
+      maxQueueSize: 0.5,
+    });
+
+    sink.enqueueBatch([
+      createEvent("first", {}),
+      createEvent("second", {}),
+    ], { sink: "detail" });
+
+    expect(sink.getQueueSize()).toBe(2);
+    await sink.flush();
+    expect(batches).toEqual([["first", "second"]]);
+  });
+
   test("sanitizes sensitive keys, unsupported values, and oversized payloads", () => {
     const circular: Record<string, unknown> = {};
     circular.self = circular;
@@ -607,6 +652,29 @@ describe("analytics router", () => {
       analyticsPayloadTruncated: true,
       analyticsPayloadBytes: expect.any(Number),
     });
+  });
+
+  test("sanitizer counts UTF-8 bytes without TextEncoder", () => {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, "TextEncoder");
+    Object.defineProperty(globalThis, "TextEncoder", {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+    try {
+      expect(
+        sanitizeAnalyticsPayload({ text: "가" }, { maxPayloadBytes: 13 }),
+      ).toMatchObject({
+        analyticsPayloadTruncated: true,
+        analyticsPayloadBytes: 14,
+      });
+    } finally {
+      if (descriptor) {
+        Object.defineProperty(globalThis, "TextEncoder", descriptor);
+      } else {
+        delete (globalThis as { TextEncoder?: typeof TextEncoder }).TextEncoder;
+      }
+    }
   });
 });
 

@@ -338,10 +338,15 @@ export function createAnalyticsRouter<
   }
 
   async function flush() {
+    await drainPending();
     const detail = config.detail;
     if (isEnabled(detail) && detail.flush) {
       captureSinkCall(() => detail.flush?.(), { sink: "detail" });
     }
+    await drainPending();
+  }
+
+  async function drainPending() {
     while (pending.length > 0) {
       const current = pending;
       pending = [];
@@ -824,10 +829,15 @@ function normalizeSampleRate(value: unknown): number {
 }
 
 function positiveIntegerOrDefault(value: unknown, fallback: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value) ||
+    !Number.isInteger(value) ||
+    value < 1
+  ) {
     return fallback;
   }
-  return Math.floor(value);
+  return value;
 }
 
 function nonNegativeIntegerOrDefault(value: unknown, fallback: number): number {
@@ -1020,7 +1030,30 @@ function jsonByteLength(value: unknown): number {
   if (typeof TextEncoder !== "undefined") {
     return new TextEncoder().encode(text).byteLength;
   }
-  return text.length;
+  return utf8ByteLength(text);
+}
+
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x7f) {
+      bytes += 1;
+    } else if (code <= 0x7ff) {
+      bytes += 2;
+    } else if (code >= 0xd800 && code <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (next >= 0xdc00 && next <= 0xdfff) {
+        bytes += 4;
+        index += 1;
+      } else {
+        bytes += 3;
+      }
+    } else {
+      bytes += 3;
+    }
+  }
+  return bytes;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
