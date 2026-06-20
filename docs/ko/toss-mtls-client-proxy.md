@@ -197,6 +197,10 @@ export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
   }
   ```
 
+  로컬 상품 지급을 적용하기 전에 proxy 결과를 앱 소유 주문 원장에 저장하세요. TrailBase 앱은
+  `templates/trailbase/sql/iap_orders.sql`과 `trailbase_guest_common::iap_orders`에서 시작할
+  수 있습니다. [iap-orders.md](iap-orders.md)를 참고하세요.
+
 - 프로모션 리워드 지급:
 
   ```json
@@ -285,11 +289,12 @@ export async function callMtlProxy<T>(path: string, body: unknown): Promise<T> {
 오류 코드(upstream promotion error code)는 `providerErrorCode`로 정리됩니다.
 
 DB 기반 캠페인에서는 `templates/trailbase/sql/promotion_campaigns.sql`을 도입 앱의
-마이그레이션 묶음(migration set)으로 복사하고, 자격 판정과 리워드 지급 원장(ledger)은 앱별로
-유지하세요. 또한 운영자가 환경 변수 파일(env file)에 프로모션 설정을 하드코딩(hard-code)하지
-않고 캠페인을 일시 중지하거나 소진 처리할 수 있도록 `providerErrorCode` 값을 원장에 저장하세요. 앱 쪽
-캠페인 및 지급 원장 패턴(ledger pattern)은 [promotion-campaigns.md](promotion-campaigns.md)를
-참고하세요.
+마이그레이션 묶음(migration set)으로 복사하세요. 새 앱은
+`templates/trailbase/sql/promotion_reward_ledger.sql`에서 시작할 수 있고, 기존 앱은 자체 지급
+원장(ledger)을 forward migration으로 맞추세요. 운영자가 환경 변수 파일(env file)에 프로모션
+설정을 하드코딩(hard-code)하지 않고 캠페인을 일시 중지하거나 소진 처리할 수 있도록
+`providerErrorCode` 값을 원장에 저장하세요. 앱 쪽 캠페인 및 지급 원장 패턴(ledger pattern)은
+[promotion-campaigns.md](promotion-campaigns.md)를 참고하세요.
 
 Toss Login 어댑터는 `appLogin()`이 반환한 `authorizationCode`와 `referrer`를 기대합니다. SDK
 `referrer` 값은 그대로 전달하세요. 샌드박스 RN 빌드(sandbox RN build)에서는 이 값이

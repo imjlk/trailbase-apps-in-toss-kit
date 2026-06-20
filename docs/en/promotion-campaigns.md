@@ -13,7 +13,8 @@ promotion is enough, the env fallback may be sufficient.
 
 Use `templates/trailbase/sql/promotion_campaigns.sql` when TrailBase should own
 promotion configuration instead of relying only on proxy environment variables.
-The table stores:
+Use `templates/trailbase/sql/promotion_reward_ledger.sql` when the app also
+wants a standard provider grant ledger. The campaign table stores:
 
 - `feature_key`: app-defined stable key for the promotion feature.
 - `provider`: currently `TOSS`.
@@ -55,15 +56,17 @@ the feature, env fallback can keep older deployments and smoke tests working.
 
 ## App Ledger
 
-The shared table is only campaign configuration. Each consumer app should own an
-app-specific ledger for eligibility and provider grant state. The ledger should
-usually store:
+Campaign configuration is separate from eligibility and provider grant state.
+New apps can copy `templates/trailbase/sql/promotion_reward_ledger.sql` as the
+starting point for that grant ledger. Existing apps with app-specific ledgers
+should add compatible columns with forward migrations instead of replacing
+their tables. A ledger should usually store:
 
 - `campaign_id` nullable reference to `promotion_campaigns`.
 - app-specific eligibility dimensions, such as user, cycle, mission, or event.
 - `reward_amount` copied at eligibility time.
-- local status such as `ELIGIBLE`, `REQUESTED`, `PENDING`, `GRANTED`, `FAILED`,
-  or `CANCELLED`.
+- local status such as `recorded`, `pending`, `success`, `failed`, or
+  `cancelled`; apps with their own ledgers can keep app-specific status names.
 - unique `provider_request_id`.
 - `provider_transaction_key`, `provider_status`, `provider_error_code`,
   `granted_at`, `failed_at`, and `failure_reason`.
@@ -72,6 +75,12 @@ Keep this ledger private to app/admin flows unless a consumer explicitly creates
 a safe public projection. Never expose Toss promotion codes, raw Toss user keys,
 provider request ids, transaction keys, or internal error details in public
 Record API views.
+
+TrailBase WASM handlers can use `trailbase_guest_common::promotion_rewards` to
+insert idempotent ledger rows, apply normalized provider outcomes, and count
+campaign usage with safe table/column identifiers. The app still owns
+eligibility, source dimensions, budget policy beyond the shared campaign table,
+and any local reward balance updates.
 
 ## React Native Claim Client
 
@@ -104,9 +113,10 @@ Promotion claims should be idempotent at the app ledger layer.
 5. Call the mTLS proxy once for that request id.
 6. Persist provider status and error information.
 
-If a retry sees a row already in `REQUESTED`, `PENDING`, or `GRANTED`, return the
-current ledger state instead of calling the proxy again. This keeps client
-retries and multi-device taps from executing the same promotion twice.
+If a retry sees a row already in a committed state such as `pending` or
+`success`, return the current ledger state instead of calling the proxy again.
+This keeps client retries and multi-device taps from executing the same
+promotion twice.
 
 ## Operator Flow
 

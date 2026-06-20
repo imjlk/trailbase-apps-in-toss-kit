@@ -26,10 +26,10 @@ migrations, copy, admin workflow, and dispatch jobs.
    notification agreement code (`templateCode`), not the send-template code
    (`templateSetCode`), to
    `requestNotificationAgreement({ options: { templateCode } })`. Simple apps
-   with a one-to-one send-template/agreement relationship may use the same
-   string for both codes. Apps where multiple send templates share one agreement
-   should keep an app-owned mapping column such as `agreement_template_code` so
-   dispatch codes and agreement codes stay distinct.
+   with a one-to-one send-template/agreement relationship may store the same
+   string in `template_code` and `agreement_template_code`. Apps where multiple
+   send templates share one agreement should store the shared agreement code in
+   `agreement_template_code` so dispatch codes and agreement codes stay distinct.
 4. Prepare test `userKey` values and API scopes for sandbox QA. The proxy sends
    the user key through the `x-toss-user-key` header.
 
@@ -47,6 +47,9 @@ Copy the templates into the app migration set before editing:
 
 Existing apps with their own `message_outbox` should add the provider response
 summary columns with a forward migration instead of replacing the table.
+Existing `message_templates` tables can add nullable `agreement_template_code`
+with a forward migration; new apps should copy the template with that column
+from the start.
 
 Manage Apps in Toss console codes by their role in the app DB:
 
@@ -58,12 +61,11 @@ Manage Apps in Toss console codes by their role in the app DB:
   include up to 2,500 recipients in `contextList`.
 - `templateCode`: the SDK option name passed to
   `requestNotificationAgreement`. This value is the notification agreement code
-  registered in the console. The default kit SQL and helpers support a simple
-  one-to-one setup where `message_templates.template_code` and
-  `notification_template_agreements.template_code` are the same functional
-  notification code. If multiple send templates share one agreement, add a
-  consumer-app migration such as `message_templates.agreement_template_code` and
-  persist/verify consent by that notification agreement code.
+  registered in the console. The shared SQL template includes
+  `message_templates.agreement_template_code`; fill it for templates where
+  `requires_agreement = 1` and persist/verify consent by that notification
+  agreement code. In simple one-to-one setups this can be the same string as
+  `message_templates.template_code`.
 
 ## Runtime Flow
 
@@ -89,15 +91,18 @@ Manage Apps in Toss console codes by their role in the app DB:
    Toss response fields such as `resultType`, `msgCount`,
    `sentPushCount`, `sentInboxCount`, `detail`, `fail`, and `reachFailReason`.
 
+TrailBase WASM handlers can use `trailbase_guest_common::apps_in_toss_messages`
+to enqueue idempotent outbox rows, claim ready rows, skip gated rows, mark
+provider exceptions as failed, and complete provider responses. Apps still own
+the enqueue policy, cooldowns, target selection, and dispatch schedule.
+
 ## QA Checklist
 
 - Approved template exists in `message_templates`.
 - Functional templates that require agreement persist and verify consent by the
-  notification agreement `templateCode` passed to the SDK. The default SQL
-  templates can also use `message_templates.template_code` as the consent gate
-  for simple one-to-one setups. Apps with shared agreement prompts should link
-  send templates to agreement codes through an `agreement_template_code` column
-  or equivalent mapping table.
+  notification agreement `templateCode` passed to the SDK. Store that value in
+  `message_templates.agreement_template_code`, even when it is the same string
+  as the send `templateSetCode`.
 - Functional templates that require agreement are blocked until the matching
   agreement row is `OPTED_IN`.
 - Marketing or re-engagement templates are blocked without marketing consent.
