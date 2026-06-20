@@ -96,6 +96,12 @@ audits, or server-side state changes that must be visible before AppsInToss
 Analytics is available. Do not store raw Toss user keys, HMACs, sealed values,
 tokens, or secrets in event metadata.
 
+Detailed analytics events are not the same as feature ledgers. If the app wants
+to mirror product analytics into TrailBase, prefer the optional
+`analytics_events` template in a separate `analytics` database and keep
+notification agreements, message outbox rows, promotion grants, IAP grants, and
+reward records in their feature-owned tables.
+
 The optional `trailbase_guest_common::domain_events` helpers insert and list
 events against an app-owned table. Keep the schema in the consumer app, for
 example:

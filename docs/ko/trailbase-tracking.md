@@ -16,8 +16,8 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 아래 값은 이 kit의 정책 값입니다.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.28.5`
-- Last verified TrailBase release date: `2026-06-12`
+- Last verified TrailBase server: `0.28.6`
+- Last verified TrailBase release date: `2026-06-17`
 - Upstream latest TrailBase server: `0.28.6`
 - Upstream latest TrailBase release date: `2026-06-17`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
@@ -29,8 +29,8 @@ test가 통과한 뒤에만 사람이 올립니다.
 수동 서버 호환성 값은 `data/trailbase-compat-policy.json`에도 기록합니다. 이 파일은
 업스트림 최신 릴리스에서 자동 생성하지 않습니다. 업스트림 최신 버전과 이 kit가 지원한다고
 선언한 버전은 서로 다른 신호이기 때문입니다.
-TrailBase `0.28.6`은 현재 업스트림 최신 버전으로만 추적합니다. Kit와 도입 앱 smoke test가
-통과하기 전까지 last verified kit policy는 `0.28.5`로 유지합니다.
+TrailBase `0.28.6`은 현재 업스트림 최신 버전이며, analytics multi-db smoke 확인 후 이 kit의
+last verified 값으로도 기록합니다.
 
 Rust 도구 버전은 `.mise.toml`과 `rust-toolchain.toml`에 함께 노출합니다. 개발자가 repo
 toolchain을 설치할 때는 `mise`를 기본 진입점으로 사용하고, `rust-toolchain.toml`은 Cargo,
@@ -88,10 +88,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbaseio/trailbase:0.28.5
+  --image trailbase/trailbase:0.28.6
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.28.5
+  --version 0.28.6
 ```
 
 일반 모드에서는 경고를 출력하되 성공으로 종료합니다. Strict 모드에서는 선언된 kit minimum보다

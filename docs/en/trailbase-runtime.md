@@ -45,7 +45,8 @@ The consumer app keeps app-specific behavior:
 Consumer apps should keep one Git-tracked depot template and one ignored runtime depot:
 
 - `apps/trailbase/traildepot-template`: the Git-tracked source of truth. Keep
-  reviewed files such as `config.textproto`, `migrations/main`, and seed SQL here.
+  reviewed files such as `config.textproto`, `migrations/main`, optional
+  `migrations/analytics`, and seed SQL here.
 - `apps/trailbase/traildepot`: local or container runtime output. Ignore DBs,
   secrets, uploads, generated WASM, and metadata. Do not track symlinks here by default.
 
@@ -56,7 +57,13 @@ apps/trailbase/
   traildepot-template/
     config.textproto
     migrations/main/
+    migrations/analytics/  # Optional, for separate analytics DB migrations.
 ```
+
+`trailbase_runtime_copy_template_migrations` copies each `migrations/<database>/`
+subdirectory into the runtime depot. Put new migrations in database-specific
+subdirectories such as `main` or `analytics`; direct SQL files under
+`migrations/` are a deprecated TrailBase layout and are not copied by this helper.
 
 The repo root `.gitignore` should ignore the runtime depot:
 

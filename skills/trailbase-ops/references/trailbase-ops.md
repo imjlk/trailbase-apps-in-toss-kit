@@ -109,6 +109,14 @@ helper exists in the checked-out package.
 - Keep API response shape and Record API wire shape stable unless the user explicitly asks for a
   breaking change.
 - Use repo-local settings helpers and production validators instead of ad hoc env parsing.
+- For high-volume detailed analytics, prefer the optional `analytics` database template over mixing
+  analytics rows into product tables in `main`. Consumer apps should add `databases: [{ name:
+  "analytics" }]`, place migrations under `migrations/analytics/`, and write through app-owned
+  endpoints using `trailbase_guest_common::analytics_events` when helpful. Custom database migrations
+  are applied when a connection references the configured database, so make sure the endpoint path
+  attaches or otherwise opens the `analytics` database before using qualified inserts. Do not put
+  functional ledgers such as notification agreement history, message outbox, promotion grants, IAP
+  grants, or rewards in the analytics sink.
 
 ## Deployment And mTLS Proxy
 
@@ -153,4 +161,5 @@ Before changing a consumer TrailBase app, inspect:
 - `apps/trailbase/scripts/production-release-check.sh`
 - `apps/trailbase/traildepot-template/config.textproto`
 - `apps/trailbase/traildepot-template/migrations/main/`
+- optional `apps/trailbase/traildepot-template/migrations/analytics/`
 - Root `package.json` TrailBase helpers, especially container-side CLI aliases such as `trail`

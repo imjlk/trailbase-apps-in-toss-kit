@@ -17,8 +17,8 @@ inputs.
 These values are policy values for this kit.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.28.5`
-- Last verified TrailBase release date: `2026-06-12`
+- Last verified TrailBase server: `0.28.6`
+- Last verified TrailBase release date: `2026-06-17`
 - Upstream latest TrailBase server: `0.28.6`
 - Upstream latest TrailBase release date: `2026-06-17`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
@@ -31,8 +31,8 @@ The manual server compatibility values are mirrored in
 `data/trailbase-compat-policy.json`. That file is intentionally not generated
 from the upstream latest release, because latest upstream and supported-by-this-kit
 are different signals.
-TrailBase `0.28.6` is currently tracked as upstream latest, but the last verified
-kit policy remains `0.28.5` until kit and consumer smoke tests pass.
+TrailBase `0.28.6` is currently tracked as upstream latest and last verified for
+this kit after the analytics multi-db smoke check.
 
 Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
 `mise` is the preferred developer entrypoint for installing the repo toolchain,
@@ -95,10 +95,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbaseio/trailbase:0.28.5
+  --image trailbase/trailbase:0.28.6
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.28.5
+  --version 0.28.6
 ```
 
 In non-strict mode the script warns and exits successfully. In strict mode it

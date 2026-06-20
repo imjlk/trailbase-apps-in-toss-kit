@@ -36,6 +36,8 @@ templates, deployment, or the mTLS proxy boundary.
 7. If Rust WASM changes, run the repo's `wasm32-wasip2` check.
 8. If deployment or proxy settings change, verify production env, Compose shape, and mTLS certificate
    mount boundaries.
+9. If detailed analytics storage changes, keep analytics rows separate from functional ledgers and
+   prefer the optional `analytics` TrailBase database template for high-volume event mirrors.
 
 ## TrailBase CLI
 

@@ -1,7 +1,7 @@
 {
   "kitMinimumSupportedTrailbaseServer": null,
-  "lastVerifiedTrailbaseServer": "0.28.5",
-  "lastVerifiedTrailbaseReleaseDate": "2026-06-12",
+  "lastVerifiedTrailbaseServer": "0.28.6",
+  "lastVerifiedTrailbaseReleaseDate": "2026-06-17",
   "description": "Manual TrailBase server compatibility policy for this kit. null means TBD and must not be auto-promoted from upstream latest.",
   "strictMode": {
     "failWhenBelowMinimum": true,
