@@ -1,5 +1,15 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.3.0 — 2026-06-20
+
+### Minor changes
+
+- [9f7cda2](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/9f7cda2e8cac8ea1d4fb43ee6c2aa9971e266b8f) Add bootstrap-controlled analytics sink helpers for AppsInToss metric logging, plus a framework-typed `ait-rn/analytics` bridge. — Thanks @imjlk!
+
+### Patch changes
+
+- Updated dependencies: trailbase-client (npm)@0.5.0
+
 ## 0.2.0 — 2026-06-19
 
 ### Minor changes

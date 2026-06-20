@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.2.4 — 2026-06-20
+
+### Patch changes
+
+- [cf5ded4](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/cf5ded486651742a2cb9a360218461f4dd65ec2c) Add shared AppsInToss functional ledger helpers and SQL templates for Smart Message outbox,
+  promotion reward grants, and IAP order/grant persistence. — Thanks @imjlk!
+- [159fc6d](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/159fc6d6a16d68c59199d6c846270c381975969c) Add an optional TrailBase analytics multi-db template, smoke check, runtime migration copy support
+  for database-specific migration directories, and Rust helpers for inserting analytics event batches. — Thanks @imjlk!
+
 ## 0.2.3 — 2026-06-16
 
 ### Patch changes
