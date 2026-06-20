@@ -35,6 +35,80 @@ const analytics = createAnalyticsRouter({
 
 모든 sink는 기본적으로 꺼져 있습니다. 컨슈머 앱이 초기화 단계에서 필요한 sink만 켭니다.
 
+## 부트스트랩 제어 opt-in 로깅
+
+프로덕션 앱에서는 클라이언트에 분석 활성 여부를 하드코딩하기보다 앱 bootstrap 응답에서 정책을 받아
+켜는 방식을 권장합니다. 값이 없거나 잘못된 정책은 disabled로 정규화됩니다.
+
+```json
+{
+  "enabled": true,
+  "trailbase": {
+    "enabled": true,
+    "endpoint": "/api/analytics/events",
+    "sampleRate": 1,
+    "maxBatchSize": 20,
+    "maxQueueSize": 200,
+    "flushIntervalMs": 5000,
+    "maxPayloadBytes": 4096,
+    "allowedEvents": ["screen_view", "answer_submit_tapped"]
+  },
+  "appsInToss": {
+    "enabled": true,
+    "allowedEvents": ["screen_view", "answer_submit_tapped"]
+  }
+}
+```
+
+```ts
+import { Analytics } from "@apps-in-toss/framework";
+import {
+  configureAnalyticsRouterFromBootstrap,
+  createAnalyticsRouter,
+} from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+
+const analytics = createAnalyticsRouter({
+  detail: false,
+  appsInToss: false,
+});
+
+configureAnalyticsRouterFromBootstrap({
+  router: analytics,
+  policy: bootstrap.analytics,
+  trailbase: {
+    baseUrl: apiBaseUrl,
+    getAuthHeaders: () => ({
+      Authorization: `Bearer ${sessionTokenStore.current}`,
+    }),
+  },
+  appsInToss: {
+    analyticsModule: Analytics,
+    mapEvent: (event) => {
+      if (event.eventName !== "answer_submit_tapped") {
+        return false;
+      }
+      return {
+        name: "answer_submit",
+        type: "press",
+        params: event.eventPayload,
+      };
+    },
+    dispatch: (event) => {
+      console.debug("[apps-in-toss-analytics]", event);
+    },
+  },
+  sessionTokenProvider: () => sessionTokenStore.current,
+});
+```
+
+`trailbase.endpoint`는 앱 백엔드 endpoint입니다. 클라이언트는 해당 endpoint로 `POST { events }`
+batch를 보내고, 실제 TrailBase table, database, multi-db 연결 선택은 백엔드가 결정합니다. 공유
+sink는 in-memory 전용입니다. allowlist, sampling, queue cap, batch flush, payload sanitization은
+지원하지만 persistent offline queue는 제공하지 않습니다.
+
+AppsInToss Analytics는 공식 콘솔 지표의 기준입니다. TrailBase mirror는 더 빠른 확인이나 더 풍부한
+디버깅 데이터가 필요한 앱 내부 분석/초기 운영 보조 용도입니다.
+
 ## 상세 분석 켜기
 
 ```ts
@@ -99,3 +173,6 @@ const analytics = createAnalyticsRouter({
 - 백엔드/API 실패, 재시도 경로, queue 상태, 출시 초기 임시 진단은 상세 분석으로 다룹니다.
 - 상세 분석이 필요 없는 컨슈머 앱은 `detail: false`로 둡니다. 같은 `track()` 호출을 유지해도
   해당 sink는 no-op으로 동작합니다.
+- 기능성 원장 데이터는 analytics sink에 섞지 않습니다. 알림동의 이력, message outbox, promotion
+  claim/grant, IAP order/grant, 광고/공유 reward 기록은 각 기능이 소유하는 table과 문서에서
+  다룹니다.
