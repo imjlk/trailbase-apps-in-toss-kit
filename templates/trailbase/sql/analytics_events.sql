@@ -1,3 +1,6 @@
+-- Legacy compatibility template. New analytics databases should prefer
+-- events.sql and the analytics.events table.
+
 CREATE TABLE IF NOT EXISTS analytics_events (
   id INTEGER PRIMARY KEY,
   event_name TEXT NOT NULL CHECK (length(trim(event_name)) > 0),

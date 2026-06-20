@@ -108,9 +108,11 @@ tokens, or secrets in event metadata.
 
 Detailed analytics events are not the same as feature ledgers. If the app wants
 to mirror product analytics into TrailBase, prefer the optional
-`analytics_events` template in a separate `analytics` database and keep
+`analytics.events` template in a separate `analytics` database and keep
 notification agreements, message outbox rows, promotion grants, IAP grants, and
-reward records in their feature-owned tables.
+reward records in their feature-owned tables. The older
+`analytics.analytics_events` template remains available only as a compatibility
+path for existing deployments.
 
 The optional `trailbase_guest_common::domain_events` helpers insert and list
 events against an app-owned table. Keep the schema in the consumer app, for

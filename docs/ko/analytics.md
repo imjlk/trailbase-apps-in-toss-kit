@@ -118,21 +118,36 @@ databases: [{
 ```
 
 Analytics migration은 `traildepot-template/migrations/analytics/` 아래에 두고,
-[`analytics_events.sql`](../../templates/trailbase/sql/analytics_events.sql) 조각을 앱 소유
-`U<timestamp>__create_analytics_events.sql` migration으로 복사합니다. 공통 runtime migration
-copier는 이제 `main`과 `analytics`를 포함한 모든 `migrations/<database>/` 하위 디렉터리를
-복사합니다.
+[`events.sql`](../../templates/trailbase/sql/events.sql) 조각을 앱 소유
+`U<timestamp>__create_events.sql` migration으로 복사합니다. 신규 앱은 `analytics.events`를
+권장합니다. 기존 [`analytics_events.sql`](../../templates/trailbase/sql/analytics_events.sql)
+조각과 `DEFAULT_ANALYTICS_EVENTS_TABLE` helper는 legacy `analytics.analytics_events` 배포를 위한
+호환 경로로 유지합니다. 공통 runtime migration copier는 `main`과 `analytics`를 포함한 모든
+`migrations/<database>/` 하위 디렉터리를 복사합니다.
 
 TrailBase custom database migration은 설정된 database를 참조하는 connection이 열릴 때 적용됩니다.
 Smoke script는 `analytics` attach와 migration 적용을 확인하기 위해 임시 ACL 없는 Record API를 만들지만,
 운영 앱에서는 public analytics Record API를 노출하지 말고 앱 소유 backend/WASM endpoint 뒤에서 analytics
 write를 처리하세요.
 
-Rust WASM endpoint에서는 `trailbase_guest_common::analytics_events`를 사용해 attached
-`analytics.analytics_events` table insert를 만들 수 있습니다. 이 helper는 endpoint connection이
-analytics database를 attach한 뒤 사용하세요. API endpoint는 앱이 소유합니다. 현재 TrailBase
-user/session을 검증하고 request 또는 batch ID를 붙이되, 원본 Toss user key, auth token,
-mTLS proxy token, 기능성 ledger를 analytics payload에 저장하지 마세요.
+Rust WASM endpoint에서는 `trailbase_guest_common::analytics_events::ANALYTICS_EVENTS_TABLE`을
+사용해 attached `analytics.events` table insert를 만들 수 있습니다. API endpoint는 앱이
+소유합니다. 현재 TrailBase user/session을 검증하고 request 또는 batch ID를 붙이되, 원본 Toss
+user key, auth token, mTLS proxy token, 기능성 ledger를 analytics payload에 저장하지 마세요.
+
+쓰기 경로는 batch 요청당 transaction 1개를 권장합니다. 인증된 user, `now`, `batch_id`는 요청
+단위로 한 번만 계산하고, 요청 events를 `AnalyticsEventInput`으로 normalize한 뒤
+`insert_analytics_event_batch_tx(&mut tx, ANALYTICS_EVENTS_TABLE, inputs)`를 호출하고 같은
+transaction을 commit하세요. event마다 transaction을 열지 마세요.
+
+hot path에서는 DDL을 실행하지 마세요. migration 적용 전 edge case를 위한 fallback initializer가
+필요하다면 먼저 `PRAGMA database_list`로 확인하고, connection에 `analytics`가 attach되어 있지
+않을 때만 `ATTACH DATABASE ? AS analytics`를 실행하세요. DB path는 SQL 문자열에 직접 넣지 말고
+parameter로 bind합니다. 이후 fallback DDL은 `PRAGMA analytics.user_version`으로 guard하세요.
+값이 `1`보다 낮을 때만 `analytics.events`와 기본 index 두 개를 만들고
+`PRAGMA analytics.user_version = 1`을 설정합니다. `user_version = 1`은 fresh
+`analytics.events` schema 기준입니다. 같은 analytics DB에 legacy `analytics.analytics_events`
+schema와 섞으면 충돌할 수 있으므로 새 analytics DB나 reset된 analytics DB에서만 사용하세요.
 
 현재 검증된 TrailBase image로 템플릿을 확인하려면 다음 smoke를 실행합니다.
 

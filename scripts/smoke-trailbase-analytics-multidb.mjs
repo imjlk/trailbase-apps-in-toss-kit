@@ -2,7 +2,7 @@
 
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -29,7 +29,9 @@ try {
         image,
         healthcheck: `http://127.0.0.1:${port}/api/healthcheck`,
         analyticsDb: path.join(traildepot, "data", "analytics.db"),
-        insertedAnalyticsEvents: 1,
+        analyticsTable: "analytics.events",
+        analyticsIndexes: ["idx_events_server_at", "idx_events_name_server_at"],
+        sampleCount: 1,
       },
       null,
       2,
@@ -65,15 +67,15 @@ function prepareDepot() {
       "}]",
       "record_apis: [{",
       '  name: "analytics_events_smoke"',
-      '  table_name: "analytics.analytics_events"',
+      '  table_name: "analytics.events"',
       '  attached_databases: ["analytics"]',
       "}]",
       "",
     ].join("\n"),
   );
   cpSync(
-    path.join(root, "templates", "trailbase", "sql", "analytics_events.sql"),
-    path.join(migrations, "U2000000000__create_analytics_events.sql"),
+    path.join(root, "templates", "trailbase", "sql", "events.sql"),
+    path.join(migrations, "U2000000000__create_events.sql"),
   );
 }
 
@@ -142,37 +144,59 @@ function verifyAnalyticsDatabase() {
     throw new Error(`analytics.db was not created at ${analyticsDbPath}`);
   }
 
-  const db = new Database(analyticsDbPath);
+  const db = new Database(":memory:");
   try {
+    db.query("ATTACH DATABASE ?1 AS analytics").run(analyticsDbPath);
+
     const history = db
-      .query("SELECT name FROM _schema_history WHERE name = ?1")
-      .get("create_analytics_events");
+      .query("SELECT name FROM analytics._schema_history WHERE name = ?1")
+      .get("create_events");
     if (!history) {
-      throw new Error("analytics _schema_history does not include create_analytics_events");
+      throw new Error("analytics _schema_history does not include create_events");
     }
 
     const table = db
-      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1")
-      .get("analytics_events");
+      .query("SELECT name FROM analytics.sqlite_master WHERE type = 'table' AND name = ?1")
+      .get("events");
     if (!table) {
-      throw new Error("analytics_events table was not created");
+      throw new Error("events table was not created");
+    }
+
+    const legacyTable = db
+      .query("SELECT name FROM analytics.sqlite_master WHERE type = 'table' AND name = ?1")
+      .get("analytics_events");
+    if (legacyTable) {
+      throw new Error("legacy analytics_events table should not be created by events.sql");
+    }
+
+    const indexRows = db.query("PRAGMA analytics.index_list('events')").all();
+    const indexNames = indexRows.map((row) => row.name).sort();
+    const expectedIndexes = ["idx_events_name_server_at", "idx_events_server_at"];
+    if (JSON.stringify(indexNames) !== JSON.stringify(expectedIndexes)) {
+      throw new Error(
+        `unexpected events indexes: expected ${expectedIndexes.join(", ")}, got ${indexNames.join(", ")}`,
+      );
+    }
+    if (indexNames.some((name) => name.includes("batch"))) {
+      throw new Error(`events should not have a batch_id index: ${indexNames.join(", ")}`);
     }
 
     db.query(
-      `INSERT INTO analytics_events
-        (event_name, screen, source, payload_json, client_created_at, server_received_at, request_id, batch_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+      `INSERT INTO analytics.events
+        (name, screen, source, props_json, user_id, client_at, server_at, request_id, batch_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`,
     ).run(
       "screen_view",
       "main",
       "smoke",
       JSON.stringify({ smoke: true }),
+      new Uint8Array([1, 2, 3]),
       Date.now(),
       Date.now(),
       "smoke-request",
       "smoke-batch",
     );
-    const row = db.query("SELECT COUNT(*) AS count FROM analytics_events").get();
+    const row = db.query("SELECT COUNT(*) AS count FROM analytics.events").get();
     if (row.count !== 1) {
       throw new Error(`expected 1 analytics event, found ${row.count}`);
     }

@@ -109,14 +109,17 @@ helper exists in the checked-out package.
 - Keep API response shape and Record API wire shape stable unless the user explicitly asks for a
   breaking change.
 - Use repo-local settings helpers and production validators instead of ad hoc env parsing.
-- For high-volume detailed analytics, prefer the optional `analytics` database template over mixing
-  analytics rows into product tables in `main`. Consumer apps should add `databases: [{ name:
+- For high-volume detailed analytics, prefer the optional `analytics.events` database template over
+  mixing analytics rows into product tables in `main`. Consumer apps should add `databases: [{ name:
   "analytics" }]`, place migrations under `migrations/analytics/`, and write through app-owned
-  endpoints using `trailbase_guest_common::analytics_events` when helpful. Custom database migrations
-  are applied when a connection references the configured database, so make sure the endpoint path
-  attaches or otherwise opens the `analytics` database before using qualified inserts. Do not put
-  functional ledgers such as notification agreement history, message outbox, promotion grants, IAP
-  grants, or rewards in the analytics sink.
+  endpoints using `trailbase_guest_common::analytics_events::ANALYTICS_EVENTS_TABLE` when helpful.
+  Existing `analytics.analytics_events` deployments can keep using `DEFAULT_ANALYTICS_EVENTS_TABLE`
+  for compatibility. Custom database migrations are applied when a connection references the
+  configured database, so make sure the endpoint path attaches or otherwise opens the `analytics`
+  database before using qualified inserts. The write path should use one transaction per batch and
+  should not run DDL per request; use migrations or a `PRAGMA analytics.user_version` guarded fallback
+  initializer. Do not put functional ledgers such as notification agreement history, message outbox,
+  promotion grants, IAP grants, or rewards in the analytics sink.
 - For AppsInToss functional ledgers, prefer kit templates and Rust helpers before copying
   consumer-local SQL snippets between apps:
   - `message_templates.sql`, `notification_template_agreements.sql`, and `message_outbox.core.sql`

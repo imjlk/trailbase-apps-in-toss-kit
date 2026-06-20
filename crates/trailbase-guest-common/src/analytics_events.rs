@@ -34,6 +34,20 @@ pub const DEFAULT_ANALYTICS_EVENTS_TABLE: AnalyticsEventTable = AnalyticsEventTa
     batch_id_column: Some("batch_id"),
 };
 
+pub const ANALYTICS_EVENTS_TABLE: AnalyticsEventTable = AnalyticsEventTable {
+    database: Some("analytics"),
+    table: "events",
+    event_name_column: "name",
+    screen_column: Some("screen"),
+    source_column: Some("source"),
+    payload_json_column: "props_json",
+    user_id_column: Some("user_id"),
+    client_created_at_column: "client_at",
+    server_received_at_column: "server_at",
+    request_id_column: Some("request_id"),
+    batch_id_column: Some("batch_id"),
+};
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct AnalyticsEventInput<'a> {
     pub event_name: &'a str,
@@ -94,8 +108,12 @@ pub fn insert_analytics_event_batch_tx<'a>(
     inputs: impl IntoIterator<Item = AnalyticsEventInput<'a>>,
 ) -> ApiResult<Vec<AnalyticsEventRecord>> {
     let records = normalize_analytics_event_inputs(table, inputs)?;
+    if records.is_empty() {
+        return Ok(records);
+    }
+    let sql = analytics_event_insert_sql(table)?;
     for record in &records {
-        let (sql, params) = analytics_event_insert_statement(table, record)?;
+        let params = analytics_event_insert_params(table, record);
         db::tx_execute(tx, &sql, &params)?;
     }
     Ok(records)
@@ -105,98 +123,41 @@ pub fn analytics_event_insert_statement(
     table: AnalyticsEventTable,
     record: &AnalyticsEventRecord,
 ) -> ApiResult<(String, Vec<Value>)> {
-    validate_analytics_event_table(table)?;
+    let sql = analytics_event_insert_sql(table)?;
+    let params = analytics_event_insert_params(table, record);
+    Ok((sql, params))
+}
 
+pub fn analytics_event_insert_sql(table: AnalyticsEventTable) -> ApiResult<String> {
+    validate_analytics_event_table(table)?;
     let mut columns = Vec::new();
     let mut values = Vec::new();
-    let mut params = Vec::new();
 
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.event_name_column,
-        Value::Text(record.event_name.clone()),
-    );
+    push_column_placeholder(&mut columns, &mut values, table.event_name_column);
     if let Some(column) = table.screen_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.screen.as_deref()),
-        );
+        push_column_placeholder(&mut columns, &mut values, column);
     }
     if let Some(column) = table.source_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.source.as_deref()),
-        );
+        push_column_placeholder(&mut columns, &mut values, column);
     }
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.payload_json_column,
-        Value::Text(record.payload.to_string()),
-    );
+    push_column_placeholder(&mut columns, &mut values, table.payload_json_column);
     if let Some(column) = table.user_id_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            record
-                .user_id
-                .as_ref()
-                .map(|value| Value::Blob(value.clone()))
-                .unwrap_or(Value::Null),
-        );
+        push_column_placeholder(&mut columns, &mut values, column);
     }
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.client_created_at_column,
-        Value::Integer(record.client_created_at),
-    );
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.server_received_at_column,
-        Value::Integer(record.server_received_at),
-    );
+    push_column_placeholder(&mut columns, &mut values, table.client_created_at_column);
+    push_column_placeholder(&mut columns, &mut values, table.server_received_at_column);
     if let Some(column) = table.request_id_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.request_id.as_deref()),
-        );
+        push_column_placeholder(&mut columns, &mut values, column);
     }
     if let Some(column) = table.batch_id_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.batch_id.as_deref()),
-        );
+        push_column_placeholder(&mut columns, &mut values, column);
     }
 
-    Ok((
-        format!(
-            "INSERT INTO {} ({}) VALUES ({})",
-            qualified_table_name(table)?,
-            columns.join(", "),
-            values.join(", ")
-        ),
-        params,
+    Ok(format!(
+        "INSERT INTO {} ({}) VALUES ({})",
+        qualified_table_name(table)?,
+        columns.join(", "),
+        values.join(", ")
     ))
 }
 
@@ -227,9 +188,15 @@ fn normalize_analytics_event_inputs<'a>(
     table: AnalyticsEventTable,
     inputs: impl IntoIterator<Item = AnalyticsEventInput<'a>>,
 ) -> ApiResult<Vec<AnalyticsEventRecord>> {
+    let inputs = inputs.into_iter().collect::<Vec<_>>();
+    if inputs.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    validate_analytics_event_table(table)?;
     inputs
         .into_iter()
-        .map(|input| normalize_analytics_event_input(table, input))
+        .map(|input| normalize_analytics_event_input_validated(table, input))
         .collect()
 }
 
@@ -238,7 +205,13 @@ fn normalize_analytics_event_input(
     input: AnalyticsEventInput<'_>,
 ) -> ApiResult<AnalyticsEventRecord> {
     validate_analytics_event_table(table)?;
+    normalize_analytics_event_input_validated(table, input)
+}
 
+fn normalize_analytics_event_input_validated(
+    table: AnalyticsEventTable,
+    input: AnalyticsEventInput<'_>,
+) -> ApiResult<AnalyticsEventRecord> {
     if table.screen_column.is_none() && input.screen.is_some() {
         return Err(internal(
             "Analytics event screen was provided without a configured screen column",
@@ -288,6 +261,41 @@ fn normalize_analytics_event_input(
     })
 }
 
+fn analytics_event_insert_params(
+    table: AnalyticsEventTable,
+    record: &AnalyticsEventRecord,
+) -> Vec<Value> {
+    let mut params = Vec::new();
+
+    params.push(Value::Text(record.event_name.clone()));
+    if table.screen_column.is_some() {
+        params.push(text_or_null(record.screen.as_deref()));
+    }
+    if table.source_column.is_some() {
+        params.push(text_or_null(record.source.as_deref()));
+    }
+    params.push(Value::Text(record.payload.to_string()));
+    if table.user_id_column.is_some() {
+        params.push(
+            record
+                .user_id
+                .as_ref()
+                .map(|value| Value::Blob(value.clone()))
+                .unwrap_or(Value::Null),
+        );
+    }
+    params.push(Value::Integer(record.client_created_at));
+    params.push(Value::Integer(record.server_received_at));
+    if table.request_id_column.is_some() {
+        params.push(text_or_null(record.request_id.as_deref()));
+    }
+    if table.batch_id_column.is_some() {
+        params.push(text_or_null(record.batch_id.as_deref()));
+    }
+
+    params
+}
+
 fn qualified_table_name(table: AnalyticsEventTable) -> ApiResult<String> {
     validate_analytics_event_table(table)?;
     Ok(match table.database {
@@ -296,16 +304,13 @@ fn qualified_table_name(table: AnalyticsEventTable) -> ApiResult<String> {
     })
 }
 
-fn push_column_value(
+fn push_column_placeholder(
     columns: &mut Vec<&'static str>,
     values: &mut Vec<String>,
-    params: &mut Vec<Value>,
     column: &'static str,
-    value: Value,
 ) {
     columns.push(column);
-    params.push(value);
-    values.push(format!("?{}", params.len()));
+    values.push(format!("?{}", columns.len()));
 }
 
 fn text_or_null(value: Option<&str>) -> Value {
@@ -382,6 +387,38 @@ mod tests {
     }
 
     #[test]
+    fn builds_recommended_events_insert_statement() {
+        let record = normalize_analytics_event_input(
+            ANALYTICS_EVENTS_TABLE,
+            AnalyticsEventInput {
+                event_name: " screen_view ",
+                screen: Some(" main "),
+                source: Some("rn"),
+                payload: Some(json!({ "roundNo": 3 })),
+                user_id: Some(&[1, 2, 3]),
+                client_created_at: 1000,
+                server_received_at: 1005,
+                request_id: Some(" request-1 "),
+                batch_id: Some(" batch-1 "),
+            },
+        )
+        .unwrap();
+
+        let (sql, params) =
+            analytics_event_insert_statement(ANALYTICS_EVENTS_TABLE, &record).unwrap();
+
+        assert_eq!(
+            sql,
+            "INSERT INTO analytics.events (name, screen, source, props_json, user_id, client_at, server_at, request_id, batch_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
+        );
+        assert_eq!(params.len(), 9);
+        assert!(matches!(&params[0], Value::Text(value) if value == "screen_view"));
+        assert!(matches!(&params[3], Value::Text(value) if value == r#"{"roundNo":3}"#));
+        assert!(matches!(&params[5], Value::Integer(1000)));
+        assert!(matches!(&params[6], Value::Integer(1005)));
+    }
+
+    #[test]
     fn defaults_missing_payload_to_object() {
         let record = normalize_analytics_event_input(
             DEFAULT_ANALYTICS_EVENTS_TABLE,
@@ -443,7 +480,7 @@ mod tests {
     #[test]
     fn normalizes_batch_before_inserting() {
         let records = normalize_analytics_event_inputs(
-            DEFAULT_ANALYTICS_EVENTS_TABLE,
+            ANALYTICS_EVENTS_TABLE,
             [
                 AnalyticsEventInput::new("first", 1, 3),
                 AnalyticsEventInput::new("second", 2, 4),
@@ -453,5 +490,33 @@ mod tests {
 
         assert_eq!(records[0].event_name, "first");
         assert_eq!(records[1].event_name, "second");
+    }
+
+    #[test]
+    fn normalizes_empty_batch_without_building_sql() {
+        let records = normalize_analytics_event_inputs(
+            AnalyticsEventTable {
+                table: "events;drop",
+                ..ANALYTICS_EVENTS_TABLE
+            },
+            [],
+        )
+        .unwrap();
+
+        assert!(records.is_empty());
+    }
+
+    #[test]
+    fn validates_batch_table_before_rows() {
+        let error = normalize_analytics_event_inputs(
+            AnalyticsEventTable {
+                table: "events;drop",
+                ..ANALYTICS_EVENTS_TABLE
+            },
+            [AnalyticsEventInput::new("screen_view", 1, 2)],
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "INTERNAL");
     }
 }

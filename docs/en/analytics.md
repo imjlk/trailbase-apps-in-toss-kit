@@ -113,20 +113,36 @@ databases: [{
 ```
 
 Place analytics migrations under `traildepot-template/migrations/analytics/` and copy the
-[`analytics_events.sql`](../../templates/trailbase/sql/analytics_events.sql) snippet into an app-owned
-`U<timestamp>__create_analytics_events.sql` migration. The shared runtime migration copier now copies
-all `migrations/<database>/` subdirectories, including `main` and `analytics`.
+[`events.sql`](../../templates/trailbase/sql/events.sql) snippet into an app-owned
+`U<timestamp>__create_events.sql` migration. New apps should use `analytics.events`. The older
+[`analytics_events.sql`](../../templates/trailbase/sql/analytics_events.sql) snippet and
+`DEFAULT_ANALYTICS_EVENTS_TABLE` helper remain available for legacy `analytics.analytics_events`
+deployments. The shared runtime migration copier copies all `migrations/<database>/` subdirectories,
+including `main` and `analytics`.
 
 TrailBase applies custom database migrations when a connection references the configured database. The
 smoke script creates a temporary ACL-less Record API only to force an `analytics` attachment and verify
 the migration; production apps should keep analytics writes behind app-owned backend or WASM endpoints
 rather than exposing a public analytics Record API.
 
-Rust WASM endpoints can use `trailbase_guest_common::analytics_events` to build inserts against the
-attached `analytics.analytics_events` table after the endpoint connection has attached the analytics
-database. Keep the API endpoint app-owned: validate the current TrailBase user/session, attach request
-or batch IDs, and never store raw Toss user keys, auth tokens, mTLS proxy tokens, or feature ledgers in
-analytics payloads.
+Rust WASM endpoints can use `trailbase_guest_common::analytics_events::ANALYTICS_EVENTS_TABLE` to
+build inserts against the attached `analytics.events` table. Keep the API endpoint app-owned: validate
+the current TrailBase user/session, attach request or batch IDs, and never store raw Toss user keys,
+auth tokens, mTLS proxy tokens, or feature ledgers in analytics payloads.
+
+For the write path, prefer one transaction per batch request. Compute the authenticated user, `now`,
+and `batch_id` once, normalize the incoming events into `AnalyticsEventInput` values, call
+`insert_analytics_event_batch_tx(&mut tx, ANALYTICS_EVENTS_TABLE, inputs)`, and then commit the
+transaction. Do not open a transaction per event.
+
+Avoid DDL on the hot path. If a consumer needs a fallback initializer before migrations have been
+applied, first check `PRAGMA database_list` and only run `ATTACH DATABASE ? AS analytics` when the
+connection has not attached `analytics`; bind the database path as a parameter instead of interpolating
+it into SQL. Then guard fallback DDL with `PRAGMA analytics.user_version`: only when the value is below
+`1`, create `analytics.events`, create the two default indexes, and set
+`PRAGMA analytics.user_version = 1`. Treat `user_version = 1` as the fresh `analytics.events` schema;
+mixing that fallback with legacy `analytics.analytics_events` in the same database can collide, so use
+it only for new or reset analytics databases.
 
 To verify the template against the currently verified TrailBase image:
 
