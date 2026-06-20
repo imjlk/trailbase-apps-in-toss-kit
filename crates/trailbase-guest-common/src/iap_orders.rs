@@ -445,12 +445,22 @@ fn iap_order_grant_statement(
         format!(
             "UPDATE {table}
              SET {status_column} = 'GRANTED',
-                 {grant_id_column} = ?2,
-                 {grant_payload_json_column} = ?3,
+                 {grant_id_column} = CASE
+                   WHEN {status_column} = 'GRANTED' THEN COALESCE({grant_id_column}, ?2)
+                   ELSE ?2
+                 END,
+                 {grant_payload_json_column} = CASE
+                   WHEN {status_column} = 'GRANTED' THEN COALESCE({grant_payload_json_column}, ?3)
+                   ELSE ?3
+                 END,
                  {granted_at_column} = COALESCE({granted_at_column}, ?4),
                  {completed_at_column} = COALESCE({completed_at_column}, ?4),
-                 {updated_at_column} = ?4
+                 {updated_at_column} = CASE
+                   WHEN {status_column} = 'GRANTED' THEN {updated_at_column}
+                   ELSE ?4
+                 END
              WHERE {order_id_column} = ?1
+               AND {status_column} IN ('PENDING_GRANT', 'GRANTED')
              RETURNING {returning_columns}",
             table = table.table,
             status_column = table.status_column,
@@ -780,6 +790,8 @@ mod tests {
 
         assert!(sql.contains("UPDATE iap_orders"));
         assert!(sql.contains("SET status = 'GRANTED'"));
+        assert!(sql.contains("WHEN status = 'GRANTED' THEN COALESCE(grant_id, ?2)"));
+        assert!(sql.contains("status IN ('PENDING_GRANT', 'GRANTED')"));
         assert_eq!(params.len(), 4);
     }
 

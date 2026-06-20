@@ -538,16 +538,48 @@ fn promotion_reward_ledger_outcome_statement(
     Ok((
         format!(
             "UPDATE {table}
-             SET {status_column} = ?2,
-                 {provider_request_id_column} = ?3,
-                 {provider_status_column} = ?4,
-                 {provider_error_code_column} = ?5,
-                 {provider_transaction_key_column} = ?6,
-                 {provider_response_json_column} = ?7,
-                 {granted_at_column} = ?8,
-                 {failed_at_column} = ?9,
-                 {failure_reason_column} = ?10,
-                 {updated_at_column} = ?11
+             SET {status_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {status_column}
+                   ELSE ?2
+                 END,
+                 {provider_request_id_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_request_id_column}
+                   ELSE ?3
+                 END,
+                 {provider_status_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_status_column}
+                   ELSE ?4
+                 END,
+                 {provider_error_code_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_error_code_column}
+                   ELSE ?5
+                 END,
+                 {provider_transaction_key_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_transaction_key_column}
+                   ELSE COALESCE(?6, {provider_transaction_key_column})
+                 END,
+                 {provider_response_json_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_response_json_column}
+                   ELSE ?7
+                 END,
+                 {granted_at_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {granted_at_column}
+                   WHEN ?2 = 'success' THEN COALESCE({granted_at_column}, ?8)
+                   ELSE NULL
+                 END,
+                 {failed_at_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {failed_at_column}
+                   WHEN ?2 = 'failed' THEN COALESCE({failed_at_column}, ?9)
+                   ELSE ?9
+                 END,
+                 {failure_reason_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {failure_reason_column}
+                   ELSE ?10
+                 END,
+                 {updated_at_column} = CASE
+                   WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {updated_at_column}
+                   ELSE ?11
+                 END
              WHERE {id_column} = ?1
              RETURNING {returning_columns}",
             table = table.table,
@@ -1078,6 +1110,8 @@ mod tests {
 
         assert!(sql.contains("UPDATE promotion_reward_ledger"));
         assert!(sql.contains("provider_transaction_key"));
+        assert!(sql.contains("status = 'success' AND ?2 <> 'success'"));
+        assert!(sql.contains("COALESCE(granted_at, ?8)"));
         assert_eq!(params.len(), 11);
         assert_eq!(outcome.provider_status, "GRANTED");
         assert_eq!(promotion_ledger_status(&outcome.provider_status), "success");

@@ -471,8 +471,20 @@ pub fn fail_message_outbox_tx(
     reason: &str,
     now: i64,
 ) -> ApiResult<()> {
-    let updated = db::tx_execute(
-        tx,
+    let (sql, params) = message_outbox_fail_statement(outbox_id, reason, now)?;
+    let updated = db::tx_execute(tx, &sql, &params)?;
+    if updated == 0 {
+        return Err(internal("Message outbox row was not found for failure"));
+    }
+    Ok(())
+}
+
+fn message_outbox_fail_statement(
+    outbox_id: &str,
+    reason: &str,
+    now: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    Ok((
         "UPDATE message_outbox
          SET status = 'FAILED',
              locked_at = NULL,
@@ -480,17 +492,15 @@ pub fn fail_message_outbox_tx(
              failure_reason = ?3,
              provider_status = 'FAILED',
              updated_at = ?2
-         WHERE id = ?1",
-        &[
+         WHERE id = ?1
+           AND status = 'LOCKED'"
+            .to_string(),
+        vec![
             Value::Text(normalize_required_text(outbox_id, "outboxId")?),
             Value::Integer(now),
             Value::Text(normalize_optional_text(reason, "message dispatch failed")),
         ],
-    )?;
-    if updated == 0 {
-        return Err(internal("Message outbox row was not found for failure"));
-    }
-    Ok(())
+    ))
 }
 
 pub fn skip_message_outbox_tx(
@@ -1197,6 +1207,16 @@ mod tests {
         assert_eq!(record.id.as_deref(), Some("outbox-1"));
         assert_eq!(record.provider, APPS_IN_TOSS_SMART_MESSAGE_PROVIDER);
         assert_eq!(record.payload_json, json!({ "name": "Ada" }).to_string());
+    }
+
+    #[test]
+    fn message_outbox_fail_statement_only_matches_locked_rows() {
+        let (sql, params) =
+            message_outbox_fail_statement(" outbox-1 ", " dispatch failed ", 100).unwrap();
+
+        assert!(sql.contains("UPDATE message_outbox"));
+        assert!(sql.contains("AND status = 'LOCKED'"));
+        assert_eq!(params.len(), 3);
     }
 
     #[test]
