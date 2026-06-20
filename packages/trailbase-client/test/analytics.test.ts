@@ -317,24 +317,81 @@ describe("analytics router", () => {
         tossUserKey: "[REDACTED]",
         section: "main",
       },
-      sessionToken: "session-token",
+      sessionToken: "[REDACTED]",
     });
   });
 
-  test("configures AppsInToss analytics only for allowed bootstrap events", async () => {
-    const dispatched: string[] = [];
-    const router = createAnalyticsRouter<"screen_view" | "debug_event">();
+  test("honors option endpoint overrides when bootstrap enables TrailBase", async () => {
+    const fetchCalls: Array<{ url: string; init: RequestInit }> = [];
+    const router = createAnalyticsRouter<"screen_view">();
+
+    const policy = configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: {
+        enabled: true,
+        trailbase: {
+          enabled: true,
+          flushIntervalMs: 0,
+        },
+      },
+      trailbase: {
+        endpoint: "/api/override-analytics/events",
+        fetcher: async (url, init) => {
+          fetchCalls.push({ url, init });
+          return jsonResponse({ ok: true });
+        },
+      },
+    });
+
+    router.track("screen_view");
+    await router.flush();
+
+    expect(policy.trailbase).toMatchObject({
+      enabled: true,
+      endpoint: "/api/override-analytics/events",
+    });
+    expect(fetchCalls).toHaveLength(1);
+    expect(fetchCalls[0]?.url).toBe("/api/override-analytics/events");
+  });
+
+  test("clears old buffered sinks when bootstrap disables analytics", async () => {
+    const fetchCalls: unknown[] = [];
+    const router = createAnalyticsRouter<"screen_view">();
 
     configureAnalyticsRouterFromBootstrap({
       router,
       policy: {
         enabled: true,
-        appsInToss: {
+        trailbase: {
           enabled: true,
-          allowedEvents: ["screen_view"],
+          endpoint: "/api/analytics/events",
+          flushIntervalMs: 5,
         },
       },
+      trailbase: {
+        fetcher: async (url, init) => {
+          fetchCalls.push({ url, init });
+          return jsonResponse({ ok: true });
+        },
+      },
+    });
+
+    router.track("screen_view");
+    configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: { enabled: false },
+    });
+    await delay(20);
+    await router.flush();
+
+    expect(fetchCalls).toEqual([]);
+  });
+
+  test("leaves AppsInToss SDK wiring to the RN analytics helper", async () => {
+    const dispatched: string[] = [];
+    const router = createAnalyticsRouter<"screen_view" | "debug_event">({
       appsInToss: {
+        enabled: true,
         mapEvent: (event) => ({
           name: event.eventName,
           type: "custom",
@@ -346,11 +403,26 @@ describe("analytics router", () => {
       },
     });
 
+    const policy = configureAnalyticsRouterFromBootstrap({
+      router,
+      policy: {
+        enabled: true,
+        appsInToss: {
+          enabled: true,
+          allowedEvents: ["screen_view"],
+        },
+      },
+    });
+
     router.track("debug_event");
     router.track("screen_view");
     await router.flush();
 
-    expect(dispatched).toEqual(["screen_view"]);
+    expect(policy.appsInToss).toMatchObject({
+      enabled: true,
+      allowedEvents: ["screen_view"],
+    });
+    expect(dispatched).toEqual([]);
   });
 
   test("TrailBase analytics client joins URLs, sends auth headers, and reports failures", async () => {
@@ -495,4 +567,8 @@ function jsonResponse(
 function parseBody(init: RequestInit | undefined): { events: unknown[] } {
   expect(typeof init?.body).toBe("string");
   return JSON.parse(init?.body as string);
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -19,7 +19,7 @@ Keep detailed analytics and AppsInToss Analytics separate. A detailed TrailBase 
 ## Basic setup
 
 ```ts
-import { createAnalyticsRouter } from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+import { createAnalyticsRouter } from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
   detail: false,
@@ -58,16 +58,16 @@ hard-coded client decision. Missing or invalid policy values normalize to disabl
 ```ts
 import { Analytics } from "@apps-in-toss/framework";
 import {
-  configureAnalyticsRouterFromBootstrap,
+  configureAppsInTossAnalyticsRouterFromBootstrap,
   createAnalyticsRouter,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+} from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
   detail: false,
   appsInToss: false,
 });
 
-configureAnalyticsRouterFromBootstrap({
+configureAppsInTossAnalyticsRouterFromBootstrap({
   router: analytics,
   policy: bootstrap.analytics,
   trailbase: {
@@ -101,6 +101,10 @@ the backend decides which TrailBase table, database, or multi-db connection to u
 in-memory only: it supports allowlists, sampling, queue caps, batch flushing, and payload sanitization,
 but it does not provide a persistent offline queue.
 
+Use `@trailbase-apps-in-toss-kit/ait-rn/analytics` when wiring the official AppsInToss `Analytics`
+SDK. The lower-level `trailbase-client/analytics` APIs remain framework-neutral primitives for routers,
+buffered sinks, sanitizers, and backend batch posting.
+
 AppsInToss Analytics is the official console metric source. The TrailBase mirror is for app-internal
 analysis and early operations support when teams need lower-latency or richer debugging data.
 
@@ -130,10 +134,13 @@ The kit does not force a database schema or API endpoint. Consumer apps own thei
 
 ```ts
 import { Analytics } from "@apps-in-toss/framework";
+import {
+  createAnalyticsRouter,
+  createAppsInTossAnalyticsConfig,
+} from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
-  appsInToss: {
-    enabled: true,
+  appsInToss: createAppsInTossAnalyticsConfig({
     analyticsModule: Analytics,
     mapEvent: (event) => {
       if (event.eventName !== "answer_submit_tapped") {
@@ -150,7 +157,7 @@ const analytics = createAnalyticsRouter({
       // real console event surface. The router keeps the shared event mapping.
       console.debug("[apps-in-toss-analytics]", event);
     },
-  },
+  }),
 });
 ```
 

@@ -238,14 +238,6 @@ export interface ConfigureAnalyticsRouterFromBootstrapOptions<
   trailbase?: Omit<TrailBaseAnalyticsEventClientOptions, "endpoint"> & {
     endpoint?: string;
   };
-  appsInToss?: Omit<
-    Extract<AppsInTossAnalyticsConfig<TEventName, TPayload>, { enabled: true }>,
-    "enabled" | "mapEvent"
-  > & {
-    mapEvent?: (
-      event: AnalyticsEvent<TEventName, TPayload>,
-    ) => AppsInTossMappedEvent | false | null | undefined;
-  };
   sessionTokenProvider?: () => string | null | undefined;
 }
 
@@ -293,6 +285,11 @@ const DEFAULT_REDACT_KEYS = [
   "sealed",
   "promotionCode",
 ];
+
+const configuredBufferedSinks = new WeakMap<
+  AnalyticsRouter<string, AnalyticsPayload>,
+  { clear: () => void }
+>();
 
 export function createAnalyticsRouter<
   TEventName extends string = string,
@@ -479,21 +476,48 @@ export function normalizeAnalyticsBootstrapPolicy(
   };
 }
 
+function normalizeBootstrapPolicyWithOverrides(
+  value: unknown,
+  endpointOverride: string | undefined,
+): NormalizedAnalyticsBootstrapPolicy {
+  const policy = normalizeAnalyticsBootstrapPolicy(value);
+  const endpoint = normalizeOptionalEndpoint(endpointOverride) ?? policy.trailbase.endpoint;
+  if (
+    policy.enabled &&
+    endpoint &&
+    (policy.trailbase.enabled || isRawTrailBaseAnalyticsPolicyEnabled(value))
+  ) {
+    return {
+      ...policy,
+      trailbase: {
+        ...policy.trailbase,
+        enabled: true,
+        endpoint,
+      },
+    };
+  }
+  return policy;
+}
+
 export function configureAnalyticsRouterFromBootstrap<
   TEventName extends string = string,
   TPayload extends AnalyticsPayload = AnalyticsPayload,
 >(
   options: ConfigureAnalyticsRouterFromBootstrapOptions<TEventName, TPayload>,
 ): NormalizedAnalyticsBootstrapPolicy {
-  const policy = normalizeAnalyticsBootstrapPolicy(options.policy);
+  const policy = normalizeBootstrapPolicyWithOverrides(
+    options.policy,
+    options.trailbase?.endpoint,
+  );
   const nextConfig: Partial<AnalyticsRouterConfig<TEventName, TPayload>> = {
     detail: false,
     appsInToss: false,
     debug: false,
   };
+  clearConfiguredBufferedSink(options.router);
 
   if (policy.enabled && policy.trailbase.enabled && policy.trailbase.endpoint) {
-    const endpoint = options.trailbase?.endpoint ?? policy.trailbase.endpoint;
+    const endpoint = normalizeOptionalEndpoint(options.trailbase?.endpoint) ?? policy.trailbase.endpoint;
     const client = createTrailBaseAnalyticsEventClient<TEventName, TPayload>({
       baseUrl: options.trailbase?.baseUrl,
       endpoint,
@@ -515,23 +539,10 @@ export function configureAnalyticsRouterFromBootstrap<
       flush: sink.flush,
       sessionTokenProvider: options.sessionTokenProvider,
     };
-  }
-
-  if (policy.enabled && policy.appsInToss.enabled) {
-    const allowedEvents = toAllowedEventsSet(policy.appsInToss.allowedEvents);
-    const mapEvent = options.appsInToss?.mapEvent;
-    nextConfig.appsInToss = {
-      ...options.appsInToss,
-      enabled: true,
-      mapEvent: mapEvent
-        ? (event) => {
-            if (!isAllowedEvent(event.eventName, allowedEvents)) {
-              return false;
-            }
-            return mapEvent(event);
-          }
-        : undefined,
-    };
+    configuredBufferedSinks.set(
+      options.router as unknown as AnalyticsRouter<string, AnalyticsPayload>,
+      sink,
+    );
   }
 
   options.router.configure(nextConfig);
@@ -614,13 +625,7 @@ export function createBufferedAnalyticsSink<
       if (sampleRate <= 0 || random() >= sampleRate) {
         continue;
       }
-      queue.push({
-        ...event,
-        eventPayload: sanitizeAnalyticsPayload(event.eventPayload, {
-          maxPayloadBytes: options.maxPayloadBytes,
-          redactKeys: options.redactKeys,
-        }) as TPayload,
-      });
+      queue.push(sanitizeAnalyticsEvent(event, options));
     }
     trimQueue();
     if (queue.length >= maxBatchSize) {
@@ -776,6 +781,22 @@ function normalizeAllowedEvents(value: unknown): string[] | undefined {
   return [...seen];
 }
 
+function isRawTrailBaseAnalyticsPolicyEnabled(value: unknown): boolean {
+  if (!isRecord(value) || value.enabled !== true || !isRecord(value.trailbase)) {
+    return false;
+  }
+  return value.trailbase.enabled === true;
+}
+
+function clearConfiguredBufferedSink<
+  TEventName extends string,
+  TPayload extends AnalyticsPayload,
+>(router: AnalyticsRouter<TEventName, TPayload>) {
+  const key = router as unknown as AnalyticsRouter<string, AnalyticsPayload>;
+  configuredBufferedSinks.get(key)?.clear();
+  configuredBufferedSinks.delete(key);
+}
+
 function toAllowedEventsSet(value: readonly string[] | undefined): Set<string> | null {
   if (value === undefined) {
     return null;
@@ -820,6 +841,14 @@ function normalizeEndpoint(value: string): string {
     throw new Error("Analytics endpoint is required");
   }
   return endpoint;
+}
+
+function normalizeOptionalEndpoint(value: string | undefined): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  const endpoint = value.trim();
+  return endpoint || null;
 }
 
 function resolveAnalyticsEndpoint(baseUrl: string | undefined, endpoint: string): string {
@@ -902,6 +931,23 @@ function sanitizeObjectPayload(
     }
   }
   return sanitized;
+}
+
+function sanitizeAnalyticsEvent<
+  TEventName extends string,
+  TPayload extends AnalyticsPayload,
+>(
+  event: AnalyticsEvent<TEventName, TPayload>,
+  options: SanitizeAnalyticsPayloadOptions,
+): AnalyticsEvent<TEventName, TPayload> {
+  return {
+    ...event,
+    eventPayload: sanitizeAnalyticsPayload(event.eventPayload, {
+      maxPayloadBytes: options.maxPayloadBytes,
+      redactKeys: options.redactKeys,
+    }) as TPayload,
+    sessionToken: event.sessionToken ? "[REDACTED]" : event.sessionToken,
+  };
 }
 
 function sanitizePayloadValue(

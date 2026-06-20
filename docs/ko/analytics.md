@@ -24,7 +24,7 @@ payload를 담을 수 있지만, AppsInToss 콘솔 이벤트는 저빈도 제품
 ## 기본 설정
 
 ```ts
-import { createAnalyticsRouter } from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+import { createAnalyticsRouter } from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
   detail: false,
@@ -63,16 +63,16 @@ const analytics = createAnalyticsRouter({
 ```ts
 import { Analytics } from "@apps-in-toss/framework";
 import {
-  configureAnalyticsRouterFromBootstrap,
+  configureAppsInTossAnalyticsRouterFromBootstrap,
   createAnalyticsRouter,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+} from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
   detail: false,
   appsInToss: false,
 });
 
-configureAnalyticsRouterFromBootstrap({
+configureAppsInTossAnalyticsRouterFromBootstrap({
   router: analytics,
   policy: bootstrap.analytics,
   trailbase: {
@@ -106,6 +106,10 @@ batch를 보내고, 실제 TrailBase table, database, multi-db 연결 선택은 
 sink는 in-memory 전용입니다. allowlist, sampling, queue cap, batch flush, payload sanitization은
 지원하지만 persistent offline queue는 제공하지 않습니다.
 
+공식 AppsInToss `Analytics` SDK를 연결할 때는 `@trailbase-apps-in-toss-kit/ait-rn/analytics`를
+사용하세요. 하위 `trailbase-client/analytics` API는 router, buffered sink, sanitizer, backend
+batch posting을 위한 framework-neutral primitive로 남겨둡니다.
+
 AppsInToss Analytics는 공식 콘솔 지표의 기준입니다. TrailBase mirror는 더 빠른 확인이나 더 풍부한
 디버깅 데이터가 필요한 앱 내부 분석/초기 운영 보조 용도입니다.
 
@@ -136,10 +140,13 @@ endpoint는 컨슈머 앱이 소유합니다.
 
 ```ts
 import { Analytics } from "@apps-in-toss/framework";
+import {
+  createAnalyticsRouter,
+  createAppsInTossAnalyticsConfig,
+} from "@trailbase-apps-in-toss-kit/ait-rn/analytics";
 
 const analytics = createAnalyticsRouter({
-  appsInToss: {
-    enabled: true,
+  appsInToss: createAppsInTossAnalyticsConfig({
     analyticsModule: Analytics,
     mapEvent: (event) => {
       if (event.eventName !== "answer_submit_tapped") {
@@ -156,7 +163,7 @@ const analytics = createAnalyticsRouter({
       // 처리하세요. router는 공유 이벤트 매핑과 설정을 유지합니다.
       console.debug("[apps-in-toss-analytics]", event);
     },
-  },
+  }),
 });
 ```
 
