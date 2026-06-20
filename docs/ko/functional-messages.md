@@ -46,6 +46,25 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
 이미 자체 `message_templates`가 있는 앱은 nullable `agreement_template_code`를 forward
 migration으로 추가할 수 있습니다. 새 앱은 이 컬럼이 포함된 템플릿을 처음부터 복사하세요.
 
+### 기존 템플릿 백필
+
+기존 앱에서는 nullable 컬럼을 추가하는 것만으로 마이그레이션이 끝나지 않습니다.
+이미 `requires_agreement = 1`인 row가 있다면 새 gate를 적용하기 전에 별도의 데이터
+마이그레이션으로 `agreement_template_code`를 반드시 채우세요. 동의가 필요한 템플릿 row는
+알림 동의문 코드가 null이 아니어야 한다는 제약을 전제로 동작합니다.
+
+발송 템플릿과 알림 동의문이 1:1인 단순 구성에서는 아래처럼 발송 코드를 복사할 수 있습니다.
+
+```sql
+UPDATE message_templates
+SET agreement_template_code = template_code
+WHERE requires_agreement = 1
+  AND agreement_template_code IS NULL;
+```
+
+여러 발송 템플릿이 하나의 알림 동의문을 공유한다면 `template_code`를 그대로 복사하지 말고,
+각 row를 공유 동의문 `templateCode`로 매핑하세요.
+
 Toss 콘솔 코드는 역할을 분리해서 앱별 DB에서 관리하세요.
 
 - `templateSetCode`: `/api-partner/v1/apps-in-toss/messenger/send-message`에 전달하는

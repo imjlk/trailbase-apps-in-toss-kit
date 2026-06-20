@@ -51,6 +51,26 @@ Existing `message_templates` tables can add nullable `agreement_template_code`
 with a forward migration; new apps should copy the template with that column
 from the start.
 
+### Existing Template Backfill
+
+Adding the nullable column is not the whole migration for existing apps. If any
+existing row has `requires_agreement = 1`, backfill
+`agreement_template_code` in a separate data step before relying on the new
+gate. The template constraint expects agreement-required rows to have a
+non-null agreement code.
+
+For simple one-to-one setups, the backfill can copy the send-template code:
+
+```sql
+UPDATE message_templates
+SET agreement_template_code = template_code
+WHERE requires_agreement = 1
+  AND agreement_template_code IS NULL;
+```
+
+If several send templates share one notification agreement, map each row to the
+shared agreement `templateCode` instead of blindly copying `template_code`.
+
 Manage Apps in Toss console codes by their role in the app DB:
 
 - `templateSetCode`: the functional message send-template code passed to

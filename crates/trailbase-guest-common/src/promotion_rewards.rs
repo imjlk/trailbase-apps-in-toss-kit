@@ -371,11 +371,7 @@ pub fn insert_promotion_reward_ledger_tx(
         });
     }
 
-    let record = load_promotion_reward_ledger_by_provider_request_id_tx(
-        tx,
-        table,
-        &record.provider_request_id,
-    )?;
+    let record = load_promotion_reward_ledger_by_idempotency_context_tx(tx, table, &record)?;
     Ok(PromotionRewardLedgerInsertResult {
         inserted: false,
         record,
@@ -612,29 +608,61 @@ fn promotion_reward_ledger_outcome_statement(
     ))
 }
 
-fn load_promotion_reward_ledger_by_provider_request_id_tx(
+fn load_promotion_reward_ledger_by_idempotency_context_tx(
     tx: &mut Transaction,
     table: PromotionRewardLedgerTable,
-    provider_request_id: &str,
+    record: &NormalizedPromotionRewardLedgerInsert,
 ) -> ApiResult<PromotionRewardLedgerRecord> {
+    let (sql, params) = promotion_reward_ledger_idempotency_lookup_statement(table, record)?;
+    let rows = db::tx_query(tx, &sql, &params)?;
+    rows.first()
+        .map(|row| promotion_reward_ledger_record_from_row(row))
+        .transpose()?
+        .ok_or_else(|| {
+            bad_request(
+                "PROMOTION_REWARD_IDEMPOTENCY_CONFLICT",
+                "providerRequestId already belongs to another reward context",
+            )
+        })
+}
+
+fn promotion_reward_ledger_idempotency_lookup_statement(
+    table: PromotionRewardLedgerTable,
+    record: &NormalizedPromotionRewardLedgerInsert,
+) -> ApiResult<(String, Vec<Value>)> {
     validate_promotion_reward_ledger_table(table)?;
-    let rows = db::tx_query(
-        tx,
-        &format!(
+    Ok((
+        format!(
             "SELECT {returning_columns}
              FROM {table}
              WHERE {provider_request_id_column} = ?1
+               AND {user_id_column} = ?2
+               AND ({campaign_id_column} = ?3 OR ({campaign_id_column} IS NULL AND ?3 IS NULL))
+               AND {source_type_column} = ?4
+               AND ({source_id_column} = ?5 OR ({source_id_column} IS NULL AND ?5 IS NULL))
+               AND {amount_column} = ?6
+               AND {provider_column} = ?7
              LIMIT 1",
             returning_columns = promotion_reward_ledger_returning_columns(table),
             table = table.table,
             provider_request_id_column = table.provider_request_id_column,
+            user_id_column = table.user_id_column,
+            campaign_id_column = table.campaign_id_column,
+            source_type_column = table.source_type_column,
+            source_id_column = table.source_id_column,
+            amount_column = table.amount_column,
+            provider_column = table.provider_column,
         ),
-        &[Value::Text(provider_request_id.to_string())],
-    )?;
-    rows.first()
-        .map(|row| promotion_reward_ledger_record_from_row(row))
-        .transpose()?
-        .ok_or_else(|| internal("Promotion reward ledger row was not found"))
+        vec![
+            Value::Text(record.provider_request_id.clone()),
+            Value::Blob(record.user_id.clone()),
+            text_or_null(record.campaign_id.as_deref()),
+            Value::Text(record.source_type.clone()),
+            text_or_null(record.source_id.as_deref()),
+            Value::Integer(record.reward_amount),
+            Value::Text(record.provider.clone()),
+        ],
+    ))
 }
 
 pub fn promotion_reward_usage_for_feature_tx(
@@ -1084,6 +1112,38 @@ mod tests {
         assert_eq!(record.id.as_deref(), Some("ledger-1"));
         assert_eq!(record.provider, "TOSS");
         assert_eq!(record.source_type, "attendance_daily");
+    }
+
+    #[test]
+    fn promotion_reward_idempotency_lookup_matches_caller_context() {
+        let record = normalize_promotion_reward_ledger_insert(PromotionRewardLedgerInsert {
+            id: None,
+            user: &[1, 2, 3],
+            campaign_id: Some("campaign-1"),
+            source_type: "attendance_daily",
+            source_id: Some("2026-06-20"),
+            reward_amount: 100,
+            provider: None,
+            provider_request_id: "request-1",
+            requested_at: 1000,
+            now: 1001,
+        })
+        .unwrap();
+
+        let (sql, params) = promotion_reward_ledger_idempotency_lookup_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            &record,
+        )
+        .unwrap();
+
+        assert!(sql.contains("WHERE provider_request_id = ?1"));
+        assert!(sql.contains("AND user_id = ?2"));
+        assert!(sql.contains("AND (campaign_id = ?3 OR (campaign_id IS NULL AND ?3 IS NULL))"));
+        assert!(sql.contains("AND source_type = ?4"));
+        assert!(sql.contains("AND (source_id = ?5 OR (source_id IS NULL AND ?5 IS NULL))"));
+        assert!(sql.contains("AND reward_amount = ?6"));
+        assert!(sql.contains("AND provider = ?7"));
+        assert_eq!(params.len(), 7);
     }
 
     #[test]

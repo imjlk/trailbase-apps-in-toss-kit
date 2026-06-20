@@ -388,17 +388,73 @@ fn iap_order_status_upsert_statement(
                {status_column} = CASE
                  WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
                  THEN {table}.{status_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{status_column}
                  ELSE excluded.{status_column}
                END,
-               {provider_status_column} = excluded.{provider_status_column},
-               {provider_reason_column} = excluded.{provider_reason_column},
-               {failure_reason_column} = excluded.{failure_reason_column},
-               {provider_response_json_column} = excluded.{provider_response_json_column},
-               {status_determined_at_column} = excluded.{status_determined_at_column},
-               {updated_at_column} = excluded.{updated_at_column},
-               {completed_at_column} = COALESCE({table}.{completed_at_column}, excluded.{completed_at_column}),
-               {refunded_at_column} = COALESCE(excluded.{refunded_at_column}, {table}.{refunded_at_column}),
-               {failed_at_column} = COALESCE(excluded.{failed_at_column}, {table}.{failed_at_column})
+               {provider_status_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{provider_status_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{provider_status_column}
+                 ELSE excluded.{provider_status_column}
+               END,
+               {provider_reason_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{provider_reason_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{provider_reason_column}
+                 ELSE excluded.{provider_reason_column}
+               END,
+               {failure_reason_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{failure_reason_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{failure_reason_column}
+                 ELSE excluded.{failure_reason_column}
+               END,
+               {provider_response_json_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{provider_response_json_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{provider_response_json_column}
+                 ELSE excluded.{provider_response_json_column}
+               END,
+               {status_determined_at_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{status_determined_at_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{status_determined_at_column}
+                 ELSE excluded.{status_determined_at_column}
+               END,
+               {updated_at_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{updated_at_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{updated_at_column}
+                 ELSE excluded.{updated_at_column}
+               END,
+               {completed_at_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{completed_at_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{completed_at_column}
+                 ELSE COALESCE({table}.{completed_at_column}, excluded.{completed_at_column})
+               END,
+               {refunded_at_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{refunded_at_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{refunded_at_column}
+                 ELSE COALESCE(excluded.{refunded_at_column}, {table}.{refunded_at_column})
+               END,
+               {failed_at_column} = CASE
+                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{failed_at_column}
+                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 THEN {table}.{failed_at_column}
+                 ELSE COALESCE(excluded.{failed_at_column}, {table}.{failed_at_column})
+               END
              WHERE {table}.{user_id_column} = excluded.{user_id_column}
                AND {table}.{product_id_column} = excluded.{product_id_column}
              RETURNING {returning_columns}",
@@ -769,6 +825,9 @@ mod tests {
         assert!(sql.contains("INSERT INTO iap_orders"));
         assert!(sql.contains("ON CONFLICT(order_id) DO UPDATE"));
         assert!(sql.contains("excluded.status <> 'REFUNDED'"));
+        assert!(sql.contains("iap_orders.status = 'REFUNDED' AND excluded.status <> 'REFUNDED'"));
+        assert!(sql.contains("THEN iap_orders.provider_status"));
+        assert!(sql.contains("THEN iap_orders.failed_at"));
         assert!(sql.contains("CASE WHEN ?5 = 'GRANTED' THEN ?11 ELSE NULL END"));
         assert!(
             sql.contains("COALESCE(iap_orders.toss_user_key_hmac, excluded.toss_user_key_hmac)")
