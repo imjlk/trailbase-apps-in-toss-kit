@@ -1,5 +1,12 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 0.5.1 — 2026-06-20
+
+### Patch changes
+
+- [1f53594](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1f535944e6d7e3c6d0416bedc7e640e03bb49faa) Fix the buffered analytics sink return path so strict consumer TypeScript
+  projects can typecheck the shared source package. — Thanks @imjlk!
+
 ## 0.5.0 — 2026-06-20
 
 ### Minor changes
