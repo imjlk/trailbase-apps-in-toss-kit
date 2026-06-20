@@ -104,8 +104,9 @@ TrailBase 도메인 이벤트는 별도의 앱 소유 히스토리 및 운영 �
 key, HMAC, 암호문, 토큰, secret을 저장하지 마세요.
 
 상세 분석 이벤트는 기능성 원장과 다릅니다. 제품 분석을 TrailBase로 mirror하려면 별도
-`analytics` database의 선택형 `analytics_events` 템플릿을 우선 사용하세요. 알림동의, message
-outbox, promotion grant, IAP grant, reward 기록은 각 기능이 소유하는 table에 둡니다.
+`analytics` database의 선택형 `analytics.events` 템플릿을 우선 사용하세요. 알림동의, message
+outbox, promotion grant, IAP grant, reward 기록은 각 기능이 소유하는 table에 둡니다. 기존
+`analytics.analytics_events` 템플릿은 이미 배포된 앱을 위한 호환 경로로만 유지합니다.
 
 선택적으로 `trailbase_guest_common::domain_events` helper를 사용하면 앱 소유 테이블에 이벤트를
 추가하고 조회할 수 있습니다. 스키마는 도입 앱에서 관리하며, 예시는 다음과 같습니다.
