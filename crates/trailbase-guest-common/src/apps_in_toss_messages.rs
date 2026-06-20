@@ -644,10 +644,24 @@ pub fn complete_message_outbox_tx(
     raw_response_json: Option<&str>,
     now: i64,
 ) -> ApiResult<()> {
+    let (sql, params) =
+        message_outbox_complete_statement(outbox_id, response, raw_response_json, now);
+    let updated = db::tx_execute(tx, &sql, &params)?;
+    if updated == 0 {
+        return Err(internal("Message outbox row was not found for completion"));
+    }
+    Ok(())
+}
+
+fn message_outbox_complete_statement(
+    outbox_id: &str,
+    response: &MessageProviderResponse,
+    raw_response_json: Option<&str>,
+    now: i64,
+) -> (String, Vec<Value>) {
     let sent_at = response.sent_at.unwrap_or(now);
     let status = if response.is_sent() { "SENT" } else { "FAILED" };
-    let updated = db::tx_execute(
-        tx,
+    (
         "UPDATE message_outbox
          SET status = ?2,
              locked_at = NULL,
@@ -662,8 +676,10 @@ pub fn complete_message_outbox_tx(
              provider_sent_inbox_count = ?11,
              provider_response_json = ?12,
              updated_at = ?7
-         WHERE id = ?1",
-        &[
+         WHERE id = ?1
+           AND status = 'LOCKED'"
+            .to_string(),
+        vec![
             Value::Text(outbox_id.to_string()),
             Value::Text(status.to_string()),
             Value::Text(response.provider_request_id.clone()),
@@ -677,11 +693,7 @@ pub fn complete_message_outbox_tx(
             optional_i64(response.sent_inbox_count),
             optional_text(raw_response_json),
         ],
-    )?;
-    if updated == 0 {
-        return Err(internal("Message outbox row was not found for completion"));
-    }
-    Ok(())
+    )
 }
 
 #[derive(Debug, Clone)]
@@ -1069,6 +1081,27 @@ mod tests {
             response.provider_error_code.as_deref(),
             Some("INVALID_TEMPLATE")
         );
+    }
+
+    #[test]
+    fn message_outbox_complete_statement_only_matches_locked_rows() {
+        let response = parse_message_proxy_response(
+            &json!({
+              "ok": false,
+              "providerRequestId": "msg-2",
+              "providerStatus": "FAILED",
+              "failureReason": "template is not approved"
+            }),
+            "fallback",
+            None,
+        );
+
+        let (sql, params) =
+            message_outbox_complete_statement("outbox-1", &response, Some("{\"ok\":false}"), 100);
+
+        assert!(sql.contains("UPDATE message_outbox"));
+        assert!(sql.contains("AND status = 'LOCKED'"));
+        assert_eq!(params.len(), 12);
     }
 
     #[test]

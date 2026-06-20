@@ -379,14 +379,12 @@ fn iap_order_status_upsert_statement(
              )
              VALUES (
                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11,
-               CASE WHEN ?5 IN ('GRANTED', 'PENDING_GRANT') THEN ?11 ELSE NULL END,
+               CASE WHEN ?5 = 'GRANTED' THEN ?11 ELSE NULL END,
                CASE WHEN ?5 = 'REFUNDED' THEN ?11 ELSE NULL END,
                CASE WHEN ?5 IN ('FAILED', 'NOT_FOUND') THEN ?11 ELSE NULL END
              )
              ON CONFLICT({order_id_column}) DO UPDATE SET
-               {user_id_column} = excluded.{user_id_column},
-               {toss_user_key_hmac_column} = COALESCE(excluded.{toss_user_key_hmac_column}, {table}.{toss_user_key_hmac_column}),
-               {product_id_column} = excluded.{product_id_column},
+               {toss_user_key_hmac_column} = COALESCE({table}.{toss_user_key_hmac_column}, excluded.{toss_user_key_hmac_column}),
                {status_column} = CASE
                  WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
                  THEN {table}.{status_column}
@@ -401,6 +399,8 @@ fn iap_order_status_upsert_statement(
                {completed_at_column} = COALESCE({table}.{completed_at_column}, excluded.{completed_at_column}),
                {refunded_at_column} = COALESCE(excluded.{refunded_at_column}, {table}.{refunded_at_column}),
                {failed_at_column} = COALESCE(excluded.{failed_at_column}, {table}.{failed_at_column})
+             WHERE {table}.{user_id_column} = excluded.{user_id_column}
+               AND {table}.{product_id_column} = excluded.{product_id_column}
              RETURNING {returning_columns}",
             table = table.table,
             order_id_column = table.order_id_column,
@@ -769,6 +769,12 @@ mod tests {
         assert!(sql.contains("INSERT INTO iap_orders"));
         assert!(sql.contains("ON CONFLICT(order_id) DO UPDATE"));
         assert!(sql.contains("excluded.status <> 'REFUNDED'"));
+        assert!(sql.contains("CASE WHEN ?5 = 'GRANTED' THEN ?11 ELSE NULL END"));
+        assert!(
+            sql.contains("COALESCE(iap_orders.toss_user_key_hmac, excluded.toss_user_key_hmac)")
+        );
+        assert!(sql.contains("WHERE iap_orders.user_id = excluded.user_id"));
+        assert!(sql.contains("AND iap_orders.product_id = excluded.product_id"));
         assert_eq!(params.len(), 11);
         assert_eq!(record.order_id, "order-1");
         assert_eq!(record.product_id, "coins.100");
