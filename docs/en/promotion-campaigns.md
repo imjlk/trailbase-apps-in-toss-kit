@@ -41,6 +41,12 @@ Choose feature keys for people who operate the service. A short, stable key such
 as `share_reward` or `onboarding_bonus` is usually easier to maintain than a key
 that encodes every eligibility detail.
 
+The shared SQL template keeps a general `feature_key/status` index for mixed
+operator views and also adds an `ACTIVE` partial index for the hot lookup path
+used before provider grants. Keep active campaign resolution in one app-owned
+transaction with the usage check and ledger transition; do not expose provider
+promotion codes or raw Toss identifiers to RN clients.
+
 ## Env Fallback
 
 Env fallback exists for legacy or local-only flows:

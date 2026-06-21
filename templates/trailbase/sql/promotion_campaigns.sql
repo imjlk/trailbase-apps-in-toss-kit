@@ -26,5 +26,9 @@ CREATE TABLE IF NOT EXISTS promotion_campaigns (
 CREATE INDEX IF NOT EXISTS idx_promotion_campaigns_active_feature
   ON promotion_campaigns(feature_key, status, starts_at DESC, created_at DESC);
 
+CREATE INDEX IF NOT EXISTS idx_promotion_campaigns_active_feature_window
+  ON promotion_campaigns(feature_key, starts_at DESC, created_at DESC)
+  WHERE status = 'ACTIVE';
+
 CREATE INDEX IF NOT EXISTS idx_promotion_campaigns_provider_code
   ON promotion_campaigns(provider, provider_promotion_code);
