@@ -47,6 +47,7 @@ try {
           "idx_message_outbox_ready_dispatch",
           "idx_notification_template_agreements_template_status",
           "idx_promotion_campaigns_active_feature",
+          "idx_promotion_campaigns_active_feature_window",
           "idx_promotion_reward_ledger_campaign_status",
           "idx_iap_orders_product_status",
         ],
@@ -85,6 +86,7 @@ function verifySchema() {
     "idx_notification_template_agreements_template_status",
   );
   assertIndex("promotion_campaigns", "idx_promotion_campaigns_active_feature");
+  assertIndex("promotion_campaigns", "idx_promotion_campaigns_active_feature_window");
   assertIndex("promotion_reward_ledger", "idx_promotion_reward_ledger_campaign_status");
   assertIndex("iap_orders", "idx_iap_orders_product_status");
 

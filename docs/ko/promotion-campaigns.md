@@ -37,6 +37,11 @@ TrailBase가 프록시 환경 변수뿐 아니라 프로모션 설정까지 관�
 모든 자격 조건을 키에 넣기보다 `share_reward`, `onboarding_bonus`처럼 짧고 안정적인 이름을
 선택하는 편이 유지보수에 좋습니다.
 
+공유 SQL 템플릿은 운영 화면처럼 여러 상태를 함께 보는 경로를 위해 `feature_key/status` index를
+유지하고, provider 지급 전 hot lookup에는 `ACTIVE` partial index를 추가합니다. 활성 캠페인
+해석은 사용량 확인 및 원장 상태 전이와 같은 앱 소유 transaction 안에서 처리하고, provider
+promotion code나 원본 Toss 식별자는 RN client에 노출하지 마세요.
+
 ## 환경 변수 대체값
 
 환경 변수 대체값(fallback)은 기존 배포나 로컬 전용 흐름을 위한 장치입니다.
