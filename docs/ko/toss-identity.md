@@ -44,6 +44,13 @@ TrailBase credential을 만드세요.
 클라이언트로 보내지 말고, 앱 코드에서 TrailBase JWT 서명이나 `_session` write를 직접
 재구현하지 마세요.
 
+익명 `_user`를 만들거나 불러오는 bootstrap 경로에서는 `ensure_verified_auth_user_tx`를
+사용하세요. 이 헬퍼는 먼저 합성 이메일로 기존 row를 찾고, 필요한 경우 `_user.verified`만
+보정하며, 최초 조회에서 row가 없을 때만 password hash를 생성하거나 갱신합니다. 이 missing-row
+경로는 atomic upsert를 사용하므로 동시 최초 bootstrap 요청도 idempotent하게 처리됩니다. 호환용
+`upsert_verified_auth_user_tx`는 아직 secret rotation을 rotation login helper로 옮기지 않은
+호출자를 위해 기존 password refresh 의미를 유지합니다.
+
 `_user` upsert가 commit된 뒤에는 서비스 관리 credential로 TrailBase 공식 auth login endpoint를
 호출합니다. `trailbase-guest-common`은 이 handoff를 위해 `login_auth_user`와
 `trailbase_auth_tokens_from_response` 헬퍼를 제공합니다. 이 헬퍼는 auth, refresh, CSRF token

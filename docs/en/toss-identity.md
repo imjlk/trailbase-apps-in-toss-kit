@@ -41,6 +41,13 @@ The credential exists to drive TrailBase's official auth flow. Do not send the s
 password to the client, and do not reimplement TrailBase JWT signing or `_session` writes in app
 code.
 
+Use `ensure_verified_auth_user_tx` when creating or loading the anonymous `_user` during bootstrap.
+It looks up an existing synthetic email first, updates only `_user.verified` when needed, and creates
+or refreshes the password hash only when the initial lookup misses. That missing-row path still uses
+an atomic upsert so concurrent first-bootstrap requests remain idempotent. The compatibility
+`upsert_verified_auth_user_tx` helper keeps its legacy password refresh semantics for callers that
+have not moved secret rotation to the rotation login helper.
+
 After the `_user` upsert commits, call TrailBase's official auth login endpoint with the
 service-managed credential. `trailbase-guest-common` exposes `login_auth_user` and
 `trailbase_auth_tokens_from_response` helpers for this handoff; they parse the auth, refresh, and
