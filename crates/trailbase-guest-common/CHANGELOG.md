@@ -1,5 +1,18 @@
 # trailbase-guest-common
 
+## 0.8.0 — 2026-06-21
+
+### Minor changes
+
+- [0f2f3e8](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/0f2f3e842479f6609cb3060733cce7e2f05f4020) Add a batch insert helper and app-owned SQL template for low-volume domain
+  events, while documenting the boundary from high-volume analytics mirrors. — Thanks @imjlk!
+- [8ae5b9f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/8ae5b9fd010069567a71eb226667679cffb1e770) Optimize Smart Message outbox claiming to lock a ready batch with one update,
+  preserve claim order, and document bulk dispatch grouping for functional message
+  jobs. — Thanks @imjlk!
+- [2bcd15e](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2bcd15e1f49bb6c48bcc90cc793e3c8f1feb6c29) Add the recommended `analytics.events` table helper and SQL template, keep the
+  legacy `analytics.analytics_events` path compatible, and optimize analytics
+  batch insert helpers to reuse table validation and insert SQL per batch. — Thanks @imjlk!
+
 ## 0.7.0 — 2026-06-20
 
 ### Minor changes
