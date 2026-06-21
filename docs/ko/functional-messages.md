@@ -104,6 +104,12 @@ TrailBase WASM 핸들러는 `trailbase_guest_common::apps_in_toss_messages`로 o
 failed로 표시하고, provider 응답을 complete할 수 있습니다. 대상자 선택, cooldown, 발송 주기와
 enqueue 정책은 계속 앱이 소유합니다.
 
+발송 잡은 claim batch 하나를 하나의 transaction 안에서 처리하는 방식을 권장합니다. ready row를
+claim한 뒤 반환된 row를 `template_code`, `purpose`, `provider` 기준으로 묶고, 각 그룹마다 단건
+또는 bulk proxy adapter를 호출하세요. row마다 별도 transaction을 열지 않습니다. bulk adapter를
+사용할 때는 그룹을 나눠 proxy 요청 하나가 Toss 제한인 2,500명 이하가 되게 하고, 최종 outbox
+상태 전이는 기존 complete/fail/skip helper를 사용합니다.
+
 ## QA 체크리스트
 
 - 승인된 템플릿이 `message_templates`에 등록되어 있습니다.

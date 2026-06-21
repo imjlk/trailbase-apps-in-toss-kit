@@ -116,6 +116,13 @@ to enqueue idempotent outbox rows, claim ready rows, skip gated rows, mark
 provider exceptions as failed, and complete provider responses. Apps still own
 the enqueue policy, cooldowns, target selection, and dispatch schedule.
 
+Dispatch jobs should process one claim batch in a single transaction: claim
+ready rows, group the returned rows by `template_code`, `purpose`, and
+`provider`, then call the single-send or bulk proxy adapter for each group. Do
+not open a separate transaction for every row. When using the bulk adapter, chunk
+groups so each proxy request stays under the Toss 2,500-recipient limit, and use
+the existing complete/fail/skip helpers for final outbox state transitions.
+
 ## QA Checklist
 
 - Approved template exists in `message_templates`.
