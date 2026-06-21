@@ -104,6 +104,22 @@ pub fn insert_domain_event_tx(
     Ok(record)
 }
 
+pub fn insert_domain_event_batch_tx<'a>(
+    tx: &mut Transaction,
+    table: DomainEventTable,
+    inputs: impl IntoIterator<Item = DomainEventInput<'a>>,
+) -> ApiResult<Vec<DomainEventRecord>> {
+    let inputs = inputs.into_iter().collect::<Vec<_>>();
+    let Some((sql, records)) = normalize_domain_event_batch(table, inputs)? else {
+        return Ok(Vec::new());
+    };
+    for record in &records {
+        let params = domain_event_record_params(table, record);
+        db::tx_execute(tx, &sql, &params)?;
+    }
+    Ok(records)
+}
+
 pub fn list_domain_events_tx(
     tx: &mut Transaction,
     table: DomainEventTable,
@@ -121,7 +137,13 @@ pub fn normalize_domain_event_input(
     input: DomainEventInput<'_>,
 ) -> ApiResult<DomainEventRecord> {
     validate_domain_event_table(table)?;
+    normalize_domain_event_input_for_table(table, input)
+}
 
+fn normalize_domain_event_input_for_table(
+    table: DomainEventTable,
+    input: DomainEventInput<'_>,
+) -> ApiResult<DomainEventRecord> {
     if table.user_id_column.is_none() && input.user_id.is_some() {
         return Err(internal(
             "Domain event user_id was provided without a configured user_id column",
@@ -161,49 +183,69 @@ pub fn domain_event_insert_statement(
     record: &DomainEventRecord,
 ) -> ApiResult<(String, Vec<Value>)> {
     validate_domain_event_table(table)?;
+    Ok((
+        domain_event_insert_statement_for_table(table),
+        domain_event_record_params(table, record),
+    ))
+}
 
+fn normalize_domain_event_batch(
+    table: DomainEventTable,
+    inputs: Vec<DomainEventInput<'_>>,
+) -> ApiResult<Option<(String, Vec<DomainEventRecord>)>> {
+    if inputs.is_empty() {
+        return Ok(None);
+    }
+    validate_domain_event_table(table)?;
+    let sql = domain_event_insert_statement_for_table(table);
+    let records = inputs
+        .into_iter()
+        .map(|input| normalize_domain_event_input_for_table(table, input))
+        .collect::<ApiResult<Vec<_>>>()?;
+    Ok(Some((sql, records)))
+}
+
+fn domain_event_insert_statement_for_table(table: DomainEventTable) -> String {
     let mut columns = Vec::new();
     let mut values = Vec::new();
-    let mut params = Vec::new();
 
     if let Some(column) = table.user_id_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.user_id.as_deref()),
-        );
+        push_insert_column(&mut columns, &mut values, column);
     }
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.event_name_column,
-        Value::Text(record.event_name.clone()),
-    );
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.metadata_json_column,
-        Value::Text(record.metadata.to_string()),
-    );
+    push_insert_column(&mut columns, &mut values, table.event_name_column);
+    push_insert_column(&mut columns, &mut values, table.metadata_json_column);
     if let Some(column) = table.source_type_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.source_type.as_deref()),
-        );
+        push_insert_column(&mut columns, &mut values, column);
     }
     if let Some(column) = table.source_id_json_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
+        push_insert_column(&mut columns, &mut values, column);
+    }
+    if let Some(column) = table.request_id_column {
+        push_insert_column(&mut columns, &mut values, column);
+    }
+    push_insert_column(&mut columns, &mut values, table.created_at_column);
+
+    format!(
+        "INSERT INTO {} ({}) VALUES ({})",
+        table.table,
+        columns.join(", "),
+        values.join(", ")
+    )
+}
+
+fn domain_event_record_params(table: DomainEventTable, record: &DomainEventRecord) -> Vec<Value> {
+    let mut params = Vec::new();
+
+    if table.user_id_column.is_some() {
+        params.push(text_or_null(record.user_id.as_deref()));
+    }
+    params.push(Value::Text(record.event_name.clone()));
+    params.push(Value::Text(record.metadata.to_string()));
+    if table.source_type_column.is_some() {
+        params.push(text_or_null(record.source_type.as_deref()));
+    }
+    if table.source_id_json_column.is_some() {
+        params.push(
             record
                 .source_id
                 .as_ref()
@@ -211,32 +253,12 @@ pub fn domain_event_insert_statement(
                 .unwrap_or(Value::Null),
         );
     }
-    if let Some(column) = table.request_id_column {
-        push_column_value(
-            &mut columns,
-            &mut values,
-            &mut params,
-            column,
-            text_or_null(record.request_id.as_deref()),
-        );
+    if table.request_id_column.is_some() {
+        params.push(text_or_null(record.request_id.as_deref()));
     }
-    push_column_value(
-        &mut columns,
-        &mut values,
-        &mut params,
-        table.created_at_column,
-        Value::Integer(record.created_at),
-    );
+    params.push(Value::Integer(record.created_at));
 
-    Ok((
-        format!(
-            "INSERT INTO {} ({}) VALUES ({})",
-            table.table,
-            columns.join(", "),
-            values.join(", ")
-        ),
-        params,
-    ))
+    params
 }
 
 pub fn domain_event_select_statement(
@@ -362,16 +384,13 @@ fn domain_event_record_from_row(
     })
 }
 
-fn push_column_value(
+fn push_insert_column(
     columns: &mut Vec<&'static str>,
     values: &mut Vec<String>,
-    params: &mut Vec<Value>,
     column: &'static str,
-    value: Value,
 ) {
     columns.push(column);
-    params.push(value);
-    values.push(format!("?{}", params.len()));
+    values.push(format!("?{}", values.len() + 1));
 }
 
 fn text_or_null(value: Option<&str>) -> Value {
@@ -500,6 +519,85 @@ mod tests {
             "INSERT INTO app_events (user_id, event_name, metadata_json, source_type, source_id_json, request_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
         );
         assert_eq!(params.len(), 7);
+    }
+
+    #[test]
+    fn normalizes_domain_event_batch_with_one_insert_statement() {
+        let inputs = vec![
+            DomainEventInput {
+                user_id: Some("user-1"),
+                event_name: "mission_claim",
+                metadata: Some(json!({ "amount": 1 })),
+                source_type: Some("mission"),
+                source_id: Some(json!("daily-1")),
+                request_id: Some("request-1"),
+                created_at: 456,
+            },
+            DomainEventInput {
+                user_id: Some("user-2"),
+                event_name: "mission_claim",
+                metadata: None,
+                source_type: Some("mission"),
+                source_id: Some(json!("daily-2")),
+                request_id: Some("request-2"),
+                created_at: 457,
+            },
+        ];
+
+        let (sql, records) = normalize_domain_event_batch(FULL_TABLE, inputs)
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(
+            sql,
+            "INSERT INTO app_events (user_id, event_name, metadata_json, source_type, source_id_json, request_id, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)"
+        );
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.user_id.as_deref())
+                .collect::<Vec<_>>(),
+            vec![Some("user-1"), Some("user-2")]
+        );
+        assert_eq!(records[1].metadata, json!({}));
+
+        let params = domain_event_record_params(FULL_TABLE, &records[0]);
+        assert_eq!(params.len(), 7);
+        assert!(matches!(&params[0], Value::Text(value) if value == "user-1"));
+        assert!(matches!(&params[1], Value::Text(value) if value == "mission_claim"));
+        assert!(matches!(&params[2], Value::Text(value) if value == "{\"amount\":1}"));
+        assert!(matches!(&params[3], Value::Text(value) if value == "mission"));
+        assert!(matches!(&params[4], Value::Text(value) if value == "\"daily-1\""));
+        assert!(matches!(&params[5], Value::Text(value) if value == "request-1"));
+        assert!(matches!(params[6], Value::Integer(456)));
+    }
+
+    #[test]
+    fn empty_domain_event_batch_returns_without_validating_table() {
+        let result = normalize_domain_event_batch(
+            DomainEventTable {
+                table: "app_events;drop",
+                ..BASIC_TABLE
+            },
+            Vec::new(),
+        )
+        .unwrap();
+
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn invalid_domain_event_batch_table_fails_before_insert() {
+        let error = normalize_domain_event_batch(
+            DomainEventTable {
+                table: "app_events;drop",
+                ..BASIC_TABLE
+            },
+            vec![DomainEventInput::new("event", 123)],
+        )
+        .unwrap_err();
+
+        assert_eq!(error.code, "INTERNAL");
     }
 
     #[test]

@@ -135,6 +135,10 @@ helper exists in the checked-out package.
   After changing the shared functional ledger SQL templates, run
   `bun run trailbase:functional-ledgers:smoke` from the kit checkout to verify the templates apply
   together, keep their expected indexes, and do not create analytics database tables.
+- For low-volume app-owned domain history and operations events, use
+  `templates/trailbase/sql/domain_events.sql` and `trailbase_guest_common::domain_events`. Keep this
+  separate from the high-volume `analytics.events` mirror, and use the batch insert helper when one
+  WASM handler records several domain events in the same transaction.
 
 ## Deployment And mTLS Proxy
 

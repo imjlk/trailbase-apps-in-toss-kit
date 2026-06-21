@@ -114,9 +114,11 @@ reward records in their feature-owned tables. The older
 `analytics.analytics_events` template remains available only as a compatibility
 path for existing deployments.
 
-The optional `trailbase_guest_common::domain_events` helpers insert and list
-events against an app-owned table. Keep the schema in the consumer app, for
-example:
+The optional `trailbase_guest_common::domain_events` helpers insert, batch
+insert, and list low-volume events against an app-owned table. Keep this for
+product history, support diagnostics, and feature audits; use `analytics.events`
+instead for high-volume analytics mirrors. New apps can copy
+`templates/trailbase/sql/domain_events.sql` before customizing the schema:
 
 ```sql
 CREATE TABLE app_events (
@@ -136,7 +138,10 @@ CREATE INDEX idx_app_events_user_created
 
 Use stable names such as `mission_claim`, `furnace_save`, or
 `promotion_reward_requested`, and keep metadata structured so the same names can
-map cleanly to AppsInToss Analytics parameters when needed.
+map cleanly to AppsInToss Analytics parameters when needed. When writing several
+domain events from one handler, use `insert_domain_event_batch_tx` inside the
+same app-owned transaction so table validation and INSERT SQL construction are
+shared for that batch.
 
 ## Template Drift
 
