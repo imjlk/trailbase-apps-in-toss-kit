@@ -52,11 +52,13 @@
 - For anonymous `_user` bootstrap, prefer
   `trailbase_guest_common::trailbase_auth::ensure_verified_auth_user_tx` so existing synthetic email
   rows are loaded or verified without recomputing password hashes. New rows still get a
-  service-managed password hash on insert.
+  service-managed password hash on insert, and the missing-row path keeps first-bootstrap races
+  idempotent with an atomic upsert.
 - Support service-managed password rotation with a current and previous password secret, then rehash
   the `_user` password to the current secret after a successful previous-secret login. Keep that
   rotation in `login_anonymous_auth_user_with_password_rotation`; the ensure helper only creates or
-  loads the verified auth user.
+  loads the verified auth user. The compatibility `upsert_verified_auth_user_tx` API still refreshes
+  the password hash for callers that have not moved rotation to the login helper.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
 
 ## React Native Client Bootstrap And Helpers
