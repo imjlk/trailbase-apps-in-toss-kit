@@ -1,5 +1,11 @@
 # trailbase-guest-common
 
+## 0.8.1 — 2026-06-21
+
+### Patch changes
+
+- [3aef7a7](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/3aef7a7871f6617e7a88856a9cec9eb2671e76f3) Avoid redundant TrailBase auth password-hash work when ensuring existing anonymous auth users during bootstrap. — Thanks @imjlk!
+
 ## 0.8.0 — 2026-06-21
 
 ### Minor changes
