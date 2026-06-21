@@ -66,13 +66,13 @@ pub fn ensure_verified_auth_user_tx(
     tx: &mut Transaction,
     credentials: &AnonymousTrailbaseUserCredentials,
 ) -> ApiResult<TrailBaseAuthUser> {
-    if let Some(row) = load_auth_user_by_email_tx(tx, &credentials.email)? {
-        if row.verified {
-            return Ok(row.user);
+    match ensure_verified_auth_user_action(load_auth_user_by_email_tx(tx, &credentials.email)?) {
+        EnsureVerifiedAuthUserAction::ReturnExisting(user) => Ok(user),
+        EnsureVerifiedAuthUserAction::VerifyExisting => {
+            verify_existing_auth_user_tx(tx, &credentials.email)
         }
-        return verify_existing_auth_user_tx(tx, &credentials.email);
+        EnsureVerifiedAuthUserAction::Insert => insert_verified_auth_user_tx(tx, credentials),
     }
-    insert_verified_auth_user_tx(tx, credentials)
 }
 
 fn load_auth_user_by_email_tx(
@@ -101,16 +101,20 @@ fn insert_verified_auth_user_tx(
 ) -> ApiResult<TrailBaseAuthUser> {
     let (sql, params) = insert_verified_auth_user_statement(credentials);
     let rows = db::tx_query(tx, &sql, &params)?;
-    if let Some(row) = rows.first() {
-        return trailbase_auth_user_from_row(row);
+    if let Some(user) = inserted_auth_user_from_rows(&rows)? {
+        return Ok(user);
     }
     let Some(row) = load_auth_user_by_email_tx(tx, &credentials.email)? else {
         return Err(internal("Failed to insert TrailBase auth user"));
     };
-    if row.verified {
-        Ok(row.user)
-    } else {
-        verify_existing_auth_user_tx(tx, &credentials.email)
+    match ensure_verified_auth_user_action(Some(row)) {
+        EnsureVerifiedAuthUserAction::ReturnExisting(user) => Ok(user),
+        EnsureVerifiedAuthUserAction::VerifyExisting => {
+            verify_existing_auth_user_tx(tx, &credentials.email)
+        }
+        EnsureVerifiedAuthUserAction::Insert => {
+            Err(internal("Failed to insert TrailBase auth user"))
+        }
     }
 }
 
@@ -118,6 +122,29 @@ fn insert_verified_auth_user_tx(
 struct TrailBaseAuthUserRow {
     user: TrailBaseAuthUser,
     verified: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum EnsureVerifiedAuthUserAction {
+    ReturnExisting(TrailBaseAuthUser),
+    VerifyExisting,
+    Insert,
+}
+
+fn ensure_verified_auth_user_action(
+    row: Option<TrailBaseAuthUserRow>,
+) -> EnsureVerifiedAuthUserAction {
+    match row {
+        Some(row) if row.verified => EnsureVerifiedAuthUserAction::ReturnExisting(row.user),
+        Some(_) => EnsureVerifiedAuthUserAction::VerifyExisting,
+        None => EnsureVerifiedAuthUserAction::Insert,
+    }
+}
+
+fn inserted_auth_user_from_rows(rows: &[Vec<Value>]) -> ApiResult<Option<TrailBaseAuthUser>> {
+    rows.first()
+        .map(|row| trailbase_auth_user_from_row(row))
+        .transpose()
 }
 
 fn auth_user_lookup_statement(email: &str) -> (String, Vec<Value>) {
@@ -518,6 +545,61 @@ mod tests {
         assert_eq!(params.len(), 2);
         assert!(matches!(&params[0], Value::Text(value) if value == "anon@example.test"));
         assert!(matches!(&params[1], Value::Text(value) if value == "service-managed-password"));
+    }
+
+    #[test]
+    fn ensure_verified_auth_user_action_returns_verified_existing_user() {
+        let user = TrailBaseAuthUser {
+            id: vec![1, 2, 3],
+            email: "anon@example.test".to_string(),
+        };
+
+        assert_eq!(
+            ensure_verified_auth_user_action(Some(TrailBaseAuthUserRow {
+                user: user.clone(),
+                verified: true,
+            })),
+            EnsureVerifiedAuthUserAction::ReturnExisting(user)
+        );
+    }
+
+    #[test]
+    fn ensure_verified_auth_user_action_verifies_unverified_existing_user() {
+        assert_eq!(
+            ensure_verified_auth_user_action(Some(TrailBaseAuthUserRow {
+                user: TrailBaseAuthUser {
+                    id: vec![1, 2, 3],
+                    email: "anon@example.test".to_string(),
+                },
+                verified: false,
+            })),
+            EnsureVerifiedAuthUserAction::VerifyExisting
+        );
+    }
+
+    #[test]
+    fn ensure_verified_auth_user_action_inserts_missing_user() {
+        assert_eq!(
+            ensure_verified_auth_user_action(None),
+            EnsureVerifiedAuthUserAction::Insert
+        );
+    }
+
+    #[test]
+    fn insert_returning_rows_parse_insert_or_signal_conflict_fallback() {
+        let rows = vec![vec![
+            Value::Blob(vec![7, 8, 9]),
+            Value::Text("anon@example.test".to_string()),
+        ]];
+
+        assert_eq!(
+            inserted_auth_user_from_rows(&rows).unwrap(),
+            Some(TrailBaseAuthUser {
+                id: vec![7, 8, 9],
+                email: "anon@example.test".to_string(),
+            })
+        );
+        assert_eq!(inserted_auth_user_from_rows(&[]).unwrap(), None);
     }
 
     #[test]
