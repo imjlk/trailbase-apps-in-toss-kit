@@ -108,8 +108,10 @@ key, HMAC, 암호문, 토큰, secret을 저장하지 마세요.
 outbox, promotion grant, IAP grant, reward 기록은 각 기능이 소유하는 table에 둡니다. 기존
 `analytics.analytics_events` 템플릿은 이미 배포된 앱을 위한 호환 경로로만 유지합니다.
 
-선택적으로 `trailbase_guest_common::domain_events` helper를 사용하면 앱 소유 테이블에 이벤트를
-추가하고 조회할 수 있습니다. 스키마는 도입 앱에서 관리하며, 예시는 다음과 같습니다.
+선택적으로 `trailbase_guest_common::domain_events` helper를 사용하면 앱 소유 테이블에
+저용량 이벤트를 추가, batch 추가, 조회할 수 있습니다. 제품 내역, 고객 지원용 진단, 기능 감사에
+사용하고, 대량 분석 mirror는 `analytics.events`를 사용하세요. 새 앱은
+`templates/trailbase/sql/domain_events.sql`을 복사한 뒤 스키마를 앱에 맞게 조정할 수 있습니다.
 
 ```sql
 CREATE TABLE app_events (
@@ -129,7 +131,9 @@ CREATE INDEX idx_app_events_user_created
 
 이벤트 이름은 `mission_claim`, `furnace_save`, `promotion_reward_requested`처럼 안정적인
 값으로 두고, metadata는 구조화된 JSON으로 유지하세요. 그러면 필요할 때 AppsInToss Analytics
-파라미터와도 자연스럽게 맞출 수 있습니다.
+파라미터와도 자연스럽게 맞출 수 있습니다. 한 handler에서 여러 domain event를 기록할 때는 같은
+앱 소유 transaction 안에서 `insert_domain_event_batch_tx`를 사용해 table 검증과 INSERT SQL
+생성을 batch 단위로 공유하세요.
 
 ## 템플릿 차이
 
