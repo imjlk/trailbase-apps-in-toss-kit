@@ -375,43 +375,22 @@ pub fn claim_ready_message_outbox_tx(
     limit: i64,
     now: i64,
 ) -> ApiResult<Vec<MessageOutboxRecord>> {
-    let limit = normalize_message_outbox_claim_limit(limit)?;
-    let rows = db::tx_query(
-        tx,
-        "SELECT id
-         FROM message_outbox
-         WHERE status = 'READY'
-           AND not_before_at <= ?1
-         ORDER BY not_before_at ASC, created_at ASC
-         LIMIT ?2",
-        &[Value::Integer(now), Value::Integer(limit)],
-    )?;
+    let (select_sql, select_params) = message_outbox_claim_ready_ids_statement(limit, now)?;
+    let rows = db::tx_query(tx, &select_sql, &select_params)?;
     let ids = rows
         .iter()
         .map(|row| db::text(&row[0], "message_outbox_id"))
         .collect::<ApiResult<Vec<_>>>()?;
-    let mut claimed = Vec::with_capacity(ids.len());
-    for id in ids {
-        let rows = db::tx_query(
-            tx,
-            "UPDATE message_outbox
-             SET status = 'LOCKED',
-                 locked_at = ?2,
-                 attempts = attempts + 1,
-                 updated_at = ?2
-             WHERE id = ?1
-               AND status = 'READY'
-             RETURNING id, user_id, toss_user_key_hmac, toss_user_key_sealed, campaign_id,
-               purpose, template_code, payload_json, idempotency_key, status, provider,
-               provider_request_id, provider_status, attempts, not_before_at, locked_at,
-               created_at, updated_at",
-            &[Value::Text(id), Value::Integer(now)],
-        )?;
-        if let Some(row) = rows.first() {
-            claimed.push(message_outbox_record_from_row(row)?);
-        }
-    }
-    Ok(claimed)
+    let Some((update_sql, update_params)) = message_outbox_claim_selected_statement(&ids, now)?
+    else {
+        return Ok(Vec::new());
+    };
+    let rows = db::tx_query(tx, &update_sql, &update_params)?;
+    let records = rows
+        .iter()
+        .map(|row| message_outbox_record_from_row(row))
+        .collect::<ApiResult<Vec<_>>>()?;
+    Ok(order_claimed_message_outbox_records(&ids, records))
 }
 
 pub fn upsert_notification_template_agreement_tx(
@@ -625,6 +604,71 @@ fn message_outbox_enqueue_statement(
             Value::Integer(record.now),
         ],
     )
+}
+
+fn message_outbox_claim_ready_ids_statement(
+    limit: i64,
+    now: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    let limit = normalize_message_outbox_claim_limit(limit)?;
+    Ok((
+        "SELECT id
+         FROM message_outbox
+         WHERE status = 'READY'
+           AND not_before_at <= ?1
+         ORDER BY not_before_at ASC, created_at ASC
+         LIMIT ?2"
+            .to_string(),
+        vec![Value::Integer(now), Value::Integer(limit)],
+    ))
+}
+
+fn message_outbox_claim_selected_statement(
+    ids: &[String],
+    now: i64,
+) -> ApiResult<Option<(String, Vec<Value>)>> {
+    if ids.is_empty() {
+        return Ok(None);
+    }
+
+    let mut placeholders = Vec::with_capacity(ids.len());
+    let mut params = Vec::with_capacity(ids.len() + 1);
+    params.push(Value::Integer(now));
+    for (index, id) in ids.iter().enumerate() {
+        placeholders.push(format!("?{}", index + 2));
+        params.push(Value::Text(normalize_required_text(id, "messageOutboxId")?));
+    }
+
+    Ok(Some((
+        format!(
+            "UPDATE message_outbox
+             SET status = 'LOCKED',
+                 locked_at = ?1,
+                 attempts = attempts + 1,
+                 updated_at = ?1
+             WHERE id IN ({})
+               AND status = 'READY'
+             RETURNING id, user_id, toss_user_key_hmac, toss_user_key_sealed, campaign_id,
+               purpose, template_code, payload_json, idempotency_key, status, provider,
+               provider_request_id, provider_status, attempts, not_before_at, locked_at,
+               created_at, updated_at",
+            placeholders.join(", ")
+        ),
+        params,
+    )))
+}
+
+fn order_claimed_message_outbox_records(
+    ids: &[String],
+    mut records: Vec<MessageOutboxRecord>,
+) -> Vec<MessageOutboxRecord> {
+    let mut ordered = Vec::with_capacity(records.len());
+    for id in ids {
+        if let Some(position) = records.iter().position(|record| record.id == *id) {
+            ordered.push(records.remove(position));
+        }
+    }
+    ordered
 }
 
 fn normalize_message_outbox_claim_limit(limit: i64) -> ApiResult<i64> {
@@ -1300,5 +1344,84 @@ mod tests {
             MAX_MESSAGE_OUTBOX_CLAIM_LIMIT
         );
         assert!(normalize_message_outbox_claim_limit(0).is_err());
+    }
+
+    #[test]
+    fn builds_message_outbox_claim_ready_ids_statement() {
+        let (sql, params) = message_outbox_claim_ready_ids_statement(2, 100).unwrap();
+
+        assert!(sql.contains("WHERE status = 'READY'"));
+        assert!(sql.contains("not_before_at <= ?1"));
+        assert!(sql.contains("ORDER BY not_before_at ASC, created_at ASC"));
+        assert!(sql.contains("LIMIT ?2"));
+        assert_eq!(params.len(), 2);
+        assert!(matches!(params[0], Value::Integer(100)));
+        assert!(matches!(params[1], Value::Integer(2)));
+    }
+
+    #[test]
+    fn builds_message_outbox_batch_claim_statement() {
+        let ids = vec!["outbox-1".to_string(), "outbox-2".to_string()];
+        let (sql, params) = message_outbox_claim_selected_statement(&ids, 120)
+            .unwrap()
+            .unwrap();
+
+        assert!(sql.contains("UPDATE message_outbox"));
+        assert!(sql.contains("SET status = 'LOCKED'"));
+        assert!(sql.contains("attempts = attempts + 1"));
+        assert!(sql.contains("WHERE id IN (?2, ?3)"));
+        assert!(sql.contains("AND status = 'READY'"));
+        assert!(sql.contains("RETURNING id, user_id"));
+        assert_eq!(params.len(), 3);
+        assert!(matches!(params[0], Value::Integer(120)));
+        assert!(matches!(&params[1], Value::Text(value) if value == "outbox-1"));
+        assert!(matches!(&params[2], Value::Text(value) if value == "outbox-2"));
+        assert!(
+            message_outbox_claim_selected_statement(&[], 120)
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn orders_batch_claim_records_by_selected_ids() {
+        fn record(id: &str) -> MessageOutboxRecord {
+            MessageOutboxRecord {
+                id: id.to_string(),
+                user_id: vec![1, 2, 3],
+                toss_user_key_hmac: "hmac".to_string(),
+                toss_user_key_sealed: None,
+                campaign_id: None,
+                purpose: MessagePurpose::Functional,
+                template_code: "template".to_string(),
+                payload_json: "{}".to_string(),
+                idempotency_key: format!("{id}-idem"),
+                status: "LOCKED".to_string(),
+                provider: APPS_IN_TOSS_SMART_MESSAGE_PROVIDER.to_string(),
+                provider_request_id: format!("{id}-request"),
+                provider_status: None,
+                attempts: 1,
+                not_before_at: 10,
+                locked_at: Some(120),
+                created_at: 1,
+                updated_at: 120,
+            }
+        }
+
+        let ids = vec![
+            "outbox-1".to_string(),
+            "outbox-2".to_string(),
+            "outbox-3".to_string(),
+        ];
+        let records = vec![record("outbox-3"), record("outbox-1")];
+        let ordered = order_claimed_message_outbox_records(&ids, records);
+
+        assert_eq!(
+            ordered
+                .iter()
+                .map(|record| record.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["outbox-1", "outbox-3"]
+        );
     }
 }
