@@ -136,3 +136,8 @@ CREATE INDEX idx_app_events_user_created
 하위 모듈(submodule)을 업데이트해도 `templates/trailbase`에서 복사해 간 파일은 자동으로
 업데이트되지 않습니다. 앱은 로컬 SQL, Compose, 환경 변수, 스모크 테스트 파일을 kit 템플릿과
 주기적으로 비교한 뒤, 해당 앱에 필요한 변경만 선택해야 합니다.
+
+앱 소유 기능성 원장 템플릿을 바꾼 뒤에는 kit checkout에서
+`bun run trailbase:functional-ledgers:smoke`를 실행하세요. 이 smoke는 message, 알림동의,
+promotion, IAP 원장 템플릿을 in-memory SQLite database에 적용하고, 핵심 index와 샘플 row를
+검증하며, 기능성 테이블이 analytics database가 아니라 앱 database에 남아 있는지 확인합니다.

@@ -144,3 +144,10 @@ Submodule updates do not update files that were copied out of
 `templates/trailbase`. Consumers should periodically compare their local SQL,
 Compose, env, and smoke-check files against kit templates and then decide which
 changes are appropriate for that app.
+
+For app-owned functional ledgers, run
+`bun run trailbase:functional-ledgers:smoke` in the kit checkout after changing
+the shared SQL templates. The smoke applies the message, notification agreement,
+promotion, and IAP ledger templates to an in-memory SQLite database, verifies the
+expected indexes, and confirms those functional tables stay in the app database
+rather than an analytics database.
