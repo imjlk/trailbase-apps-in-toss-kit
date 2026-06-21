@@ -59,22 +59,113 @@ pub fn upsert_verified_auth_user_tx(
     tx: &mut Transaction,
     credentials: &AnonymousTrailbaseUserCredentials,
 ) -> ApiResult<TrailBaseAuthUser> {
-    let rows = db::tx_query(
-        tx,
+    ensure_verified_auth_user_tx(tx, credentials)
+}
+
+pub fn ensure_verified_auth_user_tx(
+    tx: &mut Transaction,
+    credentials: &AnonymousTrailbaseUserCredentials,
+) -> ApiResult<TrailBaseAuthUser> {
+    if let Some(row) = load_auth_user_by_email_tx(tx, &credentials.email)? {
+        if row.verified {
+            return Ok(row.user);
+        }
+        return verify_existing_auth_user_tx(tx, &credentials.email);
+    }
+    insert_verified_auth_user_tx(tx, credentials)
+}
+
+fn load_auth_user_by_email_tx(
+    tx: &mut Transaction,
+    email: &str,
+) -> ApiResult<Option<TrailBaseAuthUserRow>> {
+    let (sql, params) = auth_user_lookup_statement(email);
+    let rows = db::tx_query(tx, &sql, &params)?;
+    rows.first()
+        .map(|row| trailbase_auth_user_row_from_row(row))
+        .transpose()
+}
+
+fn verify_existing_auth_user_tx(tx: &mut Transaction, email: &str) -> ApiResult<TrailBaseAuthUser> {
+    let (sql, params) = verify_existing_auth_user_statement(email);
+    let rows = db::tx_query(tx, &sql, &params)?;
+    let row = rows
+        .first()
+        .ok_or_else(|| internal("Failed to verify TrailBase auth user"))?;
+    trailbase_auth_user_from_row(row)
+}
+
+fn insert_verified_auth_user_tx(
+    tx: &mut Transaction,
+    credentials: &AnonymousTrailbaseUserCredentials,
+) -> ApiResult<TrailBaseAuthUser> {
+    let (sql, params) = insert_verified_auth_user_statement(credentials);
+    let rows = db::tx_query(tx, &sql, &params)?;
+    if let Some(row) = rows.first() {
+        return trailbase_auth_user_from_row(row);
+    }
+    let Some(row) = load_auth_user_by_email_tx(tx, &credentials.email)? else {
+        return Err(internal("Failed to insert TrailBase auth user"));
+    };
+    if row.verified {
+        Ok(row.user)
+    } else {
+        verify_existing_auth_user_tx(tx, &credentials.email)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TrailBaseAuthUserRow {
+    user: TrailBaseAuthUser,
+    verified: bool,
+}
+
+fn auth_user_lookup_statement(email: &str) -> (String, Vec<Value>) {
+    (
+        "SELECT id, email, verified
+         FROM _user
+         WHERE email = ?1
+         LIMIT 1"
+            .to_string(),
+        vec![Value::Text(email.to_string())],
+    )
+}
+
+fn verify_existing_auth_user_statement(email: &str) -> (String, Vec<Value>) {
+    (
+        "UPDATE _user
+         SET verified = 1
+         WHERE email = ?1
+         RETURNING id, email"
+            .to_string(),
+        vec![Value::Text(email.to_string())],
+    )
+}
+
+fn insert_verified_auth_user_statement(
+    credentials: &AnonymousTrailbaseUserCredentials,
+) -> (String, Vec<Value>) {
+    (
         "INSERT INTO _user (email, password_hash, verified)
          VALUES (?1, hash_password(?2), 1)
-         ON CONFLICT(email) DO UPDATE SET
-           password_hash = excluded.password_hash,
-           verified = 1
-         RETURNING id, email",
-        &[
+         ON CONFLICT(email) DO NOTHING
+         RETURNING id, email"
+            .to_string(),
+        vec![
             Value::Text(credentials.email.clone()),
             Value::Text(credentials.password.clone()),
         ],
-    )?;
-    let row = rows
-        .first()
-        .ok_or_else(|| internal("Failed to upsert TrailBase auth user"))?;
+    )
+}
+
+fn trailbase_auth_user_row_from_row(row: &[Value]) -> ApiResult<TrailBaseAuthUserRow> {
+    Ok(TrailBaseAuthUserRow {
+        user: trailbase_auth_user_from_row(row)?,
+        verified: db::integer(&row[2], "trailbase_user_verified")? == 1,
+    })
+}
+
+fn trailbase_auth_user_from_row(row: &[Value]) -> ApiResult<TrailBaseAuthUser> {
     Ok(TrailBaseAuthUser {
         id: db::blob(&row[0], "trailbase_user_id")?,
         email: db::text(&row[1], "trailbase_user_email")?,
@@ -383,6 +474,84 @@ mod tests {
     #[test]
     fn exposes_current_trailbase_auth_login_path() {
         assert_eq!(TRAILBASE_AUTH_LOGIN_PATH, "/api/auth/v1/login");
+    }
+
+    #[test]
+    fn auth_user_lookup_statement_does_not_hash_password() {
+        let (sql, params) = auth_user_lookup_statement("anon@example.test");
+        let lowered = sql.to_ascii_lowercase();
+
+        assert!(lowered.contains("select id, email, verified"));
+        assert!(!lowered.contains("hash_password"));
+        assert!(!lowered.contains("password_hash"));
+        assert_eq!(params.len(), 1);
+        assert!(matches!(&params[0], Value::Text(value) if value == "anon@example.test"));
+    }
+
+    #[test]
+    fn verify_existing_auth_user_statement_only_updates_verified_flag() {
+        let (sql, params) = verify_existing_auth_user_statement("anon@example.test");
+        let lowered = sql.to_ascii_lowercase();
+
+        assert!(lowered.contains("update _user"));
+        assert!(lowered.contains("set verified = 1"));
+        assert!(lowered.contains("returning id, email"));
+        assert!(!lowered.contains("hash_password"));
+        assert!(!lowered.contains("password_hash"));
+        assert_eq!(params.len(), 1);
+        assert!(matches!(&params[0], Value::Text(value) if value == "anon@example.test"));
+    }
+
+    #[test]
+    fn insert_verified_auth_user_statement_hashes_only_on_insert_path() {
+        let credentials = AnonymousTrailbaseUserCredentials {
+            email: "anon@example.test".to_string(),
+            password: "service-managed-password".to_string(),
+        };
+        let (sql, params) = insert_verified_auth_user_statement(&credentials);
+        let lowered = sql.to_ascii_lowercase();
+
+        assert!(lowered.contains("insert into _user"));
+        assert!(lowered.contains("password_hash"));
+        assert!(lowered.contains("hash_password(?2)"));
+        assert!(lowered.contains("returning id, email"));
+        assert_eq!(params.len(), 2);
+        assert!(matches!(&params[0], Value::Text(value) if value == "anon@example.test"));
+        assert!(matches!(&params[1], Value::Text(value) if value == "service-managed-password"));
+    }
+
+    #[test]
+    fn parses_trailbase_auth_user_rows_with_verified_state() {
+        let verified_row = vec![
+            Value::Blob(vec![1, 2, 3]),
+            Value::Text("anon@example.test".to_string()),
+            Value::Integer(1),
+        ];
+        let unverified_row = vec![
+            Value::Blob(vec![4, 5, 6]),
+            Value::Text("other@example.test".to_string()),
+            Value::Integer(0),
+        ];
+
+        let verified = trailbase_auth_user_row_from_row(&verified_row).unwrap();
+        assert!(verified.verified);
+        assert_eq!(
+            verified.user,
+            TrailBaseAuthUser {
+                id: vec![1, 2, 3],
+                email: "anon@example.test".to_string(),
+            }
+        );
+
+        let unverified = trailbase_auth_user_row_from_row(&unverified_row).unwrap();
+        assert!(!unverified.verified);
+        assert_eq!(
+            unverified.user,
+            TrailBaseAuthUser {
+                id: vec![4, 5, 6],
+                email: "other@example.test".to_string(),
+            }
+        );
     }
 
     #[test]
