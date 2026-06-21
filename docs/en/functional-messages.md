@@ -45,6 +45,10 @@ Copy the templates into the app migration set before editing:
 - `templates/trailbase/sql/notification_template_agreements.sql`
 - `templates/trailbase/sql/message_outbox.core.sql`
 
+After changing these shared templates, run
+`bun run trailbase:functional-ledgers:smoke` from the kit checkout to validate
+the message, notification agreement, promotion, and IAP ledger schema together.
+
 Existing apps with their own `message_outbox` should add the provider response
 summary columns with a forward migration instead of replacing the table.
 Existing `message_templates` tables can add nullable `agreement_template_code`

@@ -41,6 +41,10 @@ kit는 헬퍼와 SQL 템플릿을 제공하지만, 실제 마이그레이션, �
 - `templates/trailbase/sql/notification_template_agreements.sql`
 - `templates/trailbase/sql/message_outbox.core.sql`
 
+이 공유 템플릿을 바꾼 뒤에는 kit checkout에서
+`bun run trailbase:functional-ledgers:smoke`를 실행해 message, 알림동의, promotion, IAP 원장
+스키마를 함께 검증하세요.
+
 이미 자체 `message_outbox`가 있는 앱은 테이블을 교체하지 말고 forward migration으로 provider
 응답 요약 컬럼만 추가하세요.
 이미 자체 `message_templates`가 있는 앱은 nullable `agreement_template_code`를 forward

@@ -132,6 +132,9 @@ helper exists in the checked-out package.
     idempotent local grant marking.
   Keep these tables in the app/product database by default, not the `analytics` database. Eligibility,
   product grant rules, inventory/balance updates, cooldowns, and public projections stay app-owned.
+  After changing the shared functional ledger SQL templates, run
+  `bun run trailbase:functional-ledgers:smoke` from the kit checkout to verify the templates apply
+  together, keep their expected indexes, and do not create analytics database tables.
 
 ## Deployment And mTLS Proxy
 
