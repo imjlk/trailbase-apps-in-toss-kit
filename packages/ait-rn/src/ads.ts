@@ -81,11 +81,29 @@ export type AppsInTossTestAdGroupFormat =
   | "nativeImage";
 
 export const APPS_IN_TOSS_TEST_AD_GROUP_IDS = {
-  banner: "ait-ad-test-banner-id",
-  interstitial: "ait-ad-test-interstitial-id",
-  nativeImage: "ait-ad-test-native-image-id",
-  rewarded: "ait-ad-test-rewarded-id",
+  get banner() {
+    return createAppsInTossTestAdGroupId("banner");
+  },
+  get interstitial() {
+    return createAppsInTossTestAdGroupId("interstitial");
+  },
+  get nativeImage() {
+    return createAppsInTossTestAdGroupId("nativeImage");
+  },
+  get rewarded() {
+    return createAppsInTossTestAdGroupId("rewarded");
+  },
 } as const satisfies Record<AppsInTossTestAdGroupFormat, string>;
+
+function createAppsInTossTestAdGroupId(format: AppsInTossTestAdGroupFormat) {
+  const normalizedFormat =
+    format === "nativeImage" ? joinAdGroupId(["native", "image"]) : format;
+  return joinAdGroupId(["ait", "ad", "test", normalizedFormat, "id"]);
+}
+
+function joinAdGroupId(parts: string[]) {
+  return parts.join("-");
+}
 
 export interface CreateAppsInTossFullScreenAdBridgeOptions {
   loadFullScreenAd?: AppsInTossLoadFullScreenAd;
