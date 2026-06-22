@@ -10,7 +10,8 @@
     "./apps-in-toss": "./src/apps-in-toss.ts",
     "./storage": "./src/storage.ts",
     "./tanstack-db": "./src/tanstack-db.ts",
-    "./tanstack-query": "./src/tanstack-query.ts"
+    "./tanstack-query": "./src/tanstack-query.ts",
+    "./package.json": "./package.json"
   },
   "dependencies": {
     "@tanstack/react-db": "0.1.85"
