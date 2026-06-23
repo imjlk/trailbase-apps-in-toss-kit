@@ -54,7 +54,7 @@ only after app-level smoke tests.
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.9.1`
+- `apps-in-toss-framework`: `2.9.2`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
@@ -70,7 +70,26 @@ only after app-level smoke tests.
   tracking snapshot, so new apps should not use it as the active reference.
 
 If you edit these Renovate marker blocks or `renovate.json`, validate the
-configuration with `bun run renovate:validate`.
+configuration with `bun run renovate:validate`. After an upstream snapshot PR
+detects an SDK package change, review the release notes and update the root
+reference dependency, lockfile, and these markers in the same follow-up PR. The
+snapshot script is intentionally detection-only; use
+`bun run apps-in-toss:tracking:check` to verify that the snapshot, root
+`package.json`, and English/Korean tracking markers agree.
+
+## Latest Reviewed SDK Delta
+
+The repository reference has been reviewed through `@apps-in-toss/framework`
+`2.9.2`.
+
+- `2.8.0`: Added non-game navigation bar theme settings.
+- `2.9.0`: Added the `ait deploy --timeout` option for app bundle deployment.
+- `2.9.2`: Game apps now show an exit confirmation modal when the Toss app
+  navigation bar X button is pressed. Non-game apps still exit directly.
+
+No shared kit API change is required for these SDK deltas. Consumer apps should
+still run app-level smoke tests before raising their own supported Apps in Toss
+SDK/runtime policy.
 
 ## Doc Watch Outputs
 
