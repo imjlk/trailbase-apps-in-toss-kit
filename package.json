@@ -18,6 +18,7 @@
     "trailbase:version-policy:check": "node scripts/check-trailbase-version-policy.mjs",
     "trailbase:functional-ledgers:smoke": "bun scripts/smoke-trailbase-functional-ledgers.mjs",
     "apps-in-toss:snapshot": "node scripts/snapshot-apps-in-toss-docs.mjs",
+    "apps-in-toss:tracking:check": "node scripts/check-apps-in-toss-tracking.mjs",
     "sampo:release-notes:draft": "node scripts/draft-sampo-release-notes.mjs",
     "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
     "skills:sync:copy": "bun scripts/sync-agent-skills.mjs --target codex --all --mode copy",
@@ -29,6 +30,6 @@
     "skills:validate": "bun scripts/validate-agent-skills.mjs"
   },
   "devDependencies": {
-    "@apps-in-toss/framework": "2.9.1"
+    "@apps-in-toss/framework": "2.9.2"
   }
 }

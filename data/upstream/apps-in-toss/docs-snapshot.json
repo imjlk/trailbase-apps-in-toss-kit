@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-19T02:09:08.094Z",
+  "fetchedAt": "2026-06-23T01:52:15.847Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,8 +12,8 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "93c7bdc2512ba4b35d88dbea596658bb130b12e722629ebbb30d16ee1ea8314b",
-      "bytes": 40797
+      "sha256": "794706ae794bc5c830d3622c5978583d405c92c9c3dc22993a378e90e5c3bdc1",
+      "bytes": 40872
     },
     {
       "key": "react-native-tutorial",
@@ -96,7 +96,7 @@
   "packages": [
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.9.1",
+      "version": "2.9.2",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
