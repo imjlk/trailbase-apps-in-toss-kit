@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   AnalyticsSinkRequestError,
+  DEFAULT_ANALYTICS_FLUSH_INTERVAL_MS,
   configureAnalyticsRouterFromBootstrap,
   createAnalyticsRouter,
   createBufferedAnalyticsSink,
@@ -11,6 +12,10 @@ import {
 } from "../src/analytics";
 
 describe("analytics router", () => {
+  test("uses a 30 second default buffered flush interval", () => {
+    expect(DEFAULT_ANALYTICS_FLUSH_INTERVAL_MS).toBe(30_000);
+  });
+
   test("defaults to disabled sinks", async () => {
     const router = createAnalyticsRouter<"screen_view">();
 

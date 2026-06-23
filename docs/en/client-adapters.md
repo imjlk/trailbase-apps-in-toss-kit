@@ -96,10 +96,9 @@ Only enqueue or request the functional message when the synced agreement is
 
 The functional message client only calls app-owned backend endpoints. It must
 not call Toss Smart Message APIs, the mTLS proxy, or certificate-backed services
-directly from React Native. The older
-`@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss`
-`requestAppsInTossNotificationAgreement` helper is kept for compatibility but
-is deprecated for new React Native code.
+directly from React Native. Use
+`@trailbase-apps-in-toss-kit/ait-rn/notifications` for notification agreement
+normalization and functional message backend clients.
 
 ## Apps in Toss Promotion Claims
 

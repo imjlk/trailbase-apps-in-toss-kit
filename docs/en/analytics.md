@@ -153,9 +153,11 @@ bun scripts/smoke-trailbase-analytics-multidb.mjs
 Set `TRAILBASE_IMAGE=trailbase/trailbase:<version>` to test another image, or
 `KEEP_TRAILBASE_SMOKE_DIR=1` to inspect the temporary `traildepot`.
 
-Use `@trailbase-apps-in-toss-kit/ait-rn/analytics` when wiring the official AppsInToss `Analytics`
-SDK. The lower-level `trailbase-client/analytics` APIs remain framework-neutral primitives for routers,
-buffered sinks, sanitizers, and backend batch posting.
+Use `@trailbase-apps-in-toss-kit/ait-rn/analytics` for the shared client-side
+analytics router, buffered sink, sanitizer, backend batch posting client, and
+official AppsInToss `Analytics` SDK bridge.
+Consumers that imported analytics helpers from `trailbase-client` should move
+those imports to the `ait-rn/analytics` subpath.
 
 AppsInToss Analytics is the official console metric source. The TrailBase mirror is for app-internal
 analysis and early operations support when teams need lower-latency or richer debugging data.

@@ -158,9 +158,11 @@ bun scripts/smoke-trailbase-analytics-multidb.mjs
 다른 image를 확인하려면 `TRAILBASE_IMAGE=trailbase/trailbase:<version>`을 지정하고, 임시
 `traildepot`을 확인하려면 `KEEP_TRAILBASE_SMOKE_DIR=1`을 지정하세요.
 
-공식 AppsInToss `Analytics` SDK를 연결할 때는 `@trailbase-apps-in-toss-kit/ait-rn/analytics`를
-사용하세요. 하위 `trailbase-client/analytics` API는 router, buffered sink, sanitizer, backend
-batch posting을 위한 framework-neutral primitive로 남겨둡니다.
+공유 client-side analytics router, buffered sink, sanitizer, backend batch posting client,
+공식 AppsInToss `Analytics` SDK bridge는 `@trailbase-apps-in-toss-kit/ait-rn/analytics`를
+사용하세요.
+기존에 `trailbase-client`에서 analytics helper를 import하던 consumer는
+`ait-rn/analytics` subpath로 옮기세요.
 
 AppsInToss Analytics는 공식 콘솔 지표의 기준입니다. TrailBase mirror는 더 빠른 확인이나 더 풍부한
 디버깅 데이터가 필요한 앱 내부 분석/초기 운영 보조 용도입니다.
