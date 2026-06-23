@@ -91,10 +91,9 @@ SDK bridge가 없으면 fail-closed로 실패합니다. `templateCode`는 SDK에
 `OPTED_OUT` 결과는 저장하되 발송하지 않는 것이 맞습니다.
 
 기능성 메시지 client는 앱이 소유한 백엔드 endpoint만 호출합니다. React Native에서 Toss Smart
-Message API, mTLS proxy, 인증서 기반 서비스를 직접 호출하지 마세요. 기존
-`@trailbase-apps-in-toss-kit/trailbase-client/apps-in-toss`의
-`requestAppsInTossNotificationAgreement` helper는 호환을 위해 남아 있지만, 새 React Native
-코드에서는 deprecated입니다.
+Message API, mTLS proxy, 인증서 기반 서비스를 직접 호출하지 마세요. 알림동의 결과 정규화와
+기능성 메시지 백엔드 client는 `@trailbase-apps-in-toss-kit/ait-rn/notifications`를
+사용하세요.
 
 ## Apps in Toss 프로모션 claim
 

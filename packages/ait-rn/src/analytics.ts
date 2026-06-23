@@ -7,7 +7,7 @@ import {
   type AppsInTossAnalyticsModule as TrailBaseAppsInTossAnalyticsModule,
   type ConfigureAnalyticsRouterFromBootstrapOptions,
   type NormalizedAnalyticsBootstrapPolicy,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+} from "./internal/analytics-core";
 import type { AppsInTossAnalytics } from "./internal/framework";
 
 export {
@@ -17,12 +17,13 @@ export {
   DEFAULT_ANALYTICS_MAX_PAYLOAD_BYTES,
   DEFAULT_ANALYTICS_MAX_QUEUE_SIZE,
   DEFAULT_ANALYTICS_SAMPLE_RATE,
+  configureAnalyticsRouterFromBootstrap,
   createAnalyticsRouter,
   createBufferedAnalyticsSink,
   createTrailBaseAnalyticsEventClient,
   normalizeAnalyticsBootstrapPolicy,
   sanitizeAnalyticsPayload,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+} from "./internal/analytics-core";
 
 export type {
   AnalyticsBootstrapPolicy,
@@ -50,7 +51,7 @@ export type {
   TrailBaseAnalyticsBootstrapPolicy,
   TrailBaseAnalyticsEventClient,
   TrailBaseAnalyticsEventClientOptions,
-} from "@trailbase-apps-in-toss-kit/trailbase-client/analytics";
+} from "./internal/analytics-core";
 export type { AppsInTossAnalytics } from "./internal/framework";
 
 export type AppsInTossAnalyticsModule =

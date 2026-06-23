@@ -83,8 +83,8 @@ surfaces include:
   dev/test fallbacks.
 - `requestAppsInTossLogin` and `normalizeAppsInTossLoginResult` for Toss Login result normalization
   and user-facing SDK error messages.
-- `requestAppsInTossNotificationAgreement` for functional Smart Message agreement result
-  normalization.
+- `@trailbase-apps-in-toss-kit/ait-rn/notifications` for functional Smart Message agreement result
+  normalization and functional message backend clients.
 - `@trailbase-apps-in-toss-kit/ait-rn` helpers such as `createAppsInTossIdentityStorage`,
   `createAppsInTossSessionStorage`, `createAppsInTossLoginBridge`,
   `ensureAppsInTossHapticFallback`, `createPersistentJsonAtom`,
