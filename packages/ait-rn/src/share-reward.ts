@@ -391,7 +391,11 @@ function totalRewardAmountForSingleUnit(
   if (rewards.length === 0) {
     return undefined;
   }
-  const rewardUnit = rewards[0].rewardUnit;
+  const firstReward = rewards[0];
+  if (!firstReward) {
+    return undefined;
+  }
+  const rewardUnit = firstReward.rewardUnit;
   if (!rewards.every((reward) => reward.rewardUnit === rewardUnit)) {
     return undefined;
   }
