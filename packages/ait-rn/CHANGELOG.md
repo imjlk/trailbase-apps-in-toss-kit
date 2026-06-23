@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.3.2 — 2026-06-23
+
+### Patch changes
+
+- [409294a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/409294a5a3accb8c60966e5f9560ff07941840d8) Remove the `trailbase-client/analytics` public surface and keep the shared analytics router, buffered sink, sanitizer, backend batch client, and AppsInToss SDK bridge under `ait-rn/analytics`. The deprecated notification agreement helper has also been removed from `trailbase-client/apps-in-toss`; React Native consumers should use `ait-rn/notifications`. — Thanks @imjlk!
+- [4d4f631](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/4d4f6318e34e95013ba59dd20e9db9337bcb8e74) Expose package metadata for consumer build tools and avoid shipping literal AppsInToss test ad group IDs in production bundles. — Thanks @imjlk!
+- [487edd0](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/487edd0a78a4b5c10de869367201d84af5441213) Increase the default buffered analytics flush interval to 30 seconds so consumers send fewer sparse detail analytics batches by default. — Thanks @imjlk!
+- Updated dependencies: trailbase-client (npm)@1.0.0
+
 ## 0.3.1 — 2026-06-20
 
 ### Patch changes
