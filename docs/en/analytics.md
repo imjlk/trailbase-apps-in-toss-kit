@@ -44,7 +44,7 @@ hard-coded client decision. Missing or invalid policy values normalize to disabl
     "sampleRate": 1,
     "maxBatchSize": 20,
     "maxQueueSize": 200,
-    "flushIntervalMs": 5000,
+    "flushIntervalMs": 30000,
     "maxPayloadBytes": 4096,
     "allowedEvents": ["screen_view", "answer_submit_tapped"]
   },
