@@ -2,6 +2,7 @@ import { createConfig, createProxyServer } from "./core.mjs";
 
 const MIN_SHUTDOWN_TIMEOUT_MS = 2_000;
 const SHUTDOWN_TIMEOUT_BUFFER_MS = 1_000;
+const MAX_NON_IAP_SEQUENTIAL_UPSTREAM_CALLS = 3;
 
 const startedAt = performance.now();
 const config = createConfig();
@@ -55,6 +56,8 @@ function shutdownTimeoutMs(config) {
   const upstreamTimeoutMs = Number(config.upstreamTimeoutMs);
   const retryDelayMs = Number(config.iapOrderStatusRetryDelayMs);
   const maxAttempts = Number(config.iapOrderStatusMaxAttempts);
+  const sequentialUpstreamCalls = Math.max(MAX_NON_IAP_SEQUENTIAL_UPSTREAM_CALLS, maxAttempts);
+  const upstreamWindowMs = sequentialUpstreamCalls * Math.max(0, upstreamTimeoutMs);
   const retryWindowMs = Math.max(0, maxAttempts - 1) * Math.max(0, retryDelayMs);
-  return Math.max(MIN_SHUTDOWN_TIMEOUT_MS, upstreamTimeoutMs + retryWindowMs + SHUTDOWN_TIMEOUT_BUFFER_MS);
+  return Math.max(MIN_SHUTDOWN_TIMEOUT_MS, upstreamWindowMs + retryWindowMs + SHUTDOWN_TIMEOUT_BUFFER_MS);
 }
