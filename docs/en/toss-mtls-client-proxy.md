@@ -27,8 +27,11 @@ bearer token.
 
 The proxy handles `SIGTERM` and `SIGINT` by closing its HTTP server and exiting cleanly. The reusable
 Compose template sets `init: true` so signals are forwarded predictably when the container runs as an
-internal service. Do not lower production `stop_grace_period` solely for faster local feedback until
-you have measured in-flight request behavior for your deployment.
+internal service, and `stop_grace_period: 100s` so Docker does not kill valid in-flight Toss requests
+under the proxy's default upstream timeout and IAP retry settings. If you raise
+`MTLS_PROXY_UPSTREAM_TIMEOUT_MS` or `MTLS_PROXY_IAP_ORDER_STATUS_MAX_ATTEMPTS`, raise
+`stop_grace_period` with that shutdown budget. Do not lower production `stop_grace_period` solely for
+faster local feedback until you have measured in-flight request behavior for your deployment.
 
 For Docker Compose or Coolify, copy
 [`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml)

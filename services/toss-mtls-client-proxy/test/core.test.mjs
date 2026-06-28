@@ -47,8 +47,9 @@ describe("toss-mtls-client-proxy", () => {
       await waitFor(() => stdout.includes("\"event\":\"toss-mtls-client-proxy.ready\"") || child.exitCode !== null);
       expect(child.exitCode).toBe(null);
 
+      const exit = once(child, "exit");
       child.kill("SIGTERM");
-      const [code, signal] = await once(child, "exit");
+      const [code, signal] = await exit;
 
       expect(code).toBe(0);
       expect(signal).toBe(null);

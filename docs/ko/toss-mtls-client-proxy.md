@@ -26,9 +26,12 @@
 애플리케이션 컨테이너는 내부 URL과 Bearer 토큰만 받습니다.
 
 프록시는 `SIGTERM`과 `SIGINT`를 받으면 HTTP 서버를 닫고 정상 종료합니다. 재사용 Compose
-템플릿은 내부 서비스로 실행될 때 signal forwarding이 예측 가능하도록 `init: true`를 설정합니다.
-운영 환경의 진행 중 요청 동작을 측정하기 전에는 로컬 피드백 속도만을 이유로 production
-`stop_grace_period`를 줄이지 마세요.
+템플릿은 내부 서비스로 실행될 때 signal forwarding이 예측 가능하도록 `init: true`를 설정하고,
+프록시의 기본 upstream timeout 및 IAP retry 설정에서 진행 중인 Toss 요청이 Docker에 의해
+강제 종료되지 않도록 `stop_grace_period: 100s`를 설정합니다.
+`MTLS_PROXY_UPSTREAM_TIMEOUT_MS` 또는 `MTLS_PROXY_IAP_ORDER_STATUS_MAX_ATTEMPTS`를 늘린다면
+그 shutdown budget에 맞게 `stop_grace_period`도 늘리세요. 운영 환경의 진행 중 요청 동작을
+측정하기 전에는 로컬 피드백 속도만을 이유로 production `stop_grace_period`를 줄이지 마세요.
 
 Docker Compose 또는 Coolify에서는
 [`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml)을
