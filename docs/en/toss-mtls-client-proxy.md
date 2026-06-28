@@ -25,6 +25,11 @@ The most important boundary is certificate ownership: only the proxy container
 mounts certificate files. Application containers receive an internal URL and a
 bearer token.
 
+The proxy handles `SIGTERM` and `SIGINT` by closing its HTTP server and exiting cleanly. The reusable
+Compose template sets `init: true` so signals are forwarded predictably when the container runs as an
+internal service. Do not lower production `stop_grace_period` solely for faster local feedback until
+you have measured in-flight request behavior for your deployment.
+
 For Docker Compose or Coolify, copy
 [`templates/trailbase/compose/toss-mtls-client-proxy.yml`](../../templates/trailbase/compose/toss-mtls-client-proxy.yml)
 and read [coolify.md](coolify.md). The template exposes port `8787` only on the Compose network, so

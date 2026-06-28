@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test";
+import { spawn } from "node:child_process";
+import { once } from "node:events";
 import http from "node:http";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
+import { fileURLToPath } from "node:url";
 import {
   PROXY_ENDPOINTS,
   SMART_MESSAGE_BULK_MAX_CONTEXTS,
@@ -13,7 +16,51 @@ import {
   handleRequest,
 } from "../src/core.mjs";
 
+const serviceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
 describe("toss-mtls-client-proxy", () => {
+  test("server process exits cleanly on SIGTERM", async () => {
+    const port = await findFreePort();
+    const child = spawn(process.execPath, ["src/server.mjs"], {
+      cwd: serviceRoot,
+      env: {
+        ...process.env,
+        PORT: String(port),
+        MTLS_PROXY_MODE: "stub",
+        MTLS_PROXY_TOKEN: "",
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+
+    try {
+      await waitFor(() => stdout.includes("\"event\":\"toss-mtls-client-proxy.ready\"") || child.exitCode !== null);
+      expect(child.exitCode).toBe(null);
+
+      child.kill("SIGTERM");
+      const [code, signal] = await once(child, "exit");
+
+      expect(code).toBe(0);
+      expect(signal).toBe(null);
+      expect(stdout).toContain("\"event\":\"toss-mtls-client-proxy.shutdown\"");
+      expect(stderr).not.toContain("toss-mtls-client-proxy.shutdown.timeout");
+    } finally {
+      if (child.exitCode === null && child.signalCode === null) {
+        child.kill("SIGKILL");
+      }
+    }
+  });
+
   test("rejects unauthorized requests when token is configured", async () => {
     const req = request("GET", PROXY_ENDPOINTS.health);
     const res = await handleRequest(req, { mode: "stub", internalToken: "secret" });
@@ -1103,5 +1150,25 @@ async function withServer(server, fn) {
     await new Promise((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
+  }
+}
+
+async function findFreePort() {
+  const server = http.createServer();
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address();
+  await new Promise((resolve, reject) => {
+    server.close((error) => (error ? reject(error) : resolve()));
+  });
+  return port;
+}
+
+async function waitFor(predicate, timeoutMs = 5_000) {
+  const startedAt = Date.now();
+  while (!predicate()) {
+    if (Date.now() - startedAt > timeoutMs) {
+      throw new Error("Timed out waiting for condition");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
   }
 }
