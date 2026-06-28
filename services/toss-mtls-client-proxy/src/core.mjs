@@ -62,7 +62,7 @@ export function createConfig(env = process.env) {
   const certDir = env.MTLS_CERT_DIR || DEFAULT_CERT_DIR;
   const tossCertificatePair = detectTossCertificatePair(certDir);
   return {
-    port: parsePositiveInteger(env.PORT, DEFAULT_PORT),
+    port: parsePort(env.PORT, DEFAULT_PORT),
     mode: String(env.MTLS_PROXY_MODE || env.TOSS_PROXY_MODE || "stub").trim().toLowerCase(),
     internalToken: env.MTLS_PROXY_TOKEN || env.TOSS_PROXY_INTERNAL_TOKEN || "",
     upstreamBaseUrl: env.MTLS_UPSTREAM_BASE_URL || env.TOSS_API_BASE_URL || "",
@@ -1185,6 +1185,14 @@ function redactSensitiveValues(value, sensitiveValues) {
 function parsePositiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function parsePort(value, fallback) {
+  if (value == null || String(value).trim() === "") {
+    return fallback;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function positiveIntegerOrUndefined(value) {
