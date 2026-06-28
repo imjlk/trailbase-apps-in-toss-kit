@@ -47,6 +47,7 @@ function shutdown(signal) {
     }
     process.exitCode = 0;
   });
+  server.closeIdleConnections?.();
 }
 
 process.once("SIGTERM", shutdown);

@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
   PROXY_ENDPOINTS,
+  DEFAULT_PORT,
   SMART_MESSAGE_BULK_MAX_CONTEXTS,
   TOSS_ENDPOINTS,
   createConfig,
@@ -20,12 +21,11 @@ const serviceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 
 describe("toss-mtls-client-proxy", () => {
   test("server process exits cleanly on SIGTERM", async () => {
-    const port = await findFreePort();
     const child = spawn(process.execPath, ["src/server.mjs"], {
       cwd: serviceRoot,
       env: {
         ...process.env,
-        PORT: String(port),
+        PORT: "0",
         MTLS_PROXY_MODE: "stub",
         MTLS_PROXY_TOKEN: "",
       },
@@ -90,14 +90,17 @@ describe("toss-mtls-client-proxy", () => {
       MTLS_PROXY_IAP_ORDER_STATUS_MAX_ATTEMPTS: "2",
       MTLS_PROXY_IAP_ORDER_STATUS_RETRY_DELAY_MS: "0",
       MTLS_PROXY_DEBUG: "true",
+      PORT: "0",
     });
     expect(config.mode).toBe("forward");
+    expect(config.port).toBe(0);
     expect(config.requestBodyLimitBytes).toBe(123);
     expect(config.upstreamBodyLimitBytes).toBe(456);
     expect(config.upstreamTimeoutMs).toBe(789);
     expect(config.iapOrderStatusMaxAttempts).toBe(2);
     expect(config.iapOrderStatusRetryDelayMs).toBe(0);
     expect(config.debug).toBe(true);
+    expect(createConfig({ PORT: "" }).port).toBe(DEFAULT_PORT);
   });
 
   test("detects Toss console certificate filenames from the mounted cert directory", () => {
@@ -1152,16 +1155,6 @@ async function withServer(server, fn) {
       server.close((error) => (error ? reject(error) : resolve()));
     });
   }
-}
-
-async function findFreePort() {
-  const server = http.createServer();
-  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address();
-  await new Promise((resolve, reject) => {
-    server.close((error) => (error ? reject(error) : resolve()));
-  });
-  return port;
 }
 
 async function waitFor(predicate, timeoutMs = 5_000) {

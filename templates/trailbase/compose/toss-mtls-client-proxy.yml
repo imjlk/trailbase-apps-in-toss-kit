@@ -2,7 +2,7 @@ services:
   # Put Toss Login unlink callback settings on the TrailBase app service, not on this proxy.
   # See templates/trailbase/env/toss-login-unlink.env.example.
   toss-mtls-client-proxy:
-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.8
+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.9
     init: true
     stop_grace_period: 100s
     profiles:
