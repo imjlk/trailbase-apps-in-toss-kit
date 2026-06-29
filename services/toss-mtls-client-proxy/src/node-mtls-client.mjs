@@ -4,42 +4,34 @@ import { existsSync, readFileSync } from "node:fs";
 import {
   configError,
   clientError,
-  parseMaybeJson,
   sanitizeHeaders,
-  sanitizeResponseHeaders,
   upstreamError,
 } from "@trailbase-apps-in-toss-kit/toss-mtls-core";
 import { requestBodyLimitBytes, upstreamBodyLimitBytes, upstreamTimeoutMs } from "./config.mjs";
 
-export function createNodeMtlsTransport(config) {
+export function createNodeMtlsClient(config) {
   return {
-    request: (request) => forwardJson(request, config),
+    request: (url, init = {}) => forward(url, init, config),
   };
 }
 
-async function forwardJson(request, config) {
-  if (!config.upstreamBaseUrl) {
-    throw configError("MISSING_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL is required in forward mode");
-  }
-  const target = new URL(request.path, config.upstreamBaseUrl);
-  const payload = request.body === undefined ? undefined : Buffer.from(JSON.stringify(request.body));
+async function forward(url, init, config) {
+  const target = new URL(url);
+  const payload = bodyBuffer(init.body);
   if (payload && payload.length > requestBodyLimitBytes(config)) {
     throw clientError("REQUEST_BODY_TOO_LARGE", "Request body is too large", 413);
   }
   const headers = {
     accept: "application/json",
-    ...sanitizeHeaders(request.headers),
+    ...sanitizeHeaders(headersObject(init.headers)),
   };
   if (payload) {
     headers["content-type"] = headers["content-type"] || "application/json";
     headers["content-length"] = String(payload.length);
   }
-  if (request.tossUserKey) {
-    headers["x-toss-user-key"] = request.tossUserKey;
-  }
 
   const options = {
-    method: request.method,
+    method: String(init.method || "GET").toUpperCase(),
     protocol: target.protocol,
     hostname: target.hostname,
     port: target.port || undefined,
@@ -78,11 +70,14 @@ async function forwardJson(request, config) {
       upstreamRes.on("end", () => {
         if (settled) return;
         const raw = Buffer.concat(chunks).toString("utf8");
-        settle(resolve, {
-          status: upstreamRes.statusCode || 500,
-          headers: sanitizeResponseHeaders(upstreamRes.headers),
-          body: parseMaybeJson(raw),
-        });
+        const status = upstreamRes.statusCode || 500;
+        settle(
+          resolve,
+          new Response(status === 204 || status === 304 ? null : raw, {
+            status,
+            headers: responseHeaders(upstreamRes.headers),
+          }),
+        );
       });
     });
     upstream.setTimeout(upstreamTimeoutMs(config), () => {
@@ -95,6 +90,39 @@ async function forwardJson(request, config) {
     if (payload) upstream.write(payload);
     upstream.end();
   });
+}
+
+function bodyBuffer(body) {
+  if (body === undefined || body === null) return undefined;
+  if (Buffer.isBuffer(body)) return body;
+  if (body instanceof Uint8Array) return Buffer.from(body);
+  if (body instanceof ArrayBuffer) return Buffer.from(body);
+  if (typeof body === "string") return Buffer.from(body);
+  return Buffer.from(String(body));
+}
+
+function headersObject(headers) {
+  if (!headers) return {};
+  if (headers instanceof Headers) {
+    const out = {};
+    headers.forEach((value, key) => {
+      out[key] = value;
+    });
+    return out;
+  }
+  if (Array.isArray(headers)) {
+    return Object.fromEntries(headers);
+  }
+  return headers;
+}
+
+function responseHeaders(headers) {
+  const out = {};
+  for (const [key, value] of Object.entries(headers || {})) {
+    if (value === undefined) continue;
+    out[key] = Array.isArray(value) ? value.join(",") : String(value);
+  }
+  return out;
 }
 
 function readRequiredFile(path, name) {

@@ -32,6 +32,12 @@ and Apps in Toss adapter behavior to private runtime-neutral workspace packages:
 image, HTTP endpoints, environment variables, response shapes, and certificate mount model remain
 the same.
 
+The core package uses a low-level mTLS client port compatible with the shape used by
+`apps-in-toss-community/oidc-bridge`: `request(url, init) => Response`, plus an optional per-app
+client factory for future runtimes. This kit stays below the OIDC product layer: it does not provide
+OIDC discovery, JWKS, `id_token` issuance, sealed refresh-token lifecycle, or Supabase/Firebase/Auth0
+bridge behavior.
+
 The proxy handles `SIGTERM` and `SIGINT` by closing its HTTP server and exiting cleanly. The reusable
 Compose template sets `init: true` so signals are forwarded predictably when the container runs as an
 internal service, and `stop_grace_period: 100s` so Docker does not kill valid in-flight Toss requests

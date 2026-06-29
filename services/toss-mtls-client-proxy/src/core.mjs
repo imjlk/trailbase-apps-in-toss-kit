@@ -12,7 +12,7 @@ export {
   upstreamTimeoutMs,
   validateConfig,
 } from "./config.mjs";
-export { createNodeMtlsTransport } from "./node-transport.mjs";
+export { createNodeMtlsClient } from "./node-mtls-client.mjs";
 export { createProxyServer, handleRequest } from "./http-server.mjs";
 export { PROXY_ENDPOINTS } from "@trailbase-apps-in-toss-kit/toss-mtls-client";
 export {

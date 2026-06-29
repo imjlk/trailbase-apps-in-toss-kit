@@ -2,7 +2,7 @@ import http from "node:http";
 import { createTossMtlsCore, clientError, publicError } from "@trailbase-apps-in-toss-kit/toss-mtls-core";
 import { PROXY_ENDPOINTS } from "@trailbase-apps-in-toss-kit/toss-mtls-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
-import { createNodeMtlsTransport } from "./node-transport.mjs";
+import { createNodeMtlsClient } from "./node-mtls-client.mjs";
 
 export function createProxyServer(config = createConfig()) {
   validateConfig(config);
@@ -73,7 +73,8 @@ export async function handleRequest(req, config = createConfig(), core = createC
 function createCore(config) {
   return createTossMtlsCore({
     mode: config.mode,
-    transport: createNodeMtlsTransport(config),
+    upstreamBaseUrl: config.upstreamBaseUrl,
+    mtlsClient: createNodeMtlsClient(config),
     tossPromotionCode: config.tossPromotionCode,
     tossPromotionAmount: config.tossPromotionAmount,
     iapOrderStatusMaxAttempts: config.iapOrderStatusMaxAttempts,

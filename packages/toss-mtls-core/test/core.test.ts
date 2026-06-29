@@ -9,6 +9,7 @@ import {
 } from "../src/index.ts";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const upstreamBaseUrl = "https://apps-in-toss-api.toss.im";
 
 describe("toss-mtls-core", () => {
   test("src stays runtime-neutral", () => {
@@ -21,15 +22,11 @@ describe("toss-mtls-core", () => {
   });
 
   test("generic relay normalizes request and returns upstream details", async () => {
-    const calls = [];
+    const calls: MtlsCall[] = [];
     const core = createTossMtlsCore({
       mode: "forward",
-      transport: {
-        async request(input) {
-          calls.push(input);
-          return { status: 201, headers: { "x-result": "ok" }, body: { ok: true } };
-        },
-      },
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient(calls, () => jsonResponse({ ok: true }, 201, { "x-result": "ok" })),
     });
 
     const result = await core.genericMtlsRequest({
@@ -42,56 +39,55 @@ describe("toss-mtls-core", () => {
 
     expect(calls).toEqual([
       {
-        method: "POST",
-        path: "/anything",
-        headers: { "x-test": "keep-me" },
+        url: `${upstreamBaseUrl}/anything`,
+        init: {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "content-type": "application/json",
+            "x-test": "keep-me",
+            "x-toss-user-key": "toss-user",
+          },
+          body: JSON.stringify({ value: 1 }),
+        },
         body: { value: 1 },
-        tossUserKey: "toss-user",
       },
     ]);
     expect(result).toEqual({
       ok: true,
       status: 201,
-      headers: { "x-result": "ok" },
+      headers: { "content-type": "application/json", "x-result": "ok" },
       body: { ok: true },
     });
   });
 
   test("Toss Login complete performs token exchange and user lookup", async () => {
-    const calls = [];
+    const calls: MtlsCall[] = [];
     const core = createTossMtlsCore({
       mode: "forward",
-      transport: {
-        async request(input) {
-          calls.push(input);
-          if (input.path === TOSS_ENDPOINTS.loginGenerateToken) {
-            return {
-              status: 200,
-              body: {
-                resultType: "SUCCESS",
-                success: {
-                  accessToken: "toss-access-token",
-                  refreshToken: "toss-refresh-token",
-                  tokenType: "Bearer",
-                  expiresIn: 3599,
-                  scope: "user_key user_name",
-                },
-              },
-            };
-          }
-          return {
-            status: 200,
-            body: {
-              resultType: "SUCCESS",
-              success: {
-                userKey: "toss-user-key",
-                scope: "user_key",
-                agreedTerms: ["terms-1"],
-              },
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient(calls, (url) => {
+        if (new URL(url).pathname === TOSS_ENDPOINTS.loginGenerateToken) {
+          return jsonResponse({
+            resultType: "SUCCESS",
+            success: {
+              accessToken: "toss-access-token",
+              refreshToken: "toss-refresh-token",
+              tokenType: "Bearer",
+              expiresIn: 3599,
+              scope: "user_key user_name",
             },
-          };
-        },
-      },
+          });
+        }
+        return jsonResponse({
+          resultType: "SUCCESS",
+          success: {
+            userKey: "toss-user-key",
+            scope: "user_key",
+            agreedTerms: ["terms-1"],
+          },
+        });
+      }),
     });
 
     const result = await core.tossLoginComplete({
@@ -101,14 +97,21 @@ describe("toss-mtls-core", () => {
 
     expect(calls).toEqual([
       {
-        method: "POST",
-        path: TOSS_ENDPOINTS.loginGenerateToken,
+        url: `${upstreamBaseUrl}${TOSS_ENDPOINTS.loginGenerateToken}`,
+        init: {
+          method: "POST",
+          headers: { accept: "application/json", "content-type": "application/json" },
+          body: JSON.stringify({ authorizationCode: "code", referrer: "SANDBOX" }),
+        },
         body: { authorizationCode: "code", referrer: "SANDBOX" },
       },
       {
-        method: "GET",
-        path: TOSS_ENDPOINTS.loginMe,
-        headers: { authorization: "Bearer toss-access-token" },
+        url: `${upstreamBaseUrl}${TOSS_ENDPOINTS.loginMe}`,
+        init: {
+          method: "GET",
+          headers: { accept: "application/json", authorization: "Bearer toss-access-token" },
+        },
+        body: undefined,
       },
     ]);
     expect(result).toMatchObject({
@@ -127,20 +130,16 @@ describe("toss-mtls-core", () => {
   test("unlink adapter redacts user key and access token from failures", async () => {
     const core = createTossMtlsCore({
       mode: "forward",
-      transport: {
-        async request() {
-          return {
-            status: 200,
-            body: {
-              resultType: "FAIL",
-              error: {
-                errorCode: "USER_KEY_NOT_FOUND",
-                reason: "cannot unlink sensitive-user using expired-token",
-              },
-            },
-          };
-        },
-      },
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient([], () =>
+        jsonResponse({
+          resultType: "FAIL",
+          error: {
+            errorCode: "USER_KEY_NOT_FOUND",
+            reason: "cannot unlink sensitive-user using expired-token",
+          },
+        }),
+      ),
     });
 
     const result = await core.tossLoginRemoveByUserKey({
@@ -156,29 +155,55 @@ describe("toss-mtls-core", () => {
     });
   });
 
+  test("mTLS client factory requires an explicit appId", async () => {
+    const appIds: string[] = [];
+    const mtlsClientFactory = {
+      async forApp(appId: string) {
+        appIds.push(appId);
+        return fakeMtlsClient([], () => jsonResponse({ ok: true }));
+      },
+    };
+
+    const core = createTossMtlsCore({
+      mode: "forward",
+      upstreamBaseUrl,
+      appId: "app-a",
+      mtlsClientFactory,
+    });
+    await core.genericMtlsRequest({ path: "/anything" });
+
+    expect(appIds).toEqual(["app-a"]);
+    const missingAppIdCore = createTossMtlsCore({
+      mode: "forward",
+      upstreamBaseUrl,
+      mtlsClientFactory,
+    });
+    await expect(missingAppIdCore.genericMtlsRequest({ path: "/anything" })).rejects.toThrow(
+      "appId is required when mtlsClientFactory is used",
+    );
+  });
+
   test("IAP order status retries transient provider states with injected sleep", async () => {
-    const sleeps = [];
+    const sleeps: number[] = [];
     let calls = 0;
     const core = createTossMtlsCore({
       mode: "forward",
+      upstreamBaseUrl,
       iapOrderStatusMaxAttempts: 3,
       iapOrderStatusRetryDelayMs: 7,
       sleep: async (ms) => {
         sleeps.push(ms);
       },
-      transport: {
+      mtlsClient: {
         async request() {
           calls += 1;
-          return {
-            status: 200,
-            body: {
-              resultType: "SUCCESS",
-              success: {
-                orderId: "order-1",
-                status: calls < 3 ? "PENDING" : "PAYMENT_COMPLETED",
-              },
+          return jsonResponse({
+            resultType: "SUCCESS",
+            success: {
+              orderId: "order-1",
+              status: calls < 3 ? "PENDING" : "PAYMENT_COMPLETED",
             },
-          };
+          });
         },
       },
     });
@@ -196,18 +221,16 @@ describe("toss-mtls-core", () => {
   });
 
   test("promotion grant executes get-key, execute, and result lookup", async () => {
-    const calls = [];
+    const calls: MtlsCall[] = [];
     const core = createTossMtlsCore({
       mode: "forward",
-      transport: {
-        async request(input) {
-          calls.push(input);
-          if (input.path === TOSS_ENDPOINTS.promotionGetKey) {
-            return { status: 200, body: { resultType: "SUCCESS", success: { key: "promotion-key" } } };
-          }
-          return { status: 200, body: { resultType: "SUCCESS", success: "SUCCESS" } };
-        },
-      },
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient(calls, (url) => {
+        if (new URL(url).pathname === TOSS_ENDPOINTS.promotionGetKey) {
+          return jsonResponse({ resultType: "SUCCESS", success: { key: "promotion-key" } });
+        }
+        return jsonResponse({ resultType: "SUCCESS", success: "SUCCESS" });
+      }),
     });
 
     const result = await core.promotionRewardGrant({
@@ -218,7 +241,7 @@ describe("toss-mtls-core", () => {
       tossUserKey: "toss-user",
     });
 
-    expect(calls.map((call) => call.path)).toEqual([
+    expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
       TOSS_ENDPOINTS.promotionGetKey,
       TOSS_ENDPOINTS.promotionExecute,
       TOSS_ENDPOINTS.promotionResult,
@@ -233,27 +256,22 @@ describe("toss-mtls-core", () => {
   });
 
   test("Smart Message single and bulk normalize upstream responses", async () => {
-    const calls = [];
+    const calls: MtlsCall[] = [];
     const core = createTossMtlsCore({
       mode: "forward",
-      transport: {
-        async request(input) {
-          calls.push(input);
-          return {
-            status: 200,
-            body: {
-              resultType: "SUCCESS",
-              success: {
-                result: {
-                  msgCount: 1,
-                  sentPushCount: 1,
-                  sentInboxCount: 0,
-                },
-              },
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient(calls, () =>
+        jsonResponse({
+          resultType: "SUCCESS",
+          success: {
+            result: {
+              msgCount: 1,
+              sentPushCount: 1,
+              sentInboxCount: 0,
             },
-          };
-        },
-      },
+          },
+        }),
+      ),
     });
 
     const single = await core.smartMessageSend({
@@ -270,7 +288,10 @@ describe("toss-mtls-core", () => {
       contextList: [{ userKey: "toss-user", context: { name: "Ada" } }],
     });
 
-    expect(calls.map((call) => call.path)).toEqual([TOSS_ENDPOINTS.messageSend, TOSS_ENDPOINTS.messageBulkSend]);
+    expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+      TOSS_ENDPOINTS.messageSend,
+      TOSS_ENDPOINTS.messageBulkSend,
+    ]);
     expect(single).toMatchObject({ ok: true, providerStatus: "SENT", msgCount: 1 });
     expect(bulk).toMatchObject({ ok: true, providerStatus: "SENT", msgCount: 1 });
   });
@@ -288,6 +309,37 @@ describe("toss-mtls-core", () => {
     ).rejects.toThrow("contextList supports at most 2500 recipients");
   });
 });
+
+interface MtlsCall {
+  url: string;
+  init: RequestInit;
+  body: unknown;
+}
+
+function fakeMtlsClient(calls: MtlsCall[], handler: (url: string, init: RequestInit) => Response | Promise<Response>) {
+  return {
+    async request(url: string, init: RequestInit) {
+      calls.push({ url, init, body: parseRequestBody(init.body) });
+      return await handler(url, init);
+    },
+  };
+}
+
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json", ...headers },
+  });
+}
+
+function parseRequestBody(body: unknown) {
+  if (typeof body !== "string") return undefined;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return body;
+  }
+}
 
 function listSourceFiles(dir: string): string[] {
   const files = [];

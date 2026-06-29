@@ -1,8 +1,7 @@
 export type {
+  MtlsClient,
+  MtlsClientFactory,
   TossMtlsCore,
-  TossMtlsTransport,
-  TossMtlsTransportRequest,
-  TossMtlsTransportResponse,
 } from "@trailbase-apps-in-toss-kit/toss-mtls-core";
 
 export const PROXY_ENDPOINTS = Object.freeze({

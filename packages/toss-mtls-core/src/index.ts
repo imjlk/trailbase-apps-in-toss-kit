@@ -38,7 +38,7 @@ const RETRYABLE_IAP_ORDER_STATUSES = new Set([
 export type TossMtlsMode = "stub" | "forward";
 export type JsonObject = Record<string, unknown>;
 
-export interface TossMtlsTransportRequest {
+interface TossMtlsRequest {
   method: string;
   path: string;
   headers?: Record<string, string>;
@@ -46,19 +46,26 @@ export interface TossMtlsTransportRequest {
   tossUserKey?: string;
 }
 
-export interface TossMtlsTransportResponse {
+interface TossMtlsResponse {
   status: number;
-  headers?: Record<string, string>;
+  headers: Record<string, string>;
   body: unknown;
 }
 
-export interface TossMtlsTransport {
-  request(input: TossMtlsTransportRequest): Promise<TossMtlsTransportResponse>;
+export interface MtlsClient {
+  request(url: string, init: RequestInit): Promise<Response>;
+}
+
+export interface MtlsClientFactory {
+  forApp(appId: string): Promise<MtlsClient>;
 }
 
 export interface TossMtlsCoreOptions {
   mode?: TossMtlsMode | string;
-  transport?: TossMtlsTransport;
+  upstreamBaseUrl?: string;
+  mtlsClient?: MtlsClient;
+  mtlsClientFactory?: MtlsClientFactory;
+  appId?: string;
   tossPromotionCode?: string;
   tossPromotionAmount?: number;
   iapOrderStatusMaxAttempts?: number;
@@ -167,7 +174,7 @@ export async function handleGenericMtlRequest(body: unknown, options: TossMtlsCo
   };
 }
 
-export function normalizeGenericRequest(body: unknown): TossMtlsTransportRequest {
+export function normalizeGenericRequest(body: unknown): TossMtlsRequest {
   const request = objectOrSelf(body, {});
   const method = String(request.method || "POST").trim().toUpperCase();
   if (!["GET", "POST", "PUT", "PATCH", "DELETE"].includes(method)) {
@@ -461,11 +468,62 @@ async function grantPromotionReward(requestBody: unknown, options: NormalizedCor
   };
 }
 
-async function requestTransport(request: TossMtlsTransportRequest, options: NormalizedCoreOptions) {
-  if (!options.transport) {
-    throw configError("MISSING_MTLS_TRANSPORT", "mTLS transport is required in forward mode");
+async function requestTransport(request: TossMtlsRequest, options: NormalizedCoreOptions): Promise<TossMtlsResponse> {
+  const client = await resolveMtlsClient(options);
+  const url = resolveMtlsUrl(request.path, options);
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    ...sanitizeHeaders(request.headers),
+  };
+  const init: RequestInit = {
+    method: request.method,
+    headers,
+  };
+  if (request.body !== undefined) {
+    headers["content-type"] = headers["content-type"] || "application/json";
+    init.body = JSON.stringify(request.body);
   }
-  return options.transport.request(request);
+  if (request.tossUserKey) {
+    headers["x-toss-user-key"] = request.tossUserKey;
+  }
+
+  const response = await client.request(url, init);
+  const raw = await response.text();
+  return {
+    status: response.status,
+    headers: sanitizeResponseHeaders(responseHeadersObject(response.headers)),
+    body: parseMaybeJson(raw),
+  };
+}
+
+async function resolveMtlsClient(options: NormalizedCoreOptions) {
+  if (options.mtlsClient) {
+    return options.mtlsClient;
+  }
+  if (!options.mtlsClientFactory) {
+    throw configError("MISSING_MTLS_CLIENT", "mTLS client is required in forward mode");
+  }
+  const appId = stringOrUndefined(options.appId);
+  if (!appId) {
+    throw configError("MISSING_MTLS_APP_ID", "appId is required when mtlsClientFactory is used");
+  }
+  return await options.mtlsClientFactory.forApp(appId);
+}
+
+function resolveMtlsUrl(path: string, options: NormalizedCoreOptions) {
+  const baseUrl = stringOrUndefined(options.upstreamBaseUrl);
+  if (!baseUrl) {
+    throw configError("MISSING_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL is required in forward mode");
+  }
+  return new URL(path, baseUrl).toString();
+}
+
+function responseHeadersObject(headers: Headers) {
+  const out: Record<string, string> = {};
+  headers.forEach((value, key) => {
+    out[key] = value;
+  });
+  return out;
 }
 
 export function sanitizeHeaders(headers: Record<string, unknown> | undefined): Record<string, string> {

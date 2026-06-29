@@ -31,6 +31,12 @@
 `@trailbase-apps-in-toss-kit/toss-mtls-client`에 위임합니다. 이는 구현 경계일 뿐입니다.
 Docker 이미지, HTTP endpoint, 환경 변수, 응답 shape, 인증서 mount 모델은 그대로 유지됩니다.
 
+Core package는 `apps-in-toss-community/oidc-bridge`에서 쓰는 형태와 호환되는 낮은 레벨의
+mTLS client port를 사용합니다. 형태는 `request(url, init) => Response`이며, 향후 런타임을
+위한 per-app client factory도 선택적으로 둘 수 있습니다. 이 kit는 OIDC 제품 레이어 아래에
+머뭅니다. OIDC discovery, JWKS, `id_token` 발급, sealed refresh-token lifecycle,
+Supabase/Firebase/Auth0 bridge 동작은 제공하지 않습니다.
+
 프록시는 `SIGTERM`과 `SIGINT`를 받으면 HTTP 서버를 닫고 정상 종료합니다. 재사용 Compose
 템플릿은 내부 서비스로 실행될 때 signal forwarding이 예측 가능하도록 `init: true`를 설정하고,
 프록시의 기본 upstream timeout 및 IAP retry 설정에서 진행 중인 Toss 요청이 Docker에 의해

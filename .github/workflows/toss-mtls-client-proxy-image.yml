@@ -4,6 +4,10 @@ on:
   pull_request:
     paths:
       - ".github/workflows/toss-mtls-client-proxy-image.yml"
+      - "package.json"
+      - "bun.lock"
+      - "packages/toss-mtls-core/**"
+      - "packages/toss-mtls-client/**"
       - "services/toss-mtls-client-proxy/**"
   push:
     branches:
@@ -13,6 +17,10 @@ on:
       - "toss-mtls-client-proxy-v*.*.*"
     paths:
       - ".github/workflows/toss-mtls-client-proxy-image.yml"
+      - "package.json"
+      - "bun.lock"
+      - "packages/toss-mtls-core/**"
+      - "packages/toss-mtls-client/**"
       - "services/toss-mtls-client-proxy/**"
   schedule:
     # Twice-monthly rebuild to pick up patched base images even when proxy source is unchanged.
@@ -35,9 +43,6 @@ jobs:
   test:
     name: Test proxy
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/toss-mtls-client-proxy
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -50,7 +55,12 @@ jobs:
           bun-version: ${{ env.BUN_VERSION }}
 
       - name: Run tests
-        run: bun test
+        run: |
+          bun install --frozen-lockfile
+          bun test packages/toss-mtls-core packages/toss-mtls-client services/toss-mtls-client-proxy
+
+      - name: Build image
+        run: docker build -f services/toss-mtls-client-proxy/Dockerfile -t toss-mtls-client-proxy:ci .
 
   publish:
     name: Build and publish image
