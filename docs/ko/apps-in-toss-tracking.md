@@ -50,16 +50,16 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 ## Renovate가 추적하는 reference version
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.9.2`
+- `apps-in-toss-framework`: `2.10.1`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.32`
+- `create-granite-app`: `1.0.33`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.32`
+- `granite-js-react-native`: `1.0.33`
 
 - `@toss-design-system/react-native`: framework 1.0 이전 프로젝트에서 쓰던 legacy package
   name입니다. 초기 tracking snapshot 시점에는 public npm `latest` metadata를 확인할 수
@@ -73,12 +73,15 @@ tracking marker가 일치하는지는 `bun run apps-in-toss:tracking:check`로 �
 
 ## 최근 검토한 SDK 변경
 
-저장소 reference는 `@apps-in-toss/framework` `2.9.2`까지 검토했습니다.
+저장소 reference는 `@apps-in-toss/framework` `2.10.1`까지 검토했습니다.
 
 - `2.8.0`: 비게임 내비게이션 바 테마 설정 기능이 추가되었습니다.
 - `2.9.0`: 앱 번들 배포 명령어에 `ait deploy --timeout` 옵션이 추가되었습니다.
 - `2.9.2`: 게임 앱에서 Toss 앱 내비게이션 바의 X 버튼을 누르면 종료 확인 모달이 표시됩니다.
   비게임 앱은 기존처럼 바로 종료됩니다.
+- `2.10.1`: Metadata 검증용 Apps in Toss reference package family를 갱신합니다.
+  컨슈머 앱은 도입 전에 업스트림 SDK release note를 검토하고 앱 단위 smoke test를 실행해야
+  합니다.
 
 이 SDK 변경으로 공유 kit API를 바꿀 필요는 낮아 보입니다. 다만 컨슈머 앱의 지원 Apps in Toss
 SDK/runtime policy는 앱 단위 smoke test 이후에만 올리세요.

@@ -54,16 +54,16 @@ only after app-level smoke tests.
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.9.2`
+- `apps-in-toss-framework`: `2.10.1`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.3`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.32`
+- `create-granite-app`: `1.0.33`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.32`
+- `granite-js-react-native`: `1.0.33`
 
 - `@toss-design-system/react-native`: legacy package name for pre-1.0 framework
   projects. No public npm `latest` metadata was available during the initial
@@ -80,12 +80,15 @@ snapshot script is intentionally detection-only; use
 ## Latest Reviewed SDK Delta
 
 The repository reference has been reviewed through `@apps-in-toss/framework`
-`2.9.2`.
+`2.10.1`.
 
 - `2.8.0`: Added non-game navigation bar theme settings.
 - `2.9.0`: Added the `ait deploy --timeout` option for app bundle deployment.
 - `2.9.2`: Game apps now show an exit confirmation modal when the Toss app
   navigation bar X button is pressed. Non-game apps still exit directly.
+- `2.10.1`: Refreshes the tracked Apps in Toss reference package family for
+  metadata validation. Consumer apps should review upstream SDK notes and run
+  app-level smoke tests before adopting it.
 
 No shared kit API change is required for these SDK deltas. Consumer apps should
 still run app-level smoke tests before raising their own supported Apps in Toss

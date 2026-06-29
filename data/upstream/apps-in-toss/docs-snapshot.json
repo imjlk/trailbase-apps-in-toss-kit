@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-23T01:52:15.847Z",
+  "fetchedAt": "2026-06-29T11:34:50.669Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,8 +12,8 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "794706ae794bc5c830d3622c5978583d405c92c9c3dc22993a378e90e5c3bdc1",
-      "bytes": 40872
+      "sha256": "2ba2ba0540fe7a6fb90f160ffad2167eb36c52cc3ada471366f9976c04f86c95",
+      "bytes": 41698
     },
     {
       "key": "react-native-tutorial",
@@ -68,22 +68,22 @@
       "key": "smart-message-develop",
       "title": "Smart Message development",
       "url": "https://developers-apps-in-toss.toss.im/smart-message/develop.md",
-      "sha256": "dbe5a64eb1b934f2e01a90bc030ab006d66d58036f1016b44d730767b09484e4",
-      "bytes": 18004
+      "sha256": "ada6227e68bfac34f7d5aefa687dbd9e3a82cfe41b833e259cd12c3f2ba4f5c1",
+      "bytes": 18128
     },
     {
       "key": "smart-message-intro",
       "title": "Smart Message overview and notification agreement policy",
       "url": "https://developers-apps-in-toss.toss.im/smart-message/intro.md",
-      "sha256": "5f184f2944c27ed5955d2c1e4c0457b39dc672a8a7087582c421718d7000feb1",
-      "bytes": 21449
+      "sha256": "3aeb4a349a41e718c2a634adc312d8cae80df5b783ac78c17743a0b278cb915b",
+      "bytes": 21494
     },
     {
       "key": "notification-agreement-sdk",
       "title": "Notification agreement SDK requestNotificationAgreement",
       "url": "https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md",
-      "sha256": "6288cfef72004040bc46826f48fb1796a32d6fb6834e95e7045643fe33cc4005",
-      "bytes": 5712
+      "sha256": "9559b0b9f668639302658a63d3f219ca4505a4981d98e3c1b87f509e7c769a53",
+      "bytes": 5724
     },
     {
       "key": "tds-react-native",
@@ -96,7 +96,7 @@
   "packages": [
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.9.2",
+      "version": "2.10.1",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
@@ -110,14 +110,14 @@
     },
     {
       "packageName": "create-granite-app",
-      "version": "1.0.32",
+      "version": "1.0.33",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
     },
     {
       "packageName": "@granite-js/react-native",
-      "version": "1.0.32",
+      "version": "1.0.33",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"

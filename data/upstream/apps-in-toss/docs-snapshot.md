@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Snapshot
 
-- Fetched at: 2026-06-23T01:52:15.847Z
+- Fetched at: 2026-06-29T11:34:50.669Z
 
 ## Documents
 
@@ -10,8 +10,8 @@
   - Bytes: 359
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `794706ae794bc5c830d3622c5978583d405c92c9c3dc22993a378e90e5c3bdc1`
-  - Bytes: 40872
+  - SHA-256: `2ba2ba0540fe7a6fb90f160ffad2167eb36c52cc3ada471366f9976c04f86c95`
+  - Bytes: 41698
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/tutorials/react-native.md
   - SHA-256: `6f3ad98b130ef392780c78769965321c7641d01d60b9a0a350ce63b63100911a`
@@ -42,16 +42,16 @@
   - Bytes: 3167
 - Smart Message development
   - URL: https://developers-apps-in-toss.toss.im/smart-message/develop.md
-  - SHA-256: `dbe5a64eb1b934f2e01a90bc030ab006d66d58036f1016b44d730767b09484e4`
-  - Bytes: 18004
+  - SHA-256: `ada6227e68bfac34f7d5aefa687dbd9e3a82cfe41b833e259cd12c3f2ba4f5c1`
+  - Bytes: 18128
 - Smart Message overview and notification agreement policy
   - URL: https://developers-apps-in-toss.toss.im/smart-message/intro.md
-  - SHA-256: `5f184f2944c27ed5955d2c1e4c0457b39dc672a8a7087582c421718d7000feb1`
-  - Bytes: 21449
+  - SHA-256: `3aeb4a349a41e718c2a634adc312d8cae80df5b783ac78c17743a0b278cb915b`
+  - Bytes: 21494
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
-  - SHA-256: `6288cfef72004040bc46826f48fb1796a32d6fb6834e95e7045643fe33cc4005`
-  - Bytes: 5712
+  - SHA-256: `9559b0b9f668639302658a63d3f219ca4505a4981d98e3c1b87f509e7c769a53`
+  - Bytes: 5724
 - TDS React Native docs
   - URL: https://tossmini-docs.toss.im/tds-react-native/
   - SHA-256: `26f03bab074aecf12d69d2fe80f7e79b073a18fc90af511106f2db22771bbafb`
@@ -59,8 +59,8 @@
 
 ## Reference Packages
 
-- `@apps-in-toss/framework`: 2.9.2
+- `@apps-in-toss/framework`: 2.10.1
 - `@toss/tds-react-native`: 2.0.3
-- `create-granite-app`: 1.0.32
-- `@granite-js/react-native`: 1.0.32
+- `create-granite-app`: 1.0.33
+- `@granite-js/react-native`: 1.0.33
 - `@toss-design-system/react-native`: unavailable on public npm latest (404)
