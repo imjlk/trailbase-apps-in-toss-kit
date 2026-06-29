@@ -40,7 +40,7 @@
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.1.9",
+      "version": "0.1.10",
     },
   },
   "packages": {
