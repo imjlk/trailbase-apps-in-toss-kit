@@ -25,6 +25,18 @@
 가장 중요한 경계는 인증서 소유권입니다. 인증서 파일은 프록시 컨테이너만 마운트합니다.
 애플리케이션 컨테이너는 내부 URL과 Bearer 토큰만 받습니다.
 
+프록시 내부 구현은 이제 Toss endpoint 상수, 요청 정규화, stub 응답, Apps in Toss 어댑터
+동작을 비공개 runtime-neutral workspace package인
+`@trailbase-apps-in-toss-kit/toss-mtls-core`와
+`@trailbase-apps-in-toss-kit/toss-mtls-client`에 위임합니다. 이는 구현 경계일 뿐입니다.
+Docker 이미지, HTTP endpoint, 환경 변수, 응답 shape, 인증서 mount 모델은 그대로 유지됩니다.
+
+Core package는 `apps-in-toss-community/oidc-bridge`에서 쓰는 형태와 호환되는 낮은 레벨의
+mTLS client port를 사용합니다. 형태는 `request(url, init) => Response`이며, 향후 런타임을
+위한 per-app client factory도 선택적으로 둘 수 있습니다. 이 kit는 OIDC 제품 레이어 아래에
+머뭅니다. OIDC discovery, JWKS, `id_token` 발급, sealed refresh-token lifecycle,
+Supabase/Firebase/Auth0 bridge 동작은 제공하지 않습니다.
+
 프록시는 `SIGTERM`과 `SIGINT`를 받으면 HTTP 서버를 닫고 정상 종료합니다. 재사용 Compose
 템플릿은 내부 서비스로 실행될 때 signal forwarding이 예측 가능하도록 `init: true`를 설정하고,
 프록시의 기본 upstream timeout 및 IAP retry 설정에서 진행 중인 Toss 요청이 Docker에 의해
@@ -73,7 +85,8 @@ CLI로 생성해서 배포 secret store에 저장하고, 커밋하지 마세요.
 `*_public.crt`, `*_private.key` 파일을 `mtls_client_certs` 볼륨(volume)에 복사하면 됩니다.
 파일별 경로 환경 변수(path env)는 필요하지 않습니다. 볼륨에 완전한 쌍이 정확히 하나 있지
 않으면 프록시는 `MTLS_CLIENT_CERT_PATH`, `MTLS_CLIENT_KEY_PATH`를 대체 경로로 사용합니다.
-`MTLS_CA_CERT_PATH`는 선택 사항이며 파일이 있을 때만 읽습니다.
+기본 `MTLS_CA_CERT_PATH` fallback은 파일이 있을 때만 읽습니다. `MTLS_CA_CERT_PATH`를 명시적으로
+설정했다면 해당 파일이 없거나 읽을 수 없을 때 프록시는 fail-closed로 시작/요청에 실패합니다.
 
 선택적으로 설정할 수 있는 안전 제한값은 다음과 같습니다.
 

@@ -25,6 +25,19 @@ The most important boundary is certificate ownership: only the proxy container
 mounts certificate files. Application containers receive an internal URL and a
 bearer token.
 
+Internally, the proxy now delegates Toss endpoint constants, request normalization, stub responses,
+and Apps in Toss adapter behavior to private runtime-neutral workspace packages:
+`@trailbase-apps-in-toss-kit/toss-mtls-core` and
+`@trailbase-apps-in-toss-kit/toss-mtls-client`. This is an implementation boundary only. The Docker
+image, HTTP endpoints, environment variables, response shapes, and certificate mount model remain
+the same.
+
+The core package uses a low-level mTLS client port compatible with the shape used by
+`apps-in-toss-community/oidc-bridge`: `request(url, init) => Response`, plus an optional per-app
+client factory for future runtimes. This kit stays below the OIDC product layer: it does not provide
+OIDC discovery, JWKS, `id_token` issuance, sealed refresh-token lifecycle, or Supabase/Firebase/Auth0
+bridge behavior.
+
 The proxy handles `SIGTERM` and `SIGINT` by closing its HTTP server and exiting cleanly. The reusable
 Compose template sets `init: true` so signals are forwarded predictably when the container runs as an
 internal service, and `stop_grace_period: 100s` so Docker does not kill valid in-flight Toss requests
@@ -71,8 +84,9 @@ Certificates are resolved in this order:
 `MTLS_CERT_DIR` defaults to `/run/mtls`. In the normal Coolify setup, copy the Toss Console
 `*_public.crt` and `*_private.key` files into the `mtls_client_certs` volume and no per-file path env
 is needed. If the volume does not contain exactly one complete pair, the proxy falls back to
-`MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`. `MTLS_CA_CERT_PATH` is optional and is loaded only
-when the file exists.
+`MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`. The default `MTLS_CA_CERT_PATH` fallback is loaded
+only when the file exists. If you set `MTLS_CA_CERT_PATH` explicitly, the proxy fails closed when that
+file is missing or unreadable.
 
 Optional safety limits:
 

@@ -3,6 +3,7 @@
 target
 **/node_modules
 **/bun.lock
+!bun.lock
 **/bun.lockb
 .env
 .env.*
