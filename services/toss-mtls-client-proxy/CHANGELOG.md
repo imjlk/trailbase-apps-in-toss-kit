@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.11 — 2026-06-29
+
+### Patch changes
+
+- [609f263](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/609f2634460878c629136a265f4b113450240369) Extract the Toss mTLS adapter logic behind private runtime-neutral core and HTTP client workspace packages, align the core mTLS port with the `request(url, init) => Response` shape, and preserve the proxy HTTP API, Docker image behavior, and certificate boundary. — Thanks @imjlk!
+
 ## 0.1.10 — 2026-06-29
 
 ### Patch changes
