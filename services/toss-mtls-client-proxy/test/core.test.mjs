@@ -124,7 +124,7 @@ describe("toss-mtls-client-proxy", () => {
     }
   });
 
-  test("prefers explicit certificate paths over a complete Toss certificate pair", () => {
+  test("prefers a complete Toss certificate pair over explicit fallback paths", () => {
     const certDir = mkdtempSync(path.join(tmpdir(), "toss-mtls-"));
     try {
       writeFileSync(path.join(certDir, "sample-service_public.crt"), "cert");
@@ -136,8 +136,8 @@ describe("toss-mtls-client-proxy", () => {
         MTLS_CLIENT_KEY_PATH: "/custom/client.key",
       });
 
-      expect(config.clientCertPath).toBe("/custom/client.crt");
-      expect(config.clientKeyPath).toBe("/custom/client.key");
+      expect(config.clientCertPath).toBe(path.join(certDir, "sample-service_public.crt"));
+      expect(config.clientKeyPath).toBe(path.join(certDir, "sample-service_private.key"));
     } finally {
       rmSync(certDir, { recursive: true, force: true });
     }

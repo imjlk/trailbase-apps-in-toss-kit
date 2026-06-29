@@ -27,12 +27,12 @@ export function createConfig(env = process.env) {
     upstreamBaseUrl: env.MTLS_UPSTREAM_BASE_URL || env.TOSS_API_BASE_URL || "",
     certDir,
     clientCertPath:
-      env.MTLS_CLIENT_CERT_PATH ||
       tossCertificatePair?.clientCertPath ||
+      env.MTLS_CLIENT_CERT_PATH ||
       joinPath(certDir, "client-cert.pem"),
     clientKeyPath:
-      env.MTLS_CLIENT_KEY_PATH ||
       tossCertificatePair?.clientKeyPath ||
+      env.MTLS_CLIENT_KEY_PATH ||
       joinPath(certDir, "client-key.pem"),
     caCertPath: env.MTLS_CA_CERT_PATH || optionalExistingPath(joinPath(certDir, "ca-cert.pem")),
     tossPromotionCode: env.TOSS_PROMOTION_CODE || "",

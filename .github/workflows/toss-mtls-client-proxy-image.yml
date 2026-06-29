@@ -58,7 +58,7 @@ jobs:
 
       - name: Run tests
         run: |
-          bun install --frozen-lockfile
+          bun install --frozen-lockfile --filter @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
           bun test packages/toss-mtls-core packages/toss-mtls-client services/toss-mtls-client-proxy
 
       - name: Build image
