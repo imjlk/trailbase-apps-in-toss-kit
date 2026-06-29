@@ -10,15 +10,26 @@
     },
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "peerDependencies": {
         "@apps-in-toss/framework": ">=2.5.0",
         "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
       },
     },
+    "packages/toss-mtls-client": {
+      "name": "@trailbase-apps-in-toss-kit/toss-mtls-client",
+      "version": "0.1.0",
+      "dependencies": {
+        "@trailbase-apps-in-toss-kit/toss-mtls-core": "workspace:*",
+      },
+    },
+    "packages/toss-mtls-core": {
+      "name": "@trailbase-apps-in-toss-kit/toss-mtls-core",
+      "version": "0.1.0",
+    },
     "packages/trailbase-client": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-client",
-      "version": "0.5.1",
+      "version": "1.0.0",
       "dependencies": {
         "@tanstack/react-db": "0.1.85",
       },
@@ -41,6 +52,10 @@
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
       "version": "0.1.10",
+      "dependencies": {
+        "@trailbase-apps-in-toss-kit/toss-mtls-client": "workspace:*",
+        "@trailbase-apps-in-toss-kit/toss-mtls-core": "workspace:*",
+      },
     },
   },
   "packages": {
@@ -830,7 +845,11 @@
 
     "@trailbase-apps-in-toss-kit/ait-rn": ["@trailbase-apps-in-toss-kit/ait-rn@workspace:packages/ait-rn"],
 
+    "@trailbase-apps-in-toss-kit/toss-mtls-client": ["@trailbase-apps-in-toss-kit/toss-mtls-client@workspace:packages/toss-mtls-client"],
+
     "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy": ["@trailbase-apps-in-toss-kit/toss-mtls-client-proxy@workspace:services/toss-mtls-client-proxy"],
+
+    "@trailbase-apps-in-toss-kit/toss-mtls-core": ["@trailbase-apps-in-toss-kit/toss-mtls-core@workspace:packages/toss-mtls-core"],
 
     "@trailbase-apps-in-toss-kit/trailbase-client": ["@trailbase-apps-in-toss-kit/trailbase-client@workspace:packages/trailbase-client"],
 

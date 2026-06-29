@@ -3,6 +3,10 @@
   "version": "0.1.10",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@trailbase-apps-in-toss-kit/toss-mtls-client": "workspace:*",
+    "@trailbase-apps-in-toss-kit/toss-mtls-core": "workspace:*"
+  },
   "scripts": {
     "start": "bun src/server.mjs",
     "test": "bun test"

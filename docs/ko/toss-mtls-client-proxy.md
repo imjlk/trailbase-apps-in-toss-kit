@@ -25,6 +25,12 @@
 가장 중요한 경계는 인증서 소유권입니다. 인증서 파일은 프록시 컨테이너만 마운트합니다.
 애플리케이션 컨테이너는 내부 URL과 Bearer 토큰만 받습니다.
 
+프록시 내부 구현은 이제 Toss endpoint 상수, 요청 정규화, stub 응답, Apps in Toss 어댑터
+동작을 비공개 runtime-neutral workspace package인
+`@trailbase-apps-in-toss-kit/toss-mtls-core`와
+`@trailbase-apps-in-toss-kit/toss-mtls-client`에 위임합니다. 이는 구현 경계일 뿐입니다.
+Docker 이미지, HTTP endpoint, 환경 변수, 응답 shape, 인증서 mount 모델은 그대로 유지됩니다.
+
 프록시는 `SIGTERM`과 `SIGINT`를 받으면 HTTP 서버를 닫고 정상 종료합니다. 재사용 Compose
 템플릿은 내부 서비스로 실행될 때 signal forwarding이 예측 가능하도록 `init: true`를 설정하고,
 프록시의 기본 upstream timeout 및 IAP retry 설정에서 진행 중인 Toss 요청이 Docker에 의해

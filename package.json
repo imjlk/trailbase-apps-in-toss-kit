@@ -8,7 +8,7 @@
     "services/*"
   ],
   "scripts": {
-    "packages:test": "bun install --frozen-lockfile && bun test packages/trailbase-runtime packages/trailbase-client packages/ait-rn",
+    "packages:test": "bun install --frozen-lockfile && bun test packages/trailbase-runtime packages/trailbase-client packages/ait-rn packages/toss-mtls-core packages/toss-mtls-client",
     "runtime:test": "bun test packages/trailbase-runtime",
     "client:test": "bun test packages/trailbase-client",
     "renovate:validate": "npm exec --yes --package renovate -- renovate-config-validator --strict",

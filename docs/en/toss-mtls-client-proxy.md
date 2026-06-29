@@ -25,6 +25,13 @@ The most important boundary is certificate ownership: only the proxy container
 mounts certificate files. Application containers receive an internal URL and a
 bearer token.
 
+Internally, the proxy now delegates Toss endpoint constants, request normalization, stub responses,
+and Apps in Toss adapter behavior to private runtime-neutral workspace packages:
+`@trailbase-apps-in-toss-kit/toss-mtls-core` and
+`@trailbase-apps-in-toss-kit/toss-mtls-client`. This is an implementation boundary only. The Docker
+image, HTTP endpoints, environment variables, response shapes, and certificate mount model remain
+the same.
+
 The proxy handles `SIGTERM` and `SIGINT` by closing its HTTP server and exiting cleanly. The reusable
 Compose template sets `init: true` so signals are forwarded predictably when the container runs as an
 internal service, and `stop_grace_period: 100s` so Docker does not kill valid in-flight Toss requests

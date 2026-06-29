@@ -1,0 +1,17 @@
+{
+  "name": "@trailbase-apps-in-toss-kit/toss-mtls-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "HTTP client helpers for the Apps in Toss mTLS proxy.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@trailbase-apps-in-toss-kit/toss-mtls-core": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
