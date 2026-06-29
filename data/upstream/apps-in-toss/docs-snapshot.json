@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-25T01:52:54.135Z",
+  "fetchedAt": "2026-06-29T11:34:50.669Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,8 +12,8 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "1b592347aef81cced6932ab33b8654f14ed7ecd3b91e691e23dcf8f7f1eb9f46",
-      "bytes": 41424
+      "sha256": "2ba2ba0540fe7a6fb90f160ffad2167eb36c52cc3ada471366f9976c04f86c95",
+      "bytes": 41698
     },
     {
       "key": "react-native-tutorial",
@@ -75,8 +75,8 @@
       "key": "smart-message-intro",
       "title": "Smart Message overview and notification agreement policy",
       "url": "https://developers-apps-in-toss.toss.im/smart-message/intro.md",
-      "sha256": "aced3bbbfe2daac214e37d792c4af8bde2be8c690bf3caf12d782d7973aa4d1c",
-      "bytes": 21857
+      "sha256": "3aeb4a349a41e718c2a634adc312d8cae80df5b783ac78c17743a0b278cb915b",
+      "bytes": 21494
     },
     {
       "key": "notification-agreement-sdk",
@@ -96,7 +96,7 @@
   "packages": [
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.9.3",
+      "version": "2.10.1",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
@@ -110,14 +110,14 @@
     },
     {
       "packageName": "create-granite-app",
-      "version": "1.0.32",
+      "version": "1.0.33",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
     },
     {
       "packageName": "@granite-js/react-native",
-      "version": "1.0.32",
+      "version": "1.0.33",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"
