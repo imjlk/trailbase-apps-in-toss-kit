@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.10 — 2026-06-29
+
+### Patch changes
+
+- [08fd8e2](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/08fd8e2b50dc58e35b626239db2e191326567db0) Add graceful shutdown handling for the mTLS proxy, enable init and a request-safe stop grace period in
+  the reusable Compose template, and document how to preserve in-flight Toss requests during container
+  recreates. The proxy now closes idle keep-alive sockets during shutdown so idle clients do not consume
+  the full grace period. — Thanks @imjlk!
+
 ## 0.1.9 — 2026-06-16
 
 ### Patch changes
