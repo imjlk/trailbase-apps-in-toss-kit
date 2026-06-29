@@ -74,6 +74,22 @@ describe("toss-mtls-client", () => {
       PROXY_ENDPOINTS.smartMessageBulkSend,
     ]);
   });
+
+  test("throws on non-2xx proxy responses even when the body is empty or non-JSON", async () => {
+    const client = createTossMtlsHttpClient({
+      baseUrl: "http://proxy.local",
+      fetch: async () =>
+        new Response("", {
+          status: 502,
+          headers: { "content-type": "text/plain" },
+        }),
+    });
+
+    await expect(client.health()).rejects.toMatchObject({
+      status: 502,
+      body: {},
+    });
+  });
 });
 
 function fakeFetch(calls, body) {

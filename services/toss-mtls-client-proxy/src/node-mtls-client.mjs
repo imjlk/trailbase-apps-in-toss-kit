@@ -1,6 +1,6 @@
 import http from "node:http";
 import https from "node:https";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import {
   configError,
   clientError,
@@ -42,8 +42,8 @@ async function forward(url, init, config) {
   if (target.protocol === "https:") {
     options.cert = readRequiredFile(config.clientCertPath, "MTLS_CLIENT_CERT_PATH");
     options.key = readRequiredFile(config.clientKeyPath, "MTLS_CLIENT_KEY_PATH");
-    if (config.caCertPath && existsSync(config.caCertPath)) {
-      options.ca = readFileSync(config.caCertPath);
+    if (config.caCertPath) {
+      options.ca = readRequiredFile(config.caCertPath, "MTLS_CA_CERT_PATH");
     }
   }
 
@@ -98,7 +98,8 @@ function bodyBuffer(body) {
   if (body instanceof Uint8Array) return Buffer.from(body);
   if (body instanceof ArrayBuffer) return Buffer.from(body);
   if (typeof body === "string") return Buffer.from(body);
-  return Buffer.from(String(body));
+  if (body instanceof URLSearchParams) return Buffer.from(body.toString());
+  throw clientError("UNSUPPORTED_REQUEST_BODY", "Unsupported request body type", 400);
 }
 
 function headersObject(headers) {

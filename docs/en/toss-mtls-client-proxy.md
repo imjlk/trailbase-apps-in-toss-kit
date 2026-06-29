@@ -84,8 +84,9 @@ Certificates are resolved in this order:
 `MTLS_CERT_DIR` defaults to `/run/mtls`. In the normal Coolify setup, copy the Toss Console
 `*_public.crt` and `*_private.key` files into the `mtls_client_certs` volume and no per-file path env
 is needed. If the volume does not contain exactly one complete pair, the proxy falls back to
-`MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`. `MTLS_CA_CERT_PATH` is optional and is loaded only
-when the file exists.
+`MTLS_CLIENT_CERT_PATH` and `MTLS_CLIENT_KEY_PATH`. The default `MTLS_CA_CERT_PATH` fallback is loaded
+only when the file exists. If you set `MTLS_CA_CERT_PATH` explicitly, the proxy fails closed when that
+file is missing or unreadable.
 
 Optional safety limits:
 

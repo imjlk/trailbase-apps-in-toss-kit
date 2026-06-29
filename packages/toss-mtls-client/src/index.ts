@@ -46,8 +46,11 @@ export function createTossMtlsHttpClient(options: TossMtlsHttpClientOptions) {
     const response = await fetchImpl(`${baseUrl}${path}`, init);
     const text = await response.text();
     const parsed = parseMaybeJson(text);
-    if (!response.ok && (!parsed || typeof parsed !== "object")) {
-      throw new Error(`Toss mTLS proxy request failed with HTTP ${response.status}`);
+    if (!response.ok) {
+      throw Object.assign(new Error(`Toss mTLS proxy request failed with HTTP ${response.status}`), {
+        status: response.status,
+        body: parsed,
+      });
     }
     return parsed;
   };

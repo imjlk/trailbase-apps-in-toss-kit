@@ -26,7 +26,9 @@ describe("toss-mtls-core", () => {
     const core = createTossMtlsCore({
       mode: "forward",
       upstreamBaseUrl,
-      mtlsClient: fakeMtlsClient(calls, () => jsonResponse({ ok: true }, 201, { "x-result": "ok" })),
+      mtlsClient: fakeMtlsClient(calls, () =>
+        jsonResponse({ ok: true }, 201, { "set-cookie": "drop=1", "x-result": "ok" }),
+      ),
     });
 
     const result = await core.genericMtlsRequest({
@@ -59,6 +61,21 @@ describe("toss-mtls-core", () => {
       headers: { "content-type": "application/json", "x-result": "ok" },
       body: { ok: true },
     });
+  });
+
+  test("generic relay rejects unsafe relative paths", async () => {
+    const core = createTossMtlsCore({
+      mode: "forward",
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient([], () => jsonResponse({ ok: true })),
+    });
+
+    await expect(core.genericMtlsRequest({ path: "/\\evil.example/a" })).rejects.toThrow(
+      "path must be a relative absolute path",
+    );
+    await expect(core.genericMtlsRequest({ path: "/anything\u0000" })).rejects.toThrow(
+      "path must be a relative absolute path",
+    );
   });
 
   test("Toss Login complete performs token exchange and user lookup", async () => {
@@ -255,6 +272,41 @@ describe("toss-mtls-core", () => {
     });
   });
 
+  test("promotion failures are not reported as ok", async () => {
+    const missingConfigCore = createTossMtlsCore({ mode: "forward", upstreamBaseUrl });
+    const validationFailure = await missingConfigCore.promotionRewardGrant({ tossUserKey: "toss-user" });
+    expect(validationFailure).toMatchObject({
+      ok: false,
+      providerStatus: "MISSING_TOSS_PROMOTION_CODE",
+    });
+
+    const core = createTossMtlsCore({
+      mode: "forward",
+      upstreamBaseUrl,
+      mtlsClient: fakeMtlsClient([], (url) => {
+        if (new URL(url).pathname === TOSS_ENDPOINTS.promotionGetKey) {
+          return jsonResponse({ resultType: "SUCCESS", success: { key: "promotion-key" } });
+        }
+        if (new URL(url).pathname === TOSS_ENDPOINTS.promotionExecute) {
+          return jsonResponse({ resultType: "SUCCESS", success: "SUCCESS" });
+        }
+        return jsonResponse({});
+      }),
+    });
+
+    const result = await core.promotionRewardGrant({
+      amount: 50,
+      promotionCode: "campaign-code",
+      providerRequestId: "attendance-1",
+      tossUserKey: "toss-user",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      providerStatus: "FAILED",
+    });
+  });
+
   test("Smart Message single and bulk normalize upstream responses", async () => {
     const calls: MtlsCall[] = [];
     const core = createTossMtlsCore({
@@ -277,14 +329,14 @@ describe("toss-mtls-core", () => {
     const single = await core.smartMessageSend({
       providerRequestId: "msg-1",
       requestedAt: 456,
-      templateSetCode: "template",
+      templateCode: "template",
       tossUserKey: "toss-user",
       context: { name: "Ada" },
     });
     const bulk = await core.smartMessageBulkSend({
       providerRequestId: "msg-2",
       requestedAt: 789,
-      templateSetCode: "template",
+      templateCode: "template",
       contextList: [{ userKey: "toss-user", context: { name: "Ada" } }],
     });
 
@@ -294,6 +346,16 @@ describe("toss-mtls-core", () => {
     ]);
     expect(single).toMatchObject({ ok: true, providerStatus: "SENT", msgCount: 1 });
     expect(bulk).toMatchObject({ ok: true, providerStatus: "SENT", msgCount: 1 });
+    expect(calls.map((call) => call.body)).toEqual([
+      {
+        templateSetCode: "template",
+        context: { name: "Ada" },
+      },
+      {
+        templateSetCode: "template",
+        contextList: [{ userKey: "toss-user", context: { name: "Ada" } }],
+      },
+    ]);
   });
 
   test("Smart Message bulk enforces Toss recipient limit", async () => {

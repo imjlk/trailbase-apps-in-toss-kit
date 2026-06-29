@@ -85,7 +85,8 @@ CLI로 생성해서 배포 secret store에 저장하고, 커밋하지 마세요.
 `*_public.crt`, `*_private.key` 파일을 `mtls_client_certs` 볼륨(volume)에 복사하면 됩니다.
 파일별 경로 환경 변수(path env)는 필요하지 않습니다. 볼륨에 완전한 쌍이 정확히 하나 있지
 않으면 프록시는 `MTLS_CLIENT_CERT_PATH`, `MTLS_CLIENT_KEY_PATH`를 대체 경로로 사용합니다.
-`MTLS_CA_CERT_PATH`는 선택 사항이며 파일이 있을 때만 읽습니다.
+기본 `MTLS_CA_CERT_PATH` fallback은 파일이 있을 때만 읽습니다. `MTLS_CA_CERT_PATH`를 명시적으로
+설정했다면 해당 파일이 없거나 읽을 수 없을 때 프록시는 fail-closed로 시작/요청에 실패합니다.
 
 선택적으로 설정할 수 있는 안전 제한값은 다음과 같습니다.
 

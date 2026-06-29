@@ -169,7 +169,7 @@ export async function handleGenericMtlRequest(body: unknown, options: TossMtlsCo
   return {
     ok: upstream.status >= 200 && upstream.status < 300,
     status: upstream.status,
-    headers: upstream.headers || {},
+    headers: sanitizeResponseHeaders(upstream.headers),
     body: upstream.body,
   };
 }
@@ -181,7 +181,7 @@ export function normalizeGenericRequest(body: unknown): TossMtlsRequest {
     throw clientError("UNSUPPORTED_METHOD", "Unsupported method");
   }
   const path = String(request.path || "").trim();
-  if (!path.startsWith("/") || path.startsWith("//") || /^https?:\/\//i.test(path)) {
+  if (!isSafeRelativeAbsolutePath(path)) {
     throw clientError("INVALID_PROXY_PATH", "path must be a relative absolute path");
   }
   return {
@@ -459,7 +459,7 @@ async function grantPromotionReward(requestBody: unknown, options: NormalizedCor
 
   const providerStatus = normalizePromotionStatus(resultResponse.body);
   return {
-    ok: true,
+    ok: providerStatus !== "FAILED",
     providerRequestId,
     providerStatus,
     providerTransactionKey,
@@ -515,7 +515,12 @@ function resolveMtlsUrl(path: string, options: NormalizedCoreOptions) {
   if (!baseUrl) {
     throw configError("MISSING_MTLS_UPSTREAM_BASE_URL", "MTLS_UPSTREAM_BASE_URL is required in forward mode");
   }
-  return new URL(path, baseUrl).toString();
+  const base = new URL(baseUrl);
+  const url = new URL(path, base);
+  if (url.origin !== base.origin) {
+    throw clientError("INVALID_PROXY_PATH", "path must stay within the configured upstream origin");
+  }
+  return url.toString();
 }
 
 function responseHeadersObject(headers: Headers) {
@@ -608,7 +613,7 @@ function stubSmartMessageResponse(body: unknown, msgCount: number, now: () => nu
 }
 
 export function messageUpstreamBody(body: Record<string, unknown>) {
-  const templateSetCode = stringOrUndefined(body.templateSetCode);
+  const templateSetCode = resolveTemplateSetCode(body);
   if (!templateSetCode) {
     throw clientError("MISSING_TEMPLATE_SET_CODE", "templateSetCode is required");
   }
@@ -619,7 +624,7 @@ export function messageUpstreamBody(body: Record<string, unknown>) {
 }
 
 export function bulkMessageUpstreamBody(body: Record<string, unknown>) {
-  const templateSetCode = stringOrUndefined(body.templateSetCode);
+  const templateSetCode = resolveTemplateSetCode(body);
   if (!templateSetCode) {
     throw clientError("MISSING_TEMPLATE_SET_CODE", "templateSetCode is required");
   }
@@ -653,6 +658,10 @@ function messageContext(value: unknown, name: string) {
     throw clientError("INVALID_MESSAGE_CONTEXT", `${name} must be an object`);
   }
   return value;
+}
+
+function resolveTemplateSetCode(body: Record<string, unknown>) {
+  return stringOrUndefined(body.templateSetCode ?? body.templateCode);
 }
 
 export function normalizeLoginReferrer(value: unknown) {
@@ -921,7 +930,7 @@ function rewardFailure(
   providerErrorCode = undefined,
 ) {
   return {
-    ok: true,
+    ok: false,
     providerRequestId: request.providerRequestId,
     providerStatus,
     providerTransactionKey,
@@ -943,7 +952,16 @@ function normalizePromotionStatus(value: unknown) {
   ).toUpperCase();
   if (["SUCCESS", "SUCCEEDED", "GRANTED", "DONE", "COMPLETED"].includes(status)) return "GRANTED";
   if (["PENDING", "WAITING", "PROCESSING"].includes(status)) return "PENDING";
-  return status ? "FAILED" : "GRANTED";
+  return "FAILED";
+}
+
+function isSafeRelativeAbsolutePath(path: string) {
+  return (
+    path.startsWith("/") &&
+    !path.startsWith("//") &&
+    !/^https?:\/\//i.test(path) &&
+    !/[\\\u0000-\u001F\u007F]/.test(path)
+  );
 }
 
 function isUpstreamFailure(value: unknown) {

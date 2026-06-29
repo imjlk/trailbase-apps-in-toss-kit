@@ -13,6 +13,7 @@ import {
   SMART_MESSAGE_BULK_MAX_CONTEXTS,
   TOSS_ENDPOINTS,
   createConfig,
+  createNodeMtlsClient,
   createProxyServer,
   handleRequest,
 } from "../src/core.mjs";
@@ -123,7 +124,7 @@ describe("toss-mtls-client-proxy", () => {
     }
   });
 
-  test("prefers a complete Toss certificate pair over explicit fallback paths", () => {
+  test("prefers explicit certificate paths over a complete Toss certificate pair", () => {
     const certDir = mkdtempSync(path.join(tmpdir(), "toss-mtls-"));
     try {
       writeFileSync(path.join(certDir, "sample-service_public.crt"), "cert");
@@ -135,11 +136,40 @@ describe("toss-mtls-client-proxy", () => {
         MTLS_CLIENT_KEY_PATH: "/custom/client.key",
       });
 
-      expect(config.clientCertPath).toBe(path.join(certDir, "sample-service_public.crt"));
-      expect(config.clientKeyPath).toBe(path.join(certDir, "sample-service_private.key"));
+      expect(config.clientCertPath).toBe("/custom/client.crt");
+      expect(config.clientKeyPath).toBe("/custom/client.key");
     } finally {
       rmSync(certDir, { recursive: true, force: true });
     }
+  });
+
+  test("node mTLS client fails closed for unreadable configured CA files", async () => {
+    const certDir = mkdtempSync(path.join(tmpdir(), "toss-mtls-"));
+    try {
+      const clientCertPath = path.join(certDir, "client.crt");
+      const clientKeyPath = path.join(certDir, "client.key");
+      writeFileSync(clientCertPath, "cert");
+      writeFileSync(clientKeyPath, "key");
+
+      const client = createNodeMtlsClient({
+        clientCertPath,
+        clientKeyPath,
+        caCertPath: path.join(certDir, "missing-ca.pem"),
+      });
+
+      await expect(client.request("https://127.0.0.1/internal", { method: "GET" })).rejects.toThrow(
+        "MTLS_CA_CERT_PATH is missing or unreadable",
+      );
+    } finally {
+      rmSync(certDir, { recursive: true, force: true });
+    }
+  });
+
+  test("node mTLS client rejects unsupported request body types", async () => {
+    const client = createNodeMtlsClient({});
+    await expect(client.request("http://127.0.0.1/internal", { method: "POST", body: { bad: true } })).rejects.toThrow(
+      "Unsupported request body type",
+    );
   });
 
   test("uses explicit certificate paths when no complete Toss pair is available", () => {
