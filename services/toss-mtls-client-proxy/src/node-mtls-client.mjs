@@ -6,7 +6,7 @@ import {
   clientError,
   sanitizeHeaders,
   upstreamError,
-} from "@trailbase-apps-in-toss-kit/toss-mtls-core";
+} from "@ait-kit/api-core";
 import { requestBodyLimitBytes, upstreamBodyLimitBytes, upstreamTimeoutMs } from "./config.mjs";
 
 export function createNodeMtlsClient(config) {

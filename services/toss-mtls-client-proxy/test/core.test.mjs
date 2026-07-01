@@ -70,6 +70,13 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.error).toBe("UNAUTHORIZED");
   });
 
+  test("health response preserves the proxy public shape", async () => {
+    const req = request("GET", PROXY_ENDPOINTS.health);
+    const res = await handleRequest(req, { mode: "stub", internalToken: "" });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, mode: "stub" });
+  });
+
   test("requires an internal token in forward mode", () => {
     expect(() =>
       createProxyServer({
@@ -412,8 +419,12 @@ describe("toss-mtls-client-proxy", () => {
   test("forward login unlink treats top-level Toss error codes as failures", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ errorCode: "USER_KEY_NOT_FOUND", message: "missing user key" }));
+      const payload = JSON.stringify({ errorCode: "USER_KEY_NOT_FOUND", message: "missing user key" });
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(payload),
+      });
+      res.end(payload);
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const req = request(
@@ -541,6 +552,37 @@ describe("toss-mtls-client-proxy", () => {
       const body = await res.json();
       expect(res.status).toBe(413);
       expect(body.error).toBe("REQUEST_BODY_TOO_LARGE");
+    });
+  });
+
+  test("generic relay preserves top-level upstream error codes", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ errorCode: "UPSTREAM_CODE", message: "passthrough" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.genericMtlRequest,
+        {
+          method: "POST",
+          path: "/api-partner/v1/apps-in-toss/user/oauth2/access/remove-by-user-key",
+          body: { userKey: "sensitive-toss-user-key" },
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+      expect(res.body).toMatchObject({
+        ok: true,
+        status: 200,
+        headers: { "content-type": "application/json" },
+        body: { errorCode: "UPSTREAM_CODE", message: "passthrough" },
+      });
     });
   });
 

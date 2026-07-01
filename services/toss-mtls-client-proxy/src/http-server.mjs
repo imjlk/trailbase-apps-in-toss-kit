@@ -1,6 +1,6 @@
 import http from "node:http";
-import { createTossMtlsCore, clientError, publicError } from "@trailbase-apps-in-toss-kit/toss-mtls-core";
-import { PROXY_ENDPOINTS } from "@trailbase-apps-in-toss-kit/toss-mtls-client";
+import { TOSS_ENDPOINTS, createTossMtlsCore, clientError, publicError as corePublicError } from "@ait-kit/api-core";
+import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
 
@@ -29,7 +29,8 @@ export async function handleRequest(req, config = createConfig(), core = createC
   const url = new URL(req.url || "/", "http://internal.local");
 
   if (req.method === "GET" && url.pathname === PROXY_ENDPOINTS.health) {
-    return response(200, await core.health());
+    const health = await core.health();
+    return response(200, { ok: health.ok, mode: health.mode });
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.genericMtlRequest) {
@@ -71,17 +72,65 @@ export async function handleRequest(req, config = createConfig(), core = createC
 }
 
 function createCore(config) {
-  return createTossMtlsCore({
+  const mtlsClient = createNodeMtlsClient(config);
+  const baseOptions = {
     mode: config.mode,
     upstreamBaseUrl: config.upstreamBaseUrl,
-    mtlsClient: createNodeMtlsClient(config),
     tossPromotionCode: config.tossPromotionCode,
     tossPromotionAmount: config.tossPromotionAmount,
     iapOrderStatusMaxAttempts: config.iapOrderStatusMaxAttempts,
     iapOrderStatusRetryDelayMs: config.iapOrderStatusRetryDelayMs,
     debug: config.debug,
     log: (message, fields) => console.info(`[toss-mtls-client-proxy] ${message}`, fields),
+  };
+  const genericCore = createTossMtlsCore({
+    ...baseOptions,
+    mtlsClient,
   });
+  const adapterCore = createTossMtlsCore({
+    ...baseOptions,
+    mtlsClient: createAdapterMtlsClient(mtlsClient),
+  });
+
+  return {
+    ...adapterCore,
+    genericMtlsRequest: genericCore.genericMtlsRequest,
+  };
+}
+
+function createAdapterMtlsClient(mtlsClient) {
+  return {
+    async request(url, init) {
+      const response = await mtlsClient.request(url, init);
+      const target = new URL(url);
+      if (target.pathname !== TOSS_ENDPOINTS.loginRemoveByUserKey) {
+        return response;
+      }
+      const raw = await response.clone().text();
+      const body = parseMaybeJson(raw);
+      if (!isTopLevelTossErrorCode(body)) {
+        return response;
+      }
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
+      return new Response(JSON.stringify({ ok: false, ...body }), {
+        status: response.status,
+        headers,
+      });
+    },
+  };
+}
+
+function publicError(error) {
+  const safeError = corePublicError(error);
+  if (safeError.status === 500 && safeError.code === "APPS_IN_TOSS_API_ERROR") {
+    return {
+      status: 500,
+      code: "PROXY_ERROR",
+      message: "Proxy request failed",
+    };
+  }
+  return safeError;
 }
 
 function isAuthorized(req, config) {
@@ -138,4 +187,23 @@ function response(status, body) {
 
 function byteLength(chunk) {
   return Buffer.isBuffer(chunk) ? chunk.length : Buffer.byteLength(String(chunk));
+}
+
+function parseMaybeJson(raw) {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { raw };
+  }
+}
+
+function isTopLevelTossErrorCode(value) {
+  return (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    Object.hasOwn(value, "errorCode") &&
+    !Object.hasOwn(value, "ok")
+  );
 }

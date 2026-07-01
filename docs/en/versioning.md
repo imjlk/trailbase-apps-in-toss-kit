@@ -6,17 +6,16 @@ This repository uses Sampo for changeset-driven version and changelog management
 
 - `cargo/trailbase-guest-common`
 - `cargo/trailbase-toss-identity`
-- `npm/@trailbase-apps-in-toss-kit/toss-mtls-core`
-- `npm/@trailbase-apps-in-toss-kit/toss-mtls-client`
 - `npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy`
 - `npm/@trailbase-apps-in-toss-kit/ait-rn`
 - `npm/@trailbase-apps-in-toss-kit/trailbase-client`
 - `npm/@trailbase-apps-in-toss-kit/trailbase-runtime`
 
 The two Rust WASM helper crates are configured as a fixed group in `.sampo/config.toml` so they move
-together. The Toss mTLS core/client packages, Bun mTLS proxy, and shared JS packages are private npm
-packages; Sampo manages their versions and changelogs, but they are not published to npm. The proxy
-GHCR image release version comes from `services/toss-mtls-client-proxy/package.json`.
+together. The Bun mTLS proxy and shared JS packages are private npm packages; Sampo manages their
+versions and changelogs, but they are not published to npm. The proxy consumes the public
+`@ait-kit/api-core` and `@ait-kit/api-client` packages internally. The proxy GHCR image release
+version comes from `services/toss-mtls-client-proxy/package.json`.
 
 ## Regular Change Flow
 

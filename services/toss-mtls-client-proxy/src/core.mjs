@@ -14,11 +14,11 @@ export {
 } from "./config.mjs";
 export { createNodeMtlsClient } from "./node-mtls-client.mjs";
 export { createProxyServer, handleRequest } from "./http-server.mjs";
-export { PROXY_ENDPOINTS } from "@trailbase-apps-in-toss-kit/toss-mtls-client";
+export { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 export {
   DEFAULT_IAP_ORDER_STATUS_MAX_ATTEMPTS,
   DEFAULT_IAP_ORDER_STATUS_RETRY_DELAY_MS,
   SMART_MESSAGE_BULK_MAX_CONTEXTS,
   TOSS_ENDPOINTS,
   createTossMtlsCore,
-} from "@trailbase-apps-in-toss-kit/toss-mtls-core";
+} from "@ait-kit/api-core";
