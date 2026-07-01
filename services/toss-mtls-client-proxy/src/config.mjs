@@ -5,7 +5,7 @@ import {
   configError,
   parseNonNegativeInteger,
   parsePositiveInteger,
-} from "@trailbase-apps-in-toss-kit/toss-mtls-core";
+} from "@ait-kit/api-core";
 
 export const DEFAULT_PORT = 8787;
 export const DEFAULT_CERT_DIR = "/run/mtls";

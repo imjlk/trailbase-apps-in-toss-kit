@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@trailbase-apps-in-toss-kit/toss-mtls-client": "workspace:*",
-    "@trailbase-apps-in-toss-kit/toss-mtls-core": "workspace:*"
+    "@ait-kit/api-client": "0.1.1",
+    "@ait-kit/api-core": "0.1.1"
   },
   "scripts": {
     "start": "bun src/server.mjs",

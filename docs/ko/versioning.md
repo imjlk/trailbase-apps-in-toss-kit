@@ -6,17 +6,16 @@
 
 - `cargo/trailbase-guest-common`
 - `cargo/trailbase-toss-identity`
-- `npm/@trailbase-apps-in-toss-kit/toss-mtls-core`
-- `npm/@trailbase-apps-in-toss-kit/toss-mtls-client`
 - `npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy`
 - `npm/@trailbase-apps-in-toss-kit/ait-rn`
 - `npm/@trailbase-apps-in-toss-kit/trailbase-client`
 - `npm/@trailbase-apps-in-toss-kit/trailbase-runtime`
 
 두 Rust WASM helper crate는 `.sampo/config.toml`에서 고정 버전 그룹(fixed group)으로 묶여
-함께 이동합니다. Toss mTLS core/client package, Bun mTLS 프록시, 공유 JS package는 비공개 npm
-package입니다. Sampo가 버전(version)과 changelog를 관리하지만 npm에는 publish하지 않습니다.
-GHCR 이미지 릴리스 버전은 `services/toss-mtls-client-proxy/package.json`에서 가져옵니다.
+함께 이동합니다. Bun mTLS 프록시와 공유 JS package는 비공개 npm package입니다. Sampo가
+버전(version)과 changelog를 관리하지만 npm에는 publish하지 않습니다. 프록시는 내부적으로 공개
+`@ait-kit/api-core`와 `@ait-kit/api-client` package를 사용합니다. GHCR 이미지 릴리스 버전은
+`services/toss-mtls-client-proxy/package.json`에서 가져옵니다.
 
 ## 일반 변경 흐름
 

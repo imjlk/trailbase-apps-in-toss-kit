@@ -25,11 +25,10 @@
 가장 중요한 경계는 인증서 소유권입니다. 인증서 파일은 프록시 컨테이너만 마운트합니다.
 애플리케이션 컨테이너는 내부 URL과 Bearer 토큰만 받습니다.
 
-프록시 내부 구현은 이제 Toss endpoint 상수, 요청 정규화, stub 응답, Apps in Toss 어댑터
-동작을 비공개 runtime-neutral workspace package인
-`@trailbase-apps-in-toss-kit/toss-mtls-core`와
-`@trailbase-apps-in-toss-kit/toss-mtls-client`에 위임합니다. 이는 구현 경계일 뿐입니다.
-Docker 이미지, HTTP endpoint, 환경 변수, 응답 shape, 인증서 mount 모델은 그대로 유지됩니다.
+프록시 내부 구현은 Toss endpoint 상수, 요청 정규화, stub 응답, Apps in Toss 어댑터 동작을
+공개 runtime-neutral package인 `@ait-kit/api-core`와 `@ait-kit/api-client`에 위임합니다. 이는
+구현 경계일 뿐입니다. Docker 이미지, HTTP endpoint, 환경 변수, 응답 shape, 인증서 mount 모델은
+그대로 유지됩니다.
 
 Core package는 `apps-in-toss-community/oidc-bridge`에서 쓰는 형태와 호환되는 낮은 레벨의
 mTLS client port를 사용합니다. 형태는 `request(url, init) => Response`이며, 향후 런타임을

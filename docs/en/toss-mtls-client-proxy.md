@@ -25,12 +25,10 @@ The most important boundary is certificate ownership: only the proxy container
 mounts certificate files. Application containers receive an internal URL and a
 bearer token.
 
-Internally, the proxy now delegates Toss endpoint constants, request normalization, stub responses,
-and Apps in Toss adapter behavior to private runtime-neutral workspace packages:
-`@trailbase-apps-in-toss-kit/toss-mtls-core` and
-`@trailbase-apps-in-toss-kit/toss-mtls-client`. This is an implementation boundary only. The Docker
-image, HTTP endpoints, environment variables, response shapes, and certificate mount model remain
-the same.
+Internally, the proxy delegates Toss endpoint constants, request normalization, stub responses, and
+Apps in Toss adapter behavior to the public runtime-neutral packages `@ait-kit/api-core` and
+`@ait-kit/api-client`. This is an implementation boundary only. The Docker image, HTTP endpoints,
+environment variables, response shapes, and certificate mount model remain the same.
 
 The core package uses a low-level mTLS client port compatible with the shape used by
 `apps-in-toss-community/oidc-bridge`: `request(url, init) => Response`, plus an optional per-app
