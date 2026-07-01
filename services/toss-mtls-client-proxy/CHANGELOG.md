@@ -1,5 +1,12 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.1.12 — 2026-07-01
+
+### Patch changes
+
+- [9f6967c](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/9f6967cc0288d548c137c1ae890ff2478b759ebb) Switch the mTLS proxy to consume the public `@ait-kit/api-core` and `@ait-kit/api-client` packages while preserving the existing HTTP API and certificate boundary. — Thanks @imjlk!
+- [5e2cd84](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/5e2cd84cd8353170865e08825b7c3024c314673d) Remove the proxy-local Toss Login unlink error wrapper and rely on `@ait-kit/api-core` normalization while preserving the proxy HTTP contract. — Thanks @imjlk!
+
 ## 0.1.11 — 2026-06-29
 
 ### Patch changes
