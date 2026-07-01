@@ -42,15 +42,15 @@
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
       "version": "0.1.11",
       "dependencies": {
-        "@ait-kit/api-client": "0.1.1",
-        "@ait-kit/api-core": "0.1.1",
+        "@ait-kit/api-client": "0.1.2",
+        "@ait-kit/api-core": "0.1.2",
       },
     },
   },
   "packages": {
-    "@ait-kit/api-client": ["@ait-kit/api-client@0.1.1", "", { "dependencies": { "@ait-kit/api-core": "0.1.1" } }, "sha512-aDa2fxqKk46sIU/OLnhQE40T7CdY/RO6ltPRaSwGzezHAvPH1wPuANmQqIliWVPSOPYTqtD1CxlFmS1gBxXAQg=="],
+    "@ait-kit/api-client": ["@ait-kit/api-client@0.1.2", "", { "dependencies": { "@ait-kit/api-core": "0.1.2" } }, "sha512-bp1/6/OTri0/SObxPJikZ6iK9LD6gPa5EH0ZW4C0OYrylID9+gU9bn9Fq3eoTZ503v+vysiENxkwE8euSg50TQ=="],
 
-    "@ait-kit/api-core": ["@ait-kit/api-core@0.1.1", "", {}, "sha512-Q1PDPPJluCocJsUWMnlZFeqAEDRRTJg/ssW2j2Uc4uo5Qy+ncKFGUJXOsVJdokugdA8oL+vMWzyZfnPTf6IzHg=="],
+    "@ait-kit/api-core": ["@ait-kit/api-core@0.1.2", "", {}, "sha512-53TOnGWroOAPlAR4jJDvlPm0jhE0Vynlb6fpDESb40GmDZEAIijCsriygi9PM00d3PkQL9MSAuFsHKzRXHgy3A=="],
 
     "@ampproject/remapping": ["@ampproject/remapping@2.3.0", "", { "dependencies": { "@jridgewell/gen-mapping": "^0.3.5", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="],
 

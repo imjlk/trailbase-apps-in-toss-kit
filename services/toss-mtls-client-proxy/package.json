@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@ait-kit/api-client": "0.1.1",
-    "@ait-kit/api-core": "0.1.1"
+    "@ait-kit/api-client": "0.1.2",
+    "@ait-kit/api-core": "0.1.2"
   },
   "scripts": {
     "start": "bun src/server.mjs",
