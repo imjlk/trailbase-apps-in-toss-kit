@@ -419,8 +419,12 @@ describe("toss-mtls-client-proxy", () => {
   test("forward login unlink treats top-level Toss error codes as failures", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ errorCode: "USER_KEY_NOT_FOUND", message: "missing user key" }));
+      const payload = JSON.stringify({ errorCode: "USER_KEY_NOT_FOUND", message: "missing user key" });
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-length": Buffer.byteLength(payload),
+      });
+      res.end(payload);
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const req = request(

@@ -111,9 +111,11 @@ function createAdapterMtlsClient(mtlsClient) {
       if (!isTopLevelTossErrorCode(body)) {
         return response;
       }
+      const headers = new Headers(response.headers);
+      headers.delete("content-length");
       return new Response(JSON.stringify({ ok: false, ...body }), {
         status: response.status,
-        headers: response.headers,
+        headers,
       });
     },
   };
