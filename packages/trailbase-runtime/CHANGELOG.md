@@ -1,5 +1,16 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.2.5 — 2026-07-09
+
+### Patch changes
+
+- [2c3e0af](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2c3e0afb406e2a266c5d98b4fc7086716390f581) Add a copyable template drift mapping example and wire the release doctor
+  template to use it when present. — Thanks @imjlk!
+- [6d97c87](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6d97c87b206ab6a2443cda39cfa15bff0b8f4508) Add a copyable release doctor config template for production env, template drift,
+  and release-note checks. — Thanks @imjlk!
+- [7e1615d](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/7e1615d6b54ff339649e08746cc2ceb2ea0f8796) Add a reusable release doctor for preQA and production handoff checks. The runtime package now exports release-doctor helpers and a CLI that can combine production env validation, app-owned commands, and optional Sampo changeset checks into one normalized result. — Thanks @imjlk!
+- [a1e6c8d](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/a1e6c8d29e5e0c138a16fb9734e7b16cd5ad011e) Add a reusable local dev runner plan and CLI wrapper for TrailBase-backed stacks. The runner chooses non-conflicting TrailBase and mTLS proxy host ports, emits generic Compose environment variables, supports dry-run output, and leaves app-owned proxy URL wiring explicit. — Thanks @imjlk!
+
 ## 0.2.4 — 2026-06-20
 
 ### Patch changes
