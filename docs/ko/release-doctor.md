@@ -45,6 +45,7 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
       "name": "Template drift",
       "command": "bun",
       "captureOutput": "failure",
+      "timeout": 300000,
       "args": [
         "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
         ".",
@@ -67,7 +68,7 @@ root보다 아래에 있지만 명령은 repository root에서 실행해야 한�
 지원하는 check type은 다음과 같습니다.
 
 - `production-env`: 공통 운영 env 검증기를 실행합니다.
-- `command`: 앱이 소유한 명령을 실행하고 기본적으로 exit code `0`을 성공으로 봅니다. 명령 출력은 기본적으로 실패 시에만 캡처하며, `captureOutput`을 `always` 또는 `none`으로 바꿀 수 있습니다.
+- `command`: 앱이 소유한 명령을 실행하고 기본적으로 exit code `0`을 성공으로 봅니다. 명령 출력은 기본적으로 실패 시에만 캡처하며, `captureOutput`을 `always` 또는 `none`으로 바꿀 수 있습니다. `timeout` 기본값은 300,000 ms입니다.
 - `changeset`: `.sampo/changesets/*.md` 대기 changeset이 있는지 확인합니다.
 
 `"required": false`를 설정하면 실패한 check를 전체 실패가 아니라 경고로 보고합니다.

@@ -185,6 +185,7 @@ describe("release doctor", () => {
 
     expect(calls[0].stdio).toEqual(["ignore", "ignore", "pipe"]);
     expect(calls[0].maxBuffer).toBe(8 * 1024 * 1024);
+    expect(calls[0].timeout).toBe(300_000);
     expect(calls[1].stdio).toEqual(["ignore", "pipe", "pipe"]);
   });
 
@@ -500,6 +501,7 @@ describe("release doctor", () => {
               name: "Command",
               command: process.execPath,
               args: ["-e", "process.exit(0)"],
+              timeout: 30_000,
             },
           ],
         }),

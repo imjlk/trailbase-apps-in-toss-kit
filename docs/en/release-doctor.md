@@ -45,6 +45,7 @@ Add `--json` when CI should consume the normalized result.
       "name": "Template drift",
       "command": "bun",
       "captureOutput": "failure",
+      "timeout": 300000,
       "args": [
         "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
         ".",
@@ -68,7 +69,7 @@ repository root.
 Supported check types are:
 
 - `production-env`: runs the shared production env validator.
-- `command`: runs an app-owned command and treats exit code `0` as success by default. Command output is captured only on failure unless `captureOutput` is set to `always` or `none`.
+- `command`: runs an app-owned command and treats exit code `0` as success by default. Command output is captured only on failure unless `captureOutput` is set to `always` or `none`; `timeout` defaults to 300,000 ms.
 - `changeset`: checks for pending `.sampo/changesets/*.md` files.
 
 Set `"required": false` to report a failed check as a warning instead of failing

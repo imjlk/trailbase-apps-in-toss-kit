@@ -76,6 +76,7 @@ export function createCommandCheck({
   required = true,
   captureOutput = "failure",
   maxBuffer = 8 * 1024 * 1024,
+  timeout = 300_000,
   successCodes = [0],
   spawnSyncImpl = spawnSync,
 } = {}) {
@@ -91,6 +92,7 @@ export function createCommandCheck({
         return failure("Command check successCodes must contain integer exit codes");
       }
       const normalizedMaxBuffer = normalizePositiveInteger(maxBuffer, 8 * 1024 * 1024);
+      const normalizedTimeout = normalizePositiveInteger(timeout, 300_000);
       const captureStdout = shouldCaptureCommandOutput(captureOutput, "success");
       const captureStderr =
         shouldCaptureCommandOutput(captureOutput, "failure") || captureStdout;
@@ -99,6 +101,7 @@ export function createCommandCheck({
         env: { ...process.env, ...env },
         encoding: "utf8",
         maxBuffer: normalizedMaxBuffer,
+        timeout: normalizedTimeout,
         stdio: ["ignore", captureStdout ? "pipe" : "ignore", captureStderr ? "pipe" : "ignore"],
       });
       if (result.error) {
@@ -262,8 +265,18 @@ function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
     });
   }
   if (type === "command") {
-    const { name, command, args, cwd, env, required, captureOutput, maxBuffer, successCodes } =
-      entry;
+    const {
+      name,
+      command,
+      args,
+      cwd,
+      env,
+      required,
+      captureOutput,
+      maxBuffer,
+      timeout,
+      successCodes,
+    } = entry;
     return createCommandCheck({
       name,
       command,
@@ -273,6 +286,7 @@ function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
       required,
       captureOutput,
       maxBuffer,
+      timeout,
       successCodes: Array.isArray(successCodes) ? successCodes : undefined,
     });
   }
