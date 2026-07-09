@@ -29,6 +29,19 @@ Add `--json` when CI should consume the normalized result.
 
 ## Config Shape
 
+Copy the template when a service wants a starting point that combines production
+env validation, copied-template drift, and release-note reminders:
+
+```bash
+cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/release-doctor.config.example.json \
+  apps/trailbase/release-doctor.json
+```
+
+The template assumes the copied file lives at `apps/trailbase/release-doctor.json`
+and sets `"root": "../.."` so command checks run from the repository root.
+Adjust paths and app-specific env keys before using it in CI or a release
+checklist.
+
 ```json
 {
   "root": "../..",
@@ -38,7 +51,7 @@ Add `--json` when CI should consume the normalized result.
       "name": "Production env",
       "file": "apps/trailbase/.env.production",
       "appEnvKey": "APP_ENV",
-      "optionalHttps": ["APP_BASE_URL"]
+      "optionalHttps": ["APP_BASE_URL", "TRAILBASE_PUBLIC_URL"]
     },
     {
       "type": "command",
@@ -46,6 +59,7 @@ Add `--json` when CI should consume the normalized result.
       "command": "bun",
       "captureOutput": "failure",
       "timeout": 300000,
+      "required": false,
       "args": [
         "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
         ".",
@@ -55,7 +69,7 @@ Add `--json` when CI should consume the normalized result.
     },
     {
       "type": "changeset",
-      "name": "Pending changeset",
+      "name": "Pending Sampo changeset",
       "required": false
     }
   ]
@@ -73,7 +87,9 @@ Supported check types are:
 - `changeset`: checks for pending `.sampo/changesets/*.md` files.
 
 Set `"required": false` to report a failed check as a warning instead of failing
-the whole doctor run.
+the whole doctor run. The template keeps template drift and changeset checks as
+warnings by default because those policies often become strict only after a
+service has reconciled its copied files and release process.
 
 ## JavaScript Helpers
 
