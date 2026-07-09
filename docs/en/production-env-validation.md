@@ -87,6 +87,10 @@ Consumer wrappers should import the shared validator and add app-specific rules
 as small functions. Keep wrapper output human-readable and deterministic so it
 is useful in CI, local shells, and deployment runbooks.
 
+When the production env check should run alongside template drift, smoke, or
+release-note checks, use [release-doctor.md](release-doctor.md) to orchestrate
+those steps through one normalized result.
+
 For Toss Login unlink callbacks, add `applyTossLoginUnlinkRules` to the wrapper rules when the app
 exposes a callback route. The shared rule validates `TOSS_LOGIN_UNLINK_BASIC_AUTH`, accepts the
 legacy `TOSS_UNLINK_CALLBACK_BASIC_AUTH` key with a warning, and limits

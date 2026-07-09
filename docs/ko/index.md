@@ -22,6 +22,7 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 | 컨테이너 시작 스크립트 공통화 이해하기 | [trailbase-runtime.md](trailbase-runtime.md) |
 | Toss mTLS 프록시 안전하게 운영하기 | [toss-mtls-client-proxy.md](toss-mtls-client-proxy.md) |
 | 운영 환경 변수 검증하기 | [production-env-validation.md](production-env-validation.md) |
+| preQA와 릴리스 점검 함께 실행하기 | [release-doctor.md](release-doctor.md) |
 | SQL 마이그레이션과 Record API 노출 설계하기 | [schema-patterns.md](schema-patterns.md) |
 | 익명 사용자를 Toss Login 사용자와 연결하기 | [toss-identity.md](toss-identity.md) |
 | Toss 프로모션 리워드 캠페인 설계하기 | [promotion-campaigns.md](promotion-campaigns.md) |

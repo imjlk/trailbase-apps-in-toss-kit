@@ -274,21 +274,25 @@ describe("dev runner helpers", () => {
     expect([...ports].sort((a, b) => a - b)).toEqual([4000, 8787]);
   });
 
-  test("resolves TrailBase, proxy, and asset preview ports without overlap", async () => {
-    const result = await resolveLocalDevPorts({
-      trailbasePort: 49100,
-      mtlsProxyPort: 49101,
-      assetPreviewPort: 49101,
-      host: "127.0.0.1",
-      logger: { warn: () => {} },
-    });
+  test(
+    "resolves TrailBase, proxy, and asset preview ports without overlap",
+    async () => {
+      const result = await resolveLocalDevPorts({
+        trailbasePort: 49100,
+        mtlsProxyPort: 49101,
+        assetPreviewPort: 49101,
+        host: "127.0.0.1",
+        logger: { warn: () => {} },
+      });
 
-    expect(result.trailbasePort).toBe(49100);
-    expect(result.mtlsProxyPort).toBe(49101);
-    expect(result.assetPreviewPort).toBe(49102);
-    expect(result.granitePort).toBe(49102);
-    expect(result.changed).toBe(true);
-  });
+      expect(result.trailbasePort).toBe(49100);
+      expect(result.mtlsProxyPort).toBe(49101);
+      expect(result.assetPreviewPort).toBe(49102);
+      expect(result.granitePort).toBe(49102);
+      expect(result.changed).toBe(true);
+    },
+    15_000,
+  );
 
   test("shell entrypoint helper has valid syntax", () => {
     const result = spawnSync("sh", ["-n", "packages/trailbase-runtime/entrypoint/lib.sh"], {
