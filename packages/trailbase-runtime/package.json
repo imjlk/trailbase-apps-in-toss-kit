@@ -9,6 +9,8 @@
     "./dev-runner": "./src/dev-runner.mjs"
   },
   "bin": {
+    "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
+    "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
     "trailbase-prod-env-validate": "./bin/validate-production-env.mjs"
   },
   "scripts": {

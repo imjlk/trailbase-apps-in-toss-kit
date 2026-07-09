@@ -6,6 +6,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   buildComposeArgs,
+  buildDevRunnerEnv,
+  buildDevRunnerPlan,
+  buildDevRunnerUrls,
+  createDevRunnerPlan,
   detectLanIp,
   findAvailablePort,
   parseDockerPublishedHostPorts,
@@ -26,16 +30,28 @@ describe("dev runner helpers", () => {
     expect(
       parseDevRunnerArgs([
         "--fresh",
+        "--dry-run",
+        "--print-env",
         "--no-build",
         "--profile=toss-proxy",
+        "--project-name",
+        "dev-stack",
+        "--ignore-container-prefix=dev-stack-",
+        "--mtls-health-path",
+        "healthz",
         "--trailbase-port",
         "4001",
         "trailbase",
       ]),
     ).toMatchObject({
       fresh: true,
+      dryRun: true,
+      printEnv: true,
       build: false,
       profiles: ["toss-proxy"],
+      projectName: "dev-stack",
+      ignoreContainerNamePrefixes: ["dev-stack-"],
+      mtlsProxyHealthPath: "healthz",
       trailbasePort: 4001,
       services: ["trailbase"],
     });
@@ -46,10 +62,13 @@ describe("dev runner helpers", () => {
       buildComposeArgs({
         composeFiles: ["docker-compose.yml"],
         profiles: ["toss-proxy"],
+        projectName: "dev-stack",
         services: ["trailbase"],
       }),
     ).toEqual([
       "compose",
+      "--project-name",
+      "dev-stack",
       "-f",
       "docker-compose.yml",
       "--profile",
@@ -59,6 +78,139 @@ describe("dev runner helpers", () => {
       "--build",
       "trailbase",
     ]);
+  });
+
+  test("builds local dev URLs from selected ports", () => {
+    expect(
+      buildDevRunnerUrls({
+        host: "0.0.0.0",
+        trailbasePort: 4001,
+        mtlsProxyPort: 8788,
+        granitePort: 8081,
+        mtlsProxyHealthPath: "healthz",
+      }),
+    ).toEqual({
+      trailbase: "http://127.0.0.1:4001",
+      mtlsProxy: "http://127.0.0.1:8788",
+      mtlsProxyHealth: "http://127.0.0.1:8788/healthz",
+      granite: "http://127.0.0.1:8081",
+    });
+  });
+
+  test("builds local dev environment without overriding explicit URLs", () => {
+    expect(
+      buildDevRunnerEnv({
+        host: "127.0.0.1",
+        trailbasePort: 4001,
+        mtlsProxyPort: 8788,
+        granitePort: 8081,
+        fresh: true,
+        env: {
+          TRAILBASE_PUBLIC_URL: "http://trailbase.test",
+          TOSS_PROXY_SMOKE_URL: "http://proxy.test",
+          GRANITE_DEV_SERVER_URL: "http://granite.test",
+          TRAILBASE_FRESH_START_TOKEN: "manual-token",
+        },
+        now: () => 123,
+      }),
+    ).toEqual({
+      TRAILBASE_HOST_PORT: "4001",
+      MTLS_PROXY_HOST_PORT: "8788",
+      TRAILBASE_PUBLIC_URL: "http://trailbase.test",
+      TOSS_PROXY_SMOKE_URL: "http://proxy.test",
+      GRANITE_HOST_PORT: "8081",
+      GRANITE_DEV_SERVER_URL: "http://granite.test",
+      TRAILBASE_FRESH_START_TOKEN: "manual-token",
+    });
+  });
+
+  test("builds a compose runner plan", () => {
+    const plan = buildDevRunnerPlan({
+      options: {
+        composeFiles: ["apps/trailbase/docker-compose.yml"],
+        profiles: ["toss-proxy"],
+        projectName: "dev-stack",
+        services: ["trailbase", "toss-mtls-client-proxy"],
+        host: "127.0.0.1",
+        fresh: true,
+      },
+      ports: {
+        trailbasePort: 4002,
+        mtlsProxyPort: 8789,
+      },
+      env: {},
+      now: () => 456,
+    });
+
+    expect(plan.command).toBe("docker");
+    expect(plan.composeArgs).toEqual([
+      "compose",
+      "--project-name",
+      "dev-stack",
+      "-f",
+      "apps/trailbase/docker-compose.yml",
+      "--profile",
+      "toss-proxy",
+      "up",
+      "-d",
+      "--build",
+      "trailbase",
+      "toss-mtls-client-proxy",
+    ]);
+    expect(plan.env).toMatchObject({
+      TRAILBASE_HOST_PORT: "4002",
+      MTLS_PROXY_HOST_PORT: "8789",
+      TRAILBASE_PUBLIC_URL: "http://127.0.0.1:4002",
+      TOSS_PROXY_SMOKE_URL: "http://127.0.0.1:8789",
+      TRAILBASE_FRESH_START_TOKEN: "local-dev-456",
+    });
+    expect(plan.urls.mtlsProxyHealth).toBe(
+      "http://127.0.0.1:8789/internal/apps-in-toss/health",
+    );
+  });
+
+  test("creates a down plan without probing ports", async () => {
+    const { options, plan } = await createDevRunnerPlan({
+      argv: [
+        "--down",
+        "--compose-file",
+        "apps/trailbase/docker-compose.yml",
+        "--trailbase-port",
+        "4003",
+        "--mtls-port",
+        "8790",
+      ],
+      env: { GRANITE_HOST_PORT: "8081" },
+      logger: { warn: () => {}, debug: () => {} },
+    });
+
+    expect(options.down).toBe(true);
+    expect(plan.composeArgs).toEqual([
+      "compose",
+      "-f",
+      "apps/trailbase/docker-compose.yml",
+      "down",
+    ]);
+    expect(plan.env.TRAILBASE_HOST_PORT).toBe("4003");
+    expect(plan.env.MTLS_PROXY_HOST_PORT).toBe("8790");
+    expect(plan.env.GRANITE_HOST_PORT).toBeUndefined();
+    expect(plan.urls.granite).toBeUndefined();
+  });
+
+  test("treats empty port environment values as unset", async () => {
+    const { plan } = await createDevRunnerPlan({
+      argv: ["--down"],
+      env: {
+        TRAILBASE_HOST_PORT: "",
+        MTLS_PROXY_HOST_PORT: "",
+        GRANITE_HOST_PORT: "",
+      },
+      logger: { warn: () => {}, debug: () => {} },
+    });
+
+    expect(plan.env.TRAILBASE_HOST_PORT).toBe("4000");
+    expect(plan.env.MTLS_PROXY_HOST_PORT).toBe("8787");
+    expect(plan.env.GRANITE_HOST_PORT).toBeUndefined();
   });
 
   test("detects preferred private LAN IP", () => {
@@ -111,12 +263,12 @@ describe("dev runner helpers", () => {
   test("parses Docker published host ports and ignores current project containers", () => {
     const ports = parseDockerPublishedHostPorts(
       [
-        "zero-three-three-trailbase-1\t0.0.0.0:4001->4000/tcp",
+        "current-stack-trailbase-1\t0.0.0.0:4001->4000/tcp",
         "trailbase-trailbase-1\t0.0.0.0:4000->4000/tcp, [::]:4000->4000/tcp",
         "kit-proxy-1\t127.0.0.1:8787->8787/tcp",
         "internal-only\t4000/tcp",
       ].join("\n"),
-      { ignoreContainerNamePrefixes: ["zero-three-three-"] },
+      { ignoreContainerNamePrefixes: ["current-stack-"] },
     );
 
     expect([...ports].sort((a, b) => a - b)).toEqual([4000, 8787]);
@@ -134,6 +286,7 @@ describe("dev runner helpers", () => {
     expect(result.trailbasePort).toBe(49100);
     expect(result.mtlsProxyPort).toBe(49101);
     expect(result.assetPreviewPort).toBe(49102);
+    expect(result.granitePort).toBe(49102);
     expect(result.changed).toBe(true);
   });
 
@@ -143,6 +296,71 @@ describe("dev runner helpers", () => {
       encoding: "utf8",
     });
     expect(result.status).toBe(0);
+  });
+
+  test("dev-with-trailbase bin supports dry-run output", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "packages/trailbase-runtime/bin/dev-with-trailbase.mjs",
+        "--dry-run",
+        "--no-build",
+        "--compose-file",
+        "apps/trailbase/docker-compose.yml",
+        "--trailbase-port",
+        "49200",
+        "--mtls-port",
+        "49201",
+        "trailbase",
+      ],
+      {
+        cwd: new URL("../../..", import.meta.url).pathname,
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("TrailBase URL:");
+    expect(result.stdout).toContain("mTLS proxy health URL:");
+    expect(result.stdout).toContain("TRAILBASE_HOST_PORT=");
+    expect(result.stdout).toContain(
+      "command: docker compose -f apps/trailbase/docker-compose.yml up -d trailbase",
+    );
+  });
+
+  test("dev-with-trailbase bin reports invalid arguments without a stack trace", () => {
+    const result = spawnSync(
+      process.execPath,
+      [
+        "packages/trailbase-runtime/bin/dev-with-trailbase.mjs",
+        "--dry-run",
+        "--trailbase-port",
+        "not-a-port",
+      ],
+      {
+        cwd: new URL("../../..", import.meta.url).pathname,
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("error: trailbase port must be a port number");
+    expect(result.stderr).not.toContain("at ");
+  });
+
+  test("dev-with-trailbase bin documents help flags", () => {
+    const result = spawnSync(
+      process.execPath,
+      ["packages/trailbase-runtime/bin/dev-with-trailbase.mjs", "--help"],
+      {
+        cwd: new URL("../../..", import.meta.url).pathname,
+        encoding: "utf8",
+      },
+    );
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("-h, --help");
+    expect(result.stdout).toContain("--mtls-health-path");
   });
 
   test("shell URL normalization preserves explicit ports", () => {
