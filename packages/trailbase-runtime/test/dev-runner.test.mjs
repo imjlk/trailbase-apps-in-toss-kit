@@ -6,12 +6,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import {
   buildComposeArgs,
+  buildDevRunnerChildEnv,
   buildDevRunnerEnv,
   buildDevRunnerPlan,
   buildDevRunnerUrls,
   createDevRunnerPlan,
   detectLanIp,
   findAvailablePort,
+  parseDockerPublishedHostPortSets,
   parseDockerPublishedHostPorts,
   parseDevRunnerArgs,
   resolveLocalDevPorts,
@@ -121,6 +123,39 @@ describe("dev runner helpers", () => {
       GRANITE_HOST_PORT: "8081",
       GRANITE_DEV_SERVER_URL: "http://granite.test",
       TRAILBASE_FRESH_START_TOKEN: "manual-token",
+    });
+  });
+
+  test("strips stale fresh-start token from child env unless requested", () => {
+    expect(
+      buildDevRunnerChildEnv({
+        env: {
+          PATH: "/bin",
+          TRAILBASE_FRESH_START_TOKEN: "stale-token",
+          TRAILBASE_FRESH_START_CONFIRM: "DELETE_TRAILBASE_DATA",
+        },
+        planEnv: {
+          TRAILBASE_HOST_PORT: "4000",
+        },
+        fresh: false,
+      }),
+    ).toEqual({
+      PATH: "/bin",
+      TRAILBASE_HOST_PORT: "4000",
+    });
+
+    expect(
+      buildDevRunnerChildEnv({
+        env: {
+          TRAILBASE_FRESH_START_TOKEN: "manual-token",
+          TRAILBASE_FRESH_START_CONFIRM: "DELETE_TRAILBASE_DATA",
+        },
+        planEnv: {},
+        fresh: true,
+      }),
+    ).toMatchObject({
+      TRAILBASE_FRESH_START_TOKEN: "manual-token",
+      TRAILBASE_FRESH_START_CONFIRM: "DELETE_TRAILBASE_DATA",
     });
   });
 
@@ -260,6 +295,63 @@ describe("dev runner helpers", () => {
     expect(warnings[0]).toContain("TrailBase port 49000 is already in use");
   });
 
+  test("reuses an ignored container port even when the socket is already bound", async () => {
+    const server = createServer();
+    servers.push(server);
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const busyPort = server.address().port;
+
+    const result = await findAvailablePort({
+      preferredPort: busyPort,
+      host: "127.0.0.1",
+      label: "TrailBase port",
+      maxAttempts: 3,
+      allowUnavailablePorts: new Set([busyPort]),
+    });
+
+    expect(result.port).toBe(busyPort);
+    expect(result.changed).toBe(false);
+  });
+
+  test("reuses explicitly allowed fallback ports even when the socket is already bound", async () => {
+    const preferredServer = createServer();
+    const fallbackServer = createServer();
+    servers.push(preferredServer, fallbackServer);
+    await new Promise((resolve) => preferredServer.listen(0, "127.0.0.1", resolve));
+    const busyPort = preferredServer.address().port;
+    await new Promise((resolve) =>
+      fallbackServer.listen(busyPort + 1, "127.0.0.1", resolve),
+    );
+
+    const result = await findAvailablePort({
+      preferredPort: busyPort,
+      host: "127.0.0.1",
+      label: "TrailBase port",
+      logger: { warn: () => {} },
+      maxAttempts: 4,
+      busyPorts: new Set([busyPort]),
+      allowUnavailablePorts: new Set([busyPort + 1]),
+    });
+
+    expect(result.port).toBe(busyPort + 1);
+    expect(result.changed).toBe(true);
+  });
+
+  test("prefers explicitly allowed ports before probing free gaps", async () => {
+    const result = await findAvailablePort({
+      preferredPort: 49260,
+      host: "127.0.0.1",
+      label: "TrailBase port",
+      logger: { warn: () => {} },
+      maxAttempts: 4,
+      busyPorts: new Set([49260]),
+      allowUnavailablePorts: new Set([49262]),
+    });
+
+    expect(result.port).toBe(49262);
+    expect(result.changed).toBe(true);
+  });
+
   test("parses Docker published host ports and ignores current project containers", () => {
     const ports = parseDockerPublishedHostPorts(
       [
@@ -272,6 +364,160 @@ describe("dev runner helpers", () => {
     );
 
     expect([...ports].sort((a, b) => a - b)).toEqual([4000, 8787]);
+  });
+
+  test("separates ignored Docker published host ports for same-project reuse", () => {
+    const { busyPorts, ignoredPorts, ignoredPortsByService } = parseDockerPublishedHostPortSets(
+      [
+        "current-stack-trailbase-1\t0.0.0.0:4000->4000/tcp",
+        "current-stack-toss-mtls-client-proxy-1\t0.0.0.0:8787->8787/tcp",
+        "current-stack-granite-1\t0.0.0.0:5173->5173/tcp",
+        "current-stack-worker-1\t0.0.0.0:9999->9999/tcp",
+        "other-stack-trailbase-1\t0.0.0.0:4001->4000/tcp",
+      ].join("\n"),
+      { ignoreContainerNamePrefixes: ["current-stack-"] },
+    );
+
+    expect([...busyPorts]).toEqual([4001]);
+    expect([...ignoredPorts].sort((a, b) => a - b)).toEqual([
+      4000,
+      5173,
+      8787,
+      9999,
+    ]);
+    expect([...ignoredPortsByService.trailbase]).toEqual([4000]);
+    expect([...ignoredPortsByService.mtlsProxy]).toEqual([8787]);
+    expect([...ignoredPortsByService.assetPreview]).toEqual([5173]);
+    expect([...ignoredPortsByService.unknown]).toEqual([9999]);
+  });
+
+  test("does not classify generic ignored services by container port alone", () => {
+    const { ignoredPortsByService } = parseDockerPublishedHostPortSets(
+      [
+        "current-stack-api-1\t0.0.0.0:4000->4000/tcp",
+        "current-stack-worker-1\t0.0.0.0:8787->8787/tcp",
+        "current-stack-http-proxy-1\t0.0.0.0:8790->8787/tcp",
+      ].join("\n"),
+      { ignoreContainerNamePrefixes: ["current-stack-"] },
+    );
+
+    expect([...ignoredPortsByService.trailbase]).toEqual([]);
+    expect([...ignoredPortsByService.mtlsProxy]).toEqual([]);
+    expect([...ignoredPortsByService.unknown].sort((a, b) => a - b)).toEqual([
+      4000,
+      8787,
+      8790,
+    ]);
+  });
+
+  test("does not reuse matching service names when the target port is different", () => {
+    const { ignoredPortsByService } = parseDockerPublishedHostPortSets(
+      [
+        "current-stack-trailbase-1\t0.0.0.0:4050->9000/tcp",
+        "current-stack-toss-mtls-client-proxy-1\t0.0.0.0:8788->9001/tcp",
+      ].join("\n"),
+      { ignoreContainerNamePrefixes: ["current-stack-"] },
+    );
+
+    expect([...ignoredPortsByService.trailbase]).toEqual([]);
+    expect([...ignoredPortsByService.mtlsProxy]).toEqual([]);
+    expect([...ignoredPortsByService.unknown].sort((a, b) => a - b)).toEqual([
+      4050,
+      8788,
+    ]);
+  });
+
+  test("resolves local dev ports from ignored same-project containers", async () => {
+    const result = await resolveLocalDevPorts({
+      trailbasePort: 4000,
+      mtlsProxyPort: 8787,
+      ignoreContainerNamePrefixes: ["current-stack-"],
+      spawnSyncImpl: () => ({
+        status: 0,
+        stdout: [
+          "current-stack-trailbase-1\t0.0.0.0:4000->4000/tcp",
+          "current-stack-toss-mtls-client-proxy-1\t0.0.0.0:8787->8787/tcp",
+        ].join("\n"),
+      }),
+    });
+
+    expect(result.trailbasePort).toBe(4000);
+    expect(result.mtlsProxyPort).toBe(8787);
+    expect(result.changed).toBe(false);
+  });
+
+  test("reuses ignored fallback ports for the same service", async () => {
+    const fallbackServer = createServer();
+    servers.push(fallbackServer);
+    await new Promise((resolve) => fallbackServer.listen(0, "127.0.0.1", resolve));
+    const fallbackPort = fallbackServer.address().port;
+    const preferredPort = fallbackPort - 1;
+    const mtlsProxyPort = fallbackPort > 1024 ? fallbackPort - 10 : fallbackPort + 10;
+
+    const result = await resolveLocalDevPorts({
+      trailbasePort: preferredPort,
+      mtlsProxyPort,
+      ignoreContainerNamePrefixes: ["current-stack-"],
+      spawnSyncImpl: () => ({
+        status: 0,
+        stdout: [
+          `other-stack-trailbase-1\t0.0.0.0:${preferredPort}->4000/tcp`,
+          `current-stack-trailbase-1\t0.0.0.0:${fallbackPort}->4000/tcp`,
+        ].join("\n"),
+      }),
+      logger: { warn: () => {} },
+    });
+
+    expect(result.trailbasePort).toBe(fallbackPort);
+    expect(result.changed).toBe(true);
+  });
+
+  test("probes ignored fallback ports from other services", async () => {
+    const fallbackServer = createServer();
+    servers.push(fallbackServer);
+    await new Promise((resolve) => fallbackServer.listen(0, "127.0.0.1", resolve));
+    const fallbackPort = fallbackServer.address().port;
+    const preferredPort = fallbackPort - 1;
+    const mtlsProxyPort = fallbackPort > 1024 ? fallbackPort - 10 : fallbackPort + 10;
+
+    const result = await resolveLocalDevPorts({
+      trailbasePort: preferredPort,
+      mtlsProxyPort,
+      ignoreContainerNamePrefixes: ["current-stack-"],
+      spawnSyncImpl: () => ({
+        status: 0,
+        stdout: [
+          `other-stack-trailbase-1\t0.0.0.0:${preferredPort}->4000/tcp`,
+          `current-stack-proxy-1\t0.0.0.0:${fallbackPort}->8787/tcp`,
+        ].join("\n"),
+      }),
+      logger: { warn: () => {} },
+    });
+
+    expect(result.trailbasePort).toBeGreaterThan(fallbackPort);
+    expect(result.changed).toBe(true);
+  });
+
+  test("treats unclassified ignored ports as busy during local port resolution", async () => {
+    const preferredPort = 49250;
+    const unknownIgnoredPort = preferredPort + 1;
+
+    const result = await resolveLocalDevPorts({
+      trailbasePort: preferredPort,
+      mtlsProxyPort: preferredPort + 10,
+      ignoreContainerNamePrefixes: ["current-stack-"],
+      spawnSyncImpl: () => ({
+        status: 0,
+        stdout: [
+          `other-stack-trailbase-1\t0.0.0.0:${preferredPort}->4000/tcp`,
+          `current-stack-worker-1\t0.0.0.0:${unknownIgnoredPort}->9999/tcp`,
+        ].join("\n"),
+      }),
+      logger: { warn: () => {} },
+    });
+
+    expect(result.trailbasePort).toBeGreaterThan(unknownIgnoredPort);
+    expect(result.changed).toBe(true);
   });
 
   test(

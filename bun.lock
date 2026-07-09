@@ -33,8 +33,11 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "bin": {
+        "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
+        "trailbase-release-doctor": "./bin/release-doctor.mjs",
+        "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
         "trailbase-prod-env-validate": "./bin/validate-production-env.mjs",
       },
     },
