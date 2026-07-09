@@ -29,6 +29,18 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
 
 ## Config 형태
 
+운영 env 검증, 복사된 템플릿 차이 확인, 릴리스 노트 확인을 한 번에 묶는 시작점이 필요하면
+템플릿을 복사하세요.
+
+```bash
+cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/release-doctor.config.example.json \
+  apps/trailbase/release-doctor.json
+```
+
+이 템플릿은 복사된 파일이 `apps/trailbase/release-doctor.json`에 있다고 가정하고,
+명령형 check가 repository root에서 실행되도록 `"root": "../.."`를 설정합니다. CI나
+릴리스 체크리스트에서 사용하기 전에 경로와 앱별 env key를 조정하세요.
+
 ```json
 {
   "root": "../..",
@@ -38,7 +50,7 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
       "name": "Production env",
       "file": "apps/trailbase/.env.production",
       "appEnvKey": "APP_ENV",
-      "optionalHttps": ["APP_BASE_URL"]
+      "optionalHttps": ["APP_BASE_URL", "TRAILBASE_PUBLIC_URL"]
     },
     {
       "type": "command",
@@ -46,6 +58,7 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
       "command": "bun",
       "captureOutput": "failure",
       "timeout": 300000,
+      "required": false,
       "args": [
         "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
         ".",
@@ -55,7 +68,7 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
     },
     {
       "type": "changeset",
-      "name": "Pending changeset",
+      "name": "Pending Sampo changeset",
       "required": false
     }
   ]
@@ -72,6 +85,8 @@ root보다 아래에 있지만 명령은 repository root에서 실행해야 한�
 - `changeset`: `.sampo/changesets/*.md` 대기 changeset이 있는지 확인합니다.
 
 `"required": false`를 설정하면 실패한 check를 전체 실패가 아니라 경고로 보고합니다.
+템플릿은 복사된 파일과 릴리스 프로세스를 정리한 뒤에 strict 정책으로 올리는 경우가 많아서,
+템플릿 차이와 changeset check를 기본적으로 경고로 둡니다.
 
 ## JavaScript 헬퍼
 

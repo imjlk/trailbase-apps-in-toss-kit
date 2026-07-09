@@ -1,0 +1,31 @@
+{
+  "root": "../..",
+  "checks": [
+    {
+      "type": "production-env",
+      "name": "Production env",
+      "file": "apps/trailbase/.env.production",
+      "appEnvKey": "APP_ENV",
+      "optionalHttps": ["APP_BASE_URL", "TRAILBASE_PUBLIC_URL"]
+    },
+    {
+      "type": "command",
+      "name": "Template drift",
+      "command": "bun",
+      "args": [
+        "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
+        ".",
+        "--strict",
+        "--summary"
+      ],
+      "captureOutput": "failure",
+      "timeout": 300000,
+      "required": false
+    },
+    {
+      "type": "changeset",
+      "name": "Pending Sampo changeset",
+      "required": false
+    }
+  ]
+}

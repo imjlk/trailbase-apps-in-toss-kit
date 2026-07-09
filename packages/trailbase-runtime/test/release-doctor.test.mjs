@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -16,6 +16,8 @@ import {
 
 const repoRoot = new URL("../../..", import.meta.url).pathname;
 const cliScript = "packages/trailbase-runtime/bin/release-doctor.mjs";
+const releaseDoctorConfigTemplate =
+  "templates/trailbase/release/release-doctor.config.example.json";
 
 describe("release doctor", () => {
   test("runs production env checks", async () => {
@@ -334,6 +336,32 @@ describe("release doctor", () => {
       });
       expect(summary.ok).toBe(true);
       expect(summary.passed).toBe(2);
+    });
+  });
+
+  test("release doctor template is copyable under apps/trailbase", () => {
+    withTempDir((dir) => {
+      const configDir = path.join(dir, "apps", "trailbase");
+      mkdirSync(configDir, { recursive: true });
+      writeFileSync(
+        path.join(configDir, ".env.production"),
+        [
+          "APP_ENV=production",
+          "APP_BASE_URL=https://service.test",
+          "TRAILBASE_PUBLIC_URL=https://trailbase.service.test",
+        ].join("\n"),
+      );
+      writeFileSync(
+        path.join(configDir, "release-doctor.json"),
+        readFileSync(path.join(repoRoot, releaseDoctorConfigTemplate), "utf8"),
+      );
+
+      const config = loadReleaseDoctorConfig(path.join(configDir, "release-doctor.json"));
+      const checks = createReleaseDoctorChecksFromConfig(config);
+
+      expect(config.root).toBe("../..");
+      expect(checks).toHaveLength(3);
+      expect(checks[0].run().ok).toBe(true);
     });
   });
 
