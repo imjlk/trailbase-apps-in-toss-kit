@@ -30,6 +30,6 @@
     "skills:validate": "bun scripts/validate-agent-skills.mjs"
   },
   "devDependencies": {
-    "@apps-in-toss/framework": "2.10.1"
+    "@apps-in-toss/framework": "2.10.4"
   }
 }
