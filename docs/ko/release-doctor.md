@@ -35,11 +35,15 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
 ```bash
 cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/release-doctor.config.example.json \
   apps/trailbase/release-doctor.json
+cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/kit-template-map.example.json \
+  apps/trailbase/kit-template-map.json
 ```
 
 이 템플릿은 복사된 파일이 `apps/trailbase/release-doctor.json`에 있다고 가정하고,
 명령형 check가 repository root에서 실행되도록 `"root": "../.."`를 설정합니다. CI나
-릴리스 체크리스트에서 사용하기 전에 경로와 앱별 env key를 조정하세요.
+릴리스 체크리스트에서 사용하기 전에 경로, 앱별 env key, 복사한 `kit-template-map.json`을
+조정하세요. 아직 명시적인 mapping 파일을 관리할 준비가 되지 않았다면 `--mapping` 인자 쌍을
+지워 자동 후보 검색을 사용할 수 있습니다.
 
 ```json
 {
@@ -62,6 +66,8 @@ cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/release-doctor.
       "args": [
         "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
         ".",
+        "--mapping",
+        "apps/trailbase/kit-template-map.json",
         "--strict",
         "--summary"
       ]

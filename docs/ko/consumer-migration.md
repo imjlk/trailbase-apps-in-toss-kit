@@ -86,8 +86,13 @@ bun scripts/compare-consumer-templates.mjs /path/to/consumer
 있습니다.
 
 ```bash
+cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/kit-template-map.example.json \
+  apps/trailbase/kit-template-map.json
 bun scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json
 ```
+
+예시 mapping은 기본 Toss identity SQL, proxy Compose 서비스, proxy env 예시, proxy smoke
+script를 다룹니다. Strict하게 만들기 전에 경로를 조정하고 적용하지 않는 check는 제거하세요.
 
 CI 로그나 릴리스 체크리스트에는 후보별 상태와 matched, drift, missing 집계만 남기고
 싶을 때 `--summary`를 사용하세요. 전체 diff를 확인해야 할 때는 `--summary` 없이 다시

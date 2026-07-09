@@ -84,8 +84,14 @@ The command exits successfully by default and prints candidate diffs. Use
 For app-specific copies, provide an explicit mapping file to avoid noisy candidate discovery:
 
 ```bash
+cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/kit-template-map.example.json \
+  apps/trailbase/kit-template-map.json
 bun scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json
 ```
+
+The example mapping covers the core Toss identity SQL, proxy Compose service,
+proxy env example, and proxy smoke script. Edit paths and remove checks that do
+not apply before making it strict.
 
 Use `--summary` when CI logs or release checklists should show only per-candidate
 status plus matched, drift, and missing counts. Re-run without `--summary` when

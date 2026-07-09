@@ -35,12 +35,16 @@ env validation, copied-template drift, and release-note reminders:
 ```bash
 cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/release-doctor.config.example.json \
   apps/trailbase/release-doctor.json
+cp vendor/trailbase-apps-in-toss-kit/templates/trailbase/release/kit-template-map.example.json \
+  apps/trailbase/kit-template-map.json
 ```
 
 The template assumes the copied file lives at `apps/trailbase/release-doctor.json`
 and sets `"root": "../.."` so command checks run from the repository root.
-Adjust paths and app-specific env keys before using it in CI or a release
-checklist.
+Adjust paths, app-specific env keys, and the copied `kit-template-map.json`
+before using it in CI or a release checklist. If the service is not ready to
+maintain an explicit mapping file, remove the `--mapping` argument pair to use
+automatic candidate discovery.
 
 ```json
 {
@@ -63,6 +67,8 @@ checklist.
       "args": [
         "vendor/trailbase-apps-in-toss-kit/scripts/compare-consumer-templates.mjs",
         ".",
+        "--mapping",
+        "apps/trailbase/kit-template-map.json",
         "--strict",
         "--summary"
       ]
