@@ -87,6 +87,14 @@ For app-specific copies, provide an explicit mapping file to avoid noisy candida
 bun scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json
 ```
 
+Use `--summary` when CI logs or release checklists should show only per-candidate
+status plus matched, drift, and missing counts. Re-run without `--summary` when
+you need to inspect the full diff.
+
+```bash
+bun scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json --summary
+```
+
 Mapping files use this shape:
 
 ```json

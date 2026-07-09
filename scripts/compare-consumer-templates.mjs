@@ -16,12 +16,12 @@ import { fileURLToPath } from 'node:url';
 const MAX_DIFF_LINES = 120;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
-const { consumerArg, mappingArg, strict } = parseArgs(args);
+const { consumerArg, mappingArg, strict, summary } = parseArgs(args);
 const ALLOWED_MODES = new Set(['exact', 'compose-service', 'env-subset']);
 
 if (!consumerArg) {
   console.error(
-    'Usage: bun scripts/compare-consumer-templates.mjs <consumer-repo-path> [--strict] [--mapping <file>]',
+    'Usage: bun scripts/compare-consumer-templates.mjs <consumer-repo-path> [--strict] [--summary] [--mapping <file>]',
   );
   process.exit(2);
 }
@@ -39,9 +39,15 @@ const checks = mappingArg ? mappingChecks(mappingArg) : discoveredChecks();
 
 let hasDrift = false;
 let hasMissing = false;
+let matchedCount = 0;
+let driftCount = 0;
+let missingCount = 0;
 
 console.log(`Comparing kit templates against consumer: ${consumerRoot}`);
 console.log(`Mode: ${strict ? 'strict' : 'advisory'}`);
+if (summary) {
+  console.log('Output: summary');
+}
 if (mappingArg) {
   console.log(`Mapping: ${relative(consumerRoot, resolve(consumerRoot, mappingArg))}`);
 }
@@ -55,7 +61,9 @@ for (const check of checks) {
 
   if (candidates.length === 0) {
     hasMissing = true;
+    missingCount += 1;
     console.log('candidate: <none found>');
+    console.log('status: missing');
     console.log('');
     continue;
   }
@@ -64,6 +72,7 @@ for (const check of checks) {
     const relCandidate = relative(consumerRoot, candidatePath);
     if (!existsSync(candidatePath)) {
       hasMissing = true;
+      missingCount += 1;
       console.log(`candidate: ${relCandidate}`);
       console.log('status: missing');
       console.log('');
@@ -73,6 +82,7 @@ for (const check of checks) {
     const comparison = compareCandidate(check, templatePath, candidatePath);
     if (comparison.missing) {
       hasMissing = true;
+      missingCount += 1;
       console.log(`candidate: ${relCandidate}`);
       console.log(`status: ${comparison.missing}`);
       console.log('');
@@ -81,16 +91,29 @@ for (const check of checks) {
 
     if (comparison.different) {
       hasDrift = true;
+      driftCount += 1;
+    } else {
+      matchedCount += 1;
     }
 
     console.log(`candidate: ${relCandidate}`);
     if (!comparison.different) {
       console.log(`status: ${comparison.status}`);
+    } else if (summary) {
+      console.log('status: drift');
+      console.log('detail: rerun without --summary to inspect the diff');
     } else {
       printDiff(comparison.diff || '<diff unavailable>');
     }
     console.log('');
   }
+}
+
+if (summary) {
+  console.log('Summary:');
+  console.log(`matched: ${matchedCount}`);
+  console.log(`drift: ${driftCount}`);
+  console.log(`missing: ${missingCount}`);
 }
 
 if (strict && (hasDrift || hasMissing)) {
@@ -101,10 +124,15 @@ function parseArgs(values) {
   let foundConsumerArg = '';
   let foundMappingArg = '';
   let foundStrict = false;
+  let foundSummary = false;
   for (let index = 0; index < values.length; index += 1) {
     const arg = values[index];
     if (arg === '--strict') {
       foundStrict = true;
+      continue;
+    }
+    if (arg === '--summary') {
+      foundSummary = true;
       continue;
     }
     if (arg === '--mapping') {
@@ -124,7 +152,12 @@ function parseArgs(values) {
       foundConsumerArg = arg;
     }
   }
-  return { consumerArg: foundConsumerArg, mappingArg: foundMappingArg, strict: foundStrict };
+  return {
+    consumerArg: foundConsumerArg,
+    mappingArg: foundMappingArg,
+    strict: foundStrict,
+    summary: foundSummary,
+  };
 }
 
 function discoveredChecks() {
