@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 import { constants as osConstants } from "node:os";
 import { spawnSync } from "node:child_process";
-import { createDevRunnerPlan } from "../src/dev-runner.mjs";
+import {
+  buildDevRunnerChildEnv,
+  createDevRunnerPlan,
+} from "../src/dev-runner.mjs";
 
 let options;
 let plan;
@@ -29,7 +32,11 @@ if (options.dryRun) {
 }
 
 const result = spawnSync(plan.command, plan.composeArgs, {
-  env: { ...process.env, ...plan.env },
+  env: buildDevRunnerChildEnv({
+    env: process.env,
+    planEnv: plan.env,
+    fresh: options.fresh,
+  }),
   stdio: "inherit",
 });
 

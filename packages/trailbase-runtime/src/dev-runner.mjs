@@ -2,6 +2,9 @@ import { spawnSync } from "node:child_process";
 import { createServer } from "node:net";
 import { networkInterfaces } from "node:os";
 
+const DEFAULT_TRAILBASE_PORT = 4000;
+const DEFAULT_MTLS_PROXY_PORT = 8787;
+
 export function parseDevRunnerArgs(argv = process.argv.slice(2)) {
   const options = {
     build: true,
@@ -93,43 +96,74 @@ export async function findAvailablePort({
   maxAttempts = 100,
   logger = console,
   busyPorts = new Set(),
+  allowUnavailablePorts = new Set(),
 } = {}) {
   const preferred = parsePort(preferredPort, label);
+  const buildResult = (port, warning) => {
+    const changed = port !== preferred;
+    if (warning && logger?.warn) {
+      logger.warn(`WARN ${warning}`);
+    }
+    return { port, preferredPort: preferred, changed, warning };
+  };
+  const reusablePorts = [...allowUnavailablePorts]
+    .filter((port) =>
+      Number.isInteger(port) &&
+      port >= preferred &&
+      port < preferred + maxAttempts,
+    )
+    .sort((left, right) => left - right);
+  for (const port of reusablePorts) {
+    if (!busyPorts.has(port)) {
+      const warning = port !== preferred
+        ? `${label} ${preferred} changed to ${port} to reuse an allowed port on ${host}`
+        : undefined;
+      return buildResult(port, warning);
+    }
+  }
   for (let offset = 0; offset < maxAttempts; offset += 1) {
     const port = preferred + offset;
-    if (!busyPorts.has(port) && (await isPortAvailable(port, host))) {
-      const changed = port !== preferred;
-      const warning = changed
+    if (
+      !busyPorts.has(port) &&
+      (await isPortAvailable(port, host))
+    ) {
+      const warning = port !== preferred
         ? `${label} ${preferred} is already in use on ${host}; using ${port}`
         : undefined;
-      if (warning && logger?.warn) {
-        logger.warn(`WARN ${warning}`);
-      }
-      return { port, preferredPort: preferred, changed, warning };
+      return buildResult(port, warning);
     }
   }
   throw new Error(`Could not find an available ${label} starting at ${preferred}`);
 }
 
 export async function resolveLocalDevPorts({
-  trailbasePort = 4000,
-  mtlsProxyPort = 8787,
+  trailbasePort = DEFAULT_TRAILBASE_PORT,
+  mtlsProxyPort = DEFAULT_MTLS_PROXY_PORT,
   assetPreviewPort,
   host = "127.0.0.1",
   logger = console,
   ignoreContainerNamePrefixes = [],
+  spawnSyncImpl = spawnSync,
 } = {}) {
-  const dockerPublishedPorts = getDockerPublishedHostPorts({
+  const {
+    busyPorts: dockerPublishedPorts,
+    ignoredPortsByService,
+  } = getDockerPublishedHostPortSets({
     ignoreContainerNamePrefixes,
     logger,
+    spawnSyncImpl,
   });
-  const busyPorts = new Set(dockerPublishedPorts);
+  const busyPorts = new Set([
+    ...dockerPublishedPorts,
+    ...ignoredPortsByService.unknown,
+  ]);
   const trailbase = await findAvailablePort({
     preferredPort: trailbasePort,
     host,
     label: "TrailBase port",
     logger,
     busyPorts,
+    allowUnavailablePorts: ignoredPortsByService.trailbase,
   });
   busyPorts.add(trailbase.port);
   const mtlsProxy = await findAvailablePort({
@@ -138,6 +172,7 @@ export async function resolveLocalDevPorts({
     label: "mTLS proxy port",
     logger,
     busyPorts,
+    allowUnavailablePorts: ignoredPortsByService.mtlsProxy,
   });
   busyPorts.add(mtlsProxy.port);
   const assetPreview = assetPreviewPort
@@ -147,6 +182,7 @@ export async function resolveLocalDevPorts({
         label: "Asset preview port",
         logger,
         busyPorts,
+        allowUnavailablePorts: ignoredPortsByService.assetPreview,
       })
     : undefined;
   return {
@@ -169,6 +205,18 @@ export function getDockerPublishedHostPorts({
   ignoreContainerNamePrefixes = [],
   logger = console,
 } = {}) {
+  return getDockerPublishedHostPortSets({
+    spawnSyncImpl,
+    ignoreContainerNamePrefixes,
+    logger,
+  }).busyPorts;
+}
+
+export function getDockerPublishedHostPortSets({
+  spawnSyncImpl = spawnSync,
+  ignoreContainerNamePrefixes = [],
+  logger = console,
+} = {}) {
   const result = spawnSyncImpl(
     "docker",
     ["ps", "--format", "{{.Names}}\t{{.Ports}}"],
@@ -185,9 +233,13 @@ export function getDockerPublishedHostPorts({
         }`,
       );
     }
-    return new Set();
+    return {
+      busyPorts: new Set(),
+      ignoredPorts: new Set(),
+      ignoredPortsByService: createIgnoredPortServiceSets(),
+    };
   }
-  return parseDockerPublishedHostPorts(result.stdout, {
+  return parseDockerPublishedHostPortSets(result.stdout, {
     ignoreContainerNamePrefixes,
   });
 }
@@ -196,24 +248,93 @@ export function parseDockerPublishedHostPorts(
   output = "",
   { ignoreContainerNamePrefixes = [] } = {},
 ) {
-  const ports = new Set();
+  return parseDockerPublishedHostPortSets(output, {
+    ignoreContainerNamePrefixes,
+  }).busyPorts;
+}
+
+export function parseDockerPublishedHostPortSets(
+  output = "",
+  { ignoreContainerNamePrefixes = [] } = {},
+) {
+  const busyPorts = new Set();
+  const ignoredPortsByService = createIgnoredPortServiceSets();
   for (const line of String(output).split(/\r?\n/)) {
     const [name = "", published = ""] = line.split("\t");
-    if (
-      ignoreContainerNamePrefixes.some((prefix) =>
-        name.trim().startsWith(prefix),
-      )
-    ) {
-      continue;
-    }
+    const trimmedName = name.trim();
+    const ignoredPrefix = ignoreContainerNamePrefixes.find((prefix) =>
+      trimmedName.startsWith(prefix),
+    );
+    const ignored = ignoredPrefix !== undefined;
+    const serviceName = ignored
+      ? trimmedName.slice(ignoredPrefix.length)
+      : trimmedName;
     for (const segment of published.split(",")) {
-      const match = segment.trim().match(/:(\d+)(?:-\d+)?->/);
+      const match = segment.trim().match(/:(\d+)(?:-\d+)?->(\d+)(?:-\d+)?\//);
       if (match) {
-        ports.add(Number(match[1]));
+        const port = Number(match[1]);
+        const targetPort = Number(match[2]);
+        if (ignored) {
+          const service = classifyIgnoredDockerPortService(serviceName, targetPort);
+          ignoredPortsByService[service].add(port);
+        } else {
+          busyPorts.add(port);
+        }
       }
     }
   }
-  return ports;
+  const ignoredPorts = new Set(
+    Object.values(ignoredPortsByService).flatMap((ports) => [...ports]),
+  );
+  return { busyPorts, ignoredPorts, ignoredPortsByService };
+}
+
+function createIgnoredPortServiceSets() {
+  return {
+    trailbase: new Set(),
+    mtlsProxy: new Set(),
+    assetPreview: new Set(),
+    unknown: new Set(),
+  };
+}
+
+function classifyIgnoredDockerPortService(name, targetPort) {
+  const normalized = String(name).toLowerCase();
+  const nameMatches = [];
+  if (
+    normalized.includes("mtls") ||
+    normalized.includes("toss-mtls-client-proxy")
+  ) {
+    nameMatches.push("mtlsProxy");
+  }
+  if (normalized.includes("trailbase")) {
+    nameMatches.push("trailbase");
+  }
+  if (
+    normalized.includes("granite") ||
+    normalized.includes("asset") ||
+    normalized.includes("preview")
+  ) {
+    nameMatches.push("assetPreview");
+  }
+  if (
+    nameMatches.length === 1 &&
+    nameMatches[0] === "trailbase" &&
+    targetPort === DEFAULT_TRAILBASE_PORT
+  ) {
+    return "trailbase";
+  }
+  if (
+    nameMatches.length === 1 &&
+    nameMatches[0] === "mtlsProxy" &&
+    targetPort === DEFAULT_MTLS_PROXY_PORT
+  ) {
+    return "mtlsProxy";
+  }
+  if (nameMatches.length === 1 && nameMatches[0] === "assetPreview") {
+    return nameMatches[0];
+  }
+  return "unknown";
 }
 
 export function detectLanIp({
@@ -271,8 +392,8 @@ export function buildComposeArgs({
 
 export function buildDevRunnerUrls({
   host = "127.0.0.1",
-  trailbasePort = 4000,
-  mtlsProxyPort = 8787,
+  trailbasePort = DEFAULT_TRAILBASE_PORT,
+  mtlsProxyPort = DEFAULT_MTLS_PROXY_PORT,
   granitePort,
   mtlsProxyHealthPath = "/internal/apps-in-toss/health",
 } = {}) {
@@ -293,8 +414,8 @@ export function buildDevRunnerUrls({
 
 export function buildDevRunnerEnv({
   host = "127.0.0.1",
-  trailbasePort = 4000,
-  mtlsProxyPort = 8787,
+  trailbasePort = DEFAULT_TRAILBASE_PORT,
+  mtlsProxyPort = DEFAULT_MTLS_PROXY_PORT,
   granitePort,
   mtlsProxyHealthPath = "/internal/apps-in-toss/health",
   urls,
@@ -331,6 +452,19 @@ export function buildDevRunnerEnv({
   return values;
 }
 
+export function buildDevRunnerChildEnv({
+  env = process.env,
+  planEnv = {},
+  fresh = false,
+} = {}) {
+  const values = { ...env, ...planEnv };
+  if (!fresh) {
+    delete values.TRAILBASE_FRESH_START_TOKEN;
+    delete values.TRAILBASE_FRESH_START_CONFIRM;
+  }
+  return values;
+}
+
 export function buildDevRunnerPlan({
   options = {},
   ports = {},
@@ -339,11 +473,15 @@ export function buildDevRunnerPlan({
 } = {}) {
   const host = options.host || "127.0.0.1";
   const trailbasePort = parsePort(
-    ports.trailbasePort ?? options.trailbasePort ?? envPortValue(env.TRAILBASE_HOST_PORT, 4000),
+    ports.trailbasePort ??
+      options.trailbasePort ??
+      envPortValue(env.TRAILBASE_HOST_PORT, DEFAULT_TRAILBASE_PORT),
     "TrailBase port",
   );
   const mtlsProxyPort = parsePort(
-    ports.mtlsProxyPort ?? options.mtlsProxyPort ?? envPortValue(env.MTLS_PROXY_HOST_PORT, 8787),
+    ports.mtlsProxyPort ??
+      options.mtlsProxyPort ??
+      envPortValue(env.MTLS_PROXY_HOST_PORT, DEFAULT_MTLS_PROXY_PORT),
     "mTLS proxy port",
   );
   const granitePort = options.down
@@ -399,8 +537,12 @@ export async function createDevRunnerPlan({
 
   const granitePortRequest = options.granitePort ?? optionalEnvValue(env.GRANITE_HOST_PORT);
   const portRequest = {
-    trailbasePort: options.trailbasePort ?? envPortValue(env.TRAILBASE_HOST_PORT, 4000),
-    mtlsProxyPort: options.mtlsProxyPort ?? envPortValue(env.MTLS_PROXY_HOST_PORT, 8787),
+    trailbasePort:
+      options.trailbasePort ??
+      envPortValue(env.TRAILBASE_HOST_PORT, DEFAULT_TRAILBASE_PORT),
+    mtlsProxyPort:
+      options.mtlsProxyPort ??
+      envPortValue(env.MTLS_PROXY_HOST_PORT, DEFAULT_MTLS_PROXY_PORT),
     // resolveLocalDevPorts keeps this slot generic for non-Granite asset previews.
     assetPreviewPort: granitePortRequest,
     host: options.host,
