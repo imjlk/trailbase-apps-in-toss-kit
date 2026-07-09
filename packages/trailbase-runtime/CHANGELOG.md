@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.2.6 — 2026-07-09
+
+### Patch changes
+
+- [6a65736](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6a65736355cbea489e68c1c01967c30f6ca83414) Fix dev runner reruns so ignored same-project containers keep their host ports,
+  normal runs do not inherit stale fresh-start tokens, and package lock metadata
+  includes all runtime CLI bins. — Thanks @imjlk!
+
 ## 0.2.5 — 2026-07-09
 
 ### Patch changes

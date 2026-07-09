@@ -33,7 +33,7 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.2.5",
+      "version": "0.2.6",
       "bin": {
         "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
         "trailbase-release-doctor": "./bin/release-doctor.mjs",
