@@ -23,6 +23,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Understand container startup helpers | [trailbase-runtime.md](trailbase-runtime.md) |
 | Run the Toss mTLS proxy safely | [toss-mtls-client-proxy.md](toss-mtls-client-proxy.md) |
 | Validate production env files | [production-env-validation.md](production-env-validation.md) |
+| Run preQA and release checks together | [release-doctor.md](release-doctor.md) |
 | Design SQL migrations and Record API access | [schema-patterns.md](schema-patterns.md) |
 | Link anonymous users to Toss Login | [toss-identity.md](toss-identity.md) |
 | Model Toss promotion reward campaigns | [promotion-campaigns.md](promotion-campaigns.md) |

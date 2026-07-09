@@ -87,6 +87,9 @@ Fresh start는 토큰(token)과 확인 값(confirmation value)이 함께 있을 
 CI, 로컬 셸, 배포 runbook에서 모두 쓸 수 있도록 출력은 사람이 읽기 쉽고 항상 같은 형식으로
 유지하세요.
 
+운영 env 점검을 template drift, smoke, release-note 점검과 함께 실행해야 한다면
+[release-doctor.md](release-doctor.md)를 사용해 하나의 정규화된 결과로 묶으세요.
+
 앱이 Toss Login 연결 해제 콜백 route를 공개한다면 wrapper rules에
 `applyTossLoginUnlinkRules`를 추가하세요. 이 공통 규칙은 `TOSS_LOGIN_UNLINK_BASIC_AUTH`를
 검증하고, 이전 이름인 `TOSS_UNLINK_CALLBACK_BASIC_AUTH`는 경고와 함께 허용하며,

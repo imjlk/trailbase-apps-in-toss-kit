@@ -6,10 +6,12 @@
   "description": "Shared TrailBase runtime helpers for AppsInToss consumer services.",
   "exports": {
     "./production-env": "./src/production-env.mjs",
-    "./dev-runner": "./src/dev-runner.mjs"
+    "./dev-runner": "./src/dev-runner.mjs",
+    "./release-doctor": "./src/release-doctor.mjs"
   },
   "bin": {
     "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
+    "trailbase-release-doctor": "./bin/release-doctor.mjs",
     "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
     "trailbase-prod-env-validate": "./bin/validate-production-env.mjs"
   },
