@@ -31,6 +31,7 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
 
 ```json
 {
+  "root": "../..",
   "checks": [
     {
       "type": "production-env",
@@ -59,6 +60,9 @@ CI가 정규화된 결과를 읽어야 한다면 `--json`을 추가하세요.
   ]
 }
 ```
+
+상대 경로는 config 파일이 있는 디렉터리를 기준으로 해석합니다. Config 파일이 repository
+root보다 아래에 있지만 명령은 repository root에서 실행해야 한다면 `root`를 추가하세요.
 
 지원하는 check type은 다음과 같습니다.
 

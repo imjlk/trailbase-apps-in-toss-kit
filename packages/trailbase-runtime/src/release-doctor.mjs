@@ -75,6 +75,7 @@ export function createCommandCheck({
   env = {},
   required = true,
   captureOutput = "failure",
+  maxBuffer = 8 * 1024 * 1024,
   successCodes = [0],
   spawnSyncImpl = spawnSync,
 } = {}) {
@@ -89,11 +90,16 @@ export function createCommandCheck({
       if (normalizedSuccessCodes.length === 0) {
         return failure("Command check successCodes must contain integer exit codes");
       }
+      const normalizedMaxBuffer = normalizePositiveInteger(maxBuffer, 8 * 1024 * 1024);
+      const captureStdout = shouldCaptureCommandOutput(captureOutput, "success");
+      const captureStderr =
+        shouldCaptureCommandOutput(captureOutput, "failure") || captureStdout;
       const result = spawnSyncImpl(command, args.map(String), {
         cwd,
         env: { ...process.env, ...env },
         encoding: "utf8",
-        stdio: "pipe",
+        maxBuffer: normalizedMaxBuffer,
+        stdio: ["ignore", captureStdout ? "pipe" : "ignore", captureStderr ? "pipe" : "ignore"],
       });
       if (result.error) {
         return failure(result.error.message);
@@ -208,6 +214,12 @@ export function formatDoctorResultLines(summary) {
     if (result.message) {
       lines.push(`  ${result.message}`);
     }
+    if (result.output) {
+      lines.push("  OUTPUT");
+      for (const line of String(result.output).split("\n")) {
+        lines.push(`    ${line}`);
+      }
+    }
   }
   lines.push(
     `${summary.ok ? "PASS" : "FAIL"} release doctor: ${summary.passed} passed, ${summary.failed} failed, ${summary.warnings} warning(s), ${summary.skipped} skipped`,
@@ -250,7 +262,8 @@ function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
     });
   }
   if (type === "command") {
-    const { name, command, args, cwd, env, required, captureOutput, successCodes } = entry;
+    const { name, command, args, cwd, env, required, captureOutput, maxBuffer, successCodes } =
+      entry;
     return createCommandCheck({
       name,
       command,
@@ -259,6 +272,7 @@ function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
       env,
       required,
       captureOutput,
+      maxBuffer,
       successCodes: Array.isArray(successCodes) ? successCodes : undefined,
     });
   }
@@ -405,4 +419,8 @@ function normalizeSuccessCodes(successCodes) {
   }
   const normalized = successCodes.filter((code) => Number.isInteger(code));
   return normalized.length > 0 ? normalized : [];
+}
+
+function normalizePositiveInteger(value, fallback) {
+  return Number.isInteger(value) && value > 0 ? value : fallback;
 }

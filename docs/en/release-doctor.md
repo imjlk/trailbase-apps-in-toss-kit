@@ -31,6 +31,7 @@ Add `--json` when CI should consume the normalized result.
 
 ```json
 {
+  "root": "../..",
   "checks": [
     {
       "type": "production-env",
@@ -59,6 +60,10 @@ Add `--json` when CI should consume the normalized result.
   ]
 }
 ```
+
+Relative paths are resolved from the config file's directory. Add `root` when a
+config file lives below the repository root but commands should run from the
+repository root.
 
 Supported check types are:
 

@@ -159,6 +159,35 @@ describe("release doctor", () => {
     expect(summary.results[0].output).toBe("");
   });
 
+  test("does not buffer successful stdout unless requested", async () => {
+    const calls = [];
+    await runReleaseDoctor({
+      checks: [
+        createCommandCheck({
+          name: "Default",
+          command: "command",
+          spawnSyncImpl: (_command, _args, options) => {
+            calls.push(options);
+            return { status: 0, stdout: "ignored", stderr: "" };
+          },
+        }),
+        createCommandCheck({
+          name: "Always",
+          command: "command",
+          captureOutput: "always",
+          spawnSyncImpl: (_command, _args, options) => {
+            calls.push(options);
+            return { status: 0, stdout: "captured", stderr: "" };
+          },
+        }),
+      ],
+    });
+
+    expect(calls[0].stdio).toEqual(["ignore", "ignore", "pipe"]);
+    expect(calls[0].maxBuffer).toBe(8 * 1024 * 1024);
+    expect(calls[1].stdio).toEqual(["ignore", "pipe", "pipe"]);
+  });
+
   test("can capture successful command output when requested", async () => {
     const summary = await runReleaseDoctor({
       checks: [
@@ -359,12 +388,15 @@ describe("release doctor", () => {
           warnings: [],
           failures: ["APP_ENV is required"],
           message: "",
+          output: "extra context",
         },
       ],
     });
 
     expect(lines).toContain("FAILED Env");
     expect(lines).toContain("  FAIL APP_ENV is required");
+    expect(lines).toContain("  OUTPUT");
+    expect(lines).toContain("    extra context");
     expect(lines.at(-1)).toContain("FAIL release doctor");
   });
 
