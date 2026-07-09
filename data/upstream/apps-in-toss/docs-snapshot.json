@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-06-29T11:34:50.669Z",
+  "fetchedAt": "2026-07-09T10:16:23.030Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,15 +12,15 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "2ba2ba0540fe7a6fb90f160ffad2167eb36c52cc3ada471366f9976c04f86c95",
-      "bytes": 41698
+      "sha256": "8135fbf38d4db35c9c34a83fbf085a5ef3ba0ce07e9cf12f85d781295b4838df",
+      "bytes": 41723
     },
     {
       "key": "react-native-tutorial",
       "title": "React Native tutorial",
       "url": "https://developers-apps-in-toss.toss.im/tutorials/react-native.md",
-      "sha256": "6f3ad98b130ef392780c78769965321c7641d01d60b9a0a350ce63b63100911a",
-      "bytes": 12829
+      "sha256": "fea4df2967bce4903a1d4ca8b18257aac777d1311452f05cc118b40fe03d0152",
+      "bytes": 12844
     },
     {
       "key": "sdk-overview",
@@ -68,8 +68,8 @@
       "key": "smart-message-develop",
       "title": "Smart Message development",
       "url": "https://developers-apps-in-toss.toss.im/smart-message/develop.md",
-      "sha256": "ada6227e68bfac34f7d5aefa687dbd9e3a82cfe41b833e259cd12c3f2ba4f5c1",
-      "bytes": 18128
+      "sha256": "dd2f72ba29e14b6cb0a52bdc254fd5ea137eb7cdeef43d2ca01760c111e2ae1d",
+      "bytes": 21558
     },
     {
       "key": "smart-message-intro",
@@ -96,7 +96,7 @@
   "packages": [
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.10.1",
+      "version": "2.10.4",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
@@ -110,14 +110,14 @@
     },
     {
       "packageName": "create-granite-app",
-      "version": "1.0.33",
+      "version": "1.0.36",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
     },
     {
       "packageName": "@granite-js/react-native",
-      "version": "1.0.33",
+      "version": "1.0.36",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"
