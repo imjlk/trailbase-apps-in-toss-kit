@@ -66,7 +66,7 @@ describe("compare-consumer-templates", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("0.1.5");
       expect(result.stdout).toContain(
-        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.8",
+        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.10",
       );
       expect(result.stdout).toContain(
         "+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.5",
@@ -79,6 +79,117 @@ describe("compare-consumer-templates", () => {
       expect(result.stdout).not.toContain("-    profiles:");
       expect(result.stdout).not.toContain("  trailbase:");
       expect(result.stdout).not.toContain("trailbase_data");
+    });
+  });
+
+  test("summary mode reports drift without full diff output", () => {
+    withConsumer((consumerRoot) => {
+      writeConsumerFile(
+        consumerRoot,
+        "apps/trailbase/docker-compose.yml",
+        composeProxyTemplateWithImageTag("0.1.5"),
+      );
+      writeMapping(consumerRoot, [
+        {
+          name: "Compose toss mTLS proxy",
+          template: "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+          consumer: "apps/trailbase/docker-compose.yml",
+          mode: "compose-service",
+          service: "toss-mtls-client-proxy",
+          volumes: ["mtls_client_certs"],
+        },
+      ]);
+
+      const result = runCompare(consumerRoot, ["--summary"]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Output: summary");
+      expect(result.stdout).toContain("status: drift");
+      expect(result.stdout).toContain("detail: rerun without --summary to inspect the diff");
+      expect(result.stdout).toContain("Summary:");
+      expect(result.stdout).toContain("matched: 0");
+      expect(result.stdout).toContain("drift: 1");
+      expect(result.stdout).toContain("missing: 0");
+      expect(result.stdout).not.toContain(
+        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.10",
+      );
+      expect(result.stdout).not.toContain(
+        "+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.5",
+      );
+    });
+  });
+
+  test("summary mode reports all matched with no drift or missing", () => {
+    withConsumer((consumerRoot) => {
+      const template = readFileSync(
+        path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"),
+        "utf8",
+      );
+      writeConsumerFile(consumerRoot, "apps/trailbase/docker-compose.yml", template);
+      writeMapping(consumerRoot, [
+        {
+          name: "Compose toss mTLS proxy",
+          template: "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+          consumer: "apps/trailbase/docker-compose.yml",
+          mode: "compose-service",
+          service: "toss-mtls-client-proxy",
+          volumes: ["mtls_client_certs"],
+        },
+      ]);
+
+      const result = runCompare(consumerRoot, ["--summary"]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Output: summary");
+      expect(result.stdout).toContain("status: scoped match");
+      expect(result.stdout).toContain("Summary:");
+      expect(result.stdout).toContain("matched: 1");
+      expect(result.stdout).toContain("drift: 0");
+      expect(result.stdout).toContain("missing: 0");
+    });
+  });
+
+  test("summary mode keeps strict failures for missing candidates", () => {
+    withConsumer((consumerRoot) => {
+      writeMapping(consumerRoot, [
+        {
+          name: "Proxy smoke script",
+          template: "templates/trailbase/scripts/toss-proxy-smoke.sh",
+          consumer: "apps/trailbase/scripts/toss-proxy-smoke.sh",
+        },
+      ]);
+
+      const result = runCompare(consumerRoot, ["--summary", "--strict"]);
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toContain("Output: summary");
+      expect(result.stdout).toContain("status: missing");
+      expect(result.stdout).toContain("Summary:");
+      expect(result.stdout).toContain("matched: 0");
+      expect(result.stdout).toContain("drift: 0");
+      expect(result.stdout).toContain("missing: 1");
+    });
+  });
+
+  test("summary mode reports missing without strict exit failure", () => {
+    withConsumer((consumerRoot) => {
+      writeMapping(consumerRoot, [
+        {
+          name: "Proxy smoke script",
+          template: "templates/trailbase/scripts/toss-proxy-smoke.sh",
+          consumer: "apps/trailbase/scripts/toss-proxy-smoke.sh",
+        },
+      ]);
+
+      const result = runCompare(consumerRoot, ["--summary"]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Output: summary");
+      expect(result.stdout).toContain("status: missing");
+      expect(result.stdout).toContain("Summary:");
+      expect(result.stdout).toContain("matched: 0");
+      expect(result.stdout).toContain("drift: 0");
+      expect(result.stdout).toContain("missing: 1");
     });
   });
 
@@ -498,7 +609,22 @@ function writeMapping(root, checks) {
   writeConsumerFile(root, "apps/trailbase/kit-template-map.json", JSON.stringify({ checks }, null, 2));
 }
 
-function runCompare(consumerRoot) {
+function composeProxyTemplateWithImageTag(tag) {
+  const template = readFileSync(
+    path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"),
+    "utf8",
+  );
+  const replaced = template.replace(
+    /toss-mtls-client-proxy:[^\s]+/,
+    `toss-mtls-client-proxy:${tag}`,
+  );
+  if (replaced === template) {
+    throw new Error("Expected compose proxy template image tag");
+  }
+  return replaced;
+}
+
+function runCompare(consumerRoot, extraArgs = []) {
   return spawnSync(
     process.execPath,
     [
@@ -506,6 +632,7 @@ function runCompare(consumerRoot) {
       consumerRoot,
       "--mapping",
       "apps/trailbase/kit-template-map.json",
+      ...extraArgs,
     ],
     {
       cwd: repoRoot,

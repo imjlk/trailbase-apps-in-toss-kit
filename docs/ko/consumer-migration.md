@@ -89,6 +89,14 @@ bun scripts/compare-consumer-templates.mjs /path/to/consumer
 bun scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json
 ```
 
+CI 로그나 릴리스 체크리스트에는 후보별 상태와 matched, drift, missing 집계만 남기고
+싶을 때 `--summary`를 사용하세요. 전체 diff를 확인해야 할 때는 `--summary` 없이 다시
+실행하면 됩니다.
+
+```bash
+bun scripts/compare-consumer-templates.mjs /path/to/consumer --mapping apps/trailbase/kit-template-map.json --summary
+```
+
 Mapping 파일은 다음 형태입니다.
 
 ```json
