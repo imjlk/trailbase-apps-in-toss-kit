@@ -134,6 +134,45 @@ The intended defaults are:
 Consumers should surface the selected ports in their local dev command output
 so the RN app, WebView app, and smoke checks can target the right URLs.
 
+## Local Dev Runner
+
+The runtime package exports a small `dev-with-trailbase` CLI and matching
+`createDevRunnerPlan`/`buildDevRunnerPlan` helpers. Use them when a consumer
+repo wants one local command to choose non-conflicting host ports, print the
+selected URLs, and run `docker compose up` with the same environment.
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/dev-with-trailbase.mjs \
+  --compose-file apps/trailbase/docker-compose.yml \
+  --profile toss-proxy \
+  --service trailbase \
+  --service toss-mtls-client-proxy
+```
+
+The runner emits these generic environment variables for Compose interpolation
+and smoke scripts:
+
+- `TRAILBASE_HOST_PORT`
+- `MTLS_PROXY_HOST_PORT`
+- `TRAILBASE_PUBLIC_URL`
+- `TOSS_PROXY_SMOKE_URL`
+- `GRANITE_HOST_PORT` and `GRANITE_DEV_SERVER_URL` when `--granite-port` is set
+- `TRAILBASE_FRESH_START_TOKEN` only when `--fresh` is passed
+
+Wire host ports explicitly in app-owned Compose files, for example:
+
+```yaml
+ports:
+  - "${TRAILBASE_HOST_PORT:-4000}:4000"
+```
+
+Use `--dry-run --print-env` to inspect the selected ports, URLs, and Docker
+Compose command before starting containers. Dry runs still probe ports so the
+printed plan reflects conflicts with existing local stacks. The runner does not set
+`MTLS_PROXY_URL`; keep that value app-owned so TrailBase containers can use the
+internal proxy URL while host-side smoke scripts use `TOSS_PROXY_SMOKE_URL`.
+If the proxy health endpoint differs, pass `--mtls-health-path`.
+
 ## Deployment Notes
 
 TrailBase is SQLite-backed and should be treated as a single-writer service.

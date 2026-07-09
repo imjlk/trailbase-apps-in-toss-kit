@@ -130,6 +130,44 @@ Fresh start는 로컬 개발, 버려도 되는 환경, 또는 명시적인 reset
 도입 앱은 로컬 개발 명령 출력에 선택된 포트를 보여 주어야 합니다. 그래야 RN 앱, WebView 앱,
 스모크 테스트가 올바른 URL을 사용할 수 있습니다.
 
+## 로컬 Dev Runner
+
+런타임 패키지는 작은 `dev-with-trailbase` CLI와 같은 계획 객체를 만드는
+`createDevRunnerPlan`/`buildDevRunnerPlan` 헬퍼를 제공합니다. 도입 저장소에서 하나의
+로컬 명령으로 충돌하지 않는 host port를 고르고, 선택된 URL을 출력하고, 같은 환경 변수로
+`docker compose up`을 실행하고 싶을 때 사용하세요.
+
+```bash
+node vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/dev-with-trailbase.mjs \
+  --compose-file apps/trailbase/docker-compose.yml \
+  --profile toss-proxy \
+  --service trailbase \
+  --service toss-mtls-client-proxy
+```
+
+Runner는 Compose interpolation과 smoke script용으로 다음 일반 환경 변수를 생성합니다.
+
+- `TRAILBASE_HOST_PORT`
+- `MTLS_PROXY_HOST_PORT`
+- `TRAILBASE_PUBLIC_URL`
+- `TOSS_PROXY_SMOKE_URL`
+- `--granite-port`를 설정했을 때 `GRANITE_HOST_PORT`와 `GRANITE_DEV_SERVER_URL`
+- `--fresh`를 넘겼을 때만 `TRAILBASE_FRESH_START_TOKEN`
+
+Host port는 도입 앱이 소유한 Compose 파일에서 명시적으로 연결하세요.
+
+```yaml
+ports:
+  - "${TRAILBASE_HOST_PORT:-4000}:4000"
+```
+
+컨테이너를 시작하기 전에 선택된 port, URL, Docker Compose 명령을 확인하려면
+`--dry-run --print-env`를 사용하세요. Dry run도 port를 probe하므로 이미 실행 중인 로컬
+stack과의 충돌이 반영된 계획을 출력합니다. Runner는 `MTLS_PROXY_URL`을 설정하지 않습니다.
+TrailBase 컨테이너는 내부 proxy URL을 사용하고, host-side smoke script는
+`TOSS_PROXY_SMOKE_URL`을 사용하도록 이 값은 도입 앱에서 소유하세요.
+Proxy health endpoint가 다르다면 `--mtls-health-path`를 넘기세요.
+
 ## 배포 메모
 
 TrailBase는 SQLite 기반이므로 단일 writer 서비스로 다루는 것이 안전합니다. 운영 TrailBase
