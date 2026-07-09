@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptsDir, "..");
 const compareScript = path.join(scriptsDir, "compare-consumer-templates.mjs");
+const templateMapExample = "templates/trailbase/release/kit-template-map.example.json";
 
 describe("compare-consumer-templates", () => {
   test("compose-service mode scopes drift to the mapped service and volumes", () => {
@@ -144,6 +145,45 @@ describe("compare-consumer-templates", () => {
       expect(result.stdout).toContain("status: scoped match");
       expect(result.stdout).toContain("Summary:");
       expect(result.stdout).toContain("matched: 1");
+      expect(result.stdout).toContain("drift: 0");
+      expect(result.stdout).toContain("missing: 0");
+    });
+  });
+
+  test("template map example validates copied default files", () => {
+    withConsumer((consumerRoot) => {
+      copyTemplate(
+        consumerRoot,
+        templateMapExample,
+        "apps/trailbase/kit-template-map.json",
+      );
+      copyTemplate(
+        consumerRoot,
+        "templates/trailbase/sql/toss_identities.sql",
+        "apps/trailbase/traildepot-template/migrations/main/toss_identities.sql",
+      );
+      copyTemplate(
+        consumerRoot,
+        "templates/trailbase/compose/toss-mtls-client-proxy.yml",
+        "apps/trailbase/docker-compose.yml",
+      );
+      copyTemplate(
+        consumerRoot,
+        "templates/trailbase/env/toss-mtls-client-proxy.env.example",
+        "apps/trailbase/.env.production.example",
+      );
+      copyTemplate(
+        consumerRoot,
+        "templates/trailbase/scripts/toss-proxy-smoke.sh",
+        "apps/trailbase/scripts/toss-proxy-smoke.sh",
+      );
+      chmodSync(path.join(consumerRoot, "apps/trailbase/scripts/toss-proxy-smoke.sh"), 0o755);
+
+      const result = runCompare(consumerRoot, ["--summary", "--strict"]);
+
+      expect(result.status).toBe(0);
+      expect(result.stdout).toContain("Output: summary");
+      expect(result.stdout).toContain("matched: 4");
       expect(result.stdout).toContain("drift: 0");
       expect(result.stdout).toContain("missing: 0");
     });
@@ -607,6 +647,10 @@ function writeConsumerFile(root, relativePath, content) {
 
 function writeMapping(root, checks) {
   writeConsumerFile(root, "apps/trailbase/kit-template-map.json", JSON.stringify({ checks }, null, 2));
+}
+
+function copyTemplate(root, template, target) {
+  writeConsumerFile(root, target, readFileSync(path.join(repoRoot, template), "utf8"));
 }
 
 function composeProxyTemplateWithImageTag(tag) {
