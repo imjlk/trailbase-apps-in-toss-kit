@@ -16,10 +16,10 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 아래 값은 이 kit의 정책 값입니다.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.28.6`
-- Last verified TrailBase release date: `2026-06-17`
-- Upstream latest TrailBase server: `0.28.6`
-- Upstream latest TrailBase release date: `2026-06-17`
+- Last verified TrailBase server: `0.31.1`
+- Last verified TrailBase release date: `2026-07-25`
+- Upstream latest TrailBase server: `0.31.1`
+- Upstream latest TrailBase release date: `2026-07-25`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -29,8 +29,10 @@ test가 통과한 뒤에만 사람이 올립니다.
 수동 서버 호환성 값은 `data/trailbase-compat-policy.json`에도 기록합니다. 이 파일은
 업스트림 최신 릴리스에서 자동 생성하지 않습니다. 업스트림 최신 버전과 이 kit가 지원한다고
 선언한 버전은 서로 다른 신호이기 때문입니다.
-TrailBase `0.28.6`은 현재 업스트림 최신 버전이며, analytics multi-db smoke 확인 후 이 kit의
-last verified 값으로도 기록합니다.
+TrailBase `0.31.1`은 현재 업스트림 최신 버전이며, analytics multi-database migration,
+healthcheck, SQLite 검증 smoke 통과 후 이 kit의 last verified 값으로 기록합니다. Kit minimum은
+올리지 않습니다. 도입 앱은 복사한 Compose, auth, Record API, WASM surface를 별도로 테스트해야
+합니다.
 
 Rust 도구 버전은 `.mise.toml`과 `rust-toolchain.toml`에 함께 노출합니다. 개발자가 repo
 toolchain을 설치할 때는 `mise`를 기본 진입점으로 사용하고, `rust-toolchain.toml`은 Cargo,
@@ -42,20 +44,38 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.28.6`
+- `trailbase-server-github-release`: `0.31.1`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.5.1`
 
 <!-- renovate: datasource=crate depName=trailbase-client versioning=cargo -->
-- `trailbase-client`: `0.8.1`
+- `trailbase-client`: `0.10.0`
 
 <!-- renovate: datasource=npm depName=trailbase versioning=npm -->
-- `trailbase-js-client`: `0.12.1`
+- `trailbase-js-client`: `0.14.0`
 
 이 Renovate marker block이나 `renovate.json`을 수정했다면 `bun run renovate:validate`로
 설정을 검증하세요. 이 명령은 실행 시점에 `npx`로 Renovate validator를 설치해서 쓰므로
 validator를 dependency로 커밋할 필요는 없습니다.
+
+## 검토한 호환성 변경
+
+- `0.29.0`은 username 기반 auth와 anonymous auth를 추가하고 `_user.email`을
+  case-insensitive로 바꾸며 email 값 정규화를 중단합니다. Kit은 Apps in Toss identity를 계속
+  TrailBase `_user`에 매핑합니다. 도입 앱 auth smoke는 기존 synthetic identity와 session
+  bootstrap을 확인해야 합니다.
+- `0.30.0`은 custom Rust server 구성 API를 변경합니다. 이 kit은 custom TrailBase server
+  binary를 배포하지 않지만, custom binary를 쓰는 도입 앱은 `api::serve()` 또는
+  `Server::init*` 연동을 수정해야 합니다.
+- `0.31.0`은 batch/transaction Record API 응답을 operation마다 결과 하나를 반환하는 형태로
+  바꿉니다. 이 API를 쓰는 도입 앱은 응답 parsing을 수정해야 합니다.
+- `0.31.1`은 `--data-dir`/`DATA_DIR`을 deprecated 처리하고 `--depot`/`DEPOT`을 권장합니다.
+  Kit runtime은 `--depot`이 없는 `0.28.6` 같은 이전 서버와의 호환성을 위해 아직 허용되는
+  legacy `--data-dir` 표기를 유지합니다. `--depot`이 없는 버전보다 minimum supported server를
+  높인 뒤 runtime 명령을 전환하세요.
+- 최신 Rust client는 `0.10.0`, JS client는 `0.14.0`이며 `trailbase-wasm`은 계속
+  `0.5.1`입니다. Kit의 optional JS peer 범위 `>=0.12.1 <1`은 이미 `0.14.0`을 허용합니다.
 
 ## Release Watch 출력물
 
@@ -88,10 +108,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbase/trailbase:0.28.6
+  --image trailbase/trailbase:0.31.1
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.28.6
+  --version 0.31.1
 ```
 
 일반 모드에서는 경고를 출력하되 성공으로 종료합니다. Strict 모드에서는 선언된 kit minimum보다

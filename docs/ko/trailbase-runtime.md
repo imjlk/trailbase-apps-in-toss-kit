@@ -82,6 +82,9 @@ TrailBase 컨테이너 안의 CLI를 호출하게 만듭니다.
 헬퍼는 `docker compose exec trailbase /app/trail --data-dir /app/traildepot ...`를 감싸야
 합니다. Git으로 추적되는 schema/config 원본은 `traildepot-template`에 두고, 호스트
 `traildepot` symlink는 기본값으로 만들지 않습니다.
+TrailBase `0.31.1`은 `--data-dir` 대신 `--depot`을 권장하지만, `0.28.6` 같은 이전 verified
+server는 `--depot`을 노출하지 않습니다. 공유 runtime은 kit minimum이 해당 이전 버전보다
+높아질 때까지 아직 허용되는 legacy flag를 유지합니다.
 
 ## Entrypoint 패턴
 

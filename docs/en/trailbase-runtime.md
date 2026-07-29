@@ -85,6 +85,9 @@ image-bundled CLI inside the running TrailBase container instead of a host-insta
 The helper should wrap `docker compose exec trailbase /app/trail --data-dir
 /app/traildepot ...`. Keep Git-tracked schema/config source in
 `traildepot-template`; do not add host-side `traildepot` symlinks by default.
+TrailBase `0.31.1` deprecates `--data-dir` in favor of `--depot`, but older
+verified servers such as `0.28.6` do not expose `--depot`. The shared runtime
+keeps the accepted legacy flag until the kit minimum moves past those versions.
 
 ## Entrypoint Pattern
 
