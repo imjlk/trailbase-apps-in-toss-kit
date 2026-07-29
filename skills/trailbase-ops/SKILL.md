@@ -54,6 +54,9 @@ the TrailBase Docker container instead of using a host-installed binary. The rec
 `bun trail -- ...`, wrapping `docker compose exec trailbase /app/trail --data-dir /app/traildepot ...`.
 Keep Git-tracked schema/config source in `traildepot-template`; do not add host-side `traildepot`
 symlinks by default.
+TrailBase `0.31.1` deprecates `--data-dir` in favor of `--depot`, but earlier verified servers such
+as `0.28.6` do not expose `--depot`. Keep the accepted legacy flag in shared helpers until the
+consumer or kit minimum supported server moves past those older versions.
 
 ## Safety Defaults
 
