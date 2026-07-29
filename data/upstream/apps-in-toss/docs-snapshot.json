@@ -1,89 +1,124 @@
 {
-  "fetchedAt": "2026-07-29T04:28:25.440Z",
+  "fetchedAt": "2026-07-29T11:03:02.420Z",
   "documents": [
     {
       "key": "release-notes",
       "title": "Apps in Toss release notes",
-      "url": "https://developers-apps-in-toss.toss.im/release-note.md",
-      "sha256": "104d369b97a2ff7a79e02e47949b03eae5562543100ad3e230008b08e7d2299b",
-      "bytes": 2037
+      "url": "https://developers-apps-in-toss.toss.im/release-note/release-note.md",
+      "sha256": "0ce2deec9e17b965bdbc4e1b6a9ac3a721cf8a191ff0fa0464aef5d45b08bafb",
+      "bytes": 17381
     },
     {
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "7c681778b7725c28834aec4fb57acc2d43111b91aa92ad955d90680fde4319ae",
-      "bytes": 26670
+      "sha256": "82ca0c362ca577dc48a52358fd306972f76913de7e310e4195304d01c7f373e3",
+      "bytes": 28028
     },
     {
       "key": "react-native-tutorial",
       "title": "React Native tutorial",
-      "url": "https://developers-apps-in-toss.toss.im/tutorials/react-native.md",
-      "sha256": "7030a16c4223b8d7eb15838d3c05bdb699f0e88acaac78a4c7b1139f77f9d0aa",
-      "bytes": 2082
+      "url": "https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md",
+      "sha256": "5e1de62ddaec01667f094e0f90eee5151b598aacd7971117180dfb9c42660f3c",
+      "bytes": 14850
     },
     {
-      "key": "sdk-overview",
-      "title": "SDK overview",
-      "url": "https://developers-apps-in-toss.toss.im/bedrock/reference/framework/시작하기/intro.md",
-      "sha256": "a2215489d87cd0045da106047194fb2ff1b10def9c19511786820fd8e7d29615",
-      "bytes": 2110
+      "key": "react-native-reference",
+      "title": "React Native reference",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/react-native.md",
+      "sha256": "38878875b2f2cc428b1f5918227181c1b39a58270aa50550c3f4c5413dd45552",
+      "bytes": 2461
+    },
+    {
+      "key": "client-sdk-overview",
+      "title": "WebView Client SDK overview",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/sdk.md",
+      "sha256": "9343844fac907e72ea363a7be43bc5e4a537724eebdf2b6f5f3006034e50bef1",
+      "bytes": 2590
+    },
+    {
+      "key": "webview-sdk-3-migration",
+      "title": "WebView SDK 3.x migration",
+      "url": "https://developers-apps-in-toss.toss.im/development/sdk-3.x.md",
+      "sha256": "a723a264af70ebd6a191f53b32c55dd8ea70b33edbff636a53b8de5e6d3ff942",
+      "bytes": 8314
     },
     {
       "key": "api-overview",
       "title": "API overview",
-      "url": "https://developers-apps-in-toss.toss.im/api/overview.md",
-      "sha256": "ca73a67fbe204ddaf709febf01a46e74d03c13da13de6e5da55693a3abe4eddc",
-      "bytes": 2133
+      "url": "https://developers-apps-in-toss.toss.im/documentation/overview.md",
+      "sha256": "6342289e4a8be3701f09545c3e60db12c4258d5cfec4e3b0a769672b521a3017",
+      "bytes": 14683
     },
     {
-      "key": "mtls-integration-process",
-      "title": "mTLS integration process",
-      "url": "https://developers-apps-in-toss.toss.im/development/integration-process.md",
-      "sha256": "7aa696fc89a429d86a72973d80ec5350c2b55a889cbbbd2740ef76e7a33b0375",
-      "bytes": 2074
+      "key": "integration-getting-started",
+      "title": "Apps in Toss integration getting started",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md",
+      "sha256": "425febcd75c0d1532e9fcf1057c49a3471d8211a1d243190beb8dda0ccce64a0",
+      "bytes": 8492
     },
     {
-      "key": "login-develop",
-      "title": "Toss Login development",
-      "url": "https://developers-apps-in-toss.toss.im/login/develop.md",
-      "sha256": "a956901e229aa220267a82f877bd5d1106325187bdec065c8094b8b984b2c801",
-      "bytes": 2057
+      "key": "server-api-integration",
+      "title": "Server API integration",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md",
+      "sha256": "81ae8bbabf5e96791f7b5283e3f43cf1496e5d66bc51e0019764b3e1fc8b4ed8",
+      "bytes": 6366
     },
     {
-      "key": "iap-develop",
-      "title": "In-app purchase development",
-      "url": "https://developers-apps-in-toss.toss.im/iap/develop.md",
-      "sha256": "a134696e13141eab8be1cd3034be364968854c02a35fc33982206a65f7306eea",
-      "bytes": 2019
+      "key": "api-auth",
+      "title": "API authentication and mTLS",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/api/auth.md",
+      "sha256": "b0ff98c85a8f8fe045749730b9e5f5925a32722b0195c85ab48a311c0edd4467",
+      "bytes": 2910
     },
     {
-      "key": "promotion-develop",
-      "title": "Promotion development",
-      "url": "https://developers-apps-in-toss.toss.im/promotion/develop.md",
-      "sha256": "f7d3b091a007b78dccf2bd106e7f91547adc01e1bba811439ca7bd35e4d8ba03",
-      "bytes": 2034
+      "key": "toss-login-api",
+      "title": "Toss Login API",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/api/toss-login.md",
+      "sha256": "68501f5ef17839b57a08d1d1621dcb71b95d1d822aa30d19216045309a450aa5",
+      "bytes": 40288
     },
     {
-      "key": "smart-message-develop",
-      "title": "Smart Message development",
-      "url": "https://developers-apps-in-toss.toss.im/smart-message/develop.md",
-      "sha256": "cb7a03ca84826113e04c1d2172046c6ca6f1894103e83cf737e68c847cfc64fb",
-      "bytes": 2071
+      "key": "iap-api",
+      "title": "In-app purchase API",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/api/iap.md",
+      "sha256": "b5ae1ff6efa221e3aa4b9c160e458951959a39942a8a12209553f96935595e9e",
+      "bytes": 9755
     },
     {
-      "key": "smart-message-intro",
+      "key": "promotion-api",
+      "title": "Promotion API",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/api/promotion.md",
+      "sha256": "5012db132ad33e9416f30c0ba00d193e14368d68988fc2c6abd5fe5a5cf0eba4",
+      "bytes": 25601
+    },
+    {
+      "key": "push-api",
+      "title": "Push and Smart Message API",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/api/push.md",
+      "sha256": "36d683e74ceaab8d1c2d132d3e1be44edc69d7a72daac3ef6be2cd8fbbbe3793",
+      "bytes": 35417
+    },
+    {
+      "key": "smart-message-guide",
       "title": "Smart Message overview and notification agreement policy",
-      "url": "https://developers-apps-in-toss.toss.im/smart-message/intro.md",
-      "sha256": "cd6a67abad9582a0e9c9875d0f518a9ceceb4243f62b94a9c8edd4563d542001",
-      "bytes": 2027
+      "url": "https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md",
+      "sha256": "c3cfd455f29b2e0b39a9721db1655756a2ae4ab3674f8270c425a9388ab7baf5",
+      "bytes": 25821
     },
     {
       "key": "notification-agreement-sdk",
       "title": "Notification agreement SDK requestNotificationAgreement",
-      "url": "https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md",
-      "sha256": "8c120c88b6af3102dabcb62f9b5764af4f5b6342cdb4e7cd19a732188f823337",
-      "bytes": 2208
+      "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md",
+      "sha256": "f986e7667ec1807d04ae7d7f9402b1b7f46978be57722e58f42b06beb6619159",
+      "bytes": 4317
+    },
+    {
+      "key": "anonymous-user-key-sdk",
+      "title": "Anonymous user key SDK getAnonymousKey",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md",
+      "sha256": "58866b1422c4d17925fae8b5beafdb56e85c362194fd565fe8f76e7a79b296cb",
+      "bytes": 2493
     },
     {
       "key": "tds-react-native",
@@ -110,14 +145,14 @@
     },
     {
       "packageName": "create-granite-app",
-      "version": "1.0.37",
+      "version": "1.0.38",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
     },
     {
       "packageName": "@granite-js/react-native",
-      "version": "1.0.37",
+      "version": "1.0.38",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"

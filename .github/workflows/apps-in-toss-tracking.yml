@@ -52,5 +52,8 @@ jobs:
         with:
           bun-version: ${{ env.BUN_VERSION }}
 
+      - name: Test snapshot response validation
+        run: bun run apps-in-toss:snapshot:test
+
       - name: Check tracking metadata
         run: bun run apps-in-toss:tracking:check

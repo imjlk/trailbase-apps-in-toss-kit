@@ -7,19 +7,23 @@ only after app-level smoke tests.
 
 ## Official Upstream Sources
 
-- Release notes: https://developers-apps-in-toss.toss.im/release-note.md
+- Release notes: https://developers-apps-in-toss.toss.im/release-note/release-note.md
 - LLM index: https://developers-apps-in-toss.toss.im/llms.txt
-- React Native tutorial: https://developers-apps-in-toss.toss.im/tutorials/react-native.md
-- SDK overview: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/시작하기/intro.md
-- API overview: https://developers-apps-in-toss.toss.im/api/overview.md
-- mTLS integration process: https://developers-apps-in-toss.toss.im/development/integration-process.md
-- Toss Login: https://developers-apps-in-toss.toss.im/login/develop.md
-- In-app purchase: https://developers-apps-in-toss.toss.im/iap/develop.md
-- Promotion: https://developers-apps-in-toss.toss.im/promotion/develop.md
-- Smart Message: https://developers-apps-in-toss.toss.im/smart-message/develop.md
-- Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/smart-message/intro.md
-- Notification agreement SDK: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/인터렉션/requestNotificationAgreement.md
-- Non-game user identity key: https://developers-apps-in-toss.toss.im/bedrock/reference/framework/비게임/getAnonymousKey.md
+- React Native tutorial: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
+- React Native reference: https://developers-apps-in-toss.toss.im/documentation/react-native.md
+- WebView Client SDK: https://developers-apps-in-toss.toss.im/documentation/sdk.md
+- WebView SDK 3.x migration: https://developers-apps-in-toss.toss.im/development/sdk-3.x.md
+- API overview: https://developers-apps-in-toss.toss.im/documentation/overview.md
+- Integration getting started: https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md
+- Server API integration: https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md
+- API authentication and mTLS: https://developers-apps-in-toss.toss.im/documentation/api/auth.md
+- Toss Login API: https://developers-apps-in-toss.toss.im/documentation/api/toss-login.md
+- In-app purchase API: https://developers-apps-in-toss.toss.im/documentation/api/iap.md
+- Promotion API: https://developers-apps-in-toss.toss.im/documentation/api/promotion.md
+- Push and Smart Message API: https://developers-apps-in-toss.toss.im/documentation/api/push.md
+- Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
+- Notification agreement SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
+- Non-game user identity key: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md
 - TDS React Native docs: https://tossmini-docs.toss.im/tds-react-native/
 
 ## Compatibility Policy
@@ -37,6 +41,9 @@ only after app-level smoke tests.
 - Non-game mini-apps must use TDS. TDS is optional for games.
 - New React Native mini-apps should use Granite terminology and framework 1.0 or
   newer.
+- Apps in Toss SDK 3.x currently applies to WebView projects through
+  `@apps-in-toss/web-framework@rc`; it is not an upgrade target for this
+  repository's React Native `@apps-in-toss/framework` reference.
 - Framework 1.0 and newer should use `@toss/tds-react-native`; legacy framework
   versions used `@toss-design-system/react-native`.
 - mTLS API changes affect the proxy and server-side integration surface; review
@@ -54,16 +61,16 @@ only after app-level smoke tests.
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.10.4`
+- `apps-in-toss-framework`: `2.10.8`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
-- `tds-react-native`: `2.0.3`
+- `tds-react-native`: `2.0.4`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.36`
+- `create-granite-app`: `1.0.38`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.36`
+- `granite-js-react-native`: `1.0.38`
 
 - `@toss-design-system/react-native`: legacy package name for pre-1.0 framework
   projects. No public npm `latest` metadata was available during the initial
@@ -80,7 +87,7 @@ snapshot script is intentionally detection-only; use
 ## Latest Reviewed SDK Delta
 
 The repository reference has been reviewed through `@apps-in-toss/framework`
-`2.10.4`.
+`2.10.8`.
 
 - `2.8.0`: Added non-game navigation bar theme settings.
 - `2.9.0`: Added the `ait deploy --timeout` option for app bundle deployment.
@@ -91,6 +98,19 @@ The repository reference has been reviewed through `@apps-in-toss/framework`
   app-level smoke tests before adopting it.
 - `2.10.4`: Refreshes the tracked Apps in Toss framework reference and Granite
   package family for metadata validation. No shared kit API change is required.
+- `2.10.5`: Fixes bottom-screen touch handling when the navigation bar uses
+  transparent mode.
+- `2.10.6`: Fixes intermittent WebView flickering around bottom sheets.
+- `2.10.7`: Fixes an intermittent iOS white screen for heavy Toss users opening
+  WebView mini-apps.
+- `2.10.8`: Aligns React Native mini-app banner image presentation with the
+  WebView banner specification.
+
+The July 2026 API update also allows promotion, Smart Message, and Toss Pay
+server APIs to identify users with an anonymous hash in addition to Toss Login
+`userKey`. Existing proxy adapters continue to use `userKey`; adding anonymous
+hash input is a separate API-surface change and must preserve the rule that raw
+identifiers are not logged or returned.
 
 No shared kit API change is required for these SDK deltas. Consumer apps should
 still run app-level smoke tests before raising their own supported Apps in Toss
@@ -104,7 +124,9 @@ The `Apps in Toss doc watch` workflow writes upstream snapshots to:
 - `data/upstream/apps-in-toss/docs-snapshot.json`
 
 The snapshot stores document hashes and npm reference package metadata. It does
-not copy full upstream documents into this repository.
+not copy full upstream documents into this repository. The snapshot command
+rejects empty responses, GitBook `Page Not Found` documents returned with HTTP
+200, and responses that do not contain the expected document marker.
 
 The workflow currently reuses `TRAILBASE_RELEASE_WATCH_TOKEN` as the upstream
 watch PR token. That token must be able to push branches and open pull requests
@@ -112,7 +134,9 @@ for this repository so generated PRs trigger downstream `pull_request` checks.
 
 ## Review Checklist When Apps in Toss Changes
 
-- Check release notes for SDK 2.x, Granite, or required migration changes.
+- Check release notes for React Native SDK 2.x and Granite changes.
+- Review WebView SDK 3.x migration separately; do not apply its config or
+  package changes to React Native consumers.
 - Check whether React Native, React, or Toss app minimum versions changed.
 - Check mTLS API integration process changes before modifying proxy behavior.
 - Review Toss Login, IAP, promotion, and Smart Message docs for request/response
