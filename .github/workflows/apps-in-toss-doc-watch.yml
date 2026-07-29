@@ -31,6 +31,9 @@ jobs:
           install: true
           cache: true
 
+      - name: Test Apps in Toss snapshot response validation
+        run: bun run apps-in-toss:snapshot:test
+
       - name: Snapshot Apps in Toss docs and package references
         run: node scripts/snapshot-apps-in-toss-docs.mjs
 
@@ -60,7 +63,8 @@ jobs:
             - docs/ko/apps-in-toss-tracking.md
 
             Pay special attention to:
-            - SDK 2.x and Granite migration notes
+            - React Native SDK 2.x, Granite, and WebView SDK 3.x migration notes
+            - moved or missing documentation pages rejected by snapshot validation
             - mTLS API integration process changes
             - Login, IAP, promotion, and Smart Message API behavior
             - Functional Smart Message notification agreement requirements and requestNotificationAgreement SDK behavior
