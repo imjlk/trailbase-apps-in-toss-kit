@@ -111,3 +111,5 @@ Keep app-specific database updates in the consumer app. Typical handling is to l
 that omits the raw Toss `userKey`.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
+See [encryption key rotation](identity-key-rotation.md) for reader-first v1/v2 rollout and bounded reseal batches.
