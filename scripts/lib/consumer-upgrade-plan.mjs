@@ -176,6 +176,7 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
         if (status === 'both-changed') status = lines.mergeable ? 'mergeable-update' : 'conflict';
         details = { kitHunks: lines.kitHunks, consumerHunks: lines.consumerHunks };
       }
+      const contentStatus = status;
       let permissions;
       if (check.mode === 'exact') {
         const [oldExecutable, newExecutable, consumerExecutable] = [oldFile, newFile, localFile].map(file => file?.executable ?? null);
@@ -184,7 +185,7 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
         status = combinedState(status, permissionStatus);
       }
       const kitChanged = oldScope !== newScope || Boolean(permissions && permissions.oldExecutable !== permissions.newExecutable);
-      const migration = check.template.endsWith('.sql') && oldText !== newText && status !== 'already-applied';
+      const migration = check.template.endsWith('.sql') && oldText !== newText && contentStatus !== 'already-applied';
       files.push({ template: check.template, consumer, mode: check.mode, ...(component ? { scope: component } : {}), status, kitChanged,
         consumerChanged: oldScope !== localScope || Boolean(permissions && permissions.oldExecutable !== permissions.consumerExecutable),
         ...details, ...(permissions ? { permissions } : {}),

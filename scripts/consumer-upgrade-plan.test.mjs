@@ -126,6 +126,14 @@ describe('three-way consumer upgrade planning', () => {
     });
   });
 
+  test('trailing comments inside a Compose entry remain visible while separator comments stay outside', () => {
+    const base = 'services:\n  proxy:\n    image: proxy:1\n    # old rollout note\n# separator\n';
+    const next = base.replace('old rollout note', 'new rollout note');
+    fixture({ [template]: base }, { [template]: next }, { 'local.txt': base }, options => {
+      expect(plan(options, { mode: 'compose-service', service: 'proxy' }).files[0].status).toBe('update-required');
+    });
+  });
+
   test('missing unchanged environment keys remain actionable alongside an already-applied change', () => {
     fixture({ [template]: 'REQUIRED=yes\nCHANGED=old\n' }, { [template]: 'REQUIRED=yes\nCHANGED=new\n' }, { 'local.txt': 'CHANGED=new\n' }, options => {
       const p = plan(options, { mode: 'env-subset' });
@@ -177,6 +185,19 @@ describe('three-way consumer upgrade planning', () => {
       expect(p.files[0].status).toBe('update-required');
       expect(p.files[0].requiresMigrationReview).toBe(false);
       expect(p.requiresReview).toBe(true);
+    });
+  });
+
+  test('already-applied SQL content does not require another migration for stale permissions', () => {
+    const sql = 'templates/trailbase/sql/combined.sql';
+    fixture({ [sql]: 'CREATE TABLE t(id);\n' }, { [sql]: 'CREATE TABLE t(id, name);\n' }, { 'local.sql': 'CREATE TABLE t(id, name);\n' }, options => {
+      chmodSync(join(options.kitRoot, sql), 0o755);
+      chmodSync(join(options.consumerRoot, 'local.sql'), 0o644);
+      git(options.kitRoot, 'add', '.'); git(options.kitRoot, 'commit', '-qm', 'make executable');
+      const p = plan(options, { template: sql, consumer: 'local.sql' });
+      expect(p.files[0].status).toBe('update-required');
+      expect(p.files[0].requiresMigrationReview).toBe(false);
+      expect(p.files[0].kitHunks.length).toBeGreaterThan(0);
     });
   });
 
