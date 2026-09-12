@@ -362,6 +362,9 @@ same internal bearer authentication; forward mode still requires a token.
 Bun is pinned to `1.4.2` across local tooling, CI, and the container. The Compose
 copy-in template points to the already released proxy `0.1.12`; use the next
 Sampo-generated image version when deploying the changes in this source tree.
+Image `0.1.12` does not contain the API Core 0.2 changes described here. After the
+normal Sampo release publishes the new image, pin that published version in the
+consumer-owned Compose file before enabling the updated adapters.
 
 Single Smart Message requests accept one of `tossUserKey`, `userKey`, or
 `anonKey`. The proxy corrects api-core 0.2.0's `x-user-key` header to the official

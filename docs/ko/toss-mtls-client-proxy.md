@@ -364,6 +364,9 @@ relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기�
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 이미 출시된 프록시 `0.1.12`를
 참조합니다. 이 소스 트리의 변경을 배포할 때는 다음 Sampo 생성 이미지 버전을 사용하세요.
+`0.1.12` 이미지에는 여기서 설명하는 API Core 0.2 변경이 포함되지 않습니다. 정상 Sampo
+릴리스로 새 이미지가 게시된 뒤, 소비 앱의 Compose 파일을 게시된 버전으로 고정하고
+갱신된 어댑터를 활성화하세요.
 
 단건 Smart Message 요청은 `tossUserKey`, `userKey`, `anonKey` 중 하나를 받습니다.
 프록시는 api-core 0.2.0의 `x-user-key`를 단건 메시지 API의 공식 헤더인

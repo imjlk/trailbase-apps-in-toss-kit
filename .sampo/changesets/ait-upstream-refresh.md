@@ -10,6 +10,7 @@ preserving authenticated generic mTLS requests, the documented Smart Message
 recipient header, and legacy partial-delivery failure fields. Anonymous message
 requests use x-anon-key exclusively; consumers still enforce notification agreement.
 
-Copy the updated Compose template to adopt the already released proxy 0.1.12.
-Deploy the next Sampo-generated proxy image to use these source changes. No
-TrailBase schema migration or minimum supported server change is required.
+The Compose template keeps the already released proxy 0.1.12 as a baseline; that
+image does not contain these source changes. After the next Sampo-generated proxy
+image is published, update the consumer-owned image pin before using the new behavior.
+No TrailBase schema migration or minimum supported server change is required.
