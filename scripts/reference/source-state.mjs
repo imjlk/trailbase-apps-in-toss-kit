@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { resolve, relative, dirname, basename, sep } from "node:path";
+import { resolve, relative, dirname, basename, sep, isAbsolute } from "node:path";
 import { existsSync, realpathSync } from "node:fs";
 export function sourceState(root, output) {
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trimEnd();
@@ -24,13 +24,14 @@ function canonicalDestination(path) {
 }
 export function requireReportDestination(root, output) {
   const base = realpathSync(root); const destination = canonicalDestination(output);
+  if (destination === resolve(base, ".git")) throw new Error("Report output must not overwrite Git metadata");
   const git = args => execFileSync("git", args, { cwd: root, encoding: "utf8" }).trimEnd();
   const tracked = git(["ls-files", "-z"]).split("\0").filter(Boolean);
   if (tracked.some(path => resolve(base, path) === destination)) throw new Error("Report output must not overwrite tracked source");
   for (const directory of [git(["rev-parse", "--absolute-git-dir"]), git(["rev-parse", "--git-common-dir"])]) {
     const metadata = canonicalDestination(resolve(root, directory));
     const child = relative(metadata, destination);
-    if (!child || (!child.startsWith(`..${sep}`) && child !== ".." && !child.startsWith(sep))) throw new Error("Report output must not overwrite Git metadata");
+    if (!child || (!child.startsWith(`..${sep}`) && child !== ".." && !isAbsolute(child))) throw new Error("Report output must not overwrite Git metadata");
   }
 }
 export function parseFixtureEvidence(stdout) {
