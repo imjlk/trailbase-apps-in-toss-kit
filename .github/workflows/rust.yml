@@ -3,6 +3,7 @@ name: rust helpers
 on:
   pull_request:
     paths:
+      - "fixtures/contracts/**"
       - ".github/workflows/rust.yml"
       - ".mise.toml"
       - "Cargo.toml"
@@ -13,6 +14,7 @@ on:
     branches:
       - main
     paths:
+      - "fixtures/contracts/**"
       - ".github/workflows/rust.yml"
       - ".mise.toml"
       - "Cargo.toml"
