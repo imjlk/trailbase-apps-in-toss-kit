@@ -6,12 +6,13 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { sourceState, requireStableSource } from "./reference/source-state.mjs";
+import { sourceState, requireStableSource, requireReportDestination, parseFixtureEvidence } from "./reference/source-state.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
 if (args.length !== 2 || args[0] !== "--output") throw new Error("Usage: bun scripts/run-kit-reference.mjs --output <report.json>");
 const output = resolve(args[1]);
+requireReportDestination(root, output);
 const scratch = mkdtempSync(join(tmpdir(), "kit-reference-"));
 const results = [];
 const run = (command, argv, extra = {}) => spawnSync(command === "bun" && process.versions.bun ? process.execPath : command, argv, {
@@ -29,7 +30,7 @@ function step(name, command, argv, { env, parseJson = false } = {}) {
   const started = performance.now(); const result = run(command, argv, env);
   const record = { name, ok: !result.error && result.status === 0, durationMilliseconds: Math.round(performance.now() - started) };
   if (parseJson && record.ok) {
-    try { record.evidence = JSON.parse(result.stdout.slice(result.stdout.indexOf("{"))); }
+    try { record.evidence = parseFixtureEvidence(result.stdout); }
     catch { record.ok = false; record.reason = "Expected structured fixture output was unavailable"; }
   }
   if (!record.ok && !record.reason) record.reason = "Reference command failed; run the named kit check for diagnostics";

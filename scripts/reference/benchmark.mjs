@@ -33,7 +33,7 @@ try {
     for (let i = 0; i < payload.length; i += 127) parser.push(payload.slice(i, i + 127));
     assert.equal(count, events);
   }, 40);
-  console.log(JSON.stringify({ schemaVersion: 1, scope: "synthetic in-memory fixture; no network or device workload",
+  console.log(JSON.stringify({ schemaVersion: 1, ok: true, scope: "synthetic in-memory fixture; no network or device workload",
     ledger: { rows: 5000, operation: "private IAP diagnostic lookup", ...diagnostic },
     sse: { eventsPerSample: events, bytesPerSample: Buffer.byteLength(payload), ...sse } }, null, 2));
 } finally { db.close(); }
