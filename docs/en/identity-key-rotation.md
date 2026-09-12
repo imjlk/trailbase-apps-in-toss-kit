@@ -53,7 +53,8 @@ boundary; key rotation is not identity verification or account reassignment.
 every non-null ciphertext (including active-key rows), prepares the batch, then
 updates changed ciphertext with a compare-and-swap against the original value.
 It changes no HMAC, owner, revocation state or business timestamp. Revoked rows
-whose ciphertext was already removed are skipped for the Toss table.
+whose ciphertext is null or the kit’s REVOKED erasure tombstone are skipped for the Toss table.
+An active row with a tombstone is still checked and fails authentication.
 
 ```rust,ignore
 use trailbase_toss_identity::reseal::{reseal_identity_batch_tx, IdentityCiphertextTable};

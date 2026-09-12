@@ -3,7 +3,7 @@
 `trailbase_toss_identity::TossIdentityKeyRing`은 선택적으로 암호화 키 교체를 지원합니다.
 기존 단일 키 함수의 `v1.nonce.ciphertext` 읽기·쓰기는 유지합니다. Key ring은 명시한
 legacy 키로만 v1을 읽으며 `v2.keyId.nonce.ciphertext`를 씁니다. AES-GCM의 associated
- data로 버전·키 ID를 인증하며 nonce·암호문 변조도 거절합니다. 알 수 없는 ID에 다른 키를
+data로 버전·키 ID를 인증하며 nonce·암호문 변조도 거절합니다. 알 수 없는 ID에 다른 키를
 차례로 대입하지 않습니다. 최대 8개 키 중 하나만 쓰기에 사용하고 평문은 8 KiB, 암호문
 봉투는 16 KiB로 제한합니다.
 
@@ -47,7 +47,8 @@ namespace를 검증하세요. 키 교체는 사용자 식별 검증이나 계정
 템플릿에 적용합니다. 고정 ID 순서로 최대 100행을 읽고, 활성 키의 행까지 null이 아닌
 암호문을 모두 인증한 후 배치를 준비합니다. 변경되는 암호문만 원래 값에 대한
 compare-and-swap으로 갱신합니다. HMAC·소유자·철회 상태·업무 timestamp는 바꾸지 않습니다.
-Toss 테이블에서 철회 후 암호문이 제거된 행은 건너뜁니다.
+Toss 테이블에서 철회 후 암호문이 null이거나 kit의 REVOKED 삭제 표시인 행은 건너뜁니다.
+활성 행에 삭제 표시가 있으면 그대로 검사하여 인증 실패로 처리합니다.
 
 ```rust,ignore
 use trailbase_toss_identity::reseal::{reseal_identity_batch_tx, IdentityCiphertextTable};
