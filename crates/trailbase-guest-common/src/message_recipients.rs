@@ -3,6 +3,7 @@
 use crate::apps_in_toss_messages::{
     MessageDispatchGate, MessageOutboxRecord, MessagePurpose,
     message_dispatch_gate_for_trailbase_user_tx, message_outbox_record_from_row,
+    remove_raw_recipient_fields,
 };
 use crate::responses::{ApiResult, bad_request, internal};
 use crate::{db, toss_identity_store};
@@ -93,7 +94,7 @@ pub fn enqueue_anonymous_message_outbox_tx(
 }
 
 fn anonymous_enqueue_params(
-    input: AnonymousMessageOutboxEnqueueInput<'_>,
+    mut input: AnonymousMessageOutboxEnqueueInput<'_>,
 ) -> ApiResult<Vec<Value>> {
     if input.user.is_empty()
         || !input.payload.is_object()
@@ -111,6 +112,7 @@ fn anonymous_enqueue_params(
             "user, identity, message codes and object payload are required",
         ));
     }
+    remove_raw_recipient_fields(&mut input.payload);
     Ok(vec![
         input
             .id
@@ -355,7 +357,7 @@ mod tests {
                 campaign_id: Some("  "),
                 purpose: MessagePurpose::Functional,
                 template_code: if padded { " reminder " } else { "reminder" },
-                payload: json!({}),
+                payload: json!({"tossUserKey":"raw-login","userKey":"raw-user","anonKey":"raw-anon","context":{"items":[{"anonKey":"nested-raw","label":"safe"}]}}),
                 idempotency_key: if padded { " idem " } else { "idem" },
                 provider_request_id: if padded { " request " } else { "request" },
                 not_before_at: 1,
@@ -365,6 +367,13 @@ mod tests {
             let rows = crate::sql_test_support::query(&db, ENQUEUE_ANONYMOUS, &args);
             assert_eq!(rows[0][0], rusqlite::types::Value::Text("row".into()));
         }
+        let payload: String = db
+            .query_row("SELECT payload_json FROM message_outbox", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(
+            serde_json::from_str::<JsonValue>(&payload).unwrap(),
+            json!({"context":{"items":[{"label":"safe"}]}})
+        );
         let row = db.query_row("SELECT template_code,idempotency_key,provider_request_id,campaign_id FROM message_outbox", [], |r|
             Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,Option<String>>(3)?))).unwrap();
         assert_eq!(

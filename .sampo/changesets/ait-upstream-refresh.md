@@ -14,3 +14,7 @@ The Compose template keeps the already released proxy 0.1.12 as a baseline; that
 image does not contain these source changes. After the next Sampo-generated proxy
 image is published, update the consumer-owned image pin before using the new behavior.
 No TrailBase schema migration or minimum supported server change is required.
+
+Forward IAP lookups no longer promote requested SKUs into provider evidence. Paid
+responses without a provider SKU fail with UNVERIFIED_IAP_ORDER; retry verification
+before granting products. Explicit stub mode remains available for local tests.

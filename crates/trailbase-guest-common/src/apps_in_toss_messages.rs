@@ -587,8 +587,27 @@ struct NormalizedMessageOutboxEnqueue {
     now: i64,
 }
 
+// Recipient identity belongs in the private HMAC/sealed columns, never in
+// arbitrary message context persisted or forwarded to a template.
+pub(crate) fn remove_raw_recipient_fields(payload: &mut JsonValue) {
+    match payload {
+        JsonValue::Object(fields) => {
+            fields.retain(|key, _| !matches!(key.as_str(), "tossUserKey" | "userKey" | "anonKey"));
+            for value in fields.values_mut() {
+                remove_raw_recipient_fields(value);
+            }
+        }
+        JsonValue::Array(values) => {
+            for value in values {
+                remove_raw_recipient_fields(value);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn normalize_message_outbox_enqueue_input(
-    input: MessageOutboxEnqueueInput<'_>,
+    mut input: MessageOutboxEnqueueInput<'_>,
 ) -> ApiResult<NormalizedMessageOutboxEnqueue> {
     if input.user.is_empty() {
         return Err(bad_request(
@@ -602,6 +621,7 @@ fn normalize_message_outbox_enqueue_input(
             "message outbox payload must be a JSON object",
         ));
     }
+    remove_raw_recipient_fields(&mut input.payload);
     Ok(NormalizedMessageOutboxEnqueue {
         id: normalize_optional_code(input.id.map(str::to_string)),
         user_id: input.user.to_vec(),
@@ -1325,7 +1345,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_message_outbox_enqueue_statement() {
+    fn builds_message_outbox_enqueue_statement_without_raw_recipients() {
         let record = normalize_message_outbox_enqueue_input(MessageOutboxEnqueueInput {
             id: Some(" outbox-1 "),
             user: &[1, 2, 3],
@@ -1334,7 +1354,7 @@ mod tests {
             campaign_id: Some(" campaign-1 "),
             purpose: MessagePurpose::Functional,
             template_code: " template-1 ",
-            payload: json!({ "name": "Ada" }),
+            payload: json!({ "name": "Ada", "tossUserKey": "raw-login", "userKey": "raw-user", "anonKey": "raw-anon", "context": {"items": [1, {"anonKey":"nested-raw", "label":"safe"}]} }),
             idempotency_key: " idem-1 ",
             provider: None,
             provider_request_id: " request-1 ",
@@ -1350,7 +1370,10 @@ mod tests {
         assert_eq!(params.len(), 13);
         assert_eq!(record.id.as_deref(), Some("outbox-1"));
         assert_eq!(record.provider, APPS_IN_TOSS_SMART_MESSAGE_PROVIDER);
-        assert_eq!(record.payload_json, json!({ "name": "Ada" }).to_string());
+        assert_eq!(
+            record.payload_json,
+            json!({ "name": "Ada", "context": {"items": [1, {"label":"safe"}]} }).to_string()
+        );
     }
 
     #[test]
