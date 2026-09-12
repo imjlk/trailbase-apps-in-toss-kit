@@ -2,6 +2,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { validateProductionEnv } from "./production-env.mjs";
+import { createProxyCapabilitiesCheck } from "./proxy-capabilities.mjs";
+export { createProxyCapabilitiesCheck } from "./proxy-capabilities.mjs";
 
 export async function runReleaseDoctor({
   checks = [],
@@ -232,6 +234,10 @@ export function formatDoctorResultLines(summary) {
 
 function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
   const type = entry?.type;
+  if (type === "proxy-capabilities") {
+    const { name, url, urlEnv, tokenEnv, required, expectedMode, minimumVersion, requiredCapabilities, timeout } = entry;
+    return createProxyCapabilitiesCheck({ name, url, urlEnv, tokenEnv, required, expectedMode, minimumVersion, requiredCapabilities, timeout });
+  }
   if (type === "production-env") {
     const {
       name,

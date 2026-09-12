@@ -30,11 +30,13 @@
     "skills:check:agent": "bun scripts/check-agent-skills.mjs",
     "skills:validate": "bun scripts/validate-agent-skills.mjs",
     "packages:typecheck": "tsc --project tsconfig.json",
-    "trailbase:wasm:smoke": "bun scripts/smoke-trailbase-wasm.mjs"
+    "trailbase:wasm:smoke": "bun scripts/smoke-trailbase-wasm.mjs",
+    "packages:typecheck:minimum": "node scripts/check-sdk-minimum.mjs && tsc --project tsconfig.sdk-min.json"
   },
   "devDependencies": {
     "@apps-in-toss/framework": "2.10.10",
     "@types/node": "24",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "@apps-in-toss/framework-min-supported": "npm:@apps-in-toss/framework@2.5.0"
   }
 }

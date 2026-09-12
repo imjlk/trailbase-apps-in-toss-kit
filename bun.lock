@@ -6,13 +6,14 @@
       "name": "trailbase-apps-in-toss-kit",
       "devDependencies": {
         "@apps-in-toss/framework": "2.10.10",
+        "@apps-in-toss/framework-min-supported": "npm:@apps-in-toss/framework@2.5.0",
         "@types/node": "24",
         "typescript": "7.0.2",
       },
     },
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "peerDependencies": {
         "@apps-in-toss/framework": ">=2.5.0",
         "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
@@ -20,7 +21,7 @@
     },
     "packages/trailbase-client": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-client",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@tanstack/react-db": "0.3.8",
       },
@@ -35,20 +36,27 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.2.6",
+      "version": "0.3.0",
       "bin": {
         "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
         "trailbase-release-doctor": "./bin/release-doctor.mjs",
+        "trailbase-ledger-doctor": "./bin/ledger-doctor.mjs",
         "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
         "trailbase-prod-env-validate": "./bin/validate-production-env.mjs",
+      },
+      "devDependencies": {
+        "semver": "7.8.5",
       },
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.1.12",
+      "version": "0.2.0",
       "dependencies": {
         "@ait-kit/api-client": "0.2.0",
         "@ait-kit/api-core": "0.2.0",
+      },
+      "devDependencies": {
+        "@trailbase-apps-in-toss-kit/trailbase-runtime": "workspace:*",
       },
     },
   },
@@ -65,7 +73,11 @@
 
     "@apps-in-toss/analytics": ["@apps-in-toss/analytics@2.10.10", "", { "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" } }, "sha512-8pRDr1TwLpl9Sd2dLJiPR6EzfNLLAXkhXKlkzWX10SLs6zp/RIngjloA7Fjm32ObZCAXF8Diww1ez4/hg+NEYQ=="],
 
+    "@apps-in-toss/cli": ["@apps-in-toss/cli@2.5.0", "", { "dependencies": { "@apps-in-toss/ait-format": "1.0.0", "@apps-in-toss/plugins": "2.5.0", "@apps-in-toss/web-config": "2.5.0", "@clack/prompts": "^0.10.0", "@granite-js/utils": "1.0.20", "@sentry/cli": "^2.46.0", "clipanion": "^4.0.0-rc.4", "dedent": "^1.6.0", "execa": "9.3.0", "fast-glob": "^3.3.2", "jscodeshift": "^17.3.0", "source-map": "^0.8.0-beta.0", "unzipper": "^0.12.3", "uuidv7": "^1.0.2" } }, "sha512-K5qF/geIiEeAHzSZ04kezJsw4UVLelNI+cbAAnpqUxL2PHTydpGi4TMPw4uz41qzX0f1MFj4Ktg+FWlAK9k2dA=="],
+
     "@apps-in-toss/framework": ["@apps-in-toss/framework@2.10.10", "", { "dependencies": { "@apps-in-toss/analytics": "2.10.10", "@apps-in-toss/native-modules": "2.10.10", "@apps-in-toss/plugins": "2.10.10", "@apps-in-toss/react-native-cli": "2.10.10", "@apps-in-toss/types": "2.10.10", "@apps-in-toss/user-scripts": "^2.10.10", "es-hangul": "^2.3.2" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@toss/tds-react-native": ">=2.0.0", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" }, "bin": { "ait": "./bin/ait.js" } }, "sha512-6M4E4F0uzTA+W0zKHoMusTUv7eH01z9+7vNzCLHjGKvQt15K38bjF/E5Aouk8AKpJQSWwsg4MvzIA6CNJMyW7Q=="],
+
+    "@apps-in-toss/framework-min-supported": ["@apps-in-toss/framework@2.5.0", "", { "dependencies": { "@apps-in-toss/analytics": "2.5.0", "@apps-in-toss/cli": "2.5.0", "@apps-in-toss/native-modules": "2.5.0", "@apps-in-toss/plugins": "2.5.0", "@apps-in-toss/types": "2.5.0", "@apps-in-toss/user-scripts": "^2.5.0", "es-hangul": "^2.3.2" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@toss/tds-react-native": ">=2.0.0", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" }, "bin": { "ait": "./bin/ait.js" } }, "sha512-qFzFoX9sNFCGUOCyZrcgywq4ucEVsaK+Kenv2tQJjiJj0jkqAUXMIrztetWbu6H0FVo4mC9KpvYnrRd3jeiDZA=="],
 
     "@apps-in-toss/native-modules": ["@apps-in-toss/native-modules@2.10.10", "", { "dependencies": { "@apps-in-toss/types": "2.10.10", "brick-module": "0.5.2", "es-toolkit": "^1.39.3" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "react": "*", "react-native": "*" } }, "sha512-4nJOEY/dd56FUzlPRVEJmVOc0pXUibkxCtzVMHRj77M/th43qCrA2pMrv0cC6/a5vte5W1cOS+WjiunSYQTfHw=="],
 
@@ -2025,7 +2037,7 @@
 
     "secure-json-parse": ["secure-json-parse@2.7.0", "", {}, "sha512-6aU+Rwsezw7VR8/nyvKTx8QpWH9FrcYiXXlqC4z5d5XQBDRqtbfsRjnwGyqbi3gddNtWHuEk9OANUotL26qKUw=="],
 
-    "semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
+    "semver": ["semver@7.8.5", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA=="],
 
     "send": ["send@0.19.2", "", { "dependencies": { "debug": "2.6.9", "depd": "2.0.0", "destroy": "1.2.0", "encodeurl": "~2.0.0", "escape-html": "~1.0.3", "etag": "~1.8.1", "fresh": "~0.5.2", "http-errors": "~2.0.1", "mime": "1.6.0", "ms": "2.1.3", "on-finished": "~2.4.1", "range-parser": "~1.2.1", "statuses": "~2.0.2" } }, "sha512-VMbMxbDeehAxpOtWJXlcUS5E8iXh6QmN+BkRX1GARS3wRaXEEgzCcB10gTQazO42tpNIya8xIyNx8fll1OFPrg=="],
 
@@ -2281,6 +2293,18 @@
 
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
+    "@apps-in-toss/cli/@apps-in-toss/plugins": ["@apps-in-toss/plugins@2.5.0", "", { "dependencies": { "@apps-in-toss/ait-format": "1.0.0", "@apps-in-toss/plugin-compat": "2.5.0", "@granite-js/plugin-core": "1.0.20", "@granite-js/plugin-micro-frontend": "1.0.20", "@granite-js/plugin-sentry": "1.0.20", "@granite-js/utils": "1.0.20", "archiver": "^7.0.1", "connect": "^3.7.0", "esbuild": "0.25.5", "execa": "9.3.0", "picocolors": "^1.1.1", "uuidv7": "^1.0.2" } }, "sha512-XuLHamcCTsE+JW577IMr2TwYTwSeFKFqg+VeecVvNJra2MJcqjz4FTHgaAJ/I5NqNmBWGfMOFoTlBY1FRC7Eng=="],
+
+    "@apps-in-toss/cli/@apps-in-toss/web-config": ["@apps-in-toss/web-config@2.5.0", "", { "dependencies": { "@babel/core": "7.23.9", "@babel/traverse": "^7.26.9", "@babel/types": "^7.26.9", "@granite-js/utils": "1.0.20", "cosmiconfig": "^9.0.0", "cosmiconfig-typescript-loader": "^5.1.0" } }, "sha512-wW9UBYSkEfMuzzkDK4JDBemesDKC25dd/SrC+lbnfwb45VTn72XbMBr+KkxyEmH9TTH/QyNb06pXkkOUxmgFRg=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/analytics": ["@apps-in-toss/analytics@2.5.0", "", { "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" } }, "sha512-gbr2wvYCiUkGbxJWJvLZ+kwgmXDgqfyUzWc03D4U8MlIl0IlKsTQp9xjUgfI5Pej1XWuCazCsVLRa1qOhWNKzA=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/native-modules": ["@apps-in-toss/native-modules@2.5.0", "", { "dependencies": { "@apps-in-toss/types": "2.5.0", "brick-module": "0.5.2", "es-toolkit": "^1.39.3" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "react": "*", "react-native": "*" } }, "sha512-7R4QqNlDn6zDsPgNNEyIolhlBQ5e1OCUbRFbOHvAqBJpC6aPHz2miQLrSkYbUvKPiMixnFGU/sR19IrZ1/8i7Q=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/plugins": ["@apps-in-toss/plugins@2.5.0", "", { "dependencies": { "@apps-in-toss/ait-format": "1.0.0", "@apps-in-toss/plugin-compat": "2.5.0", "@granite-js/plugin-core": "1.0.20", "@granite-js/plugin-micro-frontend": "1.0.20", "@granite-js/plugin-sentry": "1.0.20", "@granite-js/utils": "1.0.20", "archiver": "^7.0.1", "connect": "^3.7.0", "esbuild": "0.25.5", "execa": "9.3.0", "picocolors": "^1.1.1", "uuidv7": "^1.0.2" } }, "sha512-XuLHamcCTsE+JW577IMr2TwYTwSeFKFqg+VeecVvNJra2MJcqjz4FTHgaAJ/I5NqNmBWGfMOFoTlBY1FRC7Eng=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/types": ["@apps-in-toss/types@2.5.0", "", {}, "sha512-BJI8QjOfLJQGE3HTrXAOXEwdGg8dUxXIJ/1FlIfBkP5izeq4+TWX1J1LJMkVv8rGCNK9i2doy0KMXhCi6Jl1kA=="],
+
     "@babel/core/@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 
     "@babel/core/@babel/generator": ["@babel/generator@7.29.7", "", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/types": "^7.29.7", "@jridgewell/gen-mapping": "^0.3.12", "@jridgewell/trace-mapping": "^0.3.28", "jsesc": "^3.0.2" } }, "sha512-DkXD5OJQaAQIdZ1bt3UZdEnHAn9Imd3IVBdX03UFe+ony9Ojw5pzr9YVKGDY1jt+Gcn/FnGkNf8r+Vj5NOJWtQ=="],
@@ -2431,6 +2455,8 @@
 
     "@react-native-community/cli/fs-extra": ["fs-extra@8.1.0", "", { "dependencies": { "graceful-fs": "^4.2.0", "jsonfile": "^4.0.0", "universalify": "^0.1.0" } }, "sha512-yhlQgA6mnOJUKOsRUFsgJdQCvkKhcz8tlZG5HBQfReYZy46OwLcY+Zia0mtdHsOo9y/hP+CxMN0TU9QxoOtG4g=="],
 
+    "@react-native-community/cli/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
+
     "@react-native-community/cli-clean/execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
 
     "@react-native-community/cli-config/cosmiconfig": ["cosmiconfig@5.2.1", "", { "dependencies": { "import-fresh": "^2.0.0", "is-directory": "^0.3.1", "js-yaml": "^3.13.1", "parse-json": "^4.0.0" } }, "sha512-H65gsXo1SKjf8zmrJ67eJk8aIRKV5ff2D4uKZIBZShbhGSpEmsQOPW/SKMKYhSTrqR7ufy6RP69rPogdaPh/kA=="],
@@ -2438,6 +2464,8 @@
     "@react-native-community/cli-config/glob": ["glob@7.2.3", "", { "dependencies": { "fs.realpath": "^1.0.0", "inflight": "^1.0.4", "inherits": "2", "minimatch": "^3.1.1", "once": "^1.3.0", "path-is-absolute": "^1.0.0" } }, "sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q=="],
 
     "@react-native-community/cli-doctor/execa": ["execa@5.1.1", "", { "dependencies": { "cross-spawn": "^7.0.3", "get-stream": "^6.0.0", "human-signals": "^2.1.0", "is-stream": "^2.0.0", "merge-stream": "^2.0.0", "npm-run-path": "^4.0.1", "onetime": "^5.1.2", "signal-exit": "^3.0.3", "strip-final-newline": "^2.0.0" } }, "sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg=="],
+
+    "@react-native-community/cli-doctor/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
 
     "@react-native-community/cli-doctor/strip-ansi": ["strip-ansi@5.2.0", "", { "dependencies": { "ansi-regex": "^4.1.0" } }, "sha512-DuRs1gKbBqsMKIZlrffwlug8MHkcnpjs5VPmL1PAh+mA30U0DTotfDZ0d2UUsXpPmPmMMJ6W773MaA3J+lbiWA=="],
 
@@ -2458,6 +2486,8 @@
     "@react-native-community/cli-server-api/ws": ["ws@7.5.11", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": "^5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-zS54Oen9bITtp7kp2XM3AydrCIq1D+HwJOuH+c+e4LfpL/lotP5osijd+UoMnxwAam1GN8R4KtLAyIrIcBNpiA=="],
 
     "@react-native-community/cli-tools/find-up": ["find-up@5.0.0", "", { "dependencies": { "locate-path": "^6.0.0", "path-exists": "^4.0.0" } }, "sha512-78/PXT1wlLLDgTzDs7sjq9hzz0vXD+zn+7wypEe4fXQxCmdmqfGsEPQxmiCSQI3ajFV91bVSsvNtrJRiW6nGng=="],
+
+    "@react-native-community/cli-tools/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
 
     "@react-native/babel-plugin-codegen/@react-native/codegen": ["@react-native/codegen@0.84.0", "", { "dependencies": { "@babel/core": "^7.25.2", "@babel/parser": "^7.25.3", "hermes-parser": "0.32.0", "invariant": "^2.2.4", "nullthrows": "^1.1.1", "tinyglobby": "^0.2.15", "yargs": "^17.6.2" } }, "sha512-TcTAO58JigCw9onYTrbE2yK2js5YNgqbmnpYyq9oXz2mofbX7JcK53kIi7fhqyJhie8RkY+X85zSOTWNs6S3CA=="],
 
@@ -2543,6 +2573,8 @@
 
     "brick-codegen/execa": ["execa@9.6.1", "", { "dependencies": { "@sindresorhus/merge-streams": "^4.0.0", "cross-spawn": "^7.0.6", "figures": "^6.1.0", "get-stream": "^9.0.0", "human-signals": "^8.0.1", "is-plain-obj": "^4.1.0", "is-stream": "^4.0.1", "npm-run-path": "^6.0.0", "pretty-ms": "^9.2.0", "signal-exit": "^4.1.0", "strip-final-newline": "^4.0.0", "yoctocolors": "^2.1.1" } }, "sha512-9Be3ZoN4LmYR90tUoVu2te2BsbzHfhJyfEiAVfz7N5/zv+jduIfLrV2xdQXOHbaD6KgpGdO9PRPM1Y4Q9QkPkA=="],
 
+    "brick-codegen/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
+
     "brick-codegen/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "c12/chokidar": ["chokidar@5.0.0", "", { "dependencies": { "readdirp": "^5.0.0" } }, "sha512-TQMmc3w+5AxjpL8iIiwebF73dRDF4fBIieAqGn9RGCWaEVwQ6Fb2cGe31Yns0RRIzii5goJ1Y7xbMwo1TxMplw=="],
@@ -2579,6 +2611,8 @@
 
     "fast-json-stringify/ajv-formats": ["ajv-formats@3.0.1", "", { "dependencies": { "ajv": "^8.0.0" } }, "sha512-8iUql50EUR+uUcdRQ3HDqa6EVyo3docL8g5WJ3FNcWmu62IbkGUue/pEyLBW8VGKKucTPgqeks4fIU1DA4yowQ=="],
 
+    "fastify/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
+
     "flow-remove-types/hermes-parser": ["hermes-parser@0.36.1", "", { "dependencies": { "hermes-estree": "0.36.1" } }, "sha512-GApNk4zLHi2UWoWZZkx7LNCOSzLSc5lB55pZ/PhK7ycFeg7u5LcF88p/WbpIi1XUDtE0MpHE3uRR3u3KB7TjSQ=="],
 
     "flow-remove-types/pirates": ["pirates@3.0.2", "", { "dependencies": { "node-modules-regexp": "^1.0.0" } }, "sha512-c5CgUJq6H2k6MJz72Ak1F5sN9n9wlSlJyEnwvpm9/y3WB4E3pHBDT2c6PEiS1vyJvq2bUxUAIu0EGf8Cx4Ic7Q=="],
@@ -2600,6 +2634,8 @@
     "import-local/pkg-dir": ["pkg-dir@4.2.0", "", { "dependencies": { "find-up": "^4.0.0" } }, "sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ=="],
 
     "istanbul-lib-instrument/@babel/core": ["@babel/core@7.29.7", "", { "dependencies": { "@babel/code-frame": "^7.29.7", "@babel/generator": "^7.29.7", "@babel/helper-compilation-targets": "^7.29.7", "@babel/helper-module-transforms": "^7.29.7", "@babel/helpers": "^7.29.7", "@babel/parser": "^7.29.7", "@babel/template": "^7.29.7", "@babel/traverse": "^7.29.7", "@babel/types": "^7.29.7", "@jridgewell/remapping": "^2.3.5", "convert-source-map": "^2.0.0", "debug": "^4.1.0", "gensync": "^1.0.0-beta.2", "json5": "^2.2.3", "semver": "^6.3.1" } }, "sha512-RgHBCvtjbOK2gXSNBNIkNoEc9qoVEtau3hj8gEqKQuL3HZAibKarWFEI3Lfm6EYKkLalOh8eSrj9b+ch9H/VBA=="],
+
+    "istanbul-lib-instrument/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
 
     "istanbul-lib-report/make-dir": ["make-dir@4.0.0", "", { "dependencies": { "semver": "^7.5.3" } }, "sha512-hXdUTZYIVOt1Ex//jAQi+wTZZpUpwBj/0QsOzqegb3rGMMeJiSEu5xLHnYfBrRV4RH2+OCSOO95Is/7x1WJ4bw=="],
 
@@ -2684,6 +2720,8 @@
     "jest-snapshot/jest-get-type": ["jest-get-type@29.6.3", "", {}, "sha512-zrteXnqYxfQh7l5FHyL38jL39di8H8rHoecLH3JNxH3BwOrBsNeabdap5e0I23lD4HHI8W5VFBZqG4Eaq5LNcw=="],
 
     "jest-snapshot/pretty-format": ["pretty-format@29.7.0", "", { "dependencies": { "@jest/schemas": "^29.6.3", "ansi-styles": "^5.0.0", "react-is": "^18.0.0" } }, "sha512-Pdlw/oPxN+aXdmM9R00JVC9WVFoCLTKJvDVLgmJ+qAffBMxsV85l/Lu7sNx4zSzPyoL2euImuEwHhOXdEgNFZQ=="],
+
+    "jest-snapshot/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
 
     "jest-util/@types/node": ["@types/node@25.9.3", "", { "dependencies": { "undici-types": ">=7.24.0 <7.24.7" } }, "sha512-603BddQMv3pUcr4U2dhujk83N2tTDVr/34wII2B6bJy6g+8WD6yUb11jszNs0gdi4PesVWl7ABt8nYMVpnLUcg=="],
 
@@ -2930,6 +2968,10 @@
     "whatwg-url-without-unicode/punycode": ["punycode@2.3.1", "", {}, "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="],
 
     "whatwg-url-without-unicode/webidl-conversions": ["webidl-conversions@5.0.0", "", {}, "sha512-VlZwKPCkYKxQgeSbH5EyngOmRp7Ww7I9rQLERETtf5ofd9pGeswWiOtogpEO850jziPRarreGxn5QIiTqpb2wA=="],
+
+    "@apps-in-toss/cli/@apps-in-toss/plugins/@apps-in-toss/plugin-compat": ["@apps-in-toss/plugin-compat@2.5.0", "", { "dependencies": { "@babel/runtime": "^7", "@granite-js/plugin-core": "1.0.20", "@granite-js/utils": "1.0.20", "@react-native-async-storage/async-storage-1.18.2": "npm:@react-native-async-storage/async-storage@1.18.2", "@react-native-community/blur-4.3.2": "npm:@react-native-community/blur@4.3.2", "@react-native/codegen-0.72.6": "npm:@react-native/codegen@0.72.6", "@react-native/js-polyfills-0.72.1": "npm:@react-native/js-polyfills@0.72.1", "@react-native/normalize-colors-0.72.0": "npm:@react-native/normalize-colors@0.72.0", "@react-navigation/elements-1.3.9": "npm:@react-navigation/elements@1.3.9", "@react-navigation/native-6.0.13": "npm:@react-navigation/native@6.0.13", "@react-navigation/native-stack-6.9.0": "npm:@react-navigation/native-stack@6.9.0", "@shopify/flash-list-1.6.2": "npm:@shopify/flash-list@1.6.2", "assert": "2.1.0", "browserify-zlib": "0.2.0", "buffer": "6.0.3", "enhanced-resolve": "^5.18.1", "es-toolkit": "^1.44.0", "events": "3.3.0", "https-browserify": "1.0.0", "lottie-react-native-6.4.0": "npm:lottie-react-native@6.4.0", "path-browserify": "1.0.1", "react-18.2.0": "npm:react@18.2.0", "react-dom-18.2.0": "npm:react-dom@18.2.0", "react-native-0.72.6": "npm:react-native@0.72.6", "react-native-fast-image-8.6.3": "npm:react-native-fast-image@8.6.3", "react-native-gesture-handler-2.8.0": "npm:react-native-gesture-handler@2.8.0", "react-native-pager-view-6.1.2": "npm:react-native-pager-view@6.1.2", "react-native-safe-area-context-4.7.4": "npm:react-native-safe-area-context@4.7.4", "react-native-screens-3.27.0": "npm:react-native-screens@3.27.0", "react-native-svg-13.14.0": "npm:react-native-svg@13.14.0", "react-native-video-6.0.0-alpha.6": "npm:react-native-video@6.0.0-alpha.6", "react-native-webview-13.6.3": "npm:react-native-webview@13.6.3", "react18-use": "^0.4.1", "stream-browserify": "3.0.0", "stream-http": "3.2.0", "url": "0.11.0", "use-effect-event": "^2.0.3", "util": "0.12.5" } }, "sha512-G+nyfR3enQ0AX1adJSizV9DfklPVbM99LBxF3KgSO1o80/Bd/iZAZjgtoiFtVJTDLkugDyO7MFQ5ouGSs6wynw=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/plugins/@apps-in-toss/plugin-compat": ["@apps-in-toss/plugin-compat@2.5.0", "", { "dependencies": { "@babel/runtime": "^7", "@granite-js/plugin-core": "1.0.20", "@granite-js/utils": "1.0.20", "@react-native-async-storage/async-storage-1.18.2": "npm:@react-native-async-storage/async-storage@1.18.2", "@react-native-community/blur-4.3.2": "npm:@react-native-community/blur@4.3.2", "@react-native/codegen-0.72.6": "npm:@react-native/codegen@0.72.6", "@react-native/js-polyfills-0.72.1": "npm:@react-native/js-polyfills@0.72.1", "@react-native/normalize-colors-0.72.0": "npm:@react-native/normalize-colors@0.72.0", "@react-navigation/elements-1.3.9": "npm:@react-navigation/elements@1.3.9", "@react-navigation/native-6.0.13": "npm:@react-navigation/native@6.0.13", "@react-navigation/native-stack-6.9.0": "npm:@react-navigation/native-stack@6.9.0", "@shopify/flash-list-1.6.2": "npm:@shopify/flash-list@1.6.2", "assert": "2.1.0", "browserify-zlib": "0.2.0", "buffer": "6.0.3", "enhanced-resolve": "^5.18.1", "es-toolkit": "^1.44.0", "events": "3.3.0", "https-browserify": "1.0.0", "lottie-react-native-6.4.0": "npm:lottie-react-native@6.4.0", "path-browserify": "1.0.1", "react-18.2.0": "npm:react@18.2.0", "react-dom-18.2.0": "npm:react-dom@18.2.0", "react-native-0.72.6": "npm:react-native@0.72.6", "react-native-fast-image-8.6.3": "npm:react-native-fast-image@8.6.3", "react-native-gesture-handler-2.8.0": "npm:react-native-gesture-handler@2.8.0", "react-native-pager-view-6.1.2": "npm:react-native-pager-view@6.1.2", "react-native-safe-area-context-4.7.4": "npm:react-native-safe-area-context@4.7.4", "react-native-screens-3.27.0": "npm:react-native-screens@3.27.0", "react-native-svg-13.14.0": "npm:react-native-svg@13.14.0", "react-native-video-6.0.0-alpha.6": "npm:react-native-video@6.0.0-alpha.6", "react-native-webview-13.6.3": "npm:react-native-webview@13.6.3", "react18-use": "^0.4.1", "stream-browserify": "3.0.0", "stream-http": "3.2.0", "url": "0.11.0", "use-effect-event": "^2.0.3", "util": "0.12.5" } }, "sha512-G+nyfR3enQ0AX1adJSizV9DfklPVbM99LBxF3KgSO1o80/Bd/iZAZjgtoiFtVJTDLkugDyO7MFQ5ouGSs6wynw=="],
 
     "@babel/core/debug/ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
 
@@ -3380,6 +3422,8 @@
     "istanbul-lib-instrument/@babel/core/debug": ["debug@4.4.3", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-RGwwWnwQvkVfavKVt22FGLw+xYSdzARwm0ru6DhTVA3umU5hZc28V3kO4stgYryrTlLpuvgI9GiijltAjNbcqA=="],
 
     "istanbul-lib-instrument/@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
+
+    "istanbul-lib-report/make-dir/semver": ["semver@7.8.4", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-rUCObTnP32Q08R2uuIrt7r9PlEonuTmtuXYcW6s5kjdlj3xbnwe+21yXptAUYcMAABLkYYTtnmzb3w3EDZfueA=="],
 
     "istanbul-lib-source-maps/debug/ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
 
