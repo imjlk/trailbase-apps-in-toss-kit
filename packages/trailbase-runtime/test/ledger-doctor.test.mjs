@@ -55,6 +55,20 @@ test('IAP distinguishes local grant from provider completion and never regrants 
   } finally { db.close(); }
 });
 
+test('persisted IAP status aliases remain visible without counting as verified provider evidence', () => {
+  const db = database();
+  try {
+    iap(db);
+    for (const status of ['ORDER_IN_PROGRESS', 'PAYMENT_PENDING', 'PENDING_GRANT', 'ALREADY_GRANTED', 'COMPLETED', 'MINIAPP_MISMATCH', 'GRANTED']) {
+      db.query('UPDATE iap_orders SET provider_status=?').run(` ${status.toLowerCase()} `);
+      const report = inspect(db, 'iap', 'order-1');
+      expect(report.record.providerStatus).toBe(status);
+      expect(report.recoveryPlan.actions).toEqual(['verify-order-with-provider']);
+      expect(report.recoveryPlan.allowsAutomaticRetry).toBe(false);
+    }
+  } finally { db.close(); }
+});
+
 test('subscription projection is reported as stored data, never an authorization decision', () => {
   const db = database();
   try {

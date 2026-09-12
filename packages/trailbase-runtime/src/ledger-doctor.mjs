@@ -31,6 +31,7 @@ function normalizedProvider(value) {
   return known(typeof value === 'string' ? value.trim().toUpperCase() : '', [
     'PAYMENT_COMPLETED', 'PURCHASED', 'REFUNDED', 'PENDING', 'NOT_FOUND', 'FAILED', 'ERROR', 'UNKNOWN',
     'SUCCESS', 'GRANTED', 'SENT', 'CANCELLED', 'SKIPPED', 'READY', 'PROCESSING',
+    'ORDER_IN_PROGRESS', 'PAYMENT_PENDING', 'PENDING_GRANT', 'ALREADY_GRANTED', 'COMPLETED', 'MINIAPP_MISMATCH',
   ]);
 }
 
