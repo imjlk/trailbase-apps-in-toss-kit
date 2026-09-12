@@ -390,7 +390,31 @@ struct NormalizedIapOrderStatusUpsert {
 
 // A local grant can retain PAYMENT_COMPLETED as its provider state. Failed,
 // missing and in-progress lookups do not establish paid-order ownership.
-pub(crate) const VERIFIED_IAP_ORDER_STATE: &str = "status IN ('PENDING_GRANT','GRANTED','REFUNDED') AND UPPER(TRIM(provider_status)) IN ('PAYMENT_COMPLETED','PURCHASED','REFUNDED')";
+const VERIFIED_PROVIDER_STATUSES: &[&str] = &["PAYMENT_COMPLETED", "PURCHASED", "REFUNDED"];
+const VERIFIED_LEDGER_STATUSES: &[IapLedgerStatus] = &[
+    IapLedgerStatus::PendingGrant,
+    IapLedgerStatus::Granted,
+    IapLedgerStatus::Refunded,
+];
+
+// Subscription projections use the default kit ledger schema. Both SQL and Rust
+// gates are derived from these same allow-lists, never from caller-provided SQL.
+pub(crate) fn verified_iap_order_state_sql() -> &'static str {
+    static SQL: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        let provider = VERIFIED_PROVIDER_STATUSES
+            .iter()
+            .map(|s| format!("'{s}'"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let ledger = VERIFIED_LEDGER_STATUSES
+            .iter()
+            .map(|s| format!("'{}'", s.as_str()))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("status IN ({ledger}) AND UPPER(TRIM(provider_status)) IN ({provider})")
+    });
+    SQL.as_str()
+}
 
 fn normalize_iap_order_status_upsert_input(
     input: IapOrderStatusUpsertInput<'_>,
@@ -424,21 +448,15 @@ fn normalize_iap_order_status_upsert_input(
         provider_response_json: normalize_optional_text(input.raw_response_json),
         status_determined_at: normalize_optional_text(input.status.status_determined_at.as_deref()),
         can_create_order: input.status.ok
-            && matches!(
-                input
+            && VERIFIED_PROVIDER_STATUSES.contains(
+                &input
                     .status
                     .provider_status
                     .trim()
                     .to_ascii_uppercase()
                     .as_str(),
-                "PAYMENT_COMPLETED" | "PURCHASED" | "REFUNDED"
             )
-            && matches!(
-                input.status.ledger_status,
-                IapLedgerStatus::PendingGrant
-                    | IapLedgerStatus::Granted
-                    | IapLedgerStatus::Refunded
-            )
+            && VERIFIED_LEDGER_STATUSES.contains(&input.status.ledger_status)
             && normalize_optional_text(input.status.order_id.as_deref()).is_some()
             && normalize_optional_text(input.status.sku.as_deref()).is_some(),
         now: input.now,

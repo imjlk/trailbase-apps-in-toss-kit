@@ -3,7 +3,7 @@
 //! belong to the consumer ingress; this module must not be exposed directly.
 use crate::{
     db,
-    iap_orders::VERIFIED_IAP_ORDER_STATE,
+    iap_orders::verified_iap_order_state_sql,
     responses::{ApiResult, bad_request, internal},
 };
 use serde::{Deserialize, Serialize};
@@ -137,8 +137,9 @@ fn entitlement_for_user(
     order_id: &str,
     user: &[u8],
 ) -> ApiResult<Option<SubscriptionEntitlement>> {
+    let verified_order_state = verified_iap_order_state_sql();
     let rows = store.query(&format!("SELECT o.product_id,e.status,e.access_granted,e.expires_at,e.auto_renew,e.occurred_at,e.needs_reconciliation
-        FROM iap_subscription_entitlements e JOIN (SELECT * FROM iap_orders WHERE {VERIFIED_IAP_ORDER_STATE}) o ON o.order_id=e.order_id
+        FROM iap_subscription_entitlements e JOIN (SELECT * FROM iap_orders WHERE {verified_order_state}) o ON o.order_id=e.order_id
         WHERE e.order_id=?1 AND o.user_id=?2"), &[Value::Text(order_id.into()),Value::Blob(user.to_vec())])?;
     rows.first()
         .map(|r| {
@@ -199,10 +200,9 @@ fn apply_event(
             return Ok(SubscriptionApplyOutcome::Duplicate);
         }
     }
+    let verified_order_state = verified_iap_order_state_sql();
     let order = store.query(
-        &format!(
-            "SELECT product_id FROM iap_orders WHERE order_id=?1 AND {VERIFIED_IAP_ORDER_STATE}"
-        ),
+        &format!("SELECT product_id FROM iap_orders WHERE order_id=?1 AND {verified_order_state}"),
         &[Value::Text(event.order_id.clone())],
     )?;
     let Some(order) = order.first() else {
