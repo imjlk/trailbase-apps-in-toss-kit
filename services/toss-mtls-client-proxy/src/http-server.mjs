@@ -58,7 +58,15 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.iapOrderStatus) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    return response(200, await core.iapOrderStatus(body));
+    // A requested SKU is not provider evidence. api-core 0.2 otherwise copies
+    // it into successful responses when Toss omits the actual product ID.
+    const result = await core.iapOrderStatus(config.mode === "forward" ? { ...body, sku: undefined } : body);
+    if (config.mode === "forward" && result.ok &&
+        ["PAYMENT_COMPLETED", "PURCHASED"].includes(String(result.providerStatus).trim().toUpperCase()) && !result.sku) {
+      return response(200, { ...result, ok: false, error: "UNVERIFIED_IAP_ORDER",
+        failureReason: "Toss order response omitted the product SKU" });
+    }
+    return response(200, result);
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {

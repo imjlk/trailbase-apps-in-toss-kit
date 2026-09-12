@@ -850,7 +850,8 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
   });
 
-  test("forward iap order status falls back to requested sku when Toss omits sku", async () => {
+  for (const paidStatus of ["PAYMENT_COMPLETED", "PURCHASED"]) {
+  test(`forward iap rejects ${paidStatus} without provider SKU`, async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
       res.writeHead(200, { "content-type": "application/json" });
@@ -859,7 +860,7 @@ describe("toss-mtls-client-proxy", () => {
           resultType: "SUCCESS",
           success: {
             orderId: "order-1",
-            status: "PAYMENT_COMPLETED",
+            status: paidStatus,
           },
         }),
       );
@@ -880,10 +881,29 @@ describe("toss-mtls-client-proxy", () => {
         internalToken: "secret",
         upstreamBaseUrl,
       });
-      expect(res.body.ok).toBe(true);
+      expect(res.body.ok).toBe(false);
       expect(res.body.orderId).toBe("order-1");
-      expect(res.body.sku).toBe("loo.credits.50");
-      expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
+      expect(res.body.sku).toBeUndefined();
+      expect(res.body.error).toBe("UNVERIFIED_IAP_ORDER");
+      expect(res.body.providerStatus).toBe(paidStatus);
+    });
+  });
+  }
+
+  test("forward IAP uses the provider SKU even when the request names a more valuable product", async () => {
+    const upstream = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: {
+        orderId: "order-1", sku: "cheap-product", status: "PURCHASED",
+      } }));
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
+        { orderId: "order-1", sku: "expensive-product", tossUserKey: "synthetic-user" },
+        { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(result.body.ok).toBe(true);
+      expect(result.body.sku).toBe("cheap-product");
     });
   });
 
@@ -898,6 +918,7 @@ describe("toss-mtls-client-proxy", () => {
           resultType: "SUCCESS",
           success: {
             orderId: "order-1",
+            sku: "loo.credits.50",
             status: hitCount === 1 ? "ORDER_IN_PROGRESS" : "PAYMENT_COMPLETED",
           },
         }),
