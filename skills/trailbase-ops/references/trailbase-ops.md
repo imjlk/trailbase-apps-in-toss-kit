@@ -157,6 +157,11 @@ helper exists in the checked-out package.
   Subscription flows use `iap_subscriptions.sql` with `iap_subscriptions` parsing,
   inbox, ordering, and per-order entitlement helpers. Authenticate webhooks at the
   consumer ingress; never use client SDK status to authorize server benefits.
+  For private support inquiries, use the read-only `trailbase-runtime/ledger-doctor`
+  and `ledger_diagnostics::ledger_diagnostic_id` fingerprints. Inspect a consistent
+  SQLite backup with an explicit timestamp unit; reports are not permission to grant,
+  resend, or change state. Re-read live state and use existing owner/attempt guards
+  for actual recovery. See `docs/en/ledger-doctor.md` and its Korean counterpart.
   Keep these tables in the app/product database by default, not the `analytics` database. Eligibility,
   product grant rules, inventory/balance updates, cooldowns, and public projections stay app-owned.
   After changing the shared functional ledger SQL templates, run
