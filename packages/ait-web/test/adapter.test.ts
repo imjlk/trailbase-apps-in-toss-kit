@@ -121,3 +121,32 @@ test("failed backend grant is not replaced with a successful client fallback", a
   await expect(f.make().purchase({ sku: "coins", processProductGrant: async () => { throw new Error("PRIVATE-CANARY"); } })).rejects.toMatchObject({ code: "SDK_ERROR" });
   expect(cleanups).toBe(2);
 });
+
+test("a void disposer does not discard later agreement events", async () => {
+  const f = fixture();
+  (f.api.Notification as any).requestAgreement = available((options: any) => {
+    setTimeout(() => options.onEvent({ type: "alreadyAgreed" }), 1);
+  });
+  expect((await f.make().requestNotificationAgreement("reminder")).status).toBe("OPTED_IN");
+});
+
+test("purchase success requires a usable original order ID and preserves native metadata", async () => {
+  const f = fixture();
+  const setResult = (data: unknown) => {
+    (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => {
+      setTimeout(() => options.onEvent({ type: "success", data }), 1);
+      // An absent SDK disposer is tolerated for the purchase bridge too.
+    });
+  };
+  for (const value of [undefined, {}, { orderId: "" }, { orderId: 4 }, { orderId: " padded " }]) {
+    setResult(value);
+    await expect(f.make().purchase({ sku: "coins", processProductGrant: async () => true })).rejects.toMatchObject({ code: "INVALID_RESULT" });
+  }
+  setResult({ order_id: "original", displayName: "Coins", amount: 100 });
+  expect(await f.make().purchase({ sku: "coins", processProductGrant: async () => true })).toMatchObject({ orderId: "original", amount: 100 });
+});
+
+test("future string login referrers reach the backend unchanged", async () => {
+  const f = fixture(); f.api.TossAuth.login = async () => ({ authorizationCode: "real-code", referrer: "FUTURE_FLOW" });
+  expect(await f.make().login()).toEqual({ authorizationCode: "real-code", referrer: "FUTURE_FLOW" });
+});

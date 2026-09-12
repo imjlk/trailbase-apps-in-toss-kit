@@ -1,5 +1,5 @@
-import type { KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
-import type { AppLoginResponse, IapCreateOneTimePurchaseOrderResult, NotificationAgreementResult } from "@apps-in-toss/web-framework";
+import type { AppsInTossLoginResult, KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
+import type { IapCreateOneTimePurchaseOrderResult, IapCreateSubscriptionPurchaseOrderResult, NotificationAgreementResult } from "@apps-in-toss/web-framework";
 
 type Sdk = typeof import("@apps-in-toss/web-framework");
 export type AppsInTossWebSdk = Pick<Sdk, "Storage" | "TossAuth" | "User" | "Notification" | "IAP" | "Share">;
@@ -52,11 +52,11 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
   };
   return {
     storage,
-    async login(): Promise<AppLoginResponse> {
+    async login(): Promise<AppsInTossLoginResult> {
       return invoke("login", async api => {
         const result = await required(api.TossAuth?.login, "login")();
         if (!result || typeof result.authorizationCode !== "string" || !result.authorizationCode.trim() ||
-            !["DEFAULT", "SANDBOX"].includes(result.referrer)) throw new WebAdapterError("INVALID_RESULT", "login");
+            typeof result.referrer !== "string" || !result.referrer.trim() || result.referrer.length > 64) throw new WebAdapterError("INVALID_RESULT", "login");
         // SANDBOX remains a real one-time code; always exchange through the backend.
         return result;
       });
@@ -91,15 +91,15 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
       if (typeof processProductGrant !== "function") throw new WebAdapterError("INVALID_INPUT", "purchase grant");
       return invoke("purchase", api => eventResult("purchase", eventTimeoutMs, (resolve, reject) =>
         required(api.IAP?.createOneTimePurchaseOrder, "purchase")({ options: { sku: product, processProductGrant: grantCallback(processProductGrant) },
-          onEvent: event => { if (event?.type === "success") resolve(event.data); else reject(new WebAdapterError("INVALID_RESULT", "purchase")); }, onError: reject })));
+          onEvent: event => { const result = event?.type === "success" ? purchaseResult(event.data) : null; if (result) resolve(result); else reject(new WebAdapterError("INVALID_RESULT", "purchase")); }, onError: reject })));
     },
-    async subscribe(options: WebPurchaseOptions & { offerId?: string }): Promise<IapCreateOneTimePurchaseOrderResult> {
+    async subscribe(options: WebPurchaseOptions & { offerId?: string }): Promise<IapCreateSubscriptionPurchaseOrderResult> {
       const sku = requiredText(options.sku, "subscription SKU", 256);
       if (typeof options.processProductGrant !== "function") throw new WebAdapterError("INVALID_INPUT", "subscription grant");
       const offerId = options.offerId === undefined ? undefined : requiredText(options.offerId, "subscription offer", 256);
       return invoke("subscription", api => eventResult("subscription", eventTimeoutMs, (resolve, reject) =>
         required(api.IAP?.createSubscriptionPurchaseOrder, "subscription")({ options: { sku, offerId, processProductGrant: grantCallback(options.processProductGrant) },
-          onEvent: event => { if (event?.type === "success") resolve(event.data); else reject(new WebAdapterError("INVALID_RESULT", "subscription")); }, onError: reject })));
+          onEvent: event => { const result = event?.type === "success" ? purchaseResult(event.data) : null; if (result) resolve(result); else reject(new WebAdapterError("INVALID_RESULT", "subscription")); }, onError: reject })));
     },
     getPendingOrders: () => invoke("pending orders", api => required(api.IAP?.getPendingOrders, "pending orders")()),
     getProducts: () => invoke("products", api => required(api.IAP?.getProductItemList, "products")()),
@@ -122,6 +122,13 @@ function required<T extends (...args: never[]) => unknown>(fn: T | undefined, op
   if (supported && supported() !== true) throw new WebAdapterError("UNSUPPORTED", operation);
   return fn;
 }
+function purchaseResult(value: unknown): IapCreateOneTimePurchaseOrderResult | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const data = value as Record<string, unknown>;
+  const orderId = data.orderId ?? data.order_id;
+  if (typeof orderId !== "string" || !orderId.trim() || orderId.trim() !== orderId || orderId.length > 256) return null;
+  return { ...data, orderId } as unknown as IapCreateOneTimePurchaseOrderResult;
+}
 function grantCallback(grant: WebPurchaseOptions["processProductGrant"]): WebPurchaseOptions["processProductGrant"] {
   return async input => { try { return (await grant(input)) === true; } catch { return false; } };
 }
@@ -129,7 +136,7 @@ function requiredText(value: string, operation: string, max: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > max || value.trim() !== value) throw new WebAdapterError("INVALID_INPUT", operation);
   return value;
 }
-function eventResult<T>(operation: string, timeout: number, subscribe: (resolve: (value: T) => void, reject: (error: unknown) => void) => (() => void)): Promise<T> {
+function eventResult<T>(operation: string, timeout: number, subscribe: (resolve: (value: T) => void, reject: (error: unknown) => void) => (void | (() => void))): Promise<T> {
   return new Promise((resolve, reject) => {
     let settled = false; let cleanup: (() => void) | undefined; let disposed = false;
     const dispose = () => { if (cleanup && !disposed) { disposed = true; try { cleanup(); } catch { /* No second result from cleanup. */ } } };
@@ -141,8 +148,8 @@ function eventResult<T>(operation: string, timeout: number, subscribe: (resolve:
     };
     const timer = setTimeout(() => finish(false, new WebAdapterError("TIMEOUT", operation)), timeout);
     try {
-      cleanup = subscribe(value => finish(true, value), error => finish(false, error));
-      if (typeof cleanup !== "function") finish(false, new WebAdapterError("INVALID_RESULT", operation));
+      const subscription = subscribe(value => finish(true, value), error => finish(false, error));
+      cleanup = typeof subscription === "function" ? subscription : undefined;
       if (settled) dispose(); // SDK can fire synchronously before returning cleanup.
     } catch (error) { finish(false, error); }
   });

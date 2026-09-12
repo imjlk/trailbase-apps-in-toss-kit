@@ -95,3 +95,5 @@ failed grants, unchanged sandbox login, identity normalization and false/pending
 outcomes. Browser compilation verifies the adapter imports no RN runtime; it does
 not establish real-device login, payment, notification or ad eligibility. Perform
 console QR/device checks before a consumer rollout.
+
+Login preserves future string referrers as well as DEFAULT/SANDBOX. Purchase results require a usable original order ID (including an order_id compatibility alias); other native result metadata is preserved. A missing SDK disposer is tolerated, and supplied disposers are called once.
