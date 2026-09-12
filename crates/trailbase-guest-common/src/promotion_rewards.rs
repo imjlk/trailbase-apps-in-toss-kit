@@ -332,6 +332,10 @@ pub fn promotion_provider_status_from_response(response: &JsonValue) -> String {
 }
 
 pub fn normalize_promotion_provider_status(ok: Option<bool>, status: Option<&str>) -> String {
+    // A failure envelope cannot authorize a grant through a contradictory status.
+    if ok == Some(false) {
+        return "FAILED".to_string();
+    }
     if let Some(status) = status.map(str::trim).filter(|status| !status.is_empty()) {
         return match status.to_ascii_uppercase().as_str() {
             "SUCCESS" | "SUCCEEDED" | "GRANTED" | "DONE" | "COMPLETED" => "GRANTED".to_string(),

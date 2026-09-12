@@ -1,0 +1,467 @@
+{
+  "schemaVersion": 1,
+  "iap": [
+    {
+      "id": "payment_completed",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "PENDING_GRANT",
+      "grantRequired": true,
+      "terminal": false,
+      "diagnosticProviderStatus": "PAYMENT_COMPLETED",
+      "diagnosticAction": "review-local-grant-transaction"
+    },
+    {
+      "id": "pending_grant",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PENDING_GRANT",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PENDING_GRANT",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "PENDING_GRANT",
+      "grantRequired": true,
+      "terminal": false,
+      "diagnosticProviderStatus": "PENDING_GRANT",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "purchased",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PURCHASED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PURCHASED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "GRANTED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "PURCHASED",
+      "diagnosticAction": "reconcile-grant-history-without-regrant"
+    },
+    {
+      "id": "granted",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "GRANTED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "GRANTED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "GRANTED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "GRANTED",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "already_granted",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "ALREADY_GRANTED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "ALREADY_GRANTED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "GRANTED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "ALREADY_GRANTED",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "completed",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "COMPLETED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "COMPLETED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "GRANTED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "COMPLETED",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "refunded",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "REFUNDED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "REFUNDED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "REFUNDED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "REFUNDED",
+      "diagnosticAction": "review-refund-policy"
+    },
+    {
+      "id": "failed",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "FAILED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "FAILED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "FAILED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "FAILED",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "error",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "ERROR",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "ERROR",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "FAILED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "ERROR",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "miniapp_mismatch",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "MINIAPP_MISMATCH",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "MINIAPP_MISMATCH",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "FAILED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "MINIAPP_MISMATCH",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "not_found",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "NOT_FOUND",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "NOT_FOUND",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "NOT_FOUND",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "NOT_FOUND",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "order_in_progress",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "ORDER_IN_PROGRESS",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "ORDER_IN_PROGRESS",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "PENDING",
+      "grantRequired": false,
+      "terminal": false,
+      "diagnosticProviderStatus": "ORDER_IN_PROGRESS",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "payment_pending",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_PENDING",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_PENDING",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "PENDING",
+      "grantRequired": false,
+      "terminal": false,
+      "diagnosticProviderStatus": "PAYMENT_PENDING",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "pending",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PENDING",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PENDING",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "PENDING",
+      "grantRequired": false,
+      "terminal": false,
+      "diagnosticProviderStatus": "PENDING",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "processing",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PROCESSING",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PROCESSING",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "PENDING",
+      "grantRequired": false,
+      "terminal": false,
+      "diagnosticProviderStatus": "PROCESSING",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "future_status",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "FUTURE_STATUS",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "FUTURE_STATUS",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "UNKNOWN",
+      "grantRequired": false,
+      "terminal": false,
+      "diagnosticProviderStatus": "UNRECOGNIZED",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "paid-without-provider-sku",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PURCHASED"
+      },
+      "proxyResponse": {
+        "ok": false,
+        "orderId": "fixture-order",
+        "providerStatus": "ERROR",
+        "error": "UNVERIFIED_IAP_ORDER",
+        "failureReason": "Toss order response omitted the product SKU"
+      },
+      "ledgerStatus": "FAILED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "ERROR",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
+      "id": "failure-with-paid-status",
+      "coreResponse": {
+        "ok": false,
+        "orderId": "fixture-order",
+        "providerStatus": "PURCHASED",
+        "sku": "fixture-coins"
+      },
+      "proxyResponse": {
+        "ok": false,
+        "orderId": "fixture-order",
+        "providerStatus": "PURCHASED",
+        "sku": "fixture-coins"
+      },
+      "ledgerStatus": "FAILED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "PURCHASED",
+      "diagnosticAction": "verify-order-with-provider"
+    }
+  ],
+  "promotion": [
+    {
+      "id": "grant",
+      "response": {
+        "ok": true,
+        "providerStatus": "GRANTED"
+      },
+      "providerStatus": "GRANTED",
+      "ledgerStatus": "success"
+    },
+    {
+      "id": "pending",
+      "response": {
+        "ok": true,
+        "providerStatus": "PROCESSING"
+      },
+      "providerStatus": "PENDING",
+      "ledgerStatus": "pending"
+    },
+    {
+      "id": "failed",
+      "response": {
+        "ok": false,
+        "providerStatus": "ERROR"
+      },
+      "providerStatus": "FAILED",
+      "ledgerStatus": "failed"
+    },
+    {
+      "id": "failure-with-success-status",
+      "response": {
+        "ok": false,
+        "providerStatus": "GRANTED"
+      },
+      "providerStatus": "FAILED",
+      "ledgerStatus": "failed"
+    }
+  ],
+  "message": [
+    {
+      "id": "partial-delivery",
+      "coreResponse": {
+        "ok": true,
+        "providerStatus": "SENT",
+        "sentPushCount": 0,
+        "sentInboxCount": 1,
+        "failures": [
+          {
+            "channel": "sentPush",
+            "reachedFailReason": "FIXTURE_BLOCKED"
+          }
+        ]
+      },
+      "proxyResponse": {
+        "ok": true,
+        "providerStatus": "SENT",
+        "sentPushCount": 0,
+        "sentInboxCount": 1,
+        "failures": [
+          {
+            "channel": "sentPush",
+            "reachedFailReason": "FIXTURE_BLOCKED",
+            "reachFailReason": "FIXTURE_BLOCKED"
+          }
+        ],
+        "failureReason": "FIXTURE_BLOCKED"
+      },
+      "providerStatus": "SENT",
+      "isSent": true
+    },
+    {
+      "id": "transport-failed",
+      "coreResponse": {
+        "ok": false,
+        "providerStatus": "SENT"
+      },
+      "proxyResponse": {
+        "ok": false,
+        "providerStatus": "SENT"
+      },
+      "providerStatus": "FAILED",
+      "isSent": false
+    },
+    {
+      "id": "legacy-success",
+      "coreResponse": {
+        "resultType": "SUCCESS"
+      },
+      "proxyResponse": {
+        "resultType": "SUCCESS"
+      },
+      "providerStatus": "SENT",
+      "isSent": true
+    },
+    {
+      "id": "empty-response",
+      "coreResponse": {},
+      "proxyResponse": {},
+      "providerStatus": "UNKNOWN",
+      "isSent": false
+    }
+  ]
+}

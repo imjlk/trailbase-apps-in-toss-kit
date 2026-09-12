@@ -205,7 +205,8 @@ pub fn parse_message_proxy_response(
     fallback_provider_request_id: &str,
     fallback_sent_at: Option<i64>,
 ) -> MessageProviderResponse {
-    let ok = value.get("ok").and_then(JsonValue::as_bool).unwrap_or(true);
+    let explicit_ok = value.get("ok").and_then(JsonValue::as_bool);
+    let ok = explicit_ok.unwrap_or(true);
     let provider_request_id = read_string_path(
         value,
         &[
@@ -217,7 +218,14 @@ pub fn parse_message_proxy_response(
     )
     .unwrap_or_else(|| fallback_provider_request_id.to_string());
     let raw_status = read_string_path(value, &["providerStatus", "status", "resultType"])
-        .unwrap_or_else(|| if ok { "SENT" } else { "FAILED" }.to_string());
+        .unwrap_or_else(|| {
+            match explicit_ok {
+                Some(true) => "SENT",
+                Some(false) => "FAILED",
+                None => "UNKNOWN",
+            }
+            .to_string()
+        });
     let provider_status = normalize_provider_status(&raw_status, ok);
     MessageProviderResponse {
         ok: ok && provider_status == "SENT",
