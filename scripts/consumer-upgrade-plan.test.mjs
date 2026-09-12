@@ -167,6 +167,19 @@ describe('three-way consumer upgrade planning', () => {
     });
   });
 
+  test('SQL permission-only changes need file review without inventing a migration', () => {
+    const sql = 'templates/trailbase/sql/permissions.sql';
+    fixture({ [sql]: 'CREATE TABLE t(id);\n' }, {}, { 'local.sql': 'CREATE TABLE t(id);\n' }, options => {
+      chmodSync(join(options.kitRoot, sql), 0o755);
+      chmodSync(join(options.consumerRoot, 'local.sql'), 0o644);
+      git(options.kitRoot, 'add', '.'); git(options.kitRoot, 'commit', '-qm', 'permissions only');
+      const p = plan(options, { template: sql, consumer: 'local.sql' });
+      expect(p.files[0].status).toBe('update-required');
+      expect(p.files[0].requiresMigrationReview).toBe(false);
+      expect(p.requiresReview).toBe(true);
+    });
+  });
+
   test('rejects invalid refs, traversal, binary inputs and escaping symlinks', () => {
     fixture({ [template]: 'old\n' }, {}, { 'local.txt': 'old\n' }, options => {
       expect(() => plan({ ...options, from: 'missing-ref' })).toThrow();
@@ -196,7 +209,9 @@ describe('three-way consumer upgrade planning', () => {
       expect(run(['--mapping', '../outside.json']).status).toBe(2);
       expect(run(['--mapping', join(temp, 'mapping.json')]).status).toBe(2);
       symlinkSync(join(repoRoot, 'package.json'), join(temp, 'escape.json'));
-      expect(run(['--mapping', 'escape.json']).status).toBe(2);
+      const escaped = run(['--mapping', 'escape.json']);
+      expect(escaped.status).toBe(2);
+      expect(escaped.stderr).toContain('escapes the consumer root');
       write(temp, 'big.json', ' '.repeat(1024 * 1024 + 1));
       expect(run(['--mapping', 'big.json']).status).toBe(2);
       writeFileSync(join(temp, 'invalid-utf8.json'), Buffer.from([0xff]));

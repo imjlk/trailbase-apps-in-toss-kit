@@ -27,8 +27,9 @@ function consumerFile(root, name) {
   const resolved = realpathSync(path);
   const rel = relative(root, resolved);
   if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error('Mapped consumer path escapes the consumer root.');
-  if (!statSync(resolved).isFile() || statSync(resolved).size > LIMIT) throw new Error('Mapped input must be a text file of at most 1 MiB.');
-  return { text: text(readFileSync(resolved)), executable: Boolean(statSync(resolved).mode & 0o100) };
+  const stats = statSync(resolved);
+  if (!stats.isFile() || stats.size > LIMIT) throw new Error('Mapped input must be a text file of at most 1 MiB.');
+  return { text: text(readFileSync(resolved)), executable: Boolean(stats.mode & 0o100) };
 }
 
 export function readConsumerMapping(consumerRoot, name) {
@@ -183,7 +184,7 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
         status = combinedState(status, permissionStatus);
       }
       const kitChanged = oldScope !== newScope || Boolean(permissions && permissions.oldExecutable !== permissions.newExecutable);
-      const migration = check.template.endsWith('.sql') && kitChanged && status !== 'already-applied';
+      const migration = check.template.endsWith('.sql') && oldText !== newText && status !== 'already-applied';
       files.push({ template: check.template, consumer, mode: check.mode, ...(component ? { scope: component } : {}), status, kitChanged,
         consumerChanged: oldScope !== localScope || Boolean(permissions && permissions.oldExecutable !== permissions.consumerExecutable),
         ...details, ...(permissions ? { permissions } : {}),
