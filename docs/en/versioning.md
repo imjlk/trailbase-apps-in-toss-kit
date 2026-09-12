@@ -73,3 +73,17 @@ tag when it does not match the proxy package version.
 Production deployments should prefer an exact SemVer tag such as `0.1.8`, or a minor tag such as
 `0.1` when intentional. Use `latest` or `edge` only when a consumer app deliberately wants to track
 moving image builds.
+
+## Bun lockfile after automated release preparation
+
+After Sampo prepares `release/main`, the workflow checks out that generated branch
+and runs `bun install --lockfile-only --ignore-scripts`. This explicitly synchronizes
+workspace versions with the bumped package manifests, including private packages.
+It commits only `bun.lock` when necessary, refuses unrelated tracked changes and
+uses a normal fast-forward push. A concurrent branch change can reject the push;
+rerun the workflow after inspecting it instead of forcing an overwrite.
+
+This step does not publish or merge the release PR. It runs only when Sampo reports
+a prepared release, is a no-op when the lockfile already matches, and disables
+package lifecycle scripts. Review the final lockfile commit together with versions
+and changelogs before merging the generated release PR.
