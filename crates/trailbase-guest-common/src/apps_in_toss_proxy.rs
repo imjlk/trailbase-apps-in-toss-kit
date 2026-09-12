@@ -103,6 +103,27 @@ pub async fn promotion_reward_status(
     .await
 }
 
+/// Status lookup for an explicitly typed recipient payload, including anonKey.
+pub async fn promotion_reward_status_with_payload(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    payload: JsonValue,
+) -> CommonResult<JsonValue> {
+    if payload
+        .get("providerTransactionKey")
+        .and_then(JsonValue::as_str)
+        .is_none_or(|key| key.trim().is_empty())
+    {
+        return Err("provider transaction key is required for result lookup".into());
+    }
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, PROMOTION_REWARD_STATUS_PATH),
+        payload,
+        bearer_token,
+    )
+    .await
+}
+
 pub async fn smart_message_send(
     proxy_url: &str,
     bearer_token: Option<&str>,

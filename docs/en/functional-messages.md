@@ -183,3 +183,5 @@ leased workers because legacy APIs do not carry an attempt identity.
 Rust message responses preserve channel failure/content identifiers and SMS,
 Alimtalk, and Friendtalk counts. Completion stores the normalized response in
 `provider_response_json` when no raw response is supplied. Keep that field private.
+
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).

@@ -353,6 +353,8 @@ Record API wrapper는 응답의 `cursor`를 유지해야 합니다. `records`만
 조회합니다. 조회 실패는 `onSubscriptionError`에 전달하며 stream을 닫고 준비 완료
 표시 없이 재시도합니다. Cleanup 이후에 끝난 목록 요청은 무시합니다.
 
+[검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
+
 XHR SSE 연결 준비는 `subscribe(id, { signal })`과 collection cleanup으로 취소할 수
 있습니다. `connectionTimeoutMs` 기본값은 15초이며 인증 헤더 준비와 응답 헤더 대기에
 적용됩니다. 이미 연결된 스트림은 이 제한으로 종료되지 않습니다. 연결 준비가 멈추면

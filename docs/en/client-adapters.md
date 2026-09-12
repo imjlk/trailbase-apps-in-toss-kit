@@ -373,6 +373,8 @@ for successful response headers before starting the snapshot. A failed snapshot
 reports `onSubscriptionError`, closes the stream, and retries without marking the
 collection ready. Cleanup cancels streams and ignores late list responses.
 
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
 XHR SSE connection setup is cancellable through `subscribe(id, { signal })` and
 collection cleanup. `connectionTimeoutMs` defaults to 15 seconds and covers header
 resolution plus the wait for response headers; it does not expire an established

@@ -1011,7 +1011,7 @@ fn notification_template_agreement_from_row(
     })
 }
 
-fn message_outbox_record_from_row(row: &[Value]) -> ApiResult<MessageOutboxRecord> {
+pub(crate) fn message_outbox_record_from_row(row: &[Value]) -> ApiResult<MessageOutboxRecord> {
     Ok(MessageOutboxRecord {
         id: db::text(&row[0], "message_outbox_id")?,
         user_id: db::blob(&row[1], "message_outbox_user_id")?,

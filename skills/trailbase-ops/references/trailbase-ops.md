@@ -60,6 +60,12 @@
   loads the verified auth user. The compatibility `upsert_verified_auth_user_tx` API still refreshes
   the password hash for callers that have not moved rotation to the login helper.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
+- For verified anonymous bootstrap, use `anonymous_identity::verify_anonymous_hash` before
+  creating/authenticating `_user`; preserve the existing HMAC of `ait:<hash>` and aliases.
+  Apply private `anonymous_identities.sql` and use the verified-key seal/store helpers.
+  Anonymous dispatch uses `message_recipients` and the same notification/marketing gate.
+  Apply the additive recipient migration once, stop legacy workers, and keep promotion
+  recovery bound to the originally stored anonymous recipient and transaction key.
 
 ## React Native Client Bootstrap And Helpers
 

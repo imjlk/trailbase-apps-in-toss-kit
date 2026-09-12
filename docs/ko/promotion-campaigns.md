@@ -154,3 +154,5 @@ transaction key를 전달하면 `POST /internal/apps-in-toss/promotion/reward/st
 최초 지급 중 통신이 끊기면 호출자가 저장하기 전에 키를 잃을 수 있습니다. 이 경우는
 운영자·제공자 확인이 필요하며 새 키로 재시도하면 안 됩니다. 결과 조회 endpoint가
 기존의 통합 지급 흐름 전체를 네트워크 중단에 대해 원자적으로 만드는 것은 아닙니다.
+
+[검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.

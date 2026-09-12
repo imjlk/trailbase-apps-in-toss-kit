@@ -108,3 +108,5 @@ API를 호출하기 위한 외부 연결용(outbound) mTLS 프록시를 거치�
 앱별 데이터베이스 업데이트는 도입 앱에 둡니다. 일반적인 처리는
 `toss_identities.toss_user_key_hmac`으로 레코드를 찾고, 일치하는 레코드를 `REVOKED`로 바꾸며,
 원본 Toss `userKey`를 제외한 audit/event 레코드를 기록하는 것입니다.
+
+[검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
