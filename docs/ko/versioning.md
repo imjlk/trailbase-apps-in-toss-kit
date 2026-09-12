@@ -75,3 +75,17 @@ tag)가 프록시 패키지 버전(proxy package version)과 일치하지 않으
 운영 배포에서는 `0.1.8` 같은 정확한 SemVer 태그를 우선 사용하세요. 의도적으로 마이너
 범위(minor range)를 따라가려면 `0.1` 같은 태그를 사용할 수 있습니다. 움직이는 이미지 빌드를
 따라가고 싶을 때만 `latest` 또는 `edge`를 사용하세요.
+
+## 자동 릴리즈 준비 후 Bun lockfile
+
+Sampo가 `release/main`을 준비하면 workflow는 생성된 브랜치를 checkout하고
+`bun install --lockfile-only --ignore-scripts`를 실행합니다. 비공개 패키지를 포함해
+workspace 버전을 변경된 package manifest와 명시적으로 맞춥니다. 필요한 경우
+`bun.lock`만 커밋하며 다른 추적 파일 변경은 거절하고 일반 fast-forward push를
+사용합니다. 동시에 브랜치가 바뀌면 push가 거절될 수 있으므로 강제 덮어쓰기 대신
+변경을 확인한 뒤 workflow를 다시 실행하세요.
+
+이 단계는 릴리즈 PR을 게시하거나 병합하지 않습니다. Sampo가 릴리즈 준비를 보고한
+경우에만 실행되며 lockfile이 일치하면 변경하지 않고, 패키지 lifecycle script를
+실행하지 않습니다. 생성된 릴리즈 PR을 병합하기 전에 버전·changelog와 함께 마지막
+lockfile 커밋도 검토하세요.
