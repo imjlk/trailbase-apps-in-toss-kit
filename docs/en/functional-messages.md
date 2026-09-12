@@ -191,3 +191,6 @@ Both enqueue paths remove reserved raw recipient fields (`tossUserKey`, `userKey
 identity in the private HMAC/sealed columns. Consumer migrations should scrub those
 fields from any legacy payloads that already contain them; new enqueues do not
 rewrite historical rows on idempotency conflicts.
+Dispatch uses the same recursive scrub before inserting the selected recipient.
+The reserved names are case-sensitive; consumers must not copy raw identifiers
+into other message context fields or encoded strings.
