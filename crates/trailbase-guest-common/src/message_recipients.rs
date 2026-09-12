@@ -31,12 +31,10 @@ pub fn payload_with_recipient(
     mut payload: JsonValue,
     recipient: ProxyRecipient<'_>,
 ) -> ApiResult<JsonValue> {
+    remove_raw_recipient_fields(&mut payload);
     let object = payload
         .as_object_mut()
         .ok_or_else(|| bad_request("INVALID_PROXY_PAYLOAD", "payload must be an object"))?;
-    for key in ["tossUserKey", "userKey", "anonKey"] {
-        object.remove(key);
-    }
     let (field, key) = match recipient {
         ProxyRecipient::TossUserKey(key) => ("tossUserKey", key),
         ProxyRecipient::AnonymousKey(key) => ("anonKey", key),
@@ -391,10 +389,15 @@ mod tests {
     #[test]
     fn payload_has_exactly_one_explicit_recipient() {
         let payload = payload_with_recipient(
-            json!({"tossUserKey":"old","userKey":"old","context":{}}),
+            json!({"tossUserKey":"old","userKey":"old","context":{
+                "anonKey":"old", "items":[{"userKey":"old","name":"Ada"}]
+            }}),
             ProxyRecipient::AnonymousKey("anon"),
         )
         .unwrap();
-        assert_eq!(payload, json!({"anonKey":"anon","context":{}}));
+        assert_eq!(
+            payload,
+            json!({"anonKey":"anon","context":{"items":[{"name":"Ada"}]}})
+        );
     }
 }
