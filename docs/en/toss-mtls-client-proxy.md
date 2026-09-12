@@ -383,6 +383,18 @@ provider SKU. PAYMENT_COMPLETED/PURCHASED responses without a provider SKU retur
 `ok: false` and `UNVERIFIED_IAP_ORDER`; retry verification before granting anything.
 Explicit stub mode keeps synthetic request-based products for local tests.
 
+## Health Metadata
+
+Authenticated health responses preserve `ok` and `mode` and add
+`kit: { contractVersion: 1, proxyVersion, capabilities }`. The version comes from
+the running package, and capabilities list implemented adapter contracts such as
+`anonymous-key.verify`, `iap.provider-sku-required`, `promotion.status`,
+`promotion.anonymous-recipient`, and `smart-message.channel-results`. The complete
+list is maintained in `src/capabilities.mjs`. No upstream call or certificate/secret
+content is included. This describes implementation availability, not readiness of
+a specific campaign or user operation. See [Release Doctor](release-doctor.md#proxy-capability-preflight)
+for deployment preflight checks. Old consumers can continue reading `ok`/`mode`.
+
 ## Shared Response Contracts
 
 The synthetic corpus under `fixtures/contracts/` is checked by Rust, the proxy,

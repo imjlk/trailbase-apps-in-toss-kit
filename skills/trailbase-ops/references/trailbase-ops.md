@@ -189,6 +189,11 @@ helper exists in the checked-out package.
 - Production image references should use exact SemVer or minor tags, not `edge` or `latest`, unless
   moving tags are intentionally being tested.
 
+- Use the Release Doctor `proxy-capabilities` check before enabling a newly required adapter.
+  Its internal health contract reports package version and implemented capabilities; it does
+  not verify upstream readiness or eligibility. Older proxies require an upgrade before
+  this check becomes mandatory. Supply tokens through env variable names, never config text.
+
 ## Apps In Toss Docs Tooling
 
 This skill should not replace official Apps in Toss SDK/API documentation lookup.
