@@ -28,7 +28,14 @@ function consumerFile(root, name) {
   const rel = relative(root, resolved);
   if (rel === '..' || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error('Mapped consumer path escapes the consumer root.');
   if (!statSync(resolved).isFile() || statSync(resolved).size > LIMIT) throw new Error('Mapped input must be a text file of at most 1 MiB.');
-  return text(readFileSync(resolved));
+  return { text: text(readFileSync(resolved)), executable: Boolean(statSync(resolved).mode & 0o100) };
+}
+
+export function readConsumerMapping(consumerRoot, name) {
+  const file = consumerFile(realpathSync(consumerRoot), name);
+  if (!file) throw new Error('Could not read the mapping file.');
+  try { return JSON.parse(file.text); }
+  catch { throw new Error('Mapping contains invalid JSON.'); }
 }
 
 function text(bytes) {
@@ -45,7 +52,7 @@ function kitFile(root, ref, path) {
   if (size > LIMIT) throw new Error('Mapped kit input exceeds 1 MiB.');
   const result = spawnSync('git', ['-C', root, 'show', `${ref}:${path}`], { maxBuffer: LIMIT + 1 });
   if (result.status !== 0 || result.error) throw new Error('Could not read mapped kit input.');
-  return text(result.stdout);
+  return { text: text(result.stdout), executable: entry.startsWith('100755 ') };
 }
 
 function scope(value, check, component) {
@@ -61,6 +68,16 @@ function state(base, next, consumer) {
   if (consumer === base) return next === null ? 'kit-removed' : 'update-required';
   if (base === null || next === null || consumer === null) return 'conflict';
   return 'both-changed';
+}
+
+function combinedState(content, mode) {
+  const states = [content, mode];
+  for (const status of ['conflict', 'missing-consumer', 'kit-removed', 'mergeable-update']) {
+    if (states.includes(status)) return status;
+  }
+  if (states.includes('update-required')) return states.includes('consumer-only') ? 'mergeable-update' : 'update-required';
+  if (states.includes('already-applied')) return 'already-applied';
+  return states.includes('consumer-only') ? 'consumer-only' : 'unchanged';
 }
 
 // Git sees only opaque line numbers. Consumer contents (including env values)
@@ -126,15 +143,18 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
   const checks = mapping.checks.map(validateCheck);
   const files = [];
   for (const check of checks) {
-    const oldText = kitFile(kitRoot, base, check.template);
-    const newText = kitFile(kitRoot, target, check.template);
+    const oldFile = kitFile(kitRoot, base, check.template);
+    const newFile = kitFile(kitRoot, target, check.template);
+    const oldText = oldFile?.text ?? null;
+    const newText = newFile?.text ?? null;
     if (oldText === null && newText === null) throw new Error('Mapped template is absent from both kit commits.');
     const components = check.mode === 'compose-service' ? [
       { section: 'services', name: check.service },
       ...(check.volumes ?? []).map(name => ({ section: 'volumes', name })),
     ] : [null];
     for (const consumer of check.consumers) for (const component of components) {
-      const localText = consumerFile(consumerRoot, consumer);
+      const localFile = consumerFile(consumerRoot, consumer);
+      const localText = localFile?.text ?? null;
       const [oldScope, newScope, localScope] = [oldText, newText, localText].map(value => scope(value, check, component));
       if (component && oldScope === null && newScope === null) throw new Error('Mapped Compose entry is absent from both kit commits.');
       let status = state(oldScope, newScope, localScope);
@@ -142,6 +162,7 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
       if (check.mode === 'env-subset') {
         const envKeys = compareEnv(oldText, newText, localText);
         if (envKeys.some(key => key.status === 'conflict')) status = 'conflict';
+        else if (envKeys.some(key => key.status === 'missing-consumer')) status = 'missing-consumer';
         else if (envKeys.some(key => ['update-required', 'kit-removed'].includes(key.status))) status = 'update-required';
         else if (oldText !== newText && envKeys.some(key => key.status === 'already-applied')) status = 'already-applied';
         else status = envKeys.some(key => key.status === 'consumer-only') ? 'consumer-only' : 'unchanged';
@@ -154,10 +175,18 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
         if (status === 'both-changed') status = lines.mergeable ? 'mergeable-update' : 'conflict';
         details = { kitHunks: lines.kitHunks, consumerHunks: lines.consumerHunks };
       }
-      const kitChanged = oldScope !== newScope;
+      let permissions;
+      if (check.mode === 'exact') {
+        const [oldExecutable, newExecutable, consumerExecutable] = [oldFile, newFile, localFile].map(file => file?.executable ?? null);
+        const permissionStatus = state(oldExecutable, newExecutable, consumerExecutable);
+        permissions = { oldExecutable, newExecutable, consumerExecutable, status: permissionStatus };
+        status = combinedState(status, permissionStatus);
+      }
+      const kitChanged = oldScope !== newScope || Boolean(permissions && permissions.oldExecutable !== permissions.newExecutable);
       const migration = check.template.endsWith('.sql') && kitChanged && status !== 'already-applied';
       files.push({ template: check.template, consumer, mode: check.mode, ...(component ? { scope: component } : {}), status, kitChanged,
-        consumerChanged: oldScope !== localScope, ...details,
+        consumerChanged: oldScope !== localScope || Boolean(permissions && permissions.oldExecutable !== permissions.consumerExecutable),
+        ...details, ...(permissions ? { permissions } : {}),
         action: migration ? 'Review a new consumer-owned forward migration; do not overwrite historical SQL.' :
           ['update-required', 'mergeable-update'].includes(status) ? 'Review kit changes and preserve consumer customization.' :
             ['conflict', 'kit-removed', 'missing-consumer'].includes(status) ? 'Manual reconciliation required; do not delete or overwrite automatically.' : 'No kit update to apply.',
@@ -183,6 +212,7 @@ export function renderUpgradePlan(plan) {
     lines.push(`${file.status}: ${file.consumer}${file.scope ? ` [${file.scope.section}.${file.scope.name}]` : ''}`, `  kit: ${file.template}`, `  ${file.action}`);
     if (file.envKeys) for (const key of file.envKeys) lines.push(`  env ${key.key}: ${key.status}`);
     else for (const side of ['kitHunks', 'consumerHunks']) for (const h of file[side]) lines.push(`  ${side}: old ${h.baseStart}+${h.baseLines} -> new ${h.changedStart}+${h.changedLines}`);
+    if (file.permissions) lines.push(`  executable: ${file.permissions.oldExecutable} -> ${file.permissions.newExecutable}; consumer ${file.permissions.consumerExecutable} (${file.permissions.status})`);
   }
   for (const file of plan.unmappedTemplates) lines.push(`unmapped: ${file.template}`, `  ${file.action}`);
   lines.push('', 'Validation:', ...plan.validation.map(item => `  ${item.scope}: ${item.argv?.join(' ') ?? item.action}`));

@@ -1,8 +1,7 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildUpgradePlan, renderUpgradePlan } from './lib/consumer-upgrade-plan.mjs';
+import { buildUpgradePlan, renderUpgradePlan, readConsumerMapping } from './lib/consumer-upgrade-plan.mjs';
 
 const usage = 'Usage: bun scripts/plan-consumer-upgrade.mjs <consumer-root> --from <kit-ref> --mapping <consumer-relative-map> [--to HEAD] [--json] [--strict]';
 try {
@@ -20,9 +19,7 @@ try {
     options.consumerRoot = resolve(arg);
   }
   if (!options.consumerRoot || !options.from || !options.mapping) throw new Error(usage);
-  let mapping;
-  try { mapping = JSON.parse(readFileSync(resolve(options.consumerRoot, options.mapping), 'utf8')); }
-  catch (error) { throw new Error(error instanceof SyntaxError ? 'Mapping contains invalid JSON.' : 'Could not read the mapping file.'); }
+  const mapping = readConsumerMapping(options.consumerRoot, options.mapping);
   const plan = buildUpgradePlan({ consumerRoot: options.consumerRoot, from: options.from, to: options.to, mapping,
     kitRoot: resolve(dirname(fileURLToPath(import.meta.url)), '..') });
   console.log(options.json ? JSON.stringify(plan, null, 2) : renderUpgradePlan(plan));

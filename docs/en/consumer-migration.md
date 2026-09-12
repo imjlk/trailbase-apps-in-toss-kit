@@ -171,6 +171,8 @@ a textual comparison, not semantic YAML or SQL validation; anchors, inheritance,
 and application behavior still require review. Environment reports show key names
 and change classifications, never values. Env mode compares active assignments
 (last assignment wins); comments and app-only keys are outside that comparison.
+Exact mode also compares Git's executable bit with the consumer file permissions.
+The mapping file itself must satisfy the same containment, size and UTF-8 constraints.
 No file contents or content hashes appear in either text or JSON output. Temporary
 comparison files contain only opaque line IDs, not consumer text or secrets.
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -118,6 +118,37 @@ describe('three-way consumer upgrade planning', () => {
     });
   });
 
+  test('same-indent YAML comments cannot hide changes in later nested properties', () => {
+    const base = 'services:\n  proxy:\n    image: proxy:1\n  # still inside the service\n    restart: always\n';
+    const next = base.replace('restart: always', 'restart: unless-stopped');
+    fixture({ [template]: base }, { [template]: next }, { 'local.txt': base }, options => {
+      expect(plan(options, { mode: 'compose-service', service: 'proxy' }).files[0].status).toBe('update-required');
+    });
+  });
+
+  test('missing unchanged environment keys remain actionable alongside an already-applied change', () => {
+    fixture({ [template]: 'REQUIRED=yes\nCHANGED=old\n' }, { [template]: 'REQUIRED=yes\nCHANGED=new\n' }, { 'local.txt': 'CHANGED=new\n' }, options => {
+      const p = plan(options, { mode: 'env-subset' });
+      expect(p.files[0].status).toBe('missing-consumer');
+      expect(p.requiresReview).toBe(true);
+    });
+  });
+
+  test('exact mode catches executable-bit-only upgrades and preserves consumer text edits', () => {
+    fixture({ [template]: '#!/bin/sh\nexit 0\n' }, {}, { 'local.txt': '#!/bin/sh\nexit 0\n' }, options => {
+      chmodSync(join(options.kitRoot, template), 0o755);
+      chmodSync(join(options.consumerRoot, 'local.txt'), 0o644);
+      git(options.kitRoot, 'add', '.'); git(options.kitRoot, 'commit', '-qm', 'make executable');
+      let p = plan(options);
+      expect(p.files[0].status).toBe('update-required');
+      expect(p.files[0].permissions.newExecutable).toBe(true);
+      expect(p.requiresReview).toBe(true);
+      writeFileSync(join(options.consumerRoot, 'local.txt'), '#!/bin/sh\nexit 2\n');
+      p = plan(options);
+      expect(p.files[0].status).toBe('mergeable-update');
+    });
+  });
+
   test('never emits exact-mode consumer content, including secrets embedded in unknown fields', () => {
     fixture({ [template]: 'old\n' }, { [template]: 'new\n' }, { 'local.txt': 'arbitrary-secret-value\n' }, options => {
       expect(JSON.stringify(plan(options))).not.toContain('arbitrary-secret-value');
@@ -162,6 +193,19 @@ describe('three-way consumer upgrade planning', () => {
       expect(run(['--strict']).status).toBe(1);
       expect(run(['--from', 'invalid-ref']).status).toBe(2);
       expect(run(['--unknown']).status).toBe(2);
+      expect(run(['--mapping', '../outside.json']).status).toBe(2);
+      expect(run(['--mapping', join(temp, 'mapping.json')]).status).toBe(2);
+      symlinkSync(join(repoRoot, 'package.json'), join(temp, 'escape.json'));
+      expect(run(['--mapping', 'escape.json']).status).toBe(2);
+      write(temp, 'big.json', ' '.repeat(1024 * 1024 + 1));
+      expect(run(['--mapping', 'big.json']).status).toBe(2);
+      writeFileSync(join(temp, 'invalid-utf8.json'), Buffer.from([0xff]));
+      expect(run(['--mapping', 'invalid-utf8.json']).status).toBe(2);
+      write(temp, 'invalid-json.json', '{do-not-echo-this-value');
+      const invalid = run(['--mapping', 'invalid-json.json']);
+      expect(invalid.status).toBe(2);
+      expect(invalid.stderr).toContain('invalid JSON');
+      expect(invalid.stderr).not.toContain('do-not-echo-this-value');
     } finally { rmSync(temp, { recursive: true, force: true }); }
   });
 });

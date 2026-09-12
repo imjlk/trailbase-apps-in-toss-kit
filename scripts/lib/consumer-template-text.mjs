@@ -8,9 +8,7 @@ export function extractYamlMappingEntry(text, parentKey, entryKey) {
   }
 
   const parentIndent = indentation(lines[parentIndex]);
-  const parentEnd = findYamlBlockEnd(lines, parentIndex + 1, parentIndent, {
-    skipBoundaryComments: true,
-  });
+  const parentEnd = findYamlBlockEnd(lines, parentIndex + 1, parentIndent);
   const entryDirectIndent = findYamlDirectChildIndent(
     lines,
     parentIndex + 1,
@@ -40,19 +38,14 @@ export function extractYamlMappingEntry(text, parentKey, entryKey) {
   return '';
 }
 
-function findYamlBlockEnd(lines, start, baseIndent, { skipBoundaryComments = false } = {}) {
+function findYamlBlockEnd(lines, start, baseIndent) {
   for (let index = start; index < lines.length; index += 1) {
     const line = lines[index];
     const trimmed = line.trim();
     if (!trimmed) {
       continue;
     }
-    if (trimmed.startsWith('#')) {
-      if (skipBoundaryComments || indentation(line) > baseIndent) {
-        continue;
-      }
-      return index;
-    }
+    if (trimmed.startsWith('#')) continue;
     if (indentation(line) <= baseIndent) {
       return index;
     }
@@ -102,7 +95,7 @@ function findYamlDirectChildIndent(lines, start, end, parentIndent) {
 
 function trimTrailingBlankLines(lines) {
   let end = lines.length;
-  while (end > 0 && !lines[end - 1].trim()) {
+  while (end > 0 && (!lines[end - 1].trim() || lines[end - 1].trim().startsWith('#'))) {
     end -= 1;
   }
   return lines.slice(0, end);
