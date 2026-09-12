@@ -83,7 +83,6 @@ pub fn require_operation_tx(
     tx: &mut Transaction,
     feature: OperationFeature,
     phase: OperationPhase,
-    now: i64,
 ) -> ApiResult<()> {
     if phase == OperationPhase::Status {
         return Ok(());
@@ -91,10 +90,11 @@ pub fn require_operation_tx(
     let hold = crate::settings::string("KIT_OPERATIONS_HOLD");
     if operation_hold_active(hold.as_deref()) {
         return Err(forbidden(
-            "OPERATION_PAUSED",
+            "OPERATION_HELD",
             "Operations are held by the server environment",
         ));
     }
+    let now = db::now_ms_tx(tx)?;
     let rows = db::tx_query(tx, SELECT_POLICY, &[Value::Text(feature.as_str().into())])?;
     let policy = rows
         .first()
@@ -113,6 +113,43 @@ pub fn require_operation_tx(
 /// configured values fail closed; absence preserves normal per-feature control.
 pub fn operation_hold_active(value: Option<&str>) -> bool {
     !matches!(value, None | Some("0") | Some("false"))
+}
+
+/// Reports only the built-in boundaries actually wired below. Consumer-owned SDK
+/// entry points and direct network sends still need explicit require_operation_tx.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OperationPolicyIntegration {
+    pub enabled: bool,
+    pub external_hold: bool,
+    pub guarded_helpers: &'static [&'static str],
+}
+pub fn operation_policy_integration() -> OperationPolicyIntegration {
+    let enabled = crate::settings::string("KIT_OPERATION_POLICIES_ENABLED");
+    let hold = crate::settings::string("KIT_OPERATIONS_HOLD");
+    OperationPolicyIntegration {
+        enabled: operation_hold_active(enabled.as_deref()),
+        external_hold: operation_hold_active(hold.as_deref()),
+        guarded_helpers: &[
+            "mark_iap_order_granted_tx",
+            "enqueue_message_outbox_tx",
+            "claim_ready_message_outbox_tx",
+            "begin_message_outbox_dispatch_tx",
+            "insert_promotion_reward_ledger_tx",
+        ],
+    }
+}
+pub(crate) fn enforce_configured_operation_tx(
+    tx: &mut Transaction,
+    feature: OperationFeature,
+    phase: OperationPhase,
+) -> ApiResult<()> {
+    let integration = operation_policy_integration();
+    if integration.enabled || integration.external_hold {
+        require_operation_tx(tx, feature, phase)
+    } else {
+        Ok(())
+    }
 }
 
 fn parse_policy(row: &[Value], feature: OperationFeature) -> ApiResult<OperationPolicy> {

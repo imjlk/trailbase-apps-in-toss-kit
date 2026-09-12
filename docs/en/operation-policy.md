@@ -22,7 +22,7 @@ This is not permission to resend a pending message or promotion.
 ```rust,ignore
 use trailbase_guest_common::operation_policy::{require_operation_tx, OperationFeature, OperationPhase};
 // In the SAME transaction as the existing message dispatch-permit helper:
-require_operation_tx(&mut tx, OperationFeature::SmartMessage, OperationPhase::Dispatch, now)?;
+require_operation_tx(&mut tx, OperationFeature::SmartMessage, OperationPhase::Dispatch)?;
 // begin_message_outbox_dispatch_tx(...), then commit, then send.
 ```
 
@@ -30,7 +30,17 @@ Use `Iap/Settlement` immediately before the existing idempotent inventory grant,
 `Promotion/Dispatch` before acquiring a provider grant permit, and
 `AppReward/Entry` or `AppReward/Settlement` inside the offer/claim policies.
 `SmartMessage/Entry` gates new outbox rows and `SmartMessage/Dispatch` gates sends.
-These are opt-in boundaries: adding the SQL alone does not intercept existing apps.
+Set `KIT_OPERATION_POLICIES_ENABLED=1` after applying the migration to enable the
+built-in guards in `mark_iap_order_granted_tx`, `enqueue_message_outbox_tx`,
+`claim_ready_message_outbox_tx`, `begin_message_outbox_dispatch_tx` and
+`insert_promotion_reward_ledger_tx`. `operation_policy_integration()` reports this
+configured state and the exact guarded helpers for a private startup diagnostic.
+The external hold overrides those boundaries even without that opt-in flag.
+Consumer-owned SDK entry points, direct promotion sends and custom inventory paths
+still need an explicit guard. The SQL alone does not intercept existing apps.
+`require_operation_tx` reads authoritative database time internally; callers cannot
+supply a stale timestamp to extend a policy. `OPERATION_HELD` distinguishes the
+external override from `OPERATION_PAUSED` for a missing/stale/disabled policy.
 Roll back denied transactions. Never hold a database transaction over network I/O.
 A pause cannot revoke already committed dispatch permits or cancel in-flight calls;
 stop/drain workers and reconcile those original attempts before declaring quiescence.
@@ -58,6 +68,16 @@ restored policies. `0`, `false` or absence selects normal per-feature policy;
 other nonempty values keep the hold active. The example env file defaults to held.
 An old backup containing enabled feature rows must never bypass this startup hold.
 Consumers must apply the guard to all side-effect paths, including background jobs.
+
+
+For TrailBase WASM, host environment variables are not automatically inherited by
+the sandbox. Render these string settings into a private `/settings.json` in a
+separately mounted read-only root and pass `--runtime-root-fs /run/kit-runtime` to
+TrailBase. Keep that root outside restored data and verify
+`operation_policy_integration()` reports enabled/held as expected before traffic.
+`settings.json` is cached per guest instance: restart all API/worker instances when
+changing the external hold or opt-in setting. A host `-e` flag alone is insufficient.
+See `templates/trailbase/runtime/operation-settings.example.json`.
 
 ## Old-backup rehearsal and release evidence
 
@@ -103,3 +123,5 @@ witness/provider state in a separate SQLite file, reopens the old backup, blocks
 second send and reconciles the original ID. The final provider call count remains
 one. Pair this with per-feature gate tests and the app's own backup/worker protocol.
 Archive only redacted results and version/backup references, never private IDs or logs.
+
+Run `KIT_SMOKE_OPERATIONS_HOLD=1 bun run trailbase:wasm:smoke` as well as the default smoke to validate mounted settings and real WASM gates in both modes.

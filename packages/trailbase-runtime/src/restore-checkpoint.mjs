@@ -8,8 +8,8 @@ export function evaluateRestoreCheckpoint(evidence = {}) {
   const { database, witness, dispatchPaused, inFlight, unresolved } = evidence ?? {};
   const failures = [];
   if (dispatchPaused !== true) failures.push("External dispatch must remain paused during restore validation");
-  if (!counter(inFlight) || inFlight !== 0) failures.push("In-flight external operations must be accounted for");
-  if (!counter(unresolved) || unresolved !== 0) failures.push("Unknown outcomes require reconciliation using their original identifiers");
+  if (inFlight !== 0) failures.push("In-flight external operations must be accounted for");
+  if (unresolved !== 0) failures.push("Unknown outcomes require reconciliation using their original identifiers");
   if (!checkpoint(database) || !checkpoint(witness)) {
     failures.push("Both database and independent durable witness checkpoints are required");
   } else if (database.generation !== witness.generation || database.sequence !== witness.sequence) {
@@ -20,8 +20,8 @@ export function evaluateRestoreCheckpoint(evidence = {}) {
   };
 }
 
-/// Programmatic Release Doctor check. Readers must inspect trusted private sources,
-/// including a durable witness outside the restored backup. Results contain no IDs.
+// Programmatic Release Doctor check. Readers must inspect trusted private sources,
+// including a durable witness outside the restored backup. Results contain no IDs.
 export function createRestoreCheckpointCheck({ name = "Restore checkpoint", readEvidence, required = true } = {}) {
   return { name, required, async run() {
     try {

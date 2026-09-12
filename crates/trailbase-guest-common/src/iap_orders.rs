@@ -202,6 +202,11 @@ pub fn mark_iap_order_granted_tx(
     table: IapOrdersTable,
     input: IapOrderGrantInput<'_>,
 ) -> ApiResult<IapOrderLedgerRecord> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::Iap,
+        crate::operation_policy::OperationPhase::Settlement,
+    )?;
     let (sql, params) = iap_order_grant_statement(table, input)?;
     let rows = db::tx_query(tx, &sql, &params)?;
     rows.first()

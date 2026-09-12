@@ -7,6 +7,7 @@ import path from "node:path";
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const templateDir = path.join(root, "templates", "trailbase", "sql");
 const templates = [
+  "operation_policies.sql",
   "message_templates.sql",
   "notification_template_agreements.sql",
   "message_outbox.core.sql",
@@ -48,6 +49,7 @@ try {
           "promotion_campaigns",
           "promotion_reward_ledger",
           "iap_orders",
+          "operation_policies",
         ],
         checkedIndexes: [
           "idx_message_outbox_ready_dispatch",
@@ -76,6 +78,9 @@ try {
 }
 
 function verifySchema() {
+  assertTable("operation_policies");
+  const feature = db.query("PRAGMA table_info(operation_policies)").all().find(row => row.name === "feature");
+  if (feature?.pk !== 1) throw new Error("operation feature must be the primary key");
   assertTable("iap_subscription_events");
   assertTable("iap_subscription_entitlements");
   assertTable("anonymous_identities");
@@ -114,6 +119,7 @@ function verifySchema() {
 function verifySampleRows() {
   const userId = new Uint8Array([1, 2, 3, 4]);
   db.query("INSERT INTO _user (id) VALUES (?1)").run(userId);
+  db.exec("INSERT INTO operation_policies VALUES ('iap',1,0,0,1,100,200)");
   db.query(
     `INSERT INTO message_templates (
       template_code, purpose, status, requires_agreement, agreement_template_code,

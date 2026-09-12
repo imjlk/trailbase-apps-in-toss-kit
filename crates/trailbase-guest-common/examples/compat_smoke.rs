@@ -2,7 +2,8 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value as JsonValue, json};
 use trailbase_guest_common::{
-    anonymous_identity, apps_in_toss_login, apps_in_toss_proxy, db, responses, trailbase_auth,
+    anonymous_identity, apps_in_toss_login, apps_in_toss_messages, apps_in_toss_proxy, db,
+    message_outbox_recovery, operation_policy, responses, trailbase_auth,
 };
 use trailbase_wasm::db::Value;
 use trailbase_wasm::http::{HttpRoute, Request, Response, routing};
@@ -28,6 +29,7 @@ impl Guest for CompatSmoke {
                 }
             }),
             routing::post("/kit-smoke/write", async |req| respond(write(req))),
+            routing::post("/kit-smoke/policy", async |_| respond(policy_probe())),
             routing::post("/kit-smoke/toss-login", async |_| {
                 let result = apps_in_toss_proxy::toss_login_complete(
                     "http://kit-proxy:8787",
@@ -126,4 +128,65 @@ fn write(req: Request) -> responses::ApiResult<JsonValue> {
     }
     db::tx_commit(&mut tx)?;
     Ok(json!({"ok":true}))
+}
+
+fn policy_probe() -> responses::ApiResult<JsonValue> {
+    use operation_policy::{OperationFeature, OperationPhase, require_operation_tx};
+    let integration = operation_policy::operation_policy_integration();
+    if !integration.enabled {
+        return Err(responses::internal(
+            "Fixture operation policy settings were not mounted",
+        ));
+    }
+    let mut tx = db::tx()?;
+    let now = db::now_ms_tx(&mut tx)?;
+    db::tx_execute(
+        &mut tx,
+        "INSERT OR REPLACE INTO operation_policies VALUES ('smart-message',1,0,0,1,?1,?2)",
+        &[Value::Integer(now), Value::Integer(now + 60_000)],
+    )?;
+    let entry = require_operation_tx(
+        &mut tx,
+        OperationFeature::SmartMessage,
+        OperationPhase::Entry,
+    )
+    .unwrap_err()
+    .code;
+    let dispatch = apps_in_toss_messages::claim_ready_message_outbox_tx(&mut tx, 1, now)
+        .unwrap_err()
+        .code;
+    // The built-in lease helper delegates to the same guarded claim path.
+    let leased_dispatch =
+        message_outbox_recovery::claim_message_outbox_with_lease_tx(&mut tx, 1, now, 1000)
+            .unwrap_err()
+            .code;
+    let settlement = require_operation_tx(
+        &mut tx,
+        OperationFeature::SmartMessage,
+        OperationPhase::Settlement,
+    )
+    .is_ok();
+    db::tx_execute(
+        &mut tx,
+        "UPDATE operation_policies SET updated_at=?1,expires_at=?2",
+        &[Value::Integer(now - 2000), Value::Integer(now - 1000)],
+    )?;
+    let expired = require_operation_tx(
+        &mut tx,
+        OperationFeature::SmartMessage,
+        OperationPhase::Settlement,
+    )
+    .is_err();
+    let status = require_operation_tx(
+        &mut tx,
+        OperationFeature::SmartMessage,
+        OperationPhase::Status,
+    )
+    .is_ok();
+    // Drop without commit: fixture rows are rolled back.
+    Ok(
+        json!({"enabled":integration.enabled,"held":integration.external_hold,
+        "entryCode":entry,"dispatchCode":dispatch,"leasedDispatchCode":leased_dispatch,
+        "settlementAllowed":settlement,"expiredDenied":expired,"statusAllowed":status}),
+    )
 }

@@ -6,7 +6,10 @@ npm/@trailbase-apps-in-toss-kit/trailbase-runtime: minor
 Add explicit per-feature entry, external dispatch, existing-result settlement and
 read-only status controls. Missing or stale policies block mutations. Copy the
 private operation_policies.sql migration, rebuild WASM and connect checks inside
-all handler/worker authorization transactions. Set KIT_OPERATIONS_HOLD=1 outside
+all handler/worker authorization transactions. Enable the built-in IAP grant,
+message enqueue/dispatch and promotion entry guards with
+KIT_OPERATION_POLICIES_ENABLED=1; inspect operation_policy_integration() at startup.
+Policy expiry uses database time internally. Set KIT_OPERATIONS_HOLD=1 outside
 the backup before starting a restored database; status lookup remains available.
 
 Add a Release Doctor restore checkpoint check and an old-SQLite-backup rehearsal.

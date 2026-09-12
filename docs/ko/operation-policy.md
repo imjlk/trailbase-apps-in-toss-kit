@@ -21,15 +21,23 @@ WASM guest를 재빌드합니다. `operation_policy::require_operation_tx`는 `i
 ```rust,ignore
 use trailbase_guest_common::operation_policy::{require_operation_tx, OperationFeature, OperationPhase};
 // 기존 메시지 발송 permit 헬퍼와 같은 트랜잭션 안에서 검사합니다.
-require_operation_tx(&mut tx, OperationFeature::SmartMessage, OperationPhase::Dispatch, now)?;
+require_operation_tx(&mut tx, OperationFeature::SmartMessage, OperationPhase::Dispatch)?;
 // begin_message_outbox_dispatch_tx(...), 커밋, 이후 발송 순서입니다.
 ```
 
 기존 멱등 재화 지급 직전에 `Iap/Settlement`, 프로모션 지급 permit 획득 전에
 `Promotion/Dispatch`, 앱 자체 보상의 offer/claim 정책 안에서 `AppReward/Entry` 또는
 `AppReward/Settlement`를 적용합니다. `SmartMessage/Entry`는 새 outbox 행,
-`SmartMessage/Dispatch`는 발송을 차단합니다. 명시적으로 연결해야 하는 경계이므로 SQL만
-추가해도 기존 앱의 모든 작업을 가로채지는 않습니다. 거절한 트랜잭션은 롤백하고 네트워크
+`SmartMessage/Dispatch`는 발송을 차단합니다. 마이그레이션 적용 후
+`KIT_OPERATION_POLICIES_ENABLED=1`로 `mark_iap_order_granted_tx`,
+`enqueue_message_outbox_tx`, `claim_ready_message_outbox_tx`,
+`begin_message_outbox_dispatch_tx`, `insert_promotion_reward_ledger_tx`의 내장 검사를
+활성화합니다. `operation_policy_integration()`은 설정 상태와 실제 검사되는 헬퍼 목록을
+비공개 시작 진단에 제공합니다. 외부 전체 중단은 opt-in flag가 없어도 이 경계에 적용됩니다.
+소비 앱이 소유한 SDK 진입·프로모션 직접 발송·사용자 정의 재화 경로에는 명시적 검사가
+여전히 필요하며 SQL만으로 모든 경로를 가로채지는 않습니다. `require_operation_tx`는
+DB 시각을 내부에서 읽어 오래된 호출자 시각으로 정책을 연장할 수 없습니다.
+`OPERATION_HELD`는 외부 전체 중단, `OPERATION_PAUSED`는 정책 누락·만료·비활성화를 뜻합니다. 거절한 트랜잭션은 롤백하고 네트워크
 I/O 동안 DB 트랜잭션을 유지하지 않습니다. 중단은 이미 커밋한 permit이나 진행 중인 외부
 호출을 취소하지 못합니다. worker를 중단·drain하고 원래 시도를 대사한 뒤 정지 상태로 판정하세요.
 
@@ -55,6 +63,15 @@ WHERE feature = 'iap' AND revision = :expected_revision;
 중단을 유지합니다. 예제 env 파일은 중단 상태가 기본입니다. 오래된 백업에 활성 정책 행이
 있어도 시작 시 중단을 우회해서는 안 됩니다. 백그라운드 작업을 포함한 모든 부수 효과
 경로에 소비 앱이 검사를 연결해야 합니다.
+
+
+TrailBase WASM sandbox는 호스트 환경 변수를 자동 상속하지 않습니다. 이 문자열 설정을
+별도 읽기 전용 root의 비공개 `/settings.json`으로 렌더링하고 TrailBase에
+`--runtime-root-fs /run/kit-runtime`을 전달하세요. 복원 데이터 밖의 root를 사용하고 트래픽
+허용 전에 `operation_policy_integration()`의 enabled/held가 의도한 값인지 확인합니다.
+`settings.json`은 guest 인스턴스별로 캐시되므로 외부 중단·opt-in 설정 변경 시 모든
+API·worker 인스턴스를 재시작합니다. 호스트의 `-e` flag만으로는 충분하지 않습니다.
+`templates/trailbase/runtime/operation-settings.example.json`을 참고하세요.
 
 ## 과거 백업 리허설과 릴리즈 증거
 
@@ -96,3 +113,5 @@ const check = createRestoreCheckpointCheck({ readEvidence: readPrivateRestoreEvi
 영속화합니다. 과거 백업을 다시 열면 두 번째 발송을 막고 원래 ID를 대사하며, 최종 제공사
 호출은 한 번으로 유지됩니다. 기능별 정책 테스트 및 앱 자체 백업·worker 절차와 함께
 검증하세요. 비공개 ID·로그 대신 가린 결과와 버전·백업 참조만 증거로 보관합니다.
+
+기본 smoke와 `KIT_SMOKE_OPERATIONS_HOLD=1 bun run trailbase:wasm:smoke`를 모두 실행해 실제 WASM의 설정 마운트와 두 모드의 검사를 검증하세요.
