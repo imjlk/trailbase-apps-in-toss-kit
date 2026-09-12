@@ -434,7 +434,7 @@ export function createAnonymousHash({
   random = globalThis.crypto,
 }: {
   prefix?: string;
-  random?: { getRandomValues?: (array: Uint8Array) => Uint8Array };
+  random?: { getRandomValues?: (array: Uint8Array<ArrayBuffer>) => Uint8Array };
 } = {}): string {
   const bytes = new Uint8Array(16);
   if (random?.getRandomValues) {

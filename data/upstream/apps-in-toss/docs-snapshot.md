@@ -1,17 +1,17 @@
-# Apps in Toss Upstream Snapshot
+# Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-07-29T11:03:02.420Z
+- Fetched at: 2026-09-12T05:05:31.228Z
 
-## Documents
+Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
 - Apps in Toss release notes
   - URL: https://developers-apps-in-toss.toss.im/release-note/release-note.md
-  - SHA-256: `0ce2deec9e17b965bdbc4e1b6a9ac3a721cf8a191ff0fa0464aef5d45b08bafb`
-  - Bytes: 17381
+  - SHA-256: `2e550a7d9294b0ddbf277c01b00ecc0e9c8332dfa46773698d21644d0326dcc0`
+  - Bytes: 21200
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `82ca0c362ca577dc48a52358fd306972f76913de7e310e4195304d01c7f373e3`
-  - Bytes: 28028
+  - SHA-256: `350854caf3c98a6b2424e53b512038af3452d3550adb4fcd9305fd284b6bcd03`
+  - Bytes: 33293
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
   - SHA-256: `5e1de62ddaec01667f094e0f90eee5151b598aacd7971117180dfb9c42660f3c`
@@ -22,48 +22,48 @@
   - Bytes: 2461
 - WebView Client SDK overview
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk.md
-  - SHA-256: `9343844fac907e72ea363a7be43bc5e4a537724eebdf2b6f5f3006034e50bef1`
+  - SHA-256: `f4f1187f86a003cd5340132264149aa0fd7d50dc44246bdeab9fc0460cddc1bc`
   - Bytes: 2590
 - WebView SDK 3.x migration
-  - URL: https://developers-apps-in-toss.toss.im/development/sdk-3.x.md
-  - SHA-256: `a723a264af70ebd6a191f53b32c55dd8ea70b33edbff636a53b8de5e6d3ff942`
-  - Bytes: 8314
+  - URL: https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x.md
+  - SHA-256: `f6818d9bd22cc09a4e02e803126a227ff390a95d6fae51398e4ec4afe1de3e84`
+  - Bytes: 11748
 - API overview
   - URL: https://developers-apps-in-toss.toss.im/documentation/overview.md
-  - SHA-256: `6342289e4a8be3701f09545c3e60db12c4258d5cfec4e3b0a769672b521a3017`
-  - Bytes: 14683
+  - SHA-256: `c6c36034b740d6daa2d544478e9247b6d9f1743af13090224cab042fe1a7c2aa`
+  - Bytes: 8096
 - Apps in Toss integration getting started
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md
-  - SHA-256: `425febcd75c0d1532e9fcf1057c49a3471d8211a1d243190beb8dda0ccce64a0`
-  - Bytes: 8492
+  - SHA-256: `d38e7f2efed77ed9e782db69b179b06d70a23d20f1c5b273a52701f423825d2e`
+  - Bytes: 8536
 - Server API integration
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md
-  - SHA-256: `81ae8bbabf5e96791f7b5283e3f43cf1496e5d66bc51e0019764b3e1fc8b4ed8`
-  - Bytes: 6366
+  - SHA-256: `5ce5e7ca330f16a24ab1b12126350002754e77ef4b3537f169bdbc7460277601`
+  - Bytes: 7359
 - API authentication and mTLS
-  - URL: https://developers-apps-in-toss.toss.im/documentation/api/auth.md
-  - SHA-256: `b0ff98c85a8f8fe045749730b9e5f5925a32722b0195c85ab48a311c0edd4467`
-  - Bytes: 2910
+  - URL: https://developers-apps-in-toss.toss.im/api/auth.md
+  - SHA-256: `3f822422597d72e981cf4dac6e22e0edef2ecd2f4c3ad8cc5db4e879fc6fcf98`
+  - Bytes: 2671
 - Toss Login API
-  - URL: https://developers-apps-in-toss.toss.im/documentation/api/toss-login.md
-  - SHA-256: `68501f5ef17839b57a08d1d1621dcb71b95d1d822aa30d19216045309a450aa5`
-  - Bytes: 40288
+  - URL: https://developers-apps-in-toss.toss.im/api/toss-login.md
+  - SHA-256: `0700f18934994797bf55f9604d65264cb1b3a2eb2d83954b6aa64c4f7632e8dd`
+  - Bytes: 42073
 - In-app purchase API
-  - URL: https://developers-apps-in-toss.toss.im/documentation/api/iap.md
-  - SHA-256: `b5ae1ff6efa221e3aa4b9c160e458951959a39942a8a12209553f96935595e9e`
-  - Bytes: 9755
+  - URL: https://developers-apps-in-toss.toss.im/api/iap.md
+  - SHA-256: `e22a60bc368838260d7949dc67d33ee272d89355eb8bf59bfe655282a46db5f5`
+  - Bytes: 9706
 - Promotion API
-  - URL: https://developers-apps-in-toss.toss.im/documentation/api/promotion.md
-  - SHA-256: `5012db132ad33e9416f30c0ba00d193e14368d68988fc2c6abd5fe5a5cf0eba4`
-  - Bytes: 25601
+  - URL: https://developers-apps-in-toss.toss.im/api/promotion.md
+  - SHA-256: `e4883dcc328b0258ec7c6bb3d05abd64a5779fc09596b5813a409a09b29f818d`
+  - Bytes: 25380
 - Push and Smart Message API
-  - URL: https://developers-apps-in-toss.toss.im/documentation/api/push.md
-  - SHA-256: `36d683e74ceaab8d1c2d132d3e1be44edc69d7a72daac3ef6be2cd8fbbbe3793`
-  - Bytes: 35417
+  - URL: https://developers-apps-in-toss.toss.im/api/push.md
+  - SHA-256: `99ffe8f49b157bee3d3c2a229920892eac4f868bc6fdd70adf590cdc556bb08e`
+  - Bytes: 36390
 - Smart Message overview and notification agreement policy
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
-  - SHA-256: `c3cfd455f29b2e0b39a9721db1655756a2ae4ab3674f8270c425a9388ab7baf5`
-  - Bytes: 25821
+  - SHA-256: `ec62e1d1080b533994d7e6966af20e13ad9046cd3ac0c0ece41fc0deb514ce93`
+  - Bytes: 27287
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
   - SHA-256: `f986e7667ec1807d04ae7d7f9402b1b7f46978be57722e58f42b06beb6619159`
@@ -72,15 +72,15 @@
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md
   - SHA-256: `58866b1422c4d17925fae8b5beafdb56e85c362194fd565fe8f76e7a79b296cb`
   - Bytes: 2493
+- Anonymous user key verification API
+  - URL: https://developers-apps-in-toss.toss.im/api/user-key.md
+  - SHA-256: `9eb1cd2b264d8725c4b42eae866a2d1dc0c2ac88e944898b5c7a54f55a0773bc`
+  - Bytes: 8251
+- In-app subscription guide
+  - URL: https://developers-apps-in-toss.toss.im/documentation/common/monetization/iap/in-app-subscription.md
+  - SHA-256: `16bab4994f053451b661c5afa67e9597db7c3b4e109f473b2160db8e0fcbd961`
+  - Bytes: 20348
 - TDS React Native docs
   - URL: https://tossmini-docs.toss.im/tds-react-native/
   - SHA-256: `26f03bab074aecf12d69d2fe80f7e79b073a18fc90af511106f2db22771bbafb`
   - Bytes: 80063
-
-## Reference Packages
-
-- `@apps-in-toss/framework`: 2.10.8
-- `@toss/tds-react-native`: 2.0.4
-- `create-granite-app`: 1.0.38
-- `@granite-js/react-native`: 1.0.38
-- `@toss-design-system/react-native`: unavailable on public npm latest (404)

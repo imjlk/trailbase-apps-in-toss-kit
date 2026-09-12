@@ -1,11 +1,10 @@
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
 import { assertValidDocumentSnapshot } from "./apps-in-toss-snapshot-validation.mjs";
 
 const OUT_DIR = "data/upstream/apps-in-toss";
-const JSON_OUT = `${OUT_DIR}/docs-snapshot.json`;
-const MARKDOWN_OUT = `${OUT_DIR}/docs-snapshot.md`;
 const REQUEST_TIMEOUT_MS = 30_000;
 
 const DOC_SOURCES = [
@@ -42,7 +41,7 @@ const DOC_SOURCES = [
   {
     key: "webview-sdk-3-migration",
     title: "WebView SDK 3.x migration",
-    url: "https://developers-apps-in-toss.toss.im/development/sdk-3.x.md",
+    url: "https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x.md",
     expectedText: "# SDK 3.x 마이그레이션"
   },
   {
@@ -66,31 +65,31 @@ const DOC_SOURCES = [
   {
     key: "api-auth",
     title: "API authentication and mTLS",
-    url: "https://developers-apps-in-toss.toss.im/documentation/api/auth.md",
+    url: "https://developers-apps-in-toss.toss.im/api/auth.md",
     expectedText: "# 인증"
   },
   {
     key: "toss-login-api",
     title: "Toss Login API",
-    url: "https://developers-apps-in-toss.toss.im/documentation/api/toss-login.md",
+    url: "https://developers-apps-in-toss.toss.im/api/toss-login.md",
     expectedText: "# 토스 로그인"
   },
   {
     key: "iap-api",
     title: "In-app purchase API",
-    url: "https://developers-apps-in-toss.toss.im/documentation/api/iap.md",
+    url: "https://developers-apps-in-toss.toss.im/api/iap.md",
     expectedText: "# 인앱 결제"
   },
   {
     key: "promotion-api",
     title: "Promotion API",
-    url: "https://developers-apps-in-toss.toss.im/documentation/api/promotion.md",
+    url: "https://developers-apps-in-toss.toss.im/api/promotion.md",
     expectedText: "# 프로모션(토스 포인트)"
   },
   {
     key: "push-api",
     title: "Push and Smart Message API",
-    url: "https://developers-apps-in-toss.toss.im/documentation/api/push.md",
+    url: "https://developers-apps-in-toss.toss.im/api/push.md",
     expectedText: "# 푸시, 알림"
   },
   {
@@ -112,6 +111,18 @@ const DOC_SOURCES = [
     expectedText: "# User.getAnonymousKey"
   },
   {
+    key: "anonymous-user-key-api",
+    title: "Anonymous user key verification API",
+    url: "https://developers-apps-in-toss.toss.im/api/user-key.md",
+    expectedText: "# 사용자 식별 키"
+  },
+  {
+    key: "iap-subscription-guide",
+    title: "In-app subscription guide",
+    url: "https://developers-apps-in-toss.toss.im/documentation/common/monetization/iap/in-app-subscription.md",
+    expectedText: "# IAP 정기결제"
+  },
+  {
     key: "tds-react-native",
     title: "TDS React Native docs",
     url: "https://tossmini-docs.toss.im/tds-react-native/",
@@ -120,6 +131,7 @@ const DOC_SOURCES = [
 ];
 
 const NPM_PACKAGES = [
+  { packageName: "@apps-in-toss/web-framework", optional: false },
   { packageName: "@apps-in-toss/framework", optional: false },
   { packageName: "@toss/tds-react-native", optional: false },
   { packageName: "create-granite-app", optional: false },
@@ -140,49 +152,26 @@ function registryUrl(packageName) {
   return `https://registry.npmjs.org/${packageName.replace("/", "%2F")}/latest`;
 }
 
-async function fetchWithTimeout(url) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  try {
-    return await fetch(url, { headers, signal: controller.signal });
-  } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error(`${url} timed out after ${REQUEST_TIMEOUT_MS}ms`);
-    }
-    throw err;
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function readText(url) {
-  const res = await fetchWithTimeout(url);
+async function readResponse(url, { optional = false, json = false } = {}) {
+  // Keep the timeout active until the body has been consumed as well.
+  const res = await fetch(url, {
+    headers,
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+  });
   if (!res.ok) {
-    throw new Error(`${url} returned ${res.status}`);
-  }
-  return res.text();
-}
-
-async function readJson(url, { optional = false } = {}) {
-  const res = await fetchWithTimeout(url);
-  if (!res.ok) {
-    if (optional) {
-      return {
-        unavailable: true,
-        status: res.status
-      };
+    if (optional && res.status === 404) {
+      return { unavailable: true, status: res.status };
     }
     throw new Error(`${url} returned ${res.status}`);
   }
-  return res.json();
+  return json ? res.json() : res.text();
 }
 
 async function snapshotDocs() {
   const docs = [];
 
   for (const source of DOC_SOURCES) {
-    const body = await readText(source.url);
+    const body = await readResponse(source.url);
     assertValidDocumentSnapshot(source, body);
     docs.push({
       key: source.key,
@@ -200,7 +189,10 @@ async function snapshotPackages() {
   const packages = [];
 
   for (const source of NPM_PACKAGES) {
-    const result = await readJson(registryUrl(source.packageName), { optional: source.optional });
+    const result = await readResponse(registryUrl(source.packageName), { optional: source.optional, json: true });
+    if (!result.unavailable && (typeof result.version !== "string" || !result.version)) {
+      throw new Error(`${source.packageName} did not return a package version`);
+    }
     packages.push({
       packageName: source.packageName,
       version: result.version ?? null,
@@ -213,119 +205,83 @@ async function snapshotPackages() {
   return packages;
 }
 
-async function readExistingSnapshot() {
-  try {
-    return JSON.parse(await readFile(JSON_OUT, "utf8"));
-  } catch (err) {
-    if (err.code === "ENOENT") {
-      return null;
-    }
-    throw err;
-  }
-}
-
 async function readExistingText(path) {
   try {
     return await readFile(path, "utf8");
   } catch (err) {
-    if (err.code === "ENOENT") {
-      return null;
-    }
+    if (err.code === "ENOENT") return null;
     throw err;
   }
 }
 
 async function writeFileIfChanged(path, contents) {
-  if ((await readExistingText(path)) === contents) {
-    return false;
-  }
+  if ((await readExistingText(path)) === contents) return;
   await writeFile(path, contents);
-  return true;
 }
 
-function comparableSnapshot(snapshot) {
-  return {
-    documents: (snapshot?.documents ?? []).map((doc) => ({
-      key: doc.key,
-      title: doc.title,
-      url: doc.url,
-      sha256: doc.sha256,
-      bytes: doc.bytes
-    })),
-    packages: (snapshot?.packages ?? []).map((pkg) => ({
-      packageName: pkg.packageName,
-      version: pkg.version ?? null,
-      unavailable: pkg.unavailable === true,
-      status: pkg.status ?? null,
-      registryUrl: pkg.registryUrl
-    }))
-  };
-}
-
-function snapshotsHaveSameContent(left, right) {
-  return JSON.stringify(comparableSnapshot(left)) === JSON.stringify(comparableSnapshot(right));
-}
-
-function formatSnapshotMarkdown(snapshot) {
+function formatSnapshotMarkdown(snapshot, kind) {
   const lines = [
-    "# Apps in Toss Upstream Snapshot",
+    `# Apps in Toss Upstream ${kind === "documents" ? "Document" : "Package"} Snapshot`,
     "",
     `- Fetched at: ${snapshot.fetchedAt}`,
     "",
-    "## Documents",
+    "Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.",
     ""
   ];
-
-  for (const doc of snapshot.documents) {
-    lines.push(`- ${doc.title}`);
-    lines.push(`  - URL: ${doc.url}`);
-    lines.push(`  - SHA-256: \`${doc.sha256}\``);
-    lines.push(`  - Bytes: ${doc.bytes}`);
+  for (const entry of snapshot[kind]) {
+    if (kind === "documents") {
+      lines.push(`- ${entry.title}`, `  - URL: ${entry.url}`, `  - SHA-256: \`${entry.sha256}\``, `  - Bytes: ${entry.bytes}`);
+    } else {
+      const status = entry.unavailable ? `unavailable on public npm latest (${entry.status})` : entry.version;
+      lines.push(`- \`${entry.packageName}\`: ${status}`);
+    }
   }
-
-  lines.push("", "## Reference Packages", "");
-
-  for (const pkg of snapshot.packages) {
-    const status = pkg.unavailable ? `unavailable on public npm latest (${pkg.status})` : pkg.version;
-    lines.push(`- \`${pkg.packageName}\`: ${status}`);
-  }
-
-  lines.push("");
-  return lines.join("\n");
+  return [...lines, ""].join("\n");
 }
 
-const existingSnapshot = await readExistingSnapshot();
-const [documents, packages] = await Promise.all([
-  snapshotDocs(),
-  snapshotPackages()
-]);
+async function persistSnapshot(outDir, kind, entries, now) {
+  const basename = kind === "documents" ? "docs-snapshot" : "packages-snapshot";
+  const jsonPath = `${outDir}/${basename}.json`;
+  const previousText = await readExistingText(jsonPath);
+  const previous = previousText ? JSON.parse(previousText) : null;
+  const snapshot = {
+    fetchedAt: previous && JSON.stringify(previous[kind]) === JSON.stringify(entries)
+      ? previous.fetchedAt : now(),
+    [kind]: entries
+  };
+  await mkdir(outDir, { recursive: true });
+  await writeFileIfChanged(jsonPath, `${JSON.stringify(snapshot, null, 2)}\n`);
+  await writeFileIfChanged(`${outDir}/${basename}.md`, formatSnapshotMarkdown(snapshot, kind));
+}
 
-const nextSnapshot = {
-  documents,
-  packages
-};
+// Each source family commits its own validated result. A moved document must not
+// discard successful npm discovery; failures retain that family's last good file.
+export async function runSnapshots({
+  outDir = OUT_DIR,
+  documents = snapshotDocs,
+  packages = snapshotPackages,
+  now = () => new Date().toISOString()
+} = {}) {
+  const results = await Promise.allSettled(
+    Object.entries({ documents, packages }).map(async ([kind, collect]) => {
+      const entries = await collect();
+      await persistSnapshot(outDir, kind, entries, now);
+      return `${kind}: ${entries.length}`;
+    })
+  );
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length) {
+    throw new AggregateError(failures.map((result) => result.reason),
+      failures.map((result) => result.reason.message).join("\n"));
+  }
+  return results.map((result) => result.value);
+}
 
-const snapshot = {
-  fetchedAt:
-    existingSnapshot && snapshotsHaveSameContent(existingSnapshot, nextSnapshot)
-      ? existingSnapshot.fetchedAt
-      : new Date().toISOString(),
-  documents,
-  packages
-};
-
-const nextJson = `${JSON.stringify(snapshot, null, 2)}\n`;
-const nextMarkdown = formatSnapshotMarkdown(snapshot);
-
-await mkdir(OUT_DIR, { recursive: true });
-const jsonChanged = await writeFileIfChanged(JSON_OUT, nextJson);
-const markdownChanged = await writeFileIfChanged(MARKDOWN_OUT, nextMarkdown);
-
-console.log(`Apps in Toss docs tracked: ${documents.length}`);
-console.log(
-  `Snapshot files changed: ${jsonChanged || markdownChanged ? "yes" : "no"}`
-);
-for (const pkg of packages) {
-  const status = pkg.unavailable ? `unavailable (${pkg.status})` : pkg.version;
-  console.log(`${pkg.packageName}: ${status}`);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    console.log((await runSnapshots()).join("\n"));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
 }

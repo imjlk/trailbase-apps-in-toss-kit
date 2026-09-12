@@ -2,7 +2,7 @@
   "name": "trailbase-apps-in-toss-kit",
   "private": true,
   "version": "0.0.0",
-  "packageManager": "bun@1.3.13",
+  "packageManager": "bun@1.4.2",
   "workspaces": [
     "packages/*",
     "services/*"
@@ -18,7 +18,7 @@
     "trailbase:version-policy:check": "node scripts/check-trailbase-version-policy.mjs",
     "trailbase:functional-ledgers:smoke": "bun scripts/smoke-trailbase-functional-ledgers.mjs",
     "apps-in-toss:snapshot": "node scripts/snapshot-apps-in-toss-docs.mjs",
-    "apps-in-toss:snapshot:test": "node --test scripts/apps-in-toss-snapshot-validation.test.mjs",
+    "apps-in-toss:snapshot:test": "node --test scripts/apps-in-toss-snapshot*.test.mjs scripts/apps-in-toss-tracking.test.mjs",
     "apps-in-toss:tracking:check": "node scripts/check-apps-in-toss-tracking.mjs",
     "sampo:release-notes:draft": "node scripts/draft-sampo-release-notes.mjs",
     "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
@@ -28,9 +28,12 @@
     "skills:sync:agent": "bun scripts/sync-agent-skills.mjs",
     "skills:check": "bun scripts/check-agent-skills.mjs --target codex --all",
     "skills:check:agent": "bun scripts/check-agent-skills.mjs",
-    "skills:validate": "bun scripts/validate-agent-skills.mjs"
+    "skills:validate": "bun scripts/validate-agent-skills.mjs",
+    "packages:typecheck": "tsc --project tsconfig.json"
   },
   "devDependencies": {
-    "@apps-in-toss/framework": "2.10.8"
+    "@apps-in-toss/framework": "2.10.10",
+    "@types/node": "24",
+    "typescript": "7.0.2"
   }
 }

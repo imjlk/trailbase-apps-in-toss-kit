@@ -762,6 +762,22 @@ mod tests {
     }
 
     #[test]
+    fn rejected_proxy_sku_verification_never_requires_a_grant() {
+        let status = normalize_iap_order_status_response(&json!({
+            "ok": false,
+            "orderId": "order-1",
+            "providerStatus": "ERROR",
+            "error": "UNVERIFIED_IAP_ORDER",
+            "failureReason": "Toss order response omitted the product SKU"
+        }));
+
+        assert!(!status.ok);
+        assert!(!status.grant_required);
+        assert_eq!(status.ledger_status, IapLedgerStatus::Failed);
+        assert_eq!(status.sku, None);
+    }
+
+    #[test]
     fn builds_idempotent_grant_and_restore_responses() {
         assert_eq!(
             idempotent_iap_grant_response(IdempotentIapGrantResponse {

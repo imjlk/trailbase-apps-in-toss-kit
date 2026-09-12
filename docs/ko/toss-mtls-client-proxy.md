@@ -356,3 +356,30 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 요청과 응답 형태가 앱에 맞으면 AppsInToss 어댑터 엔드포인트(adapter endpoint)를 사용하세요.
 다른 Toss mTLS API는 일반 relay를 사용하거나, 반복적인 정리나 여러 단계 흐름(multi-step flow)
 처리가 필요한 API에는 작은 어댑터를 추가하세요.
+
+## API Core 0.2 호환성
+
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.2.0`으로 고정하고 범용 mTLS
+relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
+인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
+Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 이미 출시된 프록시 `0.1.12`를
+참조합니다. 이 소스 트리의 변경을 배포할 때는 다음 Sampo 생성 이미지 버전을 사용하세요.
+`0.1.12` 이미지에는 여기서 설명하는 API Core 0.2 변경이 포함되지 않습니다. 정상 Sampo
+릴리스로 새 이미지가 게시된 뒤, 소비 앱의 Compose 파일을 게시된 버전으로 고정하고
+갱신된 어댑터를 활성화하세요.
+
+단건 Smart Message 요청은 `tossUserKey`, `userKey`, `anonKey` 중 하나를 받습니다.
+프록시는 api-core 0.2.0의 `x-user-key`를 단건 메시지 API의 공식 헤더인
+`x-toss-user-key`로 보정하며, 익명 요청에는 `x-anon-key`만 보냅니다.
+[공식 메시지 API](https://developers-apps-in-toss.toss.im/api/push)를 참고하세요.
+업스트림이 공식 헤더를 직접 보내는 버전을 검증한 뒤 이 호환 adapter를 제거하세요.
+
+부분 발송 응답의 기존 `failureReason`, `failures[].reachFailReason`은 유지합니다.
+업스트림의 `reachedFailReason`과 채널별 상세 정보도 제공합니다. 일부 채널 성공과
+다른 채널 실패가 함께 발생할 수 있으므로 부분 발송 메시지 전체를 자동 재시도하지
+마세요. 기능성 알림 동의를 발송 전에 확인하는 책임은 컨슈머 앱에 있습니다.
+
+forward IAP 조회는 제공자가 생략한 SKU를 요청 SKU로 채우지 않습니다. 제공자 SKU가 없는
+PAYMENT_COMPLETED/PURCHASED 응답은 `ok: false`와 `UNVERIFIED_IAP_ORDER`를 반환하므로
+상품을 지급하기 전에 서버 검증을 다시 수행하세요. 명시적인 stub 모드는 로컬 테스트용
+요청 기반 상품 응답을 유지합니다.

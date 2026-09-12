@@ -755,7 +755,8 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
   });
 
-  test("forward iap order status falls back to requested sku when Toss omits sku", async () => {
+  for (const paidStatus of ["PAYMENT_COMPLETED", "PURCHASED"]) {
+  test(`forward iap rejects ${paidStatus} without provider SKU`, async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
       res.writeHead(200, { "content-type": "application/json" });
@@ -764,7 +765,7 @@ describe("toss-mtls-client-proxy", () => {
           resultType: "SUCCESS",
           success: {
             orderId: "order-1",
-            status: "PAYMENT_COMPLETED",
+            status: paidStatus,
           },
         }),
       );
@@ -785,10 +786,29 @@ describe("toss-mtls-client-proxy", () => {
         internalToken: "secret",
         upstreamBaseUrl,
       });
-      expect(res.body.ok).toBe(true);
+      expect(res.body.ok).toBe(false);
       expect(res.body.orderId).toBe("order-1");
-      expect(res.body.sku).toBe("loo.credits.50");
-      expect(res.body.providerStatus).toBe("PAYMENT_COMPLETED");
+      expect(res.body.sku).toBeUndefined();
+      expect(res.body.error).toBe("UNVERIFIED_IAP_ORDER");
+      expect(res.body.providerStatus).toBe("ERROR");
+    });
+  });
+  }
+
+  test("forward IAP uses the provider SKU even when the request names a more valuable product", async () => {
+    const upstream = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: {
+        orderId: "order-1", sku: "cheap-product", status: "PURCHASED",
+      } }));
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
+        { orderId: "order-1", sku: "expensive-product", tossUserKey: "synthetic-user" },
+        { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(result.body.ok).toBe(true);
+      expect(result.body.sku).toBe("cheap-product");
     });
   });
 
@@ -803,6 +823,7 @@ describe("toss-mtls-client-proxy", () => {
           resultType: "SUCCESS",
           success: {
             orderId: "order-1",
+            sku: "loo.credits.50",
             status: hitCount === 1 ? "ORDER_IN_PROGRESS" : "PAYMENT_COMPLETED",
           },
         }),
@@ -888,6 +909,42 @@ describe("toss-mtls-client-proxy", () => {
       expect(res.body.sentInboxCount).toBe(0);
       expect(res.body.contentIds).toEqual(["toss:PUSH:1"]);
     });
+  });
+
+  test("anonymous messages send only x-anon-key and never return the recipient", async () => {
+    let upstreamHeaders;
+    let upstreamBody;
+    const upstreamServer = http.createServer(async (req, res) => {
+      upstreamHeaders = req.headers;
+      upstreamBody = await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: { msgCount: 1 } }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(request("POST", PROXY_ENDPOINTS.smartMessageSend, {
+        anonKey: "anonymous-test-recipient", templateSetCode: "reminder", context: {},
+      }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(upstreamHeaders["x-anon-key"]).toBe("anonymous-test-recipient");
+      expect(upstreamHeaders["x-user-key"]).toBeUndefined();
+      expect(upstreamHeaders["x-toss-user-key"]).toBeUndefined();
+      expect(upstreamBody).toEqual({ templateSetCode: "reminder", context: {} });
+      expect(res.body.ok).toBe(true);
+      expect(JSON.stringify(res.body)).not.toContain("anonymous-test-recipient");
+    });
+  });
+
+  test("forward messages reject ambiguous recipients before calling upstream", async () => {
+    await expect(handleRequest(request("POST", PROXY_ENDPOINTS.smartMessageSend, {
+      tossUserKey: "login-recipient", anonKey: "anonymous-recipient", templateSetCode: "reminder", context: {},
+    }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret" }))
+      .rejects.toThrow("exactly one");
+  });
+
+  test("generic relay still requires the configured internal token", async () => {
+    const result = await handleRequest(request("POST", PROXY_ENDPOINTS.genericMtlRequest, {
+      path: "/private", method: "POST", body: {},
+    }), { mode: "forward", internalToken: "secret" });
+    expect(result.status).toBe(401);
   });
 
   test("forward bulk message targets Toss bulk API with sanitized context list", async () => {
@@ -1136,6 +1193,7 @@ describe("toss-mtls-client-proxy", () => {
           channel: "sentInbox",
           contentId: "toss:INBOX:2",
           reachFailReason: "사용자 알림함 도달 실패",
+          reachedFailReason: "사용자 알림함 도달 실패",
         },
       ]);
     });
