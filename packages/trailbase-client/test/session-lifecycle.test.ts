@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createAppsInTossSessionManager, StaleAppSessionOperationError, type AppsInTossSessionManagerOptions } from "../src/index";
+import { createAppsInTossSessionManager, StaleAppSessionOperationError, AppSessionStorageIncompleteError, type AppsInTossSessionManagerOptions } from "../src/index";
 import { createAppsInTossSessionLifecycle } from "../src/session-lifecycle";
 
 type User = { id: string };
@@ -97,6 +97,71 @@ test("cancelled login preflight cannot open a late native login dialog", async (
   expect(await login).toBeInstanceOf(StaleAppSessionOperationError);
   await new Promise(resolve => setTimeout(resolve, 0));
   expect(dialogs).toBe(0);
+});
+
+test("superseding between mirrored writes or clears cannot restore the previous account", async () => {
+  for (const clearing of [false, true]) {
+    const values = new Map<string, string>();
+    const middle = deferred<void>();
+    let paused = false;
+    let block = false;
+    const { manager } = setup({ storage: {
+      getItem: key => values.get(key) ?? null,
+      async setItem(key, value) {
+        values.set(key, value);
+        if (block && key === "trailbase.tossSession") { paused = true; await middle.promise; }
+      },
+    } });
+    await manager.bootstrapAnonymousSession();
+    block = true;
+    const first = (clearing ? manager.clearSessions() : manager.signInWithToss()).catch(error => error);
+    await until(() => paused);
+    const restore = manager.restoreStoredAppSession();
+    block = false;
+    middle.resolve();
+    expect(await first).toBeInstanceOf(StaleAppSessionOperationError);
+    const restored = await restore;
+    expect(restored?.user.id ?? null).toBe(clearing ? null : "B");
+  }
+});
+
+test("a failed mirrored save leaves a durable marker and requires explicit recovery", async () => {
+  const values = new Map<string, string>();
+  let failWrite = false;
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem(key: string, value: string) {
+      if (failWrite && key === "trailbase.appSession") throw new Error("storage unavailable");
+      values.set(key, value);
+    },
+  };
+  const { manager } = setup({ storage, loadSession: async () => response("B") });
+  await manager.bootstrapAnonymousSession();
+  failWrite = true;
+  await expect(manager.signInWithToss()).rejects.toThrow("storage unavailable");
+  expect(values.get("trailbase.appSession.writePending")).toBe("1");
+  const restarted = setup({ storage }).manager;
+  await expect(restarted.getOrCreateAppSession()).rejects.toBeInstanceOf(AppSessionStorageIncompleteError);
+  failWrite = false;
+  await restarted.clearSessions();
+  expect(values.get("trailbase.appSession.writePending")).toBe("");
+  expect(await restarted.restoreStoredAppSession()).toBeNull();
+  await manager.signInWithToss();
+  failWrite = true;
+  await expect(manager.restoreStoredTossSession()).rejects.toThrow("storage unavailable");
+  expect(values.get("trailbase.appSession.writePending")).toBe("1");
+});
+
+test("failure before acquiring a scope clears caches once", async () => {
+  const { manager } = setup({ bootstrap: async () => { throw new Error("offline"); } });
+  let clears = 0;
+  const lifecycle = createAppsInTossSessionLifecycle({ manager, getUserId: user => user.id,
+    clearUserData: () => { clears++; }, refreshEntitlements: async () => null });
+  await expect(lifecycle.start()).rejects.toThrow("offline");
+  expect(clears).toBe(1);
+  expect(lifecycle.getSnapshot().phase).toBe("error");
+  await lifecycle.dispose();
+  expect(() => lifecycle.subscribe(() => {})).toThrow("disposed");
 });
 
 test("account transition clears resources, isolates cache keys and ignores late request/SSE updates", async () => {

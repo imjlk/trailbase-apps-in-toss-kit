@@ -7,6 +7,11 @@
 취소되지 않을 수 있습니다. 저장소 쓰기를 직렬화해 이전 쓰기가 끝난 뒤 새 인증 정보나
 `clearSessions()`의 삭제가 반영되게 합니다. 같은 저장소 키를 쓰는 여러 manager 사이에는
 이 조정이 적용되지 않으므로 화면마다 별도 인스턴스를 만들지 마세요.
+여러 키의 저장·삭제는 한 대기 작업으로 처리합니다. 저장 중단·실패 시
+`<appSessionStorageKey>.writePending` 표식이 복원을 차단합니다.
+`AppSessionStorageIncompleteError`가 발생하면 명시적으로 `clearSessions()`나 로그인으로
+복구하세요. 표식만 지우거나 개별 키를 직접 복원하면 안 됩니다. 이 내부 키도 같은 영속
+저장소 namespace에 유지하세요.
 
 `createAppsInTossSessionLifecycle`은 계정 전환과 앱 복귀를 한 경로로 연결합니다. 패키지
 루트, `apps-in-toss`, `session-lifecycle`에서 내보냅니다. 도입 후 인증 작업은 이 경로로
@@ -92,6 +97,8 @@ const subscription = AppState.addEventListener('change', (next) => {
 [토스 로그인](https://developers-apps-in-toss.toss.im/login/intro.html)을 참고하세요.
 Disconnect 이후에는 명시적인 시작·로그인 동작을 사용합니다. `dispose()`는 저장된 인증
 정보를 지우지 않고 lifecycle만 종료하므로 일반적인 앱 종료가 로그아웃이 되지 않습니다.
+정리 실패를 포함해 dispose는 최종 동작입니다. 반복 호출은 같은 정리 결과를 반환하므로
+앱 종료 경로에서 실패를 처리하세요. 종료한 lifecycle은 재사용하거나 다시 구독할 수 없습니다.
 
 스키마 마이그레이션이나 프록시 배포는 필요하지 않습니다. Canonical 계정 통합, B로 전환한
 뒤 늦게 온 A 요청, 복귀 중 구독 권한 변경, 정리 실패, 연결 해제 후 재접속을 소비 앱에서

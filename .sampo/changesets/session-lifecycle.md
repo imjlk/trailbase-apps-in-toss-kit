@@ -14,3 +14,6 @@ backend callbacks, and serialize storage writes so delayed responses cannot rest
 an old account. Handle StaleAppSessionOperationError as cancellation, use one manager
 per storage namespace, and route auth transitions through the lifecycle when adopted.
 No SQL migration or proxy rollout is required.
+Multi-key writes share one queue slot, and a persistent writePending marker blocks
+restoration of partially written credentials. Keep the marker with the session
+namespace and handle AppSessionStorageIncompleteError with clear/sign-in recovery.

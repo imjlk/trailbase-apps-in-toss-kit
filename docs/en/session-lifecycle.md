@@ -8,6 +8,11 @@ dialogs and already-dispatched server mutations may not be cancellable. Serial
 storage writes ensure an older in-flight write settles before newer credentials
 or `clearSessions()` are written. Share the same manager between screens; separate
 managers cannot coordinate writes to the same storage keys.
+Each multi-key save/clear runs in one queue slot. A small
+`<appSessionStorageKey>.writePending` marker blocks restoration after an interrupted
+or failed storage write. `AppSessionStorageIncompleteError` requires explicit
+`clearSessions()` or sign-in recovery; do not delete the marker by itself or restore
+individual keys manually. Keep this internal key in the same persistent namespace.
 
 `createAppsInTossSessionLifecycle` adds a single entry point for account transitions
 and foreground refresh. It is exported from the package root, `apps-in-toss`, and
@@ -98,6 +103,9 @@ accounts in backend endpoints. See [Toss Login](https://developers-apps-in-toss.
 After disconnect, use an explicit start/sign-in action. `dispose()` closes the
 lifecycle without deleting persisted credentials, so normal app termination does
 not sign the user out.
+Disposal is final, including cleanup failure: repeated `dispose()` calls return
+the same cleanup outcome. Handle that failure in the app's teardown path; a disposed
+lifecycle cannot be reused or subscribed to again.
 
 No schema migration or proxy deployment is required. Validate canonical-account
 upgrades, delayed A-account requests after switching to B, changed subscription

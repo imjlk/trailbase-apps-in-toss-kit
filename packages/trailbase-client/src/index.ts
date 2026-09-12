@@ -198,6 +198,13 @@ export class AppsInTossLoginError extends Error {
   }
 }
 
+export class AppSessionStorageIncompleteError extends Error {
+  constructor() {
+    super("Session storage contains an incomplete write; clear sessions or sign in again");
+    this.name = "AppSessionStorageIncompleteError";
+  }
+}
+
 export function normalizeAppsInTossLoginResult(value: unknown): AppsInTossLoginResult {
   if (!value || typeof value !== "object") {
     throw new AppsInTossLoginError("토스 로그인을 완료하지 못했어요.");
@@ -346,6 +353,10 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   type Operation = SessionOperation;
   let storageTail: Promise<void> = Promise.resolve();
   let anonymousHashPromise: Promise<string> | undefined;
+  const writeMarkerKey = `${appSessionStorageKey}.writePending`;
+  if (new Set([anonymousHashStorageKey, tossSessionStorageKey, appSessionStorageKey, writeMarkerKey]).size !== 4) {
+    throw new Error("Session storage keys and the internal write marker must be distinct");
+  }
 
   function anonymousHash() {
     anonymousHashPromise ??= resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash })
@@ -356,6 +367,9 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   async function read(op: Operation, key: string) {
     await storageTail;
     op.check();
+    const marker = await storage.getItem(writeMarkerKey);
+    op.check();
+    if (marker) throw new AppSessionStorageIncompleteError();
     const session = await readStoredSession<TUser>(storage, key);
     op.check();
     return session;
@@ -373,41 +387,51 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   }
 
   async function save(op: Operation, response: AppSessionManagerResponse<TUser>, provider: AppAuthProvider) {
-    if (provider === "toss") await persist(op, () => writeSession(storage, tossSessionStorageKey, response, provider));
-    await persist(op, () => writeSession(storage, appSessionStorageKey, response, provider));
+    await persist(op, async () => {
+      await storage.setItem(writeMarkerKey, "1");
+      if (provider === "toss") await writeSession(storage, tossSessionStorageKey, response, provider);
+      await writeSession(storage, appSessionStorageKey, response, provider);
+      await storage.setItem(writeMarkerKey, "");
+    });
     return withAuthProvider(response, provider);
   }
 
   async function clear(op: Operation, keys: string[]) {
-    for (const key of keys) await persist(op, async () => { await storage.setItem(key, ""); });
+    await persist(op, async () => {
+      await storage.setItem(writeMarkerKey, "1");
+      for (const key of keys) await storage.setItem(key, "");
+      await storage.setItem(writeMarkerKey, "");
+    });
   }
 
   async function restoreToss(op: Operation) {
     const stored = await read(op, tossSessionStorageKey);
     if (!stored) return null;
+    let response: AppSessionManagerResponse<TUser>;
     try {
-      const response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
+      response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
       op.check();
-      return await save(op, response, "toss");
     } catch (error) {
       op.check();
       await clear(op, [tossSessionStorageKey]);
       return null;
     }
+    return save(op, response, "toss");
   }
 
   async function restoreApp(op: Operation) {
     const stored = await read(op, appSessionStorageKey);
     if (!stored) return restoreToss(op);
+    let response: AppSessionManagerResponse<TUser>;
     try {
-      const response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
+      response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
       op.check();
-      return await save(op, response, stored.authProvider);
     } catch (error) {
       op.check();
       await clear(op, stored.authProvider === "toss" ? [appSessionStorageKey, tossSessionStorageKey] : [appSessionStorageKey]);
       return null;
     }
+    return save(op, response, stored.authProvider);
   }
 
   async function bootstrapApp(op: Operation) {

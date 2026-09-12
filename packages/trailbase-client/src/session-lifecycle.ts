@@ -139,7 +139,7 @@ export function createAppsInTossSessionLifecycle<TUser, TEntitlements>({
       } catch (error) {
         operation.check();
         let failure = error;
-        try { await closeActive(); }
+        try { if (active) await closeActive(); }
         catch (cleanupError) { failure = new AggregateError([error, cleanupError], "Session transition and cleanup failed"); }
         operation.check();
         publish("error");
@@ -150,7 +150,10 @@ export function createAppsInTossSessionLifecycle<TUser, TEntitlements>({
 
   return {
     getSnapshot: () => snapshot,
-    subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
+    subscribe(listener: () => void) {
+      if (disposed) throw new Error("Session lifecycle is disposed");
+      listeners.add(listener); return () => { listeners.delete(listener); };
+    },
     start: () => transition(manager.getOrCreateAppSession),
     signInWithToss: () => transition(manager.signInWithToss),
     resume: () => transition(manager.restoreStoredAppSession),
