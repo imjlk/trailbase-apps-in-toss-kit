@@ -13,7 +13,8 @@ bun scripts/run-kit-reference.mjs --output /tmp/kit-reference.json
 릴리즈 전 수동 실행도 지원합니다. 비공개 값을 제외한 JSON artifact를 30일 보관합니다.
 
 보고서에는 소스 커밋, lockfile SHA-256, 설치된 Bun·Node·Rust·RN 최소/현재·Web SDK 버전,
-관찰한 서버·프록시 image ID, 검사별 결과·시간, 브라우저 번들 크기와 로컬 측정값을
+잠근 Rust crate·WASM 버전, 서버·프록시 image ID와 일회용 WASM fixture SHA-256,
+검사별 결과·시간, 브라우저 번들 크기와 로컬 측정값을
 기록합니다. 프록시는 소스로 빌드한 stub임을 명시하므로 미출시 변경이 GHCR 배포 버전에
 포함됐다는 증거가 아닙니다. 검증 중 소스 변경, 추적하지 않은 소스 파일, 커밋 변경은
 성공을 막습니다. Finder 메타데이터와 요청한 보고서 파일은 소스 검사에서 제외합니다.

@@ -26,6 +26,13 @@ const text = (command, argv) => {
 };
 const json = path => JSON.parse(readFileSync(join(root, path), "utf8"));
 const hash = path => createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+function lockedRustVersions(name) {
+  const versions = readFileSync(join(root, "Cargo.lock"), "utf8").split("[[package]]")
+    .filter(block => block.includes(`\nname = "${name}"\n`))
+    .map(block => /^version = "([^"]+)"$/m.exec(block)?.[1]).filter(Boolean);
+  if (!versions.length) throw new Error("Required Rust lock metadata unavailable");
+  return [...new Set(versions)];
+}
 function step(name, command, argv, { env, parseJson = false } = {}) {
   const started = performance.now(); const result = run(command, argv, env);
   const record = { name, ok: !result.error && result.status === 0, durationMilliseconds: Math.round(performance.now() - started) };
@@ -48,7 +55,8 @@ try {
     rnSdk: json("node_modules/@apps-in-toss/framework/package.json").version,
     minimumRnSdk: json("node_modules/@apps-in-toss/framework-min-supported/package.json").version,
     webSdk: json("node_modules/@apps-in-toss/web-framework/package.json").version,
-    proxyPackage: json("services/toss-mtls-client-proxy/package.json").version };
+    proxyPackage: json("services/toss-mtls-client-proxy/package.json").version,
+    rustPackages: Object.fromEntries(["trailbase-wasm", "trailbase-guest-common", "trailbase-toss-identity"].map(name => [name, lockedRustVersions(name)])) };
   step("Evidence integrity checks", "bun", ["test", "scripts/reference/source-state.test.mjs"]);
   step("Rust helper tests", "cargo", ["test", "--workspace"]);
   step("JavaScript, client and proxy tests", "bun", ["test", "packages", "services/toss-mtls-client-proxy"]);
@@ -62,8 +70,9 @@ try {
   step("WebView browser bundle", "bun", ["build", "packages/ait-web/src/index.ts", "--target", "browser", "--splitting", `--outdir=${bundle}`, `--metafile=${meta}`]);
   const graph = JSON.parse(readFileSync(meta, "utf8"));
   const inputs = Object.keys(graph.inputs);
-  if (inputs.some(path => /(?:packages\/ait-rn\/|@apps-in-toss\/framework\/|react-native\/)/.test(path))) throw new Error("Web bundle unexpectedly includes an RN runtime");
-  report.browserBundle = { modules: inputs.length, rnRuntimeModules: 0,
+  const rnRuntimeModules = inputs.filter(path => /(?:packages\/ait-rn\/|@apps-in-toss\/framework\/|react-native\/)/.test(path)).length;
+  if (rnRuntimeModules) throw new Error("Web bundle unexpectedly includes an RN runtime");
+  report.browserBundle = { modules: inputs.length, rnRuntimeModules,
     totalBytes: Object.values(graph.outputs).reduce((total, item) => total + item.bytes, 0) };
   requireStableSource(report.source, sourceState(root, output));
   report.ok = true;

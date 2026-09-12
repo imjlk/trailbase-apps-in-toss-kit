@@ -12,7 +12,7 @@ import {
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import { createSseParser } from "../packages/trailbase-client/src/index.ts";
 
 const image =
@@ -94,7 +94,7 @@ try {
   ).join("\n");
   await writeFile(
     path.join(scratch, "migrations/main/U1750000000__kit.sql"),
-    `${sql}\nCREATE TABLE smoke_items (id INTEGER PRIMARY KEY, owner BLOB NOT NULL REFERENCES _user(id), value TEXT NOT NULL) STRICT;\nCREATE TABLE smoke_reseal_cursor (id INTEGER PRIMARY KEY,cursor TEXT,complete INTEGER NOT NULL) STRICT;\n`,
+    `${sql}\nCREATE TABLE smoke_items (id INTEGER PRIMARY KEY, owner BLOB NOT NULL REFERENCES _user(id), value TEXT NOT NULL) STRICT;\nCREATE TABLE smoke_reseal_cursor (id INTEGER PRIMARY KEY, cursor TEXT, complete INTEGER NOT NULL) STRICT;\n`,
   );
   await writeFile(
     path.join(scratch, "config.textproto"),
@@ -339,7 +339,11 @@ record_apis: [{
   );
   const serverImageId = docker("image", "inspect", image, "--format", "{{.Id}}");
   const proxyImageId = docker("image", "inspect", proxyImage, "--format", "{{.Id}}");
-  console.log(JSON.stringify({ ok: true, image, serverImageId, proxyImageId,
+  const wasmFixtures = {};
+  for (const fixture of ["compat_smoke", "keyring_smoke"]) {
+    wasmFixtures[fixture] = createHash("sha256").update(await readFile(path.join(scratch, "wasm", `${fixture}.wasm`))).digest("hex");
+  }
+  console.log(JSON.stringify({ ok: true, image, serverImageId, proxyImageId, wasmFixtures,
     proxyMode: "source-built-stub", checks }, null, 2));
 } catch (error) {
   if (createdContainers.includes(server)) {

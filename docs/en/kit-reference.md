@@ -15,7 +15,8 @@ The `Kit reference evidence` workflow runs it for reference changes and supports
 manual dispatch before a release. Its redacted JSON artifact is retained for 30 days.
 
 The report records the source commit, lockfile SHA-256 values, installed Bun/Node/
-Rust/RN-minimum/RN-current/Web SDK versions, observed server/proxy image IDs,
+Rust/RN-minimum/RN-current/Web SDK versions, locked Rust crate/WASM versions,
+observed server/proxy image IDs and disposable WASM fixture SHA-256 values,
 individual check results and durations, browser bundle size and local fixture
 measurements. The proxy is explicitly a source-built stub, not evidence that an
 unreleased change is present in a published GHCR version. A source modification,
