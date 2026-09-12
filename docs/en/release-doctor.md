@@ -129,3 +129,5 @@ Do not put secrets in command arguments or output. The doctor keeps command
 output short for failure context by default, but app-owned commands should
 still avoid printing tokens, certificates, raw Toss identifiers, HMACs, or
 sealed values.
+
+For private IAP, promotion and message inquiries, use the [read-only Ledger Doctor](ledger-doctor.md).

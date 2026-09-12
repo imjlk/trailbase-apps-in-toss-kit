@@ -125,3 +125,5 @@ process.exit(summary.ok ? 0 : 1);
 명령 인자나 출력에 secret을 넣지 마세요. Doctor는 실패 맥락을 위해 명령 출력을 짧게
 보관하는 것이 기본값이지만, 앱이 소유한 명령도 token, certificate, raw Toss identifier,
 HMAC, sealed value를 출력하지 않아야 합니다.
+
+비공개 IAP·프로모션·메시지 문의에는 [읽기 전용 Ledger Doctor](ledger-doctor.md)를 사용하세요.
