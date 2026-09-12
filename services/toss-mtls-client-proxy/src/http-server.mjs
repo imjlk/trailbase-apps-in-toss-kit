@@ -4,6 +4,7 @@ import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
 import { ANONYMOUS_KEY_VERIFY_PATH, requireAnonymousKey, verifyAnonymousKey } from "./anonymous-key.mjs";
+import { proxyCapabilityMetadata } from "./capabilities.mjs";
 
 export const PROMOTION_REWARD_STATUS_PATH = "/internal/apps-in-toss/promotion/reward/status";
 
@@ -33,7 +34,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "GET" && url.pathname === PROXY_ENDPOINTS.health) {
     const health = await core.health();
-    return response(200, { ok: health.ok, mode: health.mode });
+    return response(200, { ok: health.ok, mode: health.mode, kit: proxyCapabilityMetadata() });
   }
 
   if (req.method === "POST" && url.pathname === ANONYMOUS_KEY_VERIFY_PATH) {

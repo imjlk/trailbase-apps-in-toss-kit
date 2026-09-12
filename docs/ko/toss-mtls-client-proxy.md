@@ -383,6 +383,17 @@ PAYMENT_COMPLETED/PURCHASED 응답은 `ok: false`와 `UNVERIFIED_IAP_ORDER`를 �
 상품을 지급하기 전에 서버 검증을 다시 수행하세요. 명시적인 stub 모드는 로컬 테스트용
 요청 기반 상품 응답을 유지합니다.
 
+## Health 메타데이터
+
+인증된 health 응답은 기존 `ok`, `mode`를 유지하고
+`kit: { contractVersion: 1, proxyVersion, capabilities }`를 추가합니다. 버전은 실행 중인
+패키지에서 읽으며 `anonymous-key.verify`, `iap.provider-sku-required`, `promotion.status`,
+`promotion.anonymous-recipient`, `smart-message.channel-results` 같은 구현된 어댑터 계약을
+알립니다. 전체 목록은 `src/capabilities.mjs`에서 관리합니다. 업스트림 호출이나 인증서·
+비밀정보를 포함하지 않습니다. 특정 캠페인이나 사용자 작업의 준비 상태가 아닌 구현
+여부를 나타냅니다. 배포 전 검사는 [Release Doctor](release-doctor.md#프록시-지원-기능-사전-점검)를
+참고하세요. 기존 호출자는 계속 `ok`/`mode`를 읽을 수 있습니다.
+
 ## 공유 응답 계약
 
 `fixtures/contracts/`의 합성 데이터를 Rust, 프록시, RN 전송, 원장 진단에서 검증합니다.

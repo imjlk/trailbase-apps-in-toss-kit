@@ -127,3 +127,42 @@ process.exit(summary.ok ? 0 : 1);
 HMAC, sealed value를 출력하지 않아야 합니다.
 
 비공개 IAP·프로모션·메시지 문의에는 [읽기 전용 Ledger Doctor](ledger-doctor.md)를 사용하세요.
+
+## 프록시 지원 기능 사전 점검
+
+`trailbase-runtime/release-doctor` 또는 `trailbase-runtime/proxy-capabilities`의
+`createProxyCapabilitiesCheck`로 새 어댑터를 사용하기 전에 내부 프록시를 확인할 수
+있습니다. JSON 설정에서도 같은 검사를 제공합니다.
+
+```json
+{
+  "type": "proxy-capabilities",
+  "name": "필수 프록시 어댑터",
+  "urlEnv": "MTLS_PROXY_URL",
+  "tokenEnv": "MTLS_PROXY_TOKEN",
+  "expectedMode": "forward",
+  "requiredCapabilities": ["anonymous-key.verify", "promotion.status"],
+  "timeout": 5000
+}
+```
+
+토큰은 프로세스 환경변수로 전달하세요. 설정 파일은 변수 이름만 받으며 토큰이나
+커스텀 fetch 함수를 직접 받지 않습니다. URL은 사용자 정보·경로·쿼리·fragment 없는
+HTTP(S) origin이어야 합니다. 인증된 `/internal/apps-in-toss/health` GET만 보내며
+리디렉션을 거부하고 응답 본문 읽기를 포함한 전체 요청 시간과 16 KiB 본문 크기를
+제한합니다. 오류 보고서에는 토큰·URL·응답 본문·전송 오류 상세를 포함하지 않습니다.
+
+`minimumVersion`으로 최소 SemVer 프록시 버전을 선택적으로 요구할 수 있습니다.
+사전 릴리즈 순서(`0.3.0-rc.1`은 `0.3.0`보다 낮음)를 따르고 빌드 메타데이터는 비교에
+영향을 주지 않습니다. 최소 버전이 없으면 유효한 사전 릴리즈 메타데이터도 허용합니다. 지원 기능은 버전과 별도로 확인합니다. 메타데이터 누락·오류, 알 수
+없는 계약 버전, 다른 실행 모드, 필수 기능 누락은 실패입니다. 프록시 0.2.0 이하는 새
+메타데이터를 제공하지 않으므로 기능 확인을 지원하는 이미지를 게시·선택한 다음 필수
+검사로 사용하세요. 점진적으로 도입할 때 `"required": false`를 명시하면 실패를 경고로
+표시합니다.
+
+지원 기능 목록은 실행 중인 바이너리의 어댑터 계약을 나타냅니다. 업스트림 가용성,
+인증서 유효성, 캠페인 설정, 알림 동의, 결제 증거, 사용자 지급 자격을 보장하지 않습니다.
+해당 검증은 기존 앱과 통합 흐름에 유지하세요. 이 사전 점검은 지급·발송이나 업스트림
+API 호출을 수행하지 않습니다.
+
+git 서브모듈에서 Node CLI를 직접 실행할 때 npm 설치가 필요하지 않습니다. 최소 버전은 사전 릴리즈 순서를 포함하고 빌드 메타데이터를 무시하는 엄격한 SemVer 비교를 사용하며, 입력은 128자와 안전한 정수 범위의 주 버전·부 버전·패치 값으로 제한합니다.

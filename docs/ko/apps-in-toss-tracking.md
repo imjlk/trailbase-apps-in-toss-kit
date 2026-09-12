@@ -147,3 +147,18 @@ branch push와 pull request 생성 권한이 있어야 합니다.
   문서에서 기능성 메시지 동의 요건을 확인합니다.
 - 비게임 앱 template을 업데이트하기 전에 TDS package guidance를 확인합니다.
 - 앱 지원 SDK/runtime version policy를 올리기 전에 컨슈머 앱 smoke test를 실행합니다.
+
+## RN SDK 호환성 매트릭스
+
+CI는 kit 어댑터·클라이언트의 실제 소스와 타입 계약을 검토 기준 SDK와 선언된 최소
+`@apps-in-toss/framework@2.5.0` 양쪽으로 컴파일합니다. 최소 버전은 개발 전용 npm
+alias로 정확히 고정하고, `tsconfig.sdk-min.json`이 해당 타입 검사에서 SDK import를
+최소 버전으로 연결합니다. `check-sdk-minimum.mjs`는 설치 버전·peer 하한·경로 매핑을
+검증해 최소 버전 검사가 최신 버전 검사로 바뀌는 것을 막습니다. Renovate는 이 하한
+fixture를 자동 갱신하지 않습니다.
+
+`bun run packages:typecheck`, `bun run packages:typecheck:minimum`으로 실행하세요.
+최소 지원 버전을 의도적으로 높일 때 peer 정책과 fixture를 함께 갱신합니다. Alias는
+런타임 SDK 의존성이 아닙니다. 두 컴파일 성공은 검사한 두 버전의 타입 호환성을 뜻하며,
+소비 앱에서 사용할 API별 가용성 검사와 실기기 검증은 유지하세요. 중간의 모든 버전,
+기기, 네이티브 기능의 지원을 보장하지는 않습니다.

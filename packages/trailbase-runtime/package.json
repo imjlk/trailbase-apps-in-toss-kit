@@ -8,6 +8,7 @@
     "./production-env": "./src/production-env.mjs",
     "./dev-runner": "./src/dev-runner.mjs",
     "./release-doctor": "./src/release-doctor.mjs",
+    "./proxy-capabilities": "./src/proxy-capabilities.mjs",
     "./ledger-doctor": "./src/ledger-doctor.mjs",
     "./restore-checkpoint": "./src/restore-checkpoint.mjs"
   },
@@ -20,5 +21,8 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "devDependencies": {
+    "semver": "7.8.5"
   }
 }

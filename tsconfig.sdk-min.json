@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@apps-in-toss/framework": [
+        "./node_modules/@apps-in-toss/framework-min-supported"
+      ]
+    }
+  }
+}

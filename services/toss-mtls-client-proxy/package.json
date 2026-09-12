@@ -10,5 +10,8 @@
   "scripts": {
     "start": "bun src/server.mjs",
     "test": "bun test"
+  },
+  "devDependencies": {
+    "@trailbase-apps-in-toss-kit/trailbase-runtime": "workspace:*"
   }
 }
