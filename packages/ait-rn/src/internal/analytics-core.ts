@@ -885,7 +885,7 @@ function appendAnalyticsHeaders(headers: Headers, value: AnalyticsHeaders | null
     return;
   }
   if (typeof Headers !== "undefined" && value instanceof Headers) {
-    value.forEach((headerValue, headerName) => {
+    value.forEach((headerValue: string, headerName: string) => {
       headers.set(headerName, headerValue);
     });
     return;

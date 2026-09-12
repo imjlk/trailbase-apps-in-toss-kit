@@ -11,6 +11,7 @@ on:
       - "package.json"
       - "renovate.json"
       - "scripts/check-apps-in-toss-tracking.mjs"
+      - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
   push:
     branches:
@@ -24,6 +25,7 @@ on:
       - "package.json"
       - "renovate.json"
       - "scripts/check-apps-in-toss-tracking.mjs"
+      - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
   workflow_dispatch:
 
@@ -35,7 +37,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BUN_VERSION: "1.3.13"
+  BUN_VERSION: "1.4.2"
 
 jobs:
   check:

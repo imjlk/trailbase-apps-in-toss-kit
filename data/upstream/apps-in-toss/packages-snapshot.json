@@ -1,0 +1,47 @@
+{
+  "fetchedAt": "2026-09-12T05:03:20.136Z",
+  "packages": [
+    {
+      "packageName": "@apps-in-toss/web-framework",
+      "version": "3.4.0",
+      "unavailable": false,
+      "status": null,
+      "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fweb-framework/latest"
+    },
+    {
+      "packageName": "@apps-in-toss/framework",
+      "version": "2.10.10",
+      "unavailable": false,
+      "status": null,
+      "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
+    },
+    {
+      "packageName": "@toss/tds-react-native",
+      "version": "2.0.5",
+      "unavailable": false,
+      "status": null,
+      "registryUrl": "https://registry.npmjs.org/@toss%2Ftds-react-native/latest"
+    },
+    {
+      "packageName": "create-granite-app",
+      "version": "1.0.43",
+      "unavailable": false,
+      "status": null,
+      "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
+    },
+    {
+      "packageName": "@granite-js/react-native",
+      "version": "1.0.43",
+      "unavailable": false,
+      "status": null,
+      "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"
+    },
+    {
+      "packageName": "@toss-design-system/react-native",
+      "version": null,
+      "unavailable": true,
+      "status": 404,
+      "registryUrl": "https://registry.npmjs.org/@toss-design-system%2Freact-native/latest"
+    }
+  ]
+}

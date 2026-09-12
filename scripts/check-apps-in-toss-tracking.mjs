@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
+import { pathToFileURL } from "node:url";
 
-const SNAPSHOT_PATH = "data/upstream/apps-in-toss/docs-snapshot.json";
+const SNAPSHOT_PATH = "data/upstream/apps-in-toss/packages-snapshot.json";
 const PACKAGE_JSON_PATH = "package.json";
 const TRACKING_DOCS = [
   { locale: "en", path: "docs/en/apps-in-toss-tracking.md" },
@@ -79,77 +80,84 @@ function rootDevDependencyVersion(packageJson, packageName) {
   return String(version);
 }
 
-const [snapshot, packageJson, ...trackingDocs] = await Promise.all([
-  readJson(SNAPSHOT_PATH),
-  readJson(PACKAGE_JSON_PATH),
-  ...TRACKING_DOCS.map(async (doc) => ({
-    ...doc,
-    markdown: await readFile(doc.path, "utf8")
-  }))
-]);
+export function checkTracking({ snapshot, packageJson, trackingDocs }) {
+  const failures = [];
+  const checked = [];
+  const discoveries = [];
 
-const failures = [];
-const checked = [];
+  for (const trackedPackage of TRACKED_PACKAGES) {
+    const { packageName, markerKey, rootDevDependency } = trackedPackage;
+    let snapshotVersion;
 
-for (const trackedPackage of TRACKED_PACKAGES) {
-  const { packageName, markerKey, rootDevDependency } = trackedPackage;
-  let snapshotVersion;
-
-  try {
-    snapshotVersion = snapshotPackageVersion(snapshot, packageName);
-  } catch (err) {
-    failures.push(err.message);
-    continue;
-  }
-
-  const markerVersions = [];
-
-  for (const doc of trackingDocs) {
     try {
-      const markerVersion = trackingMarkerVersion(doc.markdown, doc.path, packageName, markerKey);
-      markerVersions.push({ ...doc, version: markerVersion });
-
-      if (markerVersion !== snapshotVersion) {
-        failures.push(
-          `${doc.path} tracks ${packageName}@${markerVersion}, but ${SNAPSHOT_PATH} has ${snapshotVersion}`
-        );
-      }
+      snapshotVersion = snapshotPackageVersion(snapshot, packageName);
     } catch (err) {
       failures.push(err.message);
+      continue;
     }
-  }
 
-  const [firstMarker, ...restMarkers] = markerVersions;
-  for (const marker of restMarkers) {
-    if (firstMarker && marker.version !== firstMarker.version) {
-      failures.push(
-        `${marker.path} tracks ${packageName}@${marker.version}, but ${firstMarker.path} has ${firstMarker.version}`
-      );
+    const markerVersions = [];
+
+    for (const doc of trackingDocs) {
+      try {
+        const markerVersion = trackingMarkerVersion(doc.markdown, doc.path, packageName, markerKey);
+        markerVersions.push({ ...doc, version: markerVersion });
+      } catch (err) {
+        failures.push(err.message);
+      }
     }
-  }
 
-  if (rootDevDependency) {
-    try {
-      const rootVersion = rootDevDependencyVersion(packageJson, packageName);
-      if (rootVersion !== snapshotVersion) {
+    const [firstMarker, ...restMarkers] = markerVersions;
+    for (const marker of restMarkers) {
+      if (firstMarker && marker.version !== firstMarker.version) {
         failures.push(
-          `${PACKAGE_JSON_PATH} devDependency ${packageName}@${rootVersion} does not match ${SNAPSHOT_PATH} ${snapshotVersion}`
+          `${marker.path} tracks ${packageName}@${marker.version}, but ${firstMarker.path} has ${firstMarker.version}`
         );
       }
-    } catch (err) {
-      failures.push(err.message);
+    }
+
+    if (rootDevDependency) {
+      try {
+        const rootVersion = rootDevDependencyVersion(packageJson, packageName);
+        if (firstMarker && rootVersion !== firstMarker.version) {
+          failures.push(
+            `${PACKAGE_JSON_PATH} devDependency ${packageName}@${rootVersion} does not match reviewed reference ${firstMarker.version}`
+          );
+        }
+      } catch (err) {
+        failures.push(err.message);
+      }
+    }
+
+    checked.push(`${packageName}@${firstMarker?.version}`);
+    if (firstMarker && firstMarker.version !== snapshotVersion) {
+      discoveries.push(`${packageName}: discovered ${snapshotVersion}, reviewed ${firstMarker.version}`);
     }
   }
 
-  checked.push(`${packageName}@${snapshotVersion}`);
+  return { failures, checked, discoveries };
 }
 
-if (failures.length > 0) {
-  console.error("Apps in Toss tracking check failed:");
-  for (const failure of failures) {
-    console.error(`- ${failure}`);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const [snapshot, packageJson, ...trackingDocs] = await Promise.all([
+    readJson(SNAPSHOT_PATH),
+    readJson(PACKAGE_JSON_PATH),
+    ...TRACKING_DOCS.map(async (doc) => ({
+      ...doc,
+      markdown: await readFile(doc.path, "utf8")
+    }))
+  ]);
+
+  const { failures, checked, discoveries } = checkTracking({ snapshot, packageJson, trackingDocs });
+  if (failures.length > 0) {
+    console.error("Apps in Toss tracking check failed:");
+    for (const failure of failures) {
+      console.error(`- ${failure}`);
+    }
+    process.exitCode = 1;
+  } else {
+    console.log(`Apps in Toss tracking check passed: ${checked.join(", ")}`);
   }
-  process.exitCode = 1;
-} else {
-  console.log(`Apps in Toss tracking check passed: ${checked.join(", ")}`);
+
+  for (const discovery of discoveries) console.log(`Update available for review: ${discovery}`);
 }

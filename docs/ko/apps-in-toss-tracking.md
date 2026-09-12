@@ -11,18 +11,20 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - React Native tutorial: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
 - React Native reference: https://developers-apps-in-toss.toss.im/documentation/react-native.md
 - WebView Client SDK: https://developers-apps-in-toss.toss.im/documentation/sdk.md
-- WebView SDK 3.x migration: https://developers-apps-in-toss.toss.im/development/sdk-3.x.md
+- WebView SDK 3.x migration: https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x.md
 - API overview: https://developers-apps-in-toss.toss.im/documentation/overview.md
 - Integration getting started: https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md
 - Server API integration: https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md
-- API authentication and mTLS: https://developers-apps-in-toss.toss.im/documentation/api/auth.md
-- Toss Login API: https://developers-apps-in-toss.toss.im/documentation/api/toss-login.md
-- In-app purchase API: https://developers-apps-in-toss.toss.im/documentation/api/iap.md
-- Promotion API: https://developers-apps-in-toss.toss.im/documentation/api/promotion.md
-- Push and Smart Message API: https://developers-apps-in-toss.toss.im/documentation/api/push.md
+- API authentication and mTLS: https://developers-apps-in-toss.toss.im/api/auth.md
+- Toss Login API: https://developers-apps-in-toss.toss.im/api/toss-login.md
+- In-app purchase API: https://developers-apps-in-toss.toss.im/api/iap.md
+- Promotion API: https://developers-apps-in-toss.toss.im/api/promotion.md
+- Push and Smart Message API: https://developers-apps-in-toss.toss.im/api/push.md
 - Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
 - Notification agreement SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
 - Non-game user identity key: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md
+- Anonymous user key verification API: https://developers-apps-in-toss.toss.im/api/user-key.md
+- IAP subscription guide: https://developers-apps-in-toss.toss.im/documentation/common/monetization/iap/in-app-subscription.md
 - TDS React Native docs: https://tossmini-docs.toss.im/tds-react-native/
 
 ## 호환성 정책
@@ -30,7 +32,7 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - 컨슈머 SDK, Granite, TDS package version은 앱이 소유합니다.
 - 업스트림 추적만을 위해 이 kit의 runtime dependency에 `@apps-in-toss/framework`,
   `@granite-js/react-native`, TDS package를 추가하지 않습니다.
-- 저장소 root는 lockfile/reference 검증을 위해 `@apps-in-toss/framework`를 dev dependency로
+- 저장소 root는 lockfile/reference 및 SDK 타입 검증을 위해 `@apps-in-toss/framework`를 dev dependency로
   고정할 수 있지만, publish/private kit package는 Apps in Toss SDK package를 peer 또는
   주입 dependency로 유지해야 합니다.
 - React Native 비게임 mini-app의 익명 TrailBase principal seed는 Apps in Toss
@@ -39,7 +41,7 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
   identity seed가 아닙니다.
 - 비게임 mini-app은 TDS를 반드시 사용해야 합니다. 게임에서는 TDS가 선택 사항입니다.
 - 신규 React Native mini-app은 Granite 용어와 framework 1.0 이상을 기준으로 합니다.
-- Apps in Toss SDK 3.x는 현재 `@apps-in-toss/web-framework@rc`를 사용하는 WebView
+- Apps in Toss SDK 3.x는 현재 `@apps-in-toss/web-framework@3.4.0`를 사용하는 WebView
   프로젝트 대상입니다. 이 저장소가 참조하는 React Native
   `@apps-in-toss/framework`의 업데이트 대상과 섞지 않습니다.
 - Framework 1.0 이상에서는 `@toss/tds-react-native`를 사용합니다. Legacy framework에서는
@@ -57,16 +59,16 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 ## Renovate가 추적하는 reference version
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.10.8`
+- `apps-in-toss-framework`: `2.10.10`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
-- `tds-react-native`: `2.0.4`
+- `tds-react-native`: `2.0.5`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.38`
+- `create-granite-app`: `1.0.43`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.38`
+- `granite-js-react-native`: `1.0.43`
 
 - `@toss-design-system/react-native`: framework 1.0 이전 프로젝트에서 쓰던 legacy package
   name입니다. 초기 tracking snapshot 시점에는 public npm `latest` metadata를 확인할 수
@@ -75,12 +77,14 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 이 Renovate marker block이나 `renovate.json`을 수정했다면 `bun run renovate:validate`로
 설정을 검증하세요. 업스트림 snapshot PR이 SDK package 변경을 감지하면 release note를
 검토하고 root reference dependency, lockfile, 이 marker를 같은 후속 PR에서 함께 맞추세요.
-Snapshot script는 의도적으로 감지만 담당합니다. Snapshot, root `package.json`, 영문/국문
-tracking marker가 일치하는지는 `bun run apps-in-toss:tracking:check`로 확인합니다.
+Snapshot script는 의도적으로 감지만 담당합니다. `packages-snapshot.json`은 npm에서 발견한
+버전을, 위 marker는 검토한 reference를 기록합니다. `bun run apps-in-toss:tracking:check`는
+root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새 버전 발견은 안내만 하며,
+검토 버전을 자동으로 올리거나 감지 전용 PR을 실패시키지 않습니다.
 
 ## 최근 검토한 SDK 변경
 
-저장소 reference는 `@apps-in-toss/framework` `2.10.8`까지 검토했습니다.
+저장소 reference는 `@apps-in-toss/framework` `2.10.10`까지 검토했습니다.
 
 - `2.8.0`: 비게임 내비게이션 바 테마 설정 기능이 추가되었습니다.
 - `2.9.0`: 앱 번들 배포 명령어에 `ait deploy --timeout` 옵션이 추가되었습니다.
@@ -97,12 +101,16 @@ tracking marker가 일치하는지는 `bun run apps-in-toss:tracking:check`로 �
   흰 화면이 나오던 문제를 수정합니다.
 - `2.10.8`: React Native mini-app 배너 이미지 표시 규격을 WebView와 맞춥니다.
 
+- `2.10.10`: RN reference를 갱신하고 `bun run packages:typecheck`로 주입 adapter와
+  실제 설치된 SDK 타입의 호환성을 검사합니다. SDK에 구독 구매·조회 API가 포함되어 있지만,
+  이를 kit에서 사용하는 작업은 별도 기능 변경입니다.
+
 2026년 7월 API 변경으로 promotion, Smart Message, Toss Pay 서버 API는 Toss Login
 `userKey` 외에 익명 hash로도 사용자를 식별할 수 있습니다. 기존 proxy adapter는 계속
 `userKey`를 사용합니다. 익명 hash 입력 지원은 별도 API surface 변경으로 다루고, raw 식별자를
 로그하거나 응답으로 돌려주지 않는 규칙을 유지해야 합니다.
 
-이 SDK 변경으로 공유 kit API를 바꿀 필요는 낮아 보입니다. 다만 컨슈머 앱의 지원 Apps in Toss
+이번 reference 갱신은 TrailBase 최소 지원 서버 정책을 바꾸지 않습니다. 다만 컨슈머 앱의 지원 Apps in Toss
 SDK/runtime policy는 앱 단위 smoke test 이후에만 올리세요.
 
 ## Doc Watch 출력물
@@ -111,6 +119,12 @@ SDK/runtime policy는 앱 단위 smoke test 이후에만 올리세요.
 
 - `data/upstream/apps-in-toss/docs-snapshot.md`
 - `data/upstream/apps-in-toss/docs-snapshot.json`
+- `data/upstream/apps-in-toss/packages-snapshot.md`
+- `data/upstream/apps-in-toss/packages-snapshot.json`
+
+문서 hash와 npm 발견 버전은 독립적으로 저장합니다. 한쪽 수집이 실패해도 마지막 정상
+snapshot을 유지하고 성공한 쪽은 저장합니다. Workflow는 이 변경으로 PR을 생성한 뒤에도
+수집 실패를 보고합니다. 내용이 같으면 기존 수집 시각을 유지합니다.
 
 Snapshot은 문서 hash와 npm reference package metadata를 저장합니다. 업스트림 문서 전문을 이
 저장소에 복사하지 않습니다. Snapshot 명령은 빈 응답, HTTP 200으로 반환되는 GitBook

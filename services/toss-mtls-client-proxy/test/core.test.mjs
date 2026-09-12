@@ -890,6 +890,42 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
+  test("anonymous messages send only x-anon-key and never return the recipient", async () => {
+    let upstreamHeaders;
+    let upstreamBody;
+    const upstreamServer = http.createServer(async (req, res) => {
+      upstreamHeaders = req.headers;
+      upstreamBody = await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: { msgCount: 1 } }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(request("POST", PROXY_ENDPOINTS.smartMessageSend, {
+        anonKey: "anonymous-test-recipient", templateSetCode: "reminder", context: {},
+      }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(upstreamHeaders["x-anon-key"]).toBe("anonymous-test-recipient");
+      expect(upstreamHeaders["x-user-key"]).toBeUndefined();
+      expect(upstreamHeaders["x-toss-user-key"]).toBeUndefined();
+      expect(upstreamBody).toEqual({ templateSetCode: "reminder", context: {} });
+      expect(res.body.ok).toBe(true);
+      expect(JSON.stringify(res.body)).not.toContain("anonymous-test-recipient");
+    });
+  });
+
+  test("forward messages reject ambiguous recipients before calling upstream", async () => {
+    await expect(handleRequest(request("POST", PROXY_ENDPOINTS.smartMessageSend, {
+      tossUserKey: "login-recipient", anonKey: "anonymous-recipient", templateSetCode: "reminder", context: {},
+    }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret" }))
+      .rejects.toThrow("exactly one");
+  });
+
+  test("generic relay still requires the configured internal token", async () => {
+    const result = await handleRequest(request("POST", PROXY_ENDPOINTS.genericMtlRequest, {
+      path: "/private", method: "POST", body: {},
+    }), { mode: "forward", internalToken: "secret" });
+    expect(result.status).toBe(401);
+  });
+
   test("forward bulk message targets Toss bulk API with sanitized context list", async () => {
     let upstreamBody;
     let upstreamUserKey;
@@ -1136,6 +1172,7 @@ describe("toss-mtls-client-proxy", () => {
           channel: "sentInbox",
           contentId: "toss:INBOX:2",
           reachFailReason: "사용자 알림함 도달 실패",
+          reachedFailReason: "사용자 알림함 도달 실패",
         },
       ]);
     });

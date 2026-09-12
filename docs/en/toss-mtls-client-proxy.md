@@ -353,3 +353,25 @@ returns `{ "ok": boolean, "status": number, "headers": object, "body": unknown }
 Use the AppsInToss adapter endpoints when their request and response shape fits the app. Use the
 generic relay for other Toss mTLS APIs, or add a small adapter when an API needs repeated
 normalization or multi-step flow handling.
+
+## API Core 0.2 Compatibility
+
+The proxy pins `@ait-kit/api-core` and `api-client` to `0.2.0` and explicitly
+opts into the generic mTLS relay. `/internal/mtls/request` remains behind the
+same internal bearer authentication; forward mode still requires a token.
+Bun is pinned to `1.4.2` across local tooling, CI, and the container. The Compose
+copy-in template points to the already released proxy `0.1.12`; use the next
+Sampo-generated image version when deploying the changes in this source tree.
+
+Single Smart Message requests accept one of `tossUserKey`, `userKey`, or
+`anonKey`. The proxy corrects api-core 0.2.0's `x-user-key` header to the official
+`x-toss-user-key` header for the single messenger endpoint; anonymous requests
+use only `x-anon-key`. See the [official message API](https://developers-apps-in-toss.toss.im/api/push).
+Remove this narrow compatibility adapter when a verified upstream release
+emits the documented header itself.
+
+Partial delivery still returns `failureReason` and `failures[].reachFailReason`.
+The upstream `reachedFailReason` field and per-channel details remain available.
+A successful channel can coexist with failed channels; consumers must not retry
+an entire partially delivered message automatically. Functional notification
+agreement remains the consumer's responsibility before dispatch.

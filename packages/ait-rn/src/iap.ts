@@ -869,7 +869,7 @@ function restoreResultSucceeded(result: AppsInTossIapRestoredOrderResult) {
   return result.granted && (result.completed || result.completionDeferred === true);
 }
 
-function assertIapAvailable(iap?: AppsInTossIapSdk) {
+function assertIapAvailable(iap?: AppsInTossIapSdk): asserts iap is AppsInTossIapSdk {
   if (!iap) {
     throw new AppsInTossIapBridgeError({
       code: "IAP_SDK_UNAVAILABLE",

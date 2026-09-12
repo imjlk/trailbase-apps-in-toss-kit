@@ -1,5 +1,5 @@
 import http from "node:http";
-import { createTossMtlsCore, clientError, publicError as corePublicError } from "@ait-kit/api-core";
+import { createTossMtlsCore, clientError, TOSS_ENDPOINTS, publicError as corePublicError } from "@ait-kit/api-core";
 import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
@@ -60,19 +60,22 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageSend) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    return response(200, await core.smartMessageSend(body));
+    return response(200, compatibleMessageResponse(await core.smartMessageSend(body)));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageBulkSend) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    return response(200, await core.smartMessageBulkSend(body));
+    return response(200, compatibleMessageResponse(await core.smartMessageBulkSend(body)));
   }
 
   return response(404, { ok: false, error: "NOT_FOUND" });
 }
 
 function createCore(config) {
+  const transport = createNodeMtlsClient(config);
   return createTossMtlsCore({
+    // This authenticated internal proxy intentionally exposes the generic relay.
+    allowRawMtls: true,
     mode: config.mode,
     upstreamBaseUrl: config.upstreamBaseUrl,
     tossPromotionCode: config.tossPromotionCode,
@@ -81,8 +84,36 @@ function createCore(config) {
     iapOrderStatusRetryDelayMs: config.iapOrderStatusRetryDelayMs,
     debug: config.debug,
     log: (message, fields) => console.info(`[toss-mtls-client-proxy] ${message}`, fields),
-    mtlsClient: createNodeMtlsClient(config),
+    mtlsClient: {
+      request(url, init) {
+        // api-core 0.2.0 emits x-user-key for single messages. The official
+        // messenger API still requires x-toss-user-key (api/push).
+        if (new URL(url).pathname === TOSS_ENDPOINTS.messageSend) {
+          const headers = new Headers(init.headers);
+          if (headers.has("x-user-key")) {
+            headers.set("x-toss-user-key", headers.get("x-user-key"));
+            headers.delete("x-user-key");
+          }
+          return transport.request(url, { ...init, headers });
+        }
+        return transport.request(url, init);
+      },
+    },
   });
+}
+
+function compatibleMessageResponse(result) {
+  // Preserve the proxy's partial-delivery summary alongside new channel detail.
+  const failures = result.failures?.map((failure) => ({
+    ...failure,
+    reachFailReason: failure.reachFailReason ?? failure.reachedFailReason,
+  }));
+  const reason = failures?.find((failure) => failure.reachFailReason)?.reachFailReason;
+  return {
+    ...result,
+    ...(failures ? { failures } : {}),
+    ...(reason && !result.failureReason ? { failureReason: reason } : {}),
+  };
 }
 
 function publicError(error) {

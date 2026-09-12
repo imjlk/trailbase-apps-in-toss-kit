@@ -116,7 +116,7 @@ function headersToRecord(
     return record;
   }
   if (typeof Headers !== "undefined" && headers instanceof Headers) {
-    headers.forEach((value, key) => {
+    headers.forEach((value: string, key: string) => {
       record[key] = value;
     });
     return record;
