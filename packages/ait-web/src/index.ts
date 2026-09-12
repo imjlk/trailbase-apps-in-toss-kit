@@ -155,7 +155,7 @@ function purchaseFlow(operation: string, timeout: number, grant: WebPurchaseOpti
             (grantOrderId !== undefined && grantOrderId !== id) || (candidate && candidate.orderId !== id)) {
           fail("INVALID_RESULT"); return false;
         }
-        if (input.subscriptionId !== undefined && (typeof input.subscriptionId !== "string" || !input.subscriptionId.trim() || input.subscriptionId.length > 256)) {
+        if (input.subscriptionId !== undefined && (typeof input.subscriptionId !== "string" || !input.subscriptionId.trim() || input.subscriptionId.trim() !== input.subscriptionId || input.subscriptionId.length > 256)) {
           fail("INVALID_RESULT"); return false;
         }
         // Snapshot identifiers before yielding; an SDK must not mutate a queued grant.
