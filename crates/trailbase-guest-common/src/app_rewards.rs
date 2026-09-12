@@ -216,6 +216,11 @@ pub fn issue_app_reward_attempt_tx(
     now: i64,
     policy: impl FnOnce(&mut Transaction) -> ApiResult<AppRewardOffer>,
 ) -> ApiResult<AppRewardAttempt> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::AppReward,
+        crate::operation_policy::OperationPhase::Entry,
+    )?;
     issue_attempt(tx, user, placement, source, now, policy)
 }
 
@@ -241,7 +246,14 @@ pub fn claim_app_reward_attempt_tx(
     now: i64,
     policy: impl FnOnce(&mut Transaction, &AppRewardAttempt) -> ApiResult<bool>,
 ) -> ApiResult<AppRewardAttempt> {
-    claim_attempt(tx, user, placement, id, now, policy)
+    claim_attempt(tx, user, placement, id, now, |tx, attempt| {
+        crate::operation_policy::enforce_configured_operation_tx(
+            tx,
+            crate::operation_policy::OperationFeature::AppReward,
+            crate::operation_policy::OperationPhase::Settlement,
+        )?;
+        policy(tx, attempt)
+    })
 }
 
 fn scope_params(user: &[u8], placement: &str, id: &str) -> Vec<Value> {

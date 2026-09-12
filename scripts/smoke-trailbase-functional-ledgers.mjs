@@ -72,6 +72,7 @@ try {
           promotionCampaigns: countRows("promotion_campaigns"),
           promotionRewardLedger: countRows("promotion_reward_ledger"),
           iapOrders: countRows("iap_orders"),
+          operationPolicies: countRows("operation_policies"),
           appRewardAttempts: countRows("app_reward_attempts"),
           appRewardGrants: countRows("app_reward_grants"),
         },

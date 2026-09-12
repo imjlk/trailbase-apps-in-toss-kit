@@ -2,8 +2,8 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value as JsonValue, json};
 use trailbase_guest_common::{
-    app_rewards, anonymous_identity, apps_in_toss_login, apps_in_toss_messages, apps_in_toss_proxy, db,
-    message_outbox_recovery, operation_policy, responses, trailbase_auth,
+    anonymous_identity, app_rewards, apps_in_toss_login, apps_in_toss_messages, apps_in_toss_proxy,
+    db, message_outbox_recovery, operation_policy, responses, trailbase_auth,
 };
 use trailbase_wasm::db::Value;
 use trailbase_wasm::http::{HttpRoute, Request, Response, routing};
@@ -204,6 +204,11 @@ fn reward_probe(req: Request) -> responses::ApiResult<JsonValue> {
         .map_err(|_| responses::internal("invalid principal"))?;
     let mut tx = db::tx()?;
     let now = db::now_ms_tx(&mut tx)?;
+    db::tx_execute(
+        &mut tx,
+        "INSERT OR REPLACE INTO operation_policies VALUES ('app-reward',1,1,0,1,?1,?2)",
+        &[Value::Integer(now), Value::Integer(now + 60_000)],
+    )?;
     let schema = db::tx_query(
         &mut tx,
         "SELECT count(*) FROM sqlite_master WHERE (type='table' AND name IN ('app_reward_attempts','app_reward_grants')) OR (type='index' AND name='idx_app_reward_attempts_owner_placement')",

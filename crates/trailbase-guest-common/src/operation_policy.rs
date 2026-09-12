@@ -117,7 +117,7 @@ pub fn operation_hold_active(value: Option<&str>) -> bool {
 
 /// Reports only the built-in boundaries actually wired below. Consumer-owned SDK
 /// entry points and direct network sends still need explicit require_operation_tx.
-#[derive(Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OperationPolicyIntegration {
     pub enabled: bool,
@@ -136,6 +136,8 @@ pub fn operation_policy_integration() -> OperationPolicyIntegration {
             "claim_ready_message_outbox_tx",
             "begin_message_outbox_dispatch_tx",
             "insert_promotion_reward_ledger_tx",
+            "issue_app_reward_attempt_tx",
+            "claim_app_reward_attempt_tx",
         ],
     }
 }
