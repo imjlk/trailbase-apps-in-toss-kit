@@ -32,6 +32,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Use RN/client-side adapters | [client-adapters.md](client-adapters.md) |
 | Handle account changes and app foreground | [session-lifecycle.md](session-lifecycle.md) |
 | Diagnose private IAP, promotion and message ledgers | [ledger-doctor.md](ledger-doctor.md) |
+| Pause features and rehearse old-backup recovery | [operation-policy.md](operation-policy.md) |
 | Configure detailed and AppsInToss analytics | [analytics.md](analytics.md) |
 | Release versions and GHCR images | [versioning.md](versioning.md) and [publishing.md](publishing.md) |
 | Draft release notes from Sampo changesets | [sampo-release-notes.md](sampo-release-notes.md) |
