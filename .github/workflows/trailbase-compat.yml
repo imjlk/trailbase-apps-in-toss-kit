@@ -13,6 +13,8 @@ on:
       - "docs/en/trailbase-tracking.md"
       - "docs/ko/trailbase-tracking.md"
       - "package.json"
+      - "bun.lock"
+      - "packages/trailbase-client/**"
       - "rust-toolchain.toml"
       - "scripts/check-trailbase-version-policy.mjs"
       - "scripts/smoke-trailbase-wasm.mjs"

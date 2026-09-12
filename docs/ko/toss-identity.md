@@ -36,17 +36,21 @@ TrailBase credential을 만드세요.
 - 서비스 관리 비밀번호: 별도 secret에서 파생한 서버 전용 credential.
 
 합성 이메일은 TrailBase auth identifier이지 연락처가 아닙니다. 이 주소로 메일을 보내거나
-사용자에게 표시하지 말고, `_user.verified = true`를 실제 사람 이메일이 검증되었다는 의미로
-해석하지 마세요. 이 플래그는 서비스 관리 credential이 TrailBase의 일반 로그인 흐름을 사용할
-수 있다는 기술적 표시입니다.
+사용자에게 표시하거나 TrailBase의 검증 상태를 실제 사람 이메일이 검증되었다는 의미로
+해석하지 마세요. 이전 서버는 `_user.verified`를 사용하고, TrailBase 0.31.2 이상은 검증된
+주소를 `email`, 대기 중인 주소를 `unverified_email`로 표현합니다. 합성 주소에서 이 상태는
+서비스 관리 credential이 일반 로그인 흐름을 사용할 수 있다는 기술적 표시입니다.
 
 이 credential은 TrailBase 공식 auth flow를 사용하기 위한 것입니다. 서비스 관리 비밀번호를
 클라이언트로 보내지 말고, 앱 코드에서 TrailBase JWT 서명이나 `_session` write를 직접
 재구현하지 마세요.
 
 익명 `_user`를 만들거나 불러오는 bootstrap 경로에서는 `ensure_verified_auth_user_tx`를
-사용하세요. 이 헬퍼는 먼저 합성 이메일로 기존 row를 찾고, 필요한 경우 `_user.verified`만
-보정하며, 최초 조회에서 row가 없을 때만 password hash를 생성하거나 갱신합니다. 이 missing-row
+사용하세요. 이 헬퍼는 두 스키마를 감지하고 합성 주소로 기존 row를 찾습니다. 이전 서버에서는
+`_user.verified`를 보정하고, 0.31.2 이상에서는 미검증 합성 주소만 있는 행의 주소를 `email`로
+승격한 뒤 `unverified_email`을 비웁니다. 기존 검증 주소와 대기 중인 이메일 변경, 비밀번호
+해시는 보존하며 모호한 미검증 행은 거부합니다. 최초 조회에서 row가 없을 때만 password hash를
+생성하거나 갱신합니다. 이 missing-row
 경로는 atomic upsert를 사용하므로 동시 최초 bootstrap 요청도 idempotent하게 처리됩니다. 호환용
 `upsert_verified_auth_user_tx`는 아직 secret rotation을 rotation login helper로 옮기지 않은
 호출자를 위해 기존 password refresh 의미를 유지합니다.

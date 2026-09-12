@@ -259,11 +259,12 @@ record_apis: [{
       method: "POST",
       headers: {
         authorization: `Bearer ${alpha.auth_token}`,
+        "CSRF-Token": alpha.csrf_token,
         "content-type": "application/json",
       },
-      body: JSON.stringify({ id: 2, value: "denied" }),
+      body: JSON.stringify({ id: 2, owner: alphaUser.userId, value: "denied" }),
     });
-    assert.ok([401, 403].includes(forbiddenWrite.status));
+    assert.equal(forbiddenWrite.status, 403);
     await request("/kit-smoke/write?op=update", {
       method: "POST",
       tokens: alpha,

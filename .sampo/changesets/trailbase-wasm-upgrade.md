@@ -14,3 +14,6 @@ supported by the SQL helpers; verified principals and pending email changes are
 preserved. Official auth endpoints still issue tokens. The last verified server
 moves to 0.33.14; the manual kit minimum stays TBD. Consumer production/device and
 full migration checks remain required before rollout.
+
+Trigger runtime smoke checks on client/parser dependency changes and verify the
+read-only Record API ACL with valid auth, CSRF and a complete record payload.
