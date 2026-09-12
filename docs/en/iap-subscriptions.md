@@ -65,3 +65,11 @@ consumer's webhook freshness/reconciliation policy before allowing benefits when
 updates may be missing. A newer valid event clears an earlier equal-time conflict;
 otherwise resolve the conflict from an authoritative provider state. Do not resolve
 it by assigning arbitrary precedence to ACTIVE versus REVOKED.
+
+Order existence alone never proves ownership. Applying and reading entitlements
+requires a paid/refunded ledger state backed by PAYMENT_COMPLETED, PURCHASED, or
+REFUNDED provider state. Unverified legacy rows keep callbacks RECEIVED and expose
+no entitlement, including projections written before this guard. Resolve conflicting
+legacy ownership only through a trusted owner-scoped lookup and an audited consumer
+repair; a webhook never reassigns the order. Registration callbacks may omit
+eventVersion; an explicitly supplied version must be the supported string `1.0`.

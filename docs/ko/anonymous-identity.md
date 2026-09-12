@@ -80,3 +80,6 @@ Proxy의 promotion grant·status endpoint는 `tossUserKey` 대신 `anonKey`를 �
 Endpoint를 사용하기 전에 다음 Sampo 생성 proxy 이미지를 배포하세요. 로컬 계약·SQL
 테스트를 제공하지만 rollout 전 컨슈머 앱의 sandbox·실제 앱 bootstrap, 알림 동의,
 프로모션 검증은 별도로 필요합니다.
+
+익명 메시지 등록은 기존 로그인 수신자 경로처럼 메시지·템플릿·요청 식별자의 앞뒤
+공백을 제거하고, 빈 선택 식별자는 생략된 값으로 처리합니다.

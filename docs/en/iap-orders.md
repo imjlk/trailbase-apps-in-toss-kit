@@ -54,3 +54,10 @@ rows whose timestamps were set together remain historical data; do not clear
 them automatically. No schema change is needed for the existing kit template.
 
 See [IAP Subscriptions](iap-subscriptions.md) for RN adapters and the private webhook/entitlement ledger.
+
+New order rows require a successful, owner-scoped provider lookup with returned
+order ID/SKU and PAYMENT_COMPLETED, PURCHASED, or REFUNDED state. Failed, missing,
+unknown, in-progress, or fallback-only responses cannot reserve a new order ID;
+`upsert_iap_order_status_tx` returns `UNVERIFIED_IAP_ORDER` if no matching row can
+be updated. Existing-owner diagnostic updates remain supported. Never feed client
+SDK data or a lookup without the authenticated owner identity into this helper.

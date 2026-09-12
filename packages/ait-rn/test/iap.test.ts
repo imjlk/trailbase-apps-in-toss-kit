@@ -517,6 +517,28 @@ describe("subscription IAP", () => {
     expect(products[2].type).toBe("CONSUMABLE");
   });
 
+  test("normalizes offer fields before forwarding the selected offer", async () => {
+    let selectedOffer: string | undefined;
+    const bridge = createAppsInTossIapBridge({ IAP: {
+      getProductItemList: async () => ({ products: [{
+        sku: "monthly", type: "SUBSCRIPTION", renewalCycle: "MONTHLY",
+        offers: [{ type: "NEW_SUBSCRIPTION", offerId: 123, period: true, displayAmount: 0 }],
+      }] }),
+      createSubscriptionPurchaseOrder: ({ options, onEvent }) => {
+        selectedOffer = options.offerId;
+        onEvent({ type: "success", data: { orderId: "order" } });
+        void options.processProductGrant({ orderId: "order" });
+        return () => {};
+      },
+    } });
+    const product = (await bridge.getProducts())[0];
+    expect(product.type).toBe("SUBSCRIPTION");
+    if (product.type !== "SUBSCRIPTION") throw new Error("Expected subscription");
+    expect(product.offers).toEqual([{ type: "NEW_SUBSCRIPTION", offerId: "123", period: "true", displayAmount: "0" }]);
+    await bridge.purchaseSubscription({ sku: product.sku, offerId: product.offers![0].offerId, processProductGrant: () => true });
+    expect(selectedOffer).toBe("123");
+  });
+
   test("subscription purchase forwards the offer and subscription id and cleans up once", async () => {
     let cleaned = 0;
     const grants: unknown[] = [];

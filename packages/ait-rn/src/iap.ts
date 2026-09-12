@@ -997,13 +997,16 @@ function normalizeSubscriptionProduct(record: Record<string, unknown>) {
   const offers = Array.isArray(record.offers)
     ? (record.offers.map((value) => {
         const offer = objectRecord(value);
+        const offerId = stringCandidate(offer.offerId);
+        const period = stringCandidate(offer.period);
+        const displayAmount = stringCandidate(offer.displayAmount);
         if (
           !["FREE_TRIAL", "NEW_SUBSCRIPTION", "RETURNING"].includes(
             String(offer.type),
           ) ||
-          !stringCandidate(offer.offerId) ||
-          !stringCandidate(offer.period) ||
-          (offer.type !== "FREE_TRIAL" && !stringCandidate(offer.displayAmount))
+          !offerId ||
+          !period ||
+          (offer.type !== "FREE_TRIAL" && !displayAmount)
         ) {
           throw new AppsInTossIapBridgeError({
             code: "IAP_SUBSCRIPTION_INVALID_RESPONSE",
@@ -1012,10 +1015,10 @@ function normalizeSubscriptionProduct(record: Record<string, unknown>) {
         }
         return {
           type: offer.type,
-          offerId: offer.offerId,
-          period: offer.period,
+          offerId,
+          period,
           ...(offer.type !== "FREE_TRIAL"
-            ? { displayAmount: offer.displayAmount }
+            ? { displayAmount }
             : {}),
         };
       }) as AppsInTossIapSubscriptionProduct["offers"])
