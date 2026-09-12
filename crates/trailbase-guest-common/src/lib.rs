@@ -19,6 +19,7 @@ pub mod iap_subscriptions;
 pub mod ledger_diagnostics;
 pub mod message_outbox_recovery;
 pub mod message_recipients;
+pub mod operation_policy;
 pub mod promotion_campaigns;
 pub mod promotion_rewards;
 pub mod responses;

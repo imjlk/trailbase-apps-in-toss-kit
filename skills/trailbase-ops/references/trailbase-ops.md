@@ -153,6 +153,14 @@ helper exists in the checked-out package.
     provider grant ledgers, provider outcome persistence, and budget usage checks.
   - `iap_orders.sql` with `trailbase_guest_common::iap_orders` for order-status persistence and
     idempotent local grant marking.
+  - `operation_policies.sql` with `trailbase_guest_common::operation_policy` for per-feature
+    entry/dispatch/settlement controls and read-only status. Set `KIT_OPERATION_POLICIES_ENABLED=1`
+    to enable the listed built-in guards, and wire consumer-owned paths explicitly. For WASM,
+    put these string settings in a private `/settings.json` mounted through `--runtime-root-fs`;
+    host environment variables alone are not inherited. Keep `KIT_OPERATIONS_HOLD=1` outside
+    restored backups, verify `operation_policy_integration()`, restart instances after changing
+    settings, and reconcile an independent durable witness before operator resume. See the
+    English/Korean `operation-policy.md` docs and runtime `restore-checkpoint` check.
   - `app_reward_attempts.sql` with `trailbase_guest_common::app_rewards` for server-issued
     app-owned AD/SHARE attempts and atomic once-only local credits. Require explicit server
     offer/eligibility/transactional quota policies; client SDK events and attempt IDs are not
