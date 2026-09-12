@@ -355,6 +355,8 @@ Record API wrapper는 응답의 `cursor`를 유지해야 합니다. `records`만
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
 
+RN adapter와 비공개 웹훅·이용권한 원장은 [IAP 정기구독](iap-subscriptions.md)을 참고하세요.
+
 XHR SSE 연결 준비는 `subscribe(id, { signal })`과 collection cleanup으로 취소할 수
 있습니다. `connectionTimeoutMs` 기본값은 15초이며 인증 헤더 준비와 응답 헤더 대기에
 적용됩니다. 이미 연결된 스트림은 이 제한으로 종료되지 않습니다. 연결 준비가 멈추면

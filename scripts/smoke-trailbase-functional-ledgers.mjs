@@ -14,6 +14,7 @@ const templates = [
   "promotion_campaigns.sql",
   "promotion_reward_ledger.sql",
   "iap_orders.sql",
+  "iap_subscriptions.sql",
   "anonymous_identities.sql",
   "message_outbox_recipients.migration.sql",
   "promotion_reward_recipients.sql",
@@ -75,6 +76,8 @@ try {
 }
 
 function verifySchema() {
+  assertTable("iap_subscription_events");
+  assertTable("iap_subscription_entitlements");
   assertTable("anonymous_identities");
   assertTable("promotion_reward_recipients");
   assertTable("message_outbox_attempts");

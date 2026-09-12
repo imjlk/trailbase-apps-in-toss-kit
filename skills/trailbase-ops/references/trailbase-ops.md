@@ -150,6 +150,9 @@ helper exists in the checked-out package.
   before migration. IAP local grants leave `completed_at` empty until explicit Toss
   completion confirmation through `mark_iap_order_completed_tx`. Promotion recovery
   uses `apps_in_toss_proxy::promotion_reward_status` with a persisted transaction key.
+  Subscription flows use `iap_subscriptions.sql` with `iap_subscriptions` parsing,
+  inbox, ordering, and per-order entitlement helpers. Authenticate webhooks at the
+  consumer ingress; never use client SDK status to authorize server benefits.
   Keep these tables in the app/product database by default, not the `analytics` database. Eligibility,
   product grant rules, inventory/balance updates, cooldowns, and public projections stay app-owned.
   After changing the shared functional ledger SQL templates, run

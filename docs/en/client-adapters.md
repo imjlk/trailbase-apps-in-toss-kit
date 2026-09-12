@@ -375,6 +375,8 @@ collection ready. Cleanup cancels streams and ignores late list responses.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
 
+See [IAP Subscriptions](iap-subscriptions.md) for RN adapters and the private webhook/entitlement ledger.
+
 XHR SSE connection setup is cancellable through `subscribe(id, { signal })` and
 collection cleanup. `connectionTimeoutMs` defaults to 15 seconds and covers header
 resolution plus the wait for response headers; it does not expire an established

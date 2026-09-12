@@ -189,7 +189,12 @@ pub fn upsert_iap_order_status_tx(
     rows.first()
         .map(|row| iap_order_ledger_record_from_row(row))
         .transpose()?
-        .ok_or_else(|| internal("IAP order row was not upserted"))
+        .ok_or_else(|| {
+            bad_request(
+                "UNVERIFIED_IAP_ORDER",
+                "IAP order needs a verified purchase for this owner and product",
+            )
+        })
 }
 
 pub fn mark_iap_order_granted_tx(
@@ -379,7 +384,36 @@ struct NormalizedIapOrderStatusUpsert {
     failure_reason: Option<String>,
     provider_response_json: Option<String>,
     status_determined_at: Option<String>,
+    can_create_order: bool,
     now: i64,
+}
+
+// A local grant can retain PAYMENT_COMPLETED as its provider state. Failed,
+// missing and in-progress lookups do not establish paid-order ownership.
+const VERIFIED_PROVIDER_STATUSES: &[&str] = &["PAYMENT_COMPLETED", "PURCHASED", "REFUNDED"];
+const VERIFIED_LEDGER_STATUSES: &[IapLedgerStatus] = &[
+    IapLedgerStatus::PendingGrant,
+    IapLedgerStatus::Granted,
+    IapLedgerStatus::Refunded,
+];
+
+// Subscription projections use the default kit ledger schema. Both SQL and Rust
+// gates are derived from these same allow-lists, never from caller-provided SQL.
+pub(crate) fn verified_iap_order_state_sql() -> &'static str {
+    static SQL: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
+        let provider = VERIFIED_PROVIDER_STATUSES
+            .iter()
+            .map(|s| format!("'{s}'"))
+            .collect::<Vec<_>>()
+            .join(",");
+        let ledger = VERIFIED_LEDGER_STATUSES
+            .iter()
+            .map(|s| format!("'{}'", s.as_str()))
+            .collect::<Vec<_>>()
+            .join(",");
+        format!("status IN ({ledger}) AND UPPER(TRIM(provider_status)) IN ({provider})")
+    });
+    SQL.as_str()
 }
 
 fn normalize_iap_order_status_upsert_input(
@@ -413,6 +447,18 @@ fn normalize_iap_order_status_upsert_input(
         failure_reason: normalize_optional_text(input.status.failure_reason.as_deref()),
         provider_response_json: normalize_optional_text(input.raw_response_json),
         status_determined_at: normalize_optional_text(input.status.status_determined_at.as_deref()),
+        can_create_order: input.status.ok
+            && VERIFIED_PROVIDER_STATUSES.contains(
+                &input
+                    .status
+                    .provider_status
+                    .trim()
+                    .to_ascii_uppercase()
+                    .as_str(),
+            )
+            && VERIFIED_LEDGER_STATUSES.contains(&input.status.ledger_status)
+            && normalize_optional_text(input.status.order_id.as_deref()).is_some()
+            && normalize_optional_text(input.status.sku.as_deref()).is_some(),
         now: input.now,
     })
 }
@@ -431,11 +477,14 @@ fn iap_order_status_upsert_statement(
                {status_determined_at_column}, {created_at_column}, {updated_at_column},
                {completed_at_column}, {refunded_at_column}, {failed_at_column}
              )
-             VALUES (
+             SELECT
                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11,
                CASE WHEN ?5 = 'GRANTED' THEN ?11 ELSE NULL END,
                CASE WHEN ?5 = 'REFUNDED' THEN ?11 ELSE NULL END,
                CASE WHEN ?5 IN ('FAILED', 'NOT_FOUND') THEN ?11 ELSE NULL END
+             WHERE ?12 = 1 OR EXISTS (
+               SELECT 1 FROM {table} WHERE {order_id_column} = ?1
+                 AND {user_id_column} = ?2 AND {product_id_column} = ?4
              )
              ON CONFLICT({order_id_column}) DO UPDATE SET
                {toss_user_key_hmac_column} = COALESCE({table}.{toss_user_key_hmac_column}, excluded.{toss_user_key_hmac_column}),
@@ -540,6 +589,7 @@ fn iap_order_status_upsert_statement(
             text_or_null(record.provider_response_json.as_deref()),
             text_or_null(record.status_determined_at.as_deref()),
             Value::Integer(record.now),
+            Value::Integer(i64::from(record.can_create_order)),
         ],
     ))
 }
@@ -900,7 +950,7 @@ mod tests {
         );
         assert!(sql.contains("WHERE iap_orders.user_id = excluded.user_id"));
         assert!(sql.contains("AND iap_orders.product_id = excluded.product_id"));
-        assert_eq!(params.len(), 11);
+        assert_eq!(params.len(), 12);
         assert_eq!(record.order_id, "order-1");
         assert_eq!(record.product_id, "coins.100");
         assert_eq!(record.status, IapLedgerStatus::PendingGrant);
@@ -954,6 +1004,62 @@ mod tests {
 mod sql_tests {
     use super::*;
     use crate::sql_test_support::{database, query};
+
+    #[test]
+    fn failed_lookups_cannot_preclaim_another_users_order() {
+        let db = database();
+        db.execute("INSERT INTO _user VALUES (X'02')", []).unwrap();
+        let upsert = |response: JsonValue, user: &[u8]| {
+            let status = normalize_iap_order_status_response(&response);
+            let input = normalize_iap_order_status_upsert_input(IapOrderStatusUpsertInput {
+                user,
+                toss_user_key_hmac: None,
+                order_id: "order",
+                product_id: "coins",
+                status: &status,
+                raw_response_json: None,
+                now: 20,
+            })
+            .unwrap();
+            let (sql, params) =
+                iap_order_status_upsert_statement(DEFAULT_IAP_ORDERS_TABLE, &input).unwrap();
+            query(&db, &sql, &params)
+        };
+        for status in [
+            "NOT_FOUND",
+            "FAILED",
+            "UNKNOWN",
+            "ORDER_IN_PROGRESS",
+            "MINIAPP_MISMATCH",
+        ] {
+            assert!(upsert(json!({"ok":true,"providerStatus":status}), &[1]).is_empty());
+        }
+        assert!(
+            upsert(
+                json!({"ok":false,"providerStatus":"PURCHASED","orderId":"order","sku":"coins"}),
+                &[1]
+            )
+            .is_empty()
+        );
+        // A paid status without provider-returned identifiers is not new-owner proof.
+        assert!(upsert(json!({"ok":true,"providerStatus":"PURCHASED"}), &[1]).is_empty());
+        let verified =
+            json!({"ok":true,"providerStatus":"PAYMENT_COMPLETED","orderId":"order","sku":"coins"});
+        assert_eq!(upsert(verified.clone(), &[2]).len(), 1);
+        assert!(upsert(verified, &[1]).is_empty());
+        assert!(upsert(json!({"ok":false,"providerStatus":"ERROR"}), &[1]).is_empty());
+        assert_eq!(
+            db.query_row("SELECT user_id FROM iap_orders", [], |r| r
+                .get::<_, Vec<u8>>(0))
+                .unwrap(),
+            vec![2]
+        );
+        // Failed checks can still update diagnostics for the already mapped owner.
+        assert_eq!(
+            upsert(json!({"ok":false,"providerStatus":"ERROR"}), &[2]).len(),
+            1
+        );
+    }
 
     #[test]
     fn local_grant_and_toss_completion_are_separate_idempotent_steps() {

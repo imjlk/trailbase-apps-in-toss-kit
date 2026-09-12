@@ -14,6 +14,7 @@ pub mod apps_in_toss_proxy;
 pub mod db;
 pub mod domain_events;
 pub mod iap_orders;
+pub mod iap_subscriptions;
 pub mod message_outbox_recovery;
 pub mod message_recipients;
 pub mod promotion_campaigns;
