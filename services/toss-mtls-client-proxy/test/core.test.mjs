@@ -790,7 +790,7 @@ describe("toss-mtls-client-proxy", () => {
       expect(res.body.orderId).toBe("order-1");
       expect(res.body.sku).toBeUndefined();
       expect(res.body.error).toBe("UNVERIFIED_IAP_ORDER");
-      expect(res.body.providerStatus).toBe(paidStatus);
+      expect(res.body.providerStatus).toBe("ERROR");
     });
   });
   }

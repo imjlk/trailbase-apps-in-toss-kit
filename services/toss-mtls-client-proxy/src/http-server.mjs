@@ -55,7 +55,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
     const result = await core.iapOrderStatus(config.mode === "forward" ? { ...body, sku: undefined } : body);
     if (config.mode === "forward" && result.ok &&
         ["PAYMENT_COMPLETED", "PURCHASED"].includes(String(result.providerStatus).trim().toUpperCase()) && !result.sku) {
-      return response(200, { ...result, ok: false, error: "UNVERIFIED_IAP_ORDER",
+      return response(200, { ...result, ok: false, providerStatus: "ERROR", error: "UNVERIFIED_IAP_ORDER",
         failureReason: "Toss order response omitted the product SKU" });
     }
     return response(200, result);
