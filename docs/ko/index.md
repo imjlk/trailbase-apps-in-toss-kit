@@ -31,6 +31,7 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 | 인앱 결제 주문/지급 상태 저장하기 | [iap-orders.md](iap-orders.md) |
 | 기능성 푸시/알림 메시지 붙이기 | [functional-messages.md](functional-messages.md) |
 | React Native 클라이언트 어댑터 사용하기 | [client-adapters.md](client-adapters.md) |
+| WebView SDK 3 어댑터 사용하기 | [web-adapters.md](web-adapters.md) |
 | 계정 전환과 앱 복귀 처리하기 | [session-lifecycle.md](session-lifecycle.md) |
 | 비공개 IAP·프로모션·메시지 원장 진단하기 | [ledger-doctor.md](ledger-doctor.md) |
 | 기능별 중단과 과거 백업 복원 검증 | [operation-policy.md](operation-policy.md) |

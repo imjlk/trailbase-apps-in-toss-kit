@@ -241,6 +241,17 @@ Before changing a consumer TrailBase app, inspect:
 - optional `apps/trailbase/traildepot-template/migrations/analytics/`
 - Root `package.json` TrailBase helpers, especially container-side CLI aliases such as `trail`
 
+## WebView SDK 3 adapters
+
+For WebView consumers, use `@trailbase-apps-in-toss-kit/ait-web` with the consumer's
+`@apps-in-toss/web-framework >=3.4.0 <4` dependency; keep RN adapters on their separate
+framework line. The factory covers SDK Storage, login/anonymous identity,
+notification agreement, one-time/subscription IAP and sharing. It loads current
+SDK namespaces lazily, checks availability, requires a backend grant callback,
+and never invents identities or migrates localStorage implicitly. Keep server
+verification and account lifecycle controls. Read the official SDK docs first,
+then `docs/en/web-adapters.md` / `docs/ko/web-adapters.md` for kit integration.
+
 ## Encryption-key rotation
 
 Use `trailbase_toss_identity::TossIdentityKeyRing` for opt-in v1/v2 readers and new
