@@ -130,6 +130,20 @@ pub fn unseal_toss_user_key(encryption_key: &str, sealed: &str) -> CommonResult<
     String::from_utf8(plaintext).map_err(|err| format!("sealed Toss userKey was not UTF-8: {err}"))
 }
 
+/// Seal the prefixed seed so anonymous ciphertext cannot be confused with a login key.
+pub fn seal_verified_anonymous_key(
+    encryption_key: &str,
+    key: &trailbase_guest_common::anonymous_identity::VerifiedAnonymousKey,
+) -> CommonResult<String> {
+    seal_toss_user_key(encryption_key, key.anonymous_hash())
+}
+
+pub fn unseal_anonymous_key(encryption_key: &str, sealed: &str) -> CommonResult<String> {
+    let value = unseal_toss_user_key(encryption_key, sealed)?;
+    let normalized = trailbase_guest_common::anonymous_identity::normalize_anonymous_hash(&value)?;
+    Ok(normalized[4..].to_owned())
+}
+
 pub fn hmac_and_seal(
     secrets: &TossIdentitySecrets,
     toss_user_key: &str,
@@ -154,6 +168,18 @@ fn hmac_and_seal_with_nonce(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn anonymous_ciphertext_roundtrip_requires_the_anonymous_prefix() {
+        let key = "11".repeat(32);
+        let sealed = super::seal_toss_user_key_with_nonce(&key, "ait:anonymous", [3; 12]).unwrap();
+        assert_eq!(
+            super::unseal_anonymous_key(&key, &sealed).unwrap(),
+            "anonymous"
+        );
+        let login = super::seal_toss_user_key_with_nonce(&key, "12345", [4; 12]).unwrap();
+        assert!(super::unseal_anonymous_key(&key, &login).is_err());
+    }
+
     use super::*;
 
     const KEY: &str = "0000000000000000000000000000000000000000000000000000000000000000";

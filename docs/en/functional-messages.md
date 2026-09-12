@@ -152,3 +152,45 @@ References:
   <https://developers-apps-in-toss.toss.im/smart-message/intro.html#_2-1-%E1%84%8B%E1%85%A1%E1%86%AF%E1%84%85%E1%85%B5%E1%86%B7-%E1%84%83%E1%85%A9%E1%86%BC%E1%84%8B%E1%85%B4%E1%86%AB>
 - AppsInToss notification agreement SDK:
   <https://developers-apps-in-toss.toss.im/bedrock/reference/framework/%EC%9D%B8%ED%84%B0%EB%A0%89%EC%85%98/requestNotificationAgreement.html>
+
+## Dispatch Leases and Interrupted Workers
+
+Apply `message_outbox_attempts.sql` as a new migration, then migrate all workers
+together to `trailbase_guest_common::message_outbox_recovery`. Keep attempts in the
+product database and private from Record API. Existing outbox rows are preserved.
+
+1. Claim with `claim_message_outbox_with_lease_tx` and commit. Each permit is tied
+   to the outbox id and monotonically increasing attempt number.
+2. Recheck notification/marketing agreement and template gates. If denied, call
+   `skip_message_outbox_attempt_tx`. Otherwise call `begin_message_outbox_dispatch_tx`
+   and commit before sending. If it returns false, do not send.
+3. Perform the proxy call outside a database transaction. Complete with
+   `complete_message_outbox_attempt_tx` in a fresh transaction. A late/expired
+   attempt returns false and cannot overwrite a later attempt. Retain its result
+   for explicit reconciliation; do not create another send.
+4. Run `recover_expired_message_outbox_attempts_tx` from the app's worker loop.
+   An expired claim without a dispatch permit returns to READY. An expired
+   in-flight send becomes FAILED with provider_status UNKNOWN and an UNKNOWN
+   attempt. It is excluded from automatic claiming because delivery may have
+   succeeded. Reconcile before any deliberate retry.
+
+Stop old workers before switching APIs. `quarantine_legacy_message_outbox_locks_tx`
+can move old locks with no attempt record to FAILED/UNKNOWN; it never resends.
+Use a lease duration longer than the bounded proxy timeout plus response handling.
+Legacy skip now rejects terminal rows. Do not mix legacy completion helpers with
+leased workers because legacy APIs do not carry an attempt identity.
+
+Rust message responses preserve channel failure/content identifiers and SMS,
+Alimtalk, and Friendtalk counts. Completion stores the normalized response in
+`provider_response_json` when no raw response is supplied. Keep that field private.
+
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
+Both enqueue paths remove reserved raw recipient fields (`tossUserKey`, `userKey`,
+`anonKey`) recursively from payload objects and arrays before persistence. Keep
+identity in the private HMAC/sealed columns. Consumer migrations should scrub those
+fields from any legacy payloads that already contain them; new enqueues do not
+rewrite historical rows on idempotency conflicts.
+Dispatch uses the same recursive scrub before inserting the selected recipient.
+The reserved names are case-sensitive; consumers must not copy raw identifiers
+into other message context fields or encoded strings.

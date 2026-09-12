@@ -18,6 +18,7 @@
   "include": [
     "packages/ait-rn/src/**/*.ts",
     "packages/ait-rn/type-tests/**/*.ts",
-    "packages/trailbase-client/src/**/*.ts"
+    "packages/trailbase-client/src/**/*.ts",
+    "packages/trailbase-client/type-tests/**/*.ts"
   ]
 }

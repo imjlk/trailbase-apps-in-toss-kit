@@ -205,6 +205,52 @@ pub fn mark_iap_order_granted_tx(
         .ok_or_else(|| internal("IAP order row was not found for grant"))
 }
 
+/// Record a confirmed Toss completion after local grant. Call only after a
+/// successful SDK completeProductGrant or a verified provider completion status.
+/// This never grants inventory, and is idempotent on repeated confirmation.
+pub fn mark_iap_order_completed_tx(
+    tx: &mut Transaction,
+    table: IapOrdersTable,
+    order_id: &str,
+    now: i64,
+) -> ApiResult<IapOrderLedgerRecord> {
+    let (sql, params) = iap_order_completion_statement(table, order_id, now)?;
+    let rows = db::tx_query(tx, &sql, &params)?;
+    rows.first()
+        .map(|row| iap_order_ledger_record_from_row(row))
+        .transpose()?
+        .ok_or_else(|| internal("IAP order is not locally granted for completion"))
+}
+
+fn iap_order_completion_statement(
+    table: IapOrdersTable,
+    order_id: &str,
+    now: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    validate_iap_orders_table(table)?;
+    Ok((
+        format!(
+            "UPDATE {table} SET
+        {completed_at} = COALESCE({completed_at}, ?2),
+        {updated_at} = CASE WHEN {completed_at} IS NULL THEN ?2 ELSE {updated_at} END
+        WHERE {order_id} = ?1 AND {status} = 'GRANTED' AND {granted_at} IS NOT NULL
+          AND {granted_at} <= ?2
+        RETURNING {returning}",
+            table = table.table,
+            completed_at = table.completed_at_column,
+            updated_at = table.updated_at_column,
+            order_id = table.order_id_column,
+            status = table.status_column,
+            granted_at = table.granted_at_column,
+            returning = iap_order_returning_columns(table)
+        ),
+        vec![
+            Value::Text(normalize_required_text(order_id, "orderId")?),
+            Value::Integer(now),
+        ],
+    ))
+}
+
 pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStatus {
     let ok = response
         .get("ok")
@@ -228,7 +274,11 @@ pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStat
             "ERROR".to_string()
         }
     });
-    let ledger_status = iap_ledger_status_for_provider_status(&provider_status);
+    let ledger_status = if ok {
+        iap_ledger_status_for_provider_status(&provider_status)
+    } else {
+        IapLedgerStatus::Failed
+    };
     let failure_reason = if ledger_status == IapLedgerStatus::Failed {
         read_string_path(
             response,
@@ -353,7 +403,11 @@ fn normalize_iap_order_status_upsert_input(
             "orderId",
         )?,
         product_id,
-        status: input.status.ledger_status,
+        status: if input.status.ok {
+            input.status.ledger_status
+        } else {
+            IapLedgerStatus::Failed
+        },
         provider_status: normalize_required_text(&input.status.provider_status, "providerStatus")?,
         provider_reason: normalize_optional_text(input.status.reason.as_deref()),
         failure_reason: normalize_optional_text(input.status.failure_reason.as_deref()),
@@ -435,9 +489,7 @@ fn iap_order_status_upsert_statement(
                  ELSE excluded.{updated_at_column}
                END,
                {completed_at_column} = CASE
-                 WHEN {table}.{status_column} = 'GRANTED' AND excluded.{status_column} <> 'REFUNDED'
-                 THEN {table}.{completed_at_column}
-                 WHEN {table}.{status_column} = 'REFUNDED' AND excluded.{status_column} <> 'REFUNDED'
+                 WHEN {table}.{status_column} = 'REFUNDED'
                  THEN {table}.{completed_at_column}
                  ELSE COALESCE({table}.{completed_at_column}, excluded.{completed_at_column})
                END,
@@ -510,7 +562,6 @@ fn iap_order_grant_statement(
                    ELSE ?3
                  END,
                  {granted_at_column} = COALESCE({granted_at_column}, ?4),
-                 {completed_at_column} = COALESCE({completed_at_column}, ?4),
                  {updated_at_column} = CASE
                    WHEN {status_column} = 'GRANTED' THEN {updated_at_column}
                    ELSE ?4
@@ -523,7 +574,6 @@ fn iap_order_grant_statement(
             grant_id_column = table.grant_id_column,
             grant_payload_json_column = table.grant_payload_json_column,
             granted_at_column = table.granted_at_column,
-            completed_at_column = table.completed_at_column,
             updated_at_column = table.updated_at_column,
             order_id_column = table.order_id_column,
             returning_columns = iap_order_returning_columns(table),
@@ -897,5 +947,80 @@ mod tests {
 
         assert_eq!(error.code, "INVALID_IAP_ORDER");
         assert!(validate_sql_identifier("iap_orders;drop").is_err());
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_tests {
+    use super::*;
+    use crate::sql_test_support::{database, query};
+
+    #[test]
+    fn local_grant_and_toss_completion_are_separate_idempotent_steps() {
+        let db = database();
+        db.execute_batch("INSERT INTO iap_orders (order_id,user_id,product_id,status,provider_status,created_at,updated_at)
+            VALUES ('order',X'01','coins','PENDING_GRANT','PAYMENT_COMPLETED',1,1);").unwrap();
+        let (sql, params) =
+            iap_order_completion_statement(DEFAULT_IAP_ORDERS_TABLE, "order", 2).unwrap();
+        assert!(query(&db, &sql, &params).is_empty());
+        let (sql, params) = iap_order_grant_statement(
+            DEFAULT_IAP_ORDERS_TABLE,
+            IapOrderGrantInput {
+                order_id: "order",
+                grant_id: Some("grant"),
+                grant_payload_json: None,
+                now: 10,
+            },
+        )
+        .unwrap();
+        assert_eq!(query(&db, &sql, &params).len(), 1);
+        assert_eq!(query(&db, &sql, &params).len(), 1);
+        let timestamps = || {
+            db.query_row(
+                "SELECT granted_at,completed_at FROM iap_orders WHERE order_id='order'",
+                [],
+                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, Option<i64>>(1)?)),
+            )
+            .unwrap()
+        };
+        assert_eq!(timestamps(), (10, None));
+        let (sql, params) =
+            iap_order_completion_statement(DEFAULT_IAP_ORDERS_TABLE, "order", 20).unwrap();
+        assert_eq!(query(&db, &sql, &params).len(), 1);
+        let (sql, params) =
+            iap_order_completion_statement(DEFAULT_IAP_ORDERS_TABLE, "order", 30).unwrap();
+        query(&db, &sql, &params);
+        assert_eq!(timestamps(), (10, Some(20)));
+        db.execute("UPDATE iap_orders SET status='REFUNDED'", [])
+            .unwrap();
+        assert!(query(&db, &sql, &params).is_empty());
+    }
+
+    #[test]
+    fn verified_provider_completion_fills_a_locally_granted_order() {
+        let db = database();
+        db.execute_batch("INSERT INTO iap_orders (order_id,user_id,product_id,status,provider_status,granted_at,created_at,updated_at)
+            VALUES ('order',X'01','coins','GRANTED','PAYMENT_COMPLETED',10,1,10);").unwrap();
+        let status =
+            normalize_iap_order_status_response(&json!({"ok":true,"providerStatus":"PURCHASED"}));
+        let input = normalize_iap_order_status_upsert_input(IapOrderStatusUpsertInput {
+            user: &[1],
+            toss_user_key_hmac: None,
+            order_id: "order",
+            product_id: "coins",
+            status: &status,
+            raw_response_json: None,
+            now: 20,
+        })
+        .unwrap();
+        let (sql, params) =
+            iap_order_status_upsert_statement(DEFAULT_IAP_ORDERS_TABLE, &input).unwrap();
+        query(&db, &sql, &params);
+        assert_eq!(
+            db.query_row("SELECT completed_at FROM iap_orders", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            20
+        );
     }
 }

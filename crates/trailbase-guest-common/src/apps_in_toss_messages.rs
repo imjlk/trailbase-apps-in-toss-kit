@@ -96,6 +96,16 @@ pub struct NotificationTemplateAgreementRecord {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct MessageChannelFailure {
+    pub channel: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reach_fail_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MessageProviderResponse {
     pub ok: bool,
     pub provider_request_id: String,
@@ -114,11 +124,21 @@ pub struct MessageProviderResponse {
     pub sent_push_count: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sent_inbox_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sent_sms_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sent_alimtalk_count: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sent_friendtalk_count: Option<i64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub content_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<MessageChannelFailure>,
 }
 
 impl MessageProviderResponse {
     pub fn is_sent(&self) -> bool {
-        self.provider_status == "SENT"
+        self.ok && self.provider_status == "SENT"
     }
 }
 
@@ -230,6 +250,45 @@ pub fn parse_message_proxy_response(
         msg_count: read_i64_path(value, &["msgCount"]),
         sent_push_count: read_i64_path(value, &["sentPushCount"]),
         sent_inbox_count: read_i64_path(value, &["sentInboxCount"]),
+        sent_sms_count: read_i64_path(value, &["sentSmsCount"]),
+        sent_alimtalk_count: read_i64_path(value, &["sentAlimtalkCount"]),
+        sent_friendtalk_count: read_i64_path(value, &["sentFriendtalkCount"]),
+        content_ids: value
+            .get("contentIds")
+            .and_then(JsonValue::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(JsonValue::as_str)
+            .map(str::to_owned)
+            .collect(),
+        failures: value
+            .get("failures")
+            .and_then(JsonValue::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|failure| {
+                let channel = read_string_path(failure, &["channel"])?;
+                if ![
+                    "sentPush",
+                    "sentInbox",
+                    "sentSms",
+                    "sentAlimtalk",
+                    "sentFriendtalk",
+                ]
+                .contains(&channel.as_str())
+                {
+                    return None;
+                }
+                Some(MessageChannelFailure {
+                    channel,
+                    content_id: read_string_path(failure, &["contentId"]),
+                    reach_fail_reason: read_string_path(
+                        failure,
+                        &["reachedFailReason", "reachFailReason"],
+                    ),
+                })
+            })
+            .collect(),
     }
 }
 
@@ -482,6 +541,14 @@ fn message_outbox_fail_statement(
     ))
 }
 
+const MESSAGE_OUTBOX_SKIP_SQL: &str = "UPDATE message_outbox
+         SET status = 'SKIPPED',
+             locked_at = NULL,
+             failed_at = ?2,
+             failure_reason = ?3,
+             updated_at = ?2
+         WHERE id = ?1 AND status IN ('READY', 'LOCKED')";
+
 pub fn skip_message_outbox_tx(
     tx: &mut Transaction,
     outbox_id: &str,
@@ -490,13 +557,7 @@ pub fn skip_message_outbox_tx(
 ) -> ApiResult<()> {
     let updated = db::tx_execute(
         tx,
-        "UPDATE message_outbox
-         SET status = 'SKIPPED',
-             locked_at = NULL,
-             failed_at = ?2,
-             failure_reason = ?3,
-             updated_at = ?2
-         WHERE id = ?1",
+        MESSAGE_OUTBOX_SKIP_SQL,
         &[
             Value::Text(outbox_id.to_string()),
             Value::Integer(now),
@@ -526,8 +587,27 @@ struct NormalizedMessageOutboxEnqueue {
     now: i64,
 }
 
+// Recipient identity belongs in the private HMAC/sealed columns, never in
+// arbitrary message context persisted or forwarded to a template.
+pub(crate) fn remove_raw_recipient_fields(payload: &mut JsonValue) {
+    match payload {
+        JsonValue::Object(fields) => {
+            fields.retain(|key, _| !matches!(key.as_str(), "tossUserKey" | "userKey" | "anonKey"));
+            for value in fields.values_mut() {
+                remove_raw_recipient_fields(value);
+            }
+        }
+        JsonValue::Array(values) => {
+            for value in values {
+                remove_raw_recipient_fields(value);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn normalize_message_outbox_enqueue_input(
-    input: MessageOutboxEnqueueInput<'_>,
+    mut input: MessageOutboxEnqueueInput<'_>,
 ) -> ApiResult<NormalizedMessageOutboxEnqueue> {
     if input.user.is_empty() {
         return Err(bad_request(
@@ -541,6 +621,7 @@ fn normalize_message_outbox_enqueue_input(
             "message outbox payload must be a JSON object",
         ));
     }
+    remove_raw_recipient_fields(&mut input.payload);
     Ok(NormalizedMessageOutboxEnqueue {
         id: normalize_optional_code(input.id.map(str::to_string)),
         user_id: input.user.to_vec(),
@@ -688,8 +769,14 @@ pub fn complete_message_outbox_tx(
     raw_response_json: Option<&str>,
     now: i64,
 ) -> ApiResult<()> {
-    let (sql, params) =
-        message_outbox_complete_statement(outbox_id, response, raw_response_json, now);
+    let normalized_json = serde_json::to_string(response)
+        .map_err(|_| internal("Failed to serialize message delivery result"))?;
+    let (sql, params) = message_outbox_complete_statement(
+        outbox_id,
+        response,
+        raw_response_json.or(Some(&normalized_json)),
+        now,
+    );
     let updated = db::tx_execute(tx, &sql, &params)?;
     if updated == 0 {
         return Err(internal("Message outbox row was not found for completion"));
@@ -944,7 +1031,7 @@ fn notification_template_agreement_from_row(
     })
 }
 
-fn message_outbox_record_from_row(row: &[Value]) -> ApiResult<MessageOutboxRecord> {
+pub(crate) fn message_outbox_record_from_row(row: &[Value]) -> ApiResult<MessageOutboxRecord> {
     Ok(MessageOutboxRecord {
         id: db::text(&row[0], "message_outbox_id")?,
         user_id: db::blob(&row[1], "message_outbox_user_id")?,
@@ -1258,7 +1345,7 @@ mod tests {
     }
 
     #[test]
-    fn builds_message_outbox_enqueue_statement() {
+    fn builds_message_outbox_enqueue_statement_without_raw_recipients() {
         let record = normalize_message_outbox_enqueue_input(MessageOutboxEnqueueInput {
             id: Some(" outbox-1 "),
             user: &[1, 2, 3],
@@ -1267,7 +1354,7 @@ mod tests {
             campaign_id: Some(" campaign-1 "),
             purpose: MessagePurpose::Functional,
             template_code: " template-1 ",
-            payload: json!({ "name": "Ada" }),
+            payload: json!({ "name": "Ada", "tossUserKey": "raw-login", "userKey": "raw-user", "anonKey": "raw-anon", "context": {"items": [1, {"anonKey":"nested-raw", "label":"safe"}]} }),
             idempotency_key: " idem-1 ",
             provider: None,
             provider_request_id: " request-1 ",
@@ -1283,7 +1370,10 @@ mod tests {
         assert_eq!(params.len(), 13);
         assert_eq!(record.id.as_deref(), Some("outbox-1"));
         assert_eq!(record.provider, APPS_IN_TOSS_SMART_MESSAGE_PROVIDER);
-        assert_eq!(record.payload_json, json!({ "name": "Ada" }).to_string());
+        assert_eq!(
+            record.payload_json,
+            json!({ "name": "Ada", "context": {"items": [1, {"label":"safe"}]} }).to_string()
+        );
     }
 
     #[test]
@@ -1422,6 +1512,51 @@ mod tests {
                 .map(|record| record.id.as_str())
                 .collect::<Vec<_>>(),
             vec!["outbox-1", "outbox-3"]
+        );
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_tests {
+    use super::*;
+    use crate::sql_test_support::{database, insert_outbox};
+
+    #[test]
+    fn skip_preserves_all_terminal_states() {
+        let db = database();
+        for status in ["SENT", "FAILED", "SKIPPED", "CANCELLED", "READY", "LOCKED"] {
+            insert_outbox(&db, status, status, 1);
+            let changed = db
+                .execute(
+                    MESSAGE_OUTBOX_SKIP_SQL,
+                    rusqlite::params![status, 20, "no agreement"],
+                )
+                .unwrap();
+            assert_eq!(changed, usize::from(matches!(status, "READY" | "LOCKED")));
+        }
+    }
+
+    #[test]
+    fn parses_channel_details_without_copying_unknown_recipient_fields() {
+        let response = parse_message_proxy_response(
+            &serde_json::json!({
+                "ok": true, "providerStatus": "SENT", "sentSmsCount": 1,
+                "contentIds": ["content-1"], "failures": [{"channel":"sentInbox", "contentId":"content-2",
+                    "reachedFailReason":"disabled", "reachFailReason":"disabled", "userKey":"private"}]
+            }),
+            "request",
+            None,
+        );
+        assert_eq!(response.sent_sms_count, Some(1));
+        assert_eq!(response.content_ids, ["content-1"]);
+        assert_eq!(
+            response.failures[0].reach_fail_reason.as_deref(),
+            Some("disabled")
+        );
+        assert!(
+            !serde_json::to_string(&response)
+                .unwrap()
+                .contains("private")
         );
     }
 }

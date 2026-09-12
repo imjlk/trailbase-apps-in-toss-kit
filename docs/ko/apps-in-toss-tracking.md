@@ -105,11 +105,10 @@ root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새
   실제 설치된 SDK 타입의 호환성을 검사합니다. SDK에 구독 구매·조회 API가 포함되어 있지만,
   이를 kit에서 사용하는 작업은 별도 기능 변경입니다.
 
-2026년 7월 API 변경으로 promotion, Smart Message, Toss Pay 서버 API는 Toss Login
-`userKey` 외에 익명 hash로도 사용자를 식별할 수 있습니다. Smart Message adapter는 이미
-`anonKey`를 받아 `x-anon-key`로 전달하며, Toss Login 수신자는 `x-toss-user-key`를 사용합니다.
-익명 식별키 검증과 promotion 입력 지원은 별도 기능 변경입니다. raw 식별자를 로그하거나
-응답으로 돌려주지 않는 규칙을 유지해야 합니다.
+2026년 7월 API 변경으로 promotion·Smart Message는 익명 수신자를 지원합니다. Kit도
+이제 익명키 검증, 비공개 identity 저장소, 메시지 수신자 타입, 익명 promotion adapter를
+제공합니다. Migration과 동의 요건은 [검증된 익명 사용자 식별](anonymous-identity.md)을
+참고하세요. 공개 응답과 로그에는 식별자 원문을 넣지 않습니다.
 
 이번 reference 갱신은 TrailBase 최소 지원 서버 정책을 바꾸지 않습니다. 다만 컨슈머 앱의 지원 Apps in Toss
 SDK/runtime policy는 앱 단위 smoke test 이후에만 올리세요.

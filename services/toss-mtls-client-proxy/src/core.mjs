@@ -13,7 +13,7 @@ export {
   validateConfig,
 } from "./config.mjs";
 export { createNodeMtlsClient } from "./node-mtls-client.mjs";
-export { createProxyServer, handleRequest } from "./http-server.mjs";
+export { createProxyServer, handleRequest, PROMOTION_REWARD_STATUS_PATH } from "./http-server.mjs";
 export { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 export {
   DEFAULT_IAP_ORDER_STATUS_MAX_ATTEMPTS,
@@ -22,3 +22,5 @@ export {
   TOSS_ENDPOINTS,
   createTossMtlsCore,
 } from "@ait-kit/api-core";
+
+export { ANONYMOUS_KEY_VERIFY_PATH, TOSS_ANONYMOUS_KEY_VERIFY_PATH } from "./anonymous-key.mjs";

@@ -60,6 +60,12 @@
   loads the verified auth user. The compatibility `upsert_verified_auth_user_tx` API still refreshes
   the password hash for callers that have not moved rotation to the login helper.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
+- For verified anonymous bootstrap, use `anonymous_identity::verify_anonymous_hash` before
+  creating/authenticating `_user`; preserve the existing HMAC of `ait:<hash>` and aliases.
+  Apply private `anonymous_identities.sql` and use the verified-key seal/store helpers.
+  Anonymous dispatch uses `message_recipients` and the same notification/marketing gate.
+  Apply the additive recipient migration once, stop legacy workers, and keep promotion
+  recovery bound to the originally stored anonymous recipient and transaction key.
 
 ## React Native Client Bootstrap And Helpers
 
@@ -138,6 +144,12 @@ helper exists in the checked-out package.
     provider grant ledgers, provider outcome persistence, and budget usage checks.
   - `iap_orders.sql` with `trailbase_guest_common::iap_orders` for order-status persistence and
     idempotent local grant marking.
+  For recoverable message workers, apply `message_outbox_attempts.sql` and use
+  `message_outbox_recovery` leases. Commit the dispatch permit before sending; expired
+  in-flight sends are UNKNOWN and must not be automatically resent. Stop legacy workers
+  before migration. IAP local grants leave `completed_at` empty until explicit Toss
+  completion confirmation through `mark_iap_order_completed_tx`. Promotion recovery
+  uses `apps_in_toss_proxy::promotion_reward_status` with a persisted transaction key.
   Keep these tables in the app/product database by default, not the `analytics` database. Eligibility,
   product grant rules, inventory/balance updates, cooldowns, and public projections stay app-owned.
   After changing the shared functional ledger SQL templates, run

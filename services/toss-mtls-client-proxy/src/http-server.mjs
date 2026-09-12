@@ -3,6 +3,9 @@ import { createTossMtlsCore, clientError, TOSS_ENDPOINTS, publicError as corePub
 import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
+import { ANONYMOUS_KEY_VERIFY_PATH, requireAnonymousKey, verifyAnonymousKey } from "./anonymous-key.mjs";
+
+export const PROMOTION_REWARD_STATUS_PATH = "/internal/apps-in-toss/promotion/reward/status";
 
 export function createProxyServer(config = createConfig()) {
   validateConfig(config);
@@ -31,6 +34,11 @@ export async function handleRequest(req, config = createConfig(), core = createC
   if (req.method === "GET" && url.pathname === PROXY_ENDPOINTS.health) {
     const health = await core.health();
     return response(200, { ok: health.ok, mode: health.mode });
+  }
+
+  if (req.method === "POST" && url.pathname === ANONYMOUS_KEY_VERIFY_PATH) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    return response(200, await verifyAnonymousKey(body, core, config.mode));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.genericMtlRequest) {
@@ -63,7 +71,17 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    return response(200, await core.promotionRewardGrant(body));
+    return response(200, await promotionReward(core, config, body));
+  }
+
+  if (req.method === "POST" && url.pathname === PROMOTION_REWARD_STATUS_PATH) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    const key = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
+    if (!key) {
+      throw clientError("MISSING_PROMOTION_TRANSACTION_KEY", "providerTransactionKey is required for result lookup");
+    }
+    // api-core skips get-key and execute when an existing transaction key is supplied.
+    return response(200, await promotionReward(core, config, { ...body, providerTransactionKey: key }));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageSend) {
@@ -79,7 +97,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
   return response(404, { ok: false, error: "NOT_FOUND" });
 }
 
-function createCore(config) {
+function createCore(config, anonymousPromotion = false) {
   const transport = createNodeMtlsClient(config);
   return createTossMtlsCore({
     // This authenticated internal proxy intentionally exposes the generic relay.
@@ -104,10 +122,36 @@ function createCore(config) {
           }
           return transport.request(url, { ...init, headers });
         }
+        if (anonymousPromotion && [TOSS_ENDPOINTS.promotionGetKey, TOSS_ENDPOINTS.promotionExecute, TOSS_ENDPOINTS.promotionResult].includes(new URL(url).pathname)) {
+          const headers = new Headers(init.headers);
+          const key = headers.get("x-toss-user-key");
+          if (key) headers.set("x-anon-key", key);
+          headers.delete("x-toss-user-key");
+          return transport.request(url, { ...init, headers });
+        }
         return transport.request(url, init);
       },
     },
   });
+}
+
+async function promotionReward(core, config, body) {
+  if (body?.anonKey === undefined) return core.promotionRewardGrant(body);
+  const anonKey = requireAnonymousKey(body.anonKey);
+  if (body.tossUserKey !== undefined || body.userKey !== undefined) {
+    throw clientError("INVALID_PROMOTION_RECIPIENT", "provide exactly one promotion recipient");
+  }
+  // api-core 0.2.0's promotion adapter requires tossUserKey. Adapt only its
+  // transport header within this request; preserve its status/key recovery logic.
+  const result = await createCore(config, true).promotionRewardGrant({ ...body, anonKey: undefined, tossUserKey: anonKey });
+  return redactRecipient(result, anonKey);
+}
+
+function redactRecipient(value, recipient) {
+  if (typeof value === "string") return value.split(recipient).join("[redacted]");
+  if (Array.isArray(value)) return value.map((entry) => redactRecipient(entry, recipient));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactRecipient(entry, recipient)]));
+  return value;
 }
 
 function compatibleMessageResponse(result) {

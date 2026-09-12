@@ -38,3 +38,17 @@ the consumer app.
   views.
 - Keep high-volume analytics separate. IAP order/grant rows are functional
   ledgers, not analytics sink events.
+
+## Grant and Completion Recovery
+
+`mark_iap_order_granted_tx` now records `granted_at` without filling
+`completed_at`. Commit the local inventory change and grant marker together.
+After Toss `completeProductGrant` succeeds, call `mark_iap_order_completed_tx`
+from the authenticated backend, or persist a verified provider completion status.
+The completion helper only accepts an already locally granted, non-refunded order
+and preserves the first confirmation timestamp on retries.
+
+`GRANTED` with a null `completed_at` needs only Toss completion recovery; do not
+grant inventory again. Authorize order ownership before either helper. Existing
+rows whose timestamps were set together remain historical data; do not clear
+them automatically. No schema change is needed for the existing kit template.

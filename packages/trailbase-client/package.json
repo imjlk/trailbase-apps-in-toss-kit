@@ -13,7 +13,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
-    "@tanstack/react-db": "0.1.85"
+    "@tanstack/react-db": "0.3.8"
   },
   "peerDependencies": {
     "@tanstack/react-query": ">=5.0.0",

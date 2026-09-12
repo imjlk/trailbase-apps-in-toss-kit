@@ -354,3 +354,28 @@ only after the app has repeated Record API snapshot and realtime collection code
 If an app already has a stable client layer, migrate one repeated concern at a
 time. The expected result is less transport code, not a different application
 data model.
+
+## Reconnect Snapshot Reconciliation
+
+The TanStack adapter now uses `@tanstack/react-db` 0.3.8. After each successful
+subscription it loads a fresh snapshot before applying queued live events. The
+default `snapshotMode: "replace"` follows returned pagination cursors and removes
+previously synchronized rows absent from the completed snapshot. `pagination.limit`
+is a page size, not a total collection limit. Start at the first page. Custom
+Record API wrappers must preserve the returned `cursor`; a wrapper returning only
+`records` promises that it has returned the complete snapshot.
+
+Use `snapshotMode: "merge"` to preserve a deliberately windowed or partial list;
+that mode re-fetches on reconnect but cannot remove rows deleted while offline.
+Use a dedicated Record API/view whose subscription has the same row scope as its
+list; list-only filters do not constrain `subscribe("*")`. XHR subscriptions wait
+for successful response headers before starting the snapshot. A failed snapshot
+reports `onSubscriptionError`, closes the stream, and retries without marking the
+collection ready. Cleanup cancels streams and ignores late list responses.
+
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
+XHR SSE connection setup is cancellable through `subscribe(id, { signal })` and
+collection cleanup. `connectionTimeoutMs` defaults to 15 seconds and covers header
+resolution plus the wait for response headers; it does not expire an established
+stream. Stalled setup aborts the request and lets collection reconnection retry.

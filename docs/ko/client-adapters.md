@@ -335,3 +335,27 @@ Record API 스냅샷과 실시간 컬렉션 코드가 반복될 때만 TanStack 
 
 이미 안정적인 클라이언트 계층이 있는 앱이라면 반복되는 부분을 하나씩 옮기세요. 기대하는
 결과는 애플리케이션 데이터 모델 변경이 아니라 전송 코드 감소입니다.
+
+## 재연결 시 스냅샷 정합성
+
+TanStack adapter는 `@tanstack/react-db` 0.3.8을 사용합니다. 구독에 연결될 때마다
+새 스냅샷을 조회하고 대기 중인 실시간 이벤트를 그 뒤에 적용합니다. 기본
+`snapshotMode: "replace"`는 응답의 pagination cursor를 따라 끝까지 조회한 다음,
+이전에 동기화했지만 최종 스냅샷에 없는 행을 제거합니다. `pagination.limit`는 전체
+collection 한도가 아니라 페이지 크기입니다. 첫 페이지부터 시작하세요. 사용자 정의
+Record API wrapper는 응답의 `cursor`를 유지해야 합니다. `records`만 반환하면 전체
+스냅샷을 반환한다는 계약으로 간주합니다.
+
+의도적으로 일부 행이나 특정 페이지를 조회한다면 `snapshotMode: "merge"`를 쓰세요.
+재연결 시 재조회하지만 연결이 끊긴 동안 삭제된 행은 제거할 수 없습니다. 목록과 구독의
+행 범위가 같은 전용 Record API/view를 사용하세요. list에만 전달한 filter는
+`subscribe("*")`를 제한하지 않습니다. XHR 구독은 성공 응답 헤더를 받은 뒤 스냅샷을
+조회합니다. 조회 실패는 `onSubscriptionError`에 전달하며 stream을 닫고 준비 완료
+표시 없이 재시도합니다. Cleanup 이후에 끝난 목록 요청은 무시합니다.
+
+[검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
+
+XHR SSE 연결 준비는 `subscribe(id, { signal })`과 collection cleanup으로 취소할 수
+있습니다. `connectionTimeoutMs` 기본값은 15초이며 인증 헤더 준비와 응답 헤더 대기에
+적용됩니다. 이미 연결된 스트림은 이 제한으로 종료되지 않습니다. 연결 준비가 멈추면
+요청을 중단하고 collection 재연결이 재시도합니다.
