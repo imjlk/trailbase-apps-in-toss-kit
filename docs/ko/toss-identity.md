@@ -114,3 +114,5 @@ API를 호출하기 위한 외부 연결용(outbound) mTLS 프록시를 거치�
 원본 Toss `userKey`를 제외한 audit/event 레코드를 기록하는 것입니다.
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
+
+Reader 우선 v1/v2 전환과 제한된 재암호화 배치는 [암호화 키 교체](identity-key-rotation.md)를 참고하세요.

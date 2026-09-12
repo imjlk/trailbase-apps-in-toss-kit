@@ -64,6 +64,7 @@ try {
     path.join(scratch, "wasm/compat_smoke.wasm"),
   );
   const templates = [
+    "app_reward_attempts.sql",
     "message_templates.sql",
     "notification_template_agreements.sql",
     "message_outbox.core.sql",
@@ -283,6 +284,10 @@ record_apis: [{
   checks.push(
     "Record API ownership/read-only ACL and SSE insert/update/delete",
   );
+  assert.deepEqual(await request("/kit-smoke/rewards", { tokens: alpha, method: "POST" }), {
+    schemaOk: true, replaySame: true, scopeDenied: true, granted: true,
+  });
+  checks.push("app reward tables/index coexistence, server issuance, once-only grant and scoped replay");
   const refreshed = await request("/api/auth/v1/refresh", {
     method: "POST",
     body: { refresh_token: alpha.refresh_token },

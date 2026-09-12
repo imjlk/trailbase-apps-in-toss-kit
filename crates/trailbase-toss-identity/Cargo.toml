@@ -12,3 +12,6 @@ base64.workspace = true
 serde.workspace = true
 trailbase-guest-common = { path = "../trailbase-guest-common", version = "0.9.0" }
 trailbase-wasm.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+rusqlite = { version = "0.40.2", features = ["bundled"] }
