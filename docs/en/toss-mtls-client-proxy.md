@@ -394,3 +394,12 @@ list is maintained in `src/capabilities.mjs`. No upstream call or certificate/se
 content is included. This describes implementation availability, not readiness of
 a specific campaign or user operation. See [Release Doctor](release-doctor.md#proxy-capability-preflight)
 for deployment preflight checks. Old consumers can continue reading `ok`/`mode`.
+
+## Shared Response Contracts
+
+The synthetic corpus under `fixtures/contracts/` is checked by Rust, the proxy,
+RN transport and ledger diagnostics. It covers provider aliases, missing payment
+SKU, explicit failures and partial message delivery. An explicit failed promotion
+response cannot become a grant through a contradictory status. A message response
+with neither an explicit result flag nor a status field remains UNKNOWN; reconcile its
+original request before any resend. These checks complement real provider tests.
