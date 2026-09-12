@@ -68,3 +68,5 @@ kit의 해석이 아니라 원본 도구의 동작 자체를 확인해야 할 �
 영문 문서는 `docs/en/`에 있고, 같은 파일명의 한글 문서는 `docs/ko/`에 있습니다.
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
+
+RN adapter와 비공개 웹훅·이용권한 원장은 [IAP 정기구독](iap-subscriptions.md)을 참고하세요.

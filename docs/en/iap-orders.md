@@ -52,3 +52,5 @@ and preserves the first confirmation timestamp on retries.
 grant inventory again. Authorize order ownership before either helper. Existing
 rows whose timestamps were set together remain historical data; do not clear
 them automatically. No schema change is needed for the existing kit template.
+
+See [IAP Subscriptions](iap-subscriptions.md) for RN adapters and the private webhook/entitlement ledger.

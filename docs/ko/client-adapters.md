@@ -354,3 +354,5 @@ Record API wrapper는 응답의 `cursor`를 유지해야 합니다. `records`만
 표시 없이 재시도합니다. Cleanup 이후에 끝난 목록 요청은 무시합니다.
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
+
+RN adapter와 비공개 웹훅·이용권한 원장은 [IAP 정기구독](iap-subscriptions.md)을 참고하세요.

@@ -374,3 +374,5 @@ reports `onSubscriptionError`, closes the stream, and retries without marking th
 collection ready. Cleanup cancels streams and ignores late list responses.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
+See [IAP Subscriptions](iap-subscriptions.md) for RN adapters and the private webhook/entitlement ledger.

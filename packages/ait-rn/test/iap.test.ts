@@ -399,15 +399,20 @@ describe("AppsInToss IAP bridge", () => {
       expect((error as Error).message).toBe(
         "Apps in Toss one-time purchase failed.",
       );
-      expect((error as Error).message).not.toContain("raw-toss-user-key-secret");
+      expect((error as Error).message).not.toContain(
+        "raw-toss-user-key-secret",
+      );
     }
   });
 });
 
 describe("AppsInToss IAP grant client", () => {
   test("posts grant, complete, and pending requests to app-owned endpoints", async () => {
-    const calls: Array<{ body: unknown; headers: HeadersInit | undefined; url: string }> =
-      [];
+    const calls: Array<{
+      body: unknown;
+      headers: HeadersInit | undefined;
+      url: string;
+    }> = [];
     const client = createAppsInTossIapGrantClient({
       baseUrl: "https://api.example.test",
       endpoints: {
@@ -434,7 +439,9 @@ describe("AppsInToss IAP grant client", () => {
       source: "purchase",
     });
     await client.complete({ orderId: "order-1", sku: "coins.100" });
-    await client.pending({ orders: [{ orderId: "order-2", sku: "coins.200" }] });
+    await client.pending({
+      orders: [{ orderId: "order-2", sku: "coins.200" }],
+    });
 
     expect(calls).toEqual([
       {
@@ -479,5 +486,158 @@ describe("AppsInToss IAP grant client", () => {
     const module = await import("../src/iap");
     expect(module.createAppsInTossIapBridge).toBeFunction();
     expect(module.createAppsInTossIapGrantClient).toBeFunction();
+  });
+});
+
+describe("subscription IAP", () => {
+  test("preserves product kind, renewal cycle and offer details", async () => {
+    const bridge = createAppsInTossIapBridge({
+      IAP: {
+        getProductItemList: async () => ({
+          products: [
+            {
+              sku: "monthly",
+              type: "SUBSCRIPTION",
+              renewalCycle: "MONTHLY",
+              offers: [{ type: "FREE_TRIAL", offerId: "trial", period: "P7D" }],
+            },
+            { sku: "unlock", type: "NON_CONSUMABLE" },
+            { sku: "coins", type: "CONSUMABLE" },
+          ],
+        }),
+      },
+    });
+    const products = await bridge.getProducts();
+    expect(products[0]).toMatchObject({
+      type: "SUBSCRIPTION",
+      renewalCycle: "MONTHLY",
+      offers: [{ type: "FREE_TRIAL", offerId: "trial", period: "P7D" }],
+    });
+    expect(products[1].type).toBe("NON_CONSUMABLE");
+    expect(products[2].type).toBe("CONSUMABLE");
+  });
+
+  test("subscription purchase forwards the offer and subscription id and cleans up once", async () => {
+    let cleaned = 0;
+    const grants: unknown[] = [];
+    const bridge = createAppsInTossIapBridge({
+      IAP: {
+        createSubscriptionPurchaseOrder: ({ options, onEvent }) => {
+          expect(options.sku).toBe("monthly");
+          expect(options.offerId).toBe("trial");
+          onEvent({ type: "success", data: { orderId: "order" } });
+          void options.processProductGrant({
+            orderId: "order",
+            subscriptionId: "subscription",
+          });
+          return () => {
+            cleaned++;
+          };
+        },
+      },
+    });
+    const result = await bridge.purchaseSubscription({
+      sku: "monthly",
+      offerId: "trial",
+      processProductGrant: (input) => {
+        grants.push(input);
+        return true;
+      },
+    });
+    expect(result).toMatchObject({
+      orderId: "order",
+      sku: "monthly",
+      subscriptionId: "subscription",
+    });
+    expect(grants).toEqual([
+      {
+        orderId: "order",
+        sku: "monthly",
+        subscriptionId: "subscription",
+        source: "purchase",
+        providerPayload: { orderId: "order", subscriptionId: "subscription" },
+      },
+    ]);
+    expect(cleaned).toBe(1);
+  });
+
+  test("subscription availability is checked per API", async () => {
+    const bridge = createAppsInTossIapBridge({
+      IAP: { getSubscriptionInfo: async () => undefined },
+    });
+    await expect(
+      bridge.purchaseSubscription({
+        sku: "monthly",
+        processProductGrant: () => true,
+      }),
+    ).rejects.toMatchObject({ code: "IAP_SUBSCRIPTION_UNAVAILABLE" });
+    await expect(
+      bridge.getSubscriptionInfo({ orderId: "order" }),
+    ).rejects.toMatchObject({ code: "IAP_SUBSCRIPTION_UNSUPPORTED" });
+  });
+
+  test("status query uses the installed SDK shape and rejects malformed authority fields", async () => {
+    let subscription: any = {
+      catalogId: 1,
+      status: "ACTIVE",
+      expiresAt: null,
+      isAutoRenew: true,
+      gracePeriodExpiresAt: null,
+      isAccessible: true,
+    };
+    const bridge = createAppsInTossIapBridge({
+      IAP: {
+        getSubscriptionInfo: async (input) => {
+          expect(input).toEqual({ params: { orderId: "order" } });
+          return { subscription };
+        },
+      },
+    });
+    expect(
+      (await bridge.getSubscriptionInfo({ orderId: " order " })).isAccessible,
+    ).toBe(true);
+    subscription = { ...subscription, isAccessible: "true" };
+    await expect(
+      bridge.getSubscriptionInfo({ orderId: "order" }),
+    ).rejects.toMatchObject({ code: "IAP_SUBSCRIPTION_INVALID_RESPONSE" });
+  });
+
+  test("subscription timeout cleans up and rejects a late grant callback", async () => {
+    let callback: any;
+    let grants = 0;
+    let cleaned = 0;
+    const bridge = createAppsInTossIapBridge({
+      purchaseTimeoutMs: 5,
+      IAP: {
+        createSubscriptionPurchaseOrder: ({ options }) => {
+          callback = options.processProductGrant;
+          return () => {
+            cleaned++;
+          };
+        },
+      },
+    });
+    await expect(
+      bridge.purchaseSubscription({
+        sku: "monthly",
+        processProductGrant: () => {
+          grants++;
+          return true;
+        },
+      }),
+    ).rejects.toMatchObject({ code: "IAP_PURCHASE_TIMEOUT" });
+    expect(await callback({ orderId: "late" })).toBe(false);
+    expect(grants).toBe(0);
+    expect(cleaned).toBe(1);
+  });
+
+  test("status queries time out without being treated as a revoked subscription", async () => {
+    const bridge = createAppsInTossIapBridge({
+      getSubscriptionInfoTimeoutMs: 5,
+      IAP: { getSubscriptionInfo: () => new Promise(() => {}) },
+    });
+    await expect(
+      bridge.getSubscriptionInfo({ orderId: "order" }),
+    ).rejects.toMatchObject({ code: "IAP_SUBSCRIPTION_QUERY_TIMEOUT" });
   });
 });

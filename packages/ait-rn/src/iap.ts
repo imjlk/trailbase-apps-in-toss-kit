@@ -9,7 +9,37 @@ import {
   type AppsInTossJsonFetcher,
 } from "./internal/http";
 
+// Structural contracts remain loadable with older peer SDKs. CI checks these
+// against the actual pinned SDK; new methods remain optional at runtime.
+export type AppsInTossIapProductType =
+  "CONSUMABLE" | "NON_CONSUMABLE" | "SUBSCRIPTION";
+export type AppsInTossIapRenewalCycle = "WEEKLY" | "MONTHLY" | "YEARLY";
+export type AppsInTossIapOffer =
+  | { type: "FREE_TRIAL"; offerId: string; period: string }
+  | {
+      type: "NEW_SUBSCRIPTION" | "RETURNING";
+      offerId: string;
+      period: string;
+      displayAmount: string;
+    };
+export type AppsInTossIapSubscriptionProduct = AppsInTossIapProduct & {
+  type: "SUBSCRIPTION";
+  renewalCycle: AppsInTossIapRenewalCycle;
+};
+export interface AppsInTossIapSubscriptionInfo {
+  catalogId: number;
+  status:
+    "ACTIVE" | "EXPIRED" | "IN_GRACE_PERIOD" | "ON_HOLD" | "PAUSED" | "REVOKED";
+  expiresAt: string | null;
+  isAutoRenew: boolean;
+  gracePeriodExpiresAt: string | null;
+  isAccessible: boolean;
+}
+
 export interface AppsInTossIapProduct {
+  type?: AppsInTossIapProductType;
+  renewalCycle?: AppsInTossIapRenewalCycle;
+  offers?: AppsInTossIapOffer[];
   description: string;
   displayAmount: string;
   displayName: string;
@@ -24,6 +54,7 @@ export interface AppsInTossIapPendingOrder {
 }
 
 export interface AppsInTossIapPurchaseResult {
+  subscriptionId?: string;
   amount?: number;
   currency?: string;
   displayAmount?: string;
@@ -35,6 +66,7 @@ export interface AppsInTossIapPurchaseResult {
 }
 
 export interface AppsInTossIapProductGrantInput {
+  subscriptionId?: string;
   orderId: string;
   providerPayload?: unknown;
   sku: string;
@@ -53,8 +85,7 @@ export type AppsInTossIapProductGrantOutcome =
 export type AppsInTossIapProcessProductGrant = (
   input: AppsInTossIapProductGrantInput,
 ) =>
-  | AppsInTossIapProductGrantOutcome
-  | Promise<AppsInTossIapProductGrantOutcome>;
+  AppsInTossIapProductGrantOutcome | Promise<AppsInTossIapProductGrantOutcome>;
 
 type AppsInTossIapSupportedFunction<T> = T & {
   isSupported?: () => boolean;
@@ -78,6 +109,27 @@ export type AppsInTossIapCreateOneTimePurchaseOrder =
     }) => void | (() => void)
   >;
 
+export type AppsInTossIapCreateSubscriptionPurchaseOrder =
+  AppsInTossIapSupportedFunction<
+    (params: {
+      onError: (error: unknown) => void | Promise<void>;
+      onEvent: (event: unknown) => void | Promise<void>;
+      options: {
+        sku: string;
+        offerId?: string | null;
+        processProductGrant: (params: {
+          orderId: string;
+          subscriptionId?: string;
+        }) => boolean | Promise<boolean>;
+      };
+    }) => void | (() => void)
+  >;
+export type AppsInTossIapGetSubscriptionInfo = AppsInTossIapSupportedFunction<
+  (params: {
+    params: { orderId: string };
+  }) => Promise<{ subscription: AppsInTossIapSubscriptionInfo } | undefined>
+>;
+
 export type AppsInTossIapGetPendingOrders = AppsInTossIapSupportedFunction<
   () => Promise<{ orders?: unknown[] } | undefined>
 >;
@@ -87,6 +139,8 @@ export type AppsInTossIapCompleteProductGrant = AppsInTossIapSupportedFunction<
 >;
 
 export interface AppsInTossIapSdk {
+  createSubscriptionPurchaseOrder?: AppsInTossIapCreateSubscriptionPurchaseOrder;
+  getSubscriptionInfo?: AppsInTossIapGetSubscriptionInfo;
   completeProductGrant?: AppsInTossIapCompleteProductGrant;
   createOneTimePurchaseOrder?: AppsInTossIapCreateOneTimePurchaseOrder;
   getPendingOrders?: AppsInTossIapGetPendingOrders;
@@ -95,6 +149,11 @@ export interface AppsInTossIapSdk {
 }
 
 export type AppsInTossIapBridgeErrorCode =
+  | "IAP_SUBSCRIPTION_UNAVAILABLE"
+  | "IAP_SUBSCRIPTION_UNSUPPORTED"
+  | "IAP_SUBSCRIPTION_QUERY_FAILED"
+  | "IAP_SUBSCRIPTION_QUERY_TIMEOUT"
+  | "IAP_SUBSCRIPTION_INVALID_RESPONSE"
   | "IAP_COMPLETE_PRODUCT_GRANT_FAILED"
   | "IAP_COMPLETE_PRODUCT_GRANT_REJECTED"
   | "IAP_COMPLETE_PRODUCT_GRANT_UNAVAILABLE"
@@ -141,6 +200,7 @@ export interface CreateAppsInTossIapBridgeOptions {
   completeProductGrantTimeoutMs?: number;
   getPendingOrdersTimeoutMs?: number;
   getProductsTimeoutMs?: number;
+  getSubscriptionInfoTimeoutMs?: number;
   processProductGrantTimeoutMs?: number;
   purchaseTimeoutMs?: number;
 }
@@ -149,6 +209,10 @@ export interface AppsInTossIapPurchaseOneTimeOptions {
   processProductGrant: AppsInTossIapProcessProductGrant;
   processProductGrantTimeoutMs?: number;
   sku: string;
+}
+
+export interface AppsInTossIapPurchaseSubscriptionOptions extends AppsInTossIapPurchaseOneTimeOptions {
+  offerId?: string | null;
 }
 
 export interface AppsInTossIapCompleteProductGrantOptions {
@@ -182,6 +246,12 @@ export interface AppsInTossIapRestorePendingOrdersResult {
 }
 
 export interface AppsInTossIapBridge {
+  purchaseSubscription(
+    options: AppsInTossIapPurchaseSubscriptionOptions,
+  ): Promise<AppsInTossIapPurchaseResult>;
+  getSubscriptionInfo(options: {
+    orderId: string;
+  }): Promise<AppsInTossIapSubscriptionInfo>;
   completeProductGrant(
     options: AppsInTossIapCompleteProductGrantOptions,
   ): Promise<boolean>;
@@ -199,6 +269,7 @@ export function createAppsInTossIapBridge({
   completeProductGrantTimeoutMs = 15_000,
   getPendingOrdersTimeoutMs = 15_000,
   getProductsTimeoutMs = 15_000,
+  getSubscriptionInfoTimeoutMs = 15_000,
   processProductGrantTimeoutMs = 25_000,
   purchaseTimeoutMs,
 }: CreateAppsInTossIapBridgeOptions = {}): AppsInTossIapBridge {
@@ -232,7 +303,8 @@ export function createAppsInTossIapBridge({
       if (!response) {
         throw new AppsInTossIapBridgeError({
           code: "IAP_GET_PRODUCTS_UNSUPPORTED",
-          message: "Apps in Toss product list is not supported in this runtime.",
+          message:
+            "Apps in Toss product list is not supported in this runtime.",
         });
       }
       return (response.products ?? []).map(normalizeProduct);
@@ -271,16 +343,119 @@ export function createAppsInTossIapBridge({
     }
     assertSupported(createOneTimePurchaseOrder, {
       code: "IAP_PURCHASE_UNSUPPORTED",
-      message: "Apps in Toss one-time purchase is not supported in this runtime.",
+      message:
+        "Apps in Toss one-time purchase is not supported in this runtime.",
     });
 
-    return requestOneTimePurchase({
-      createOneTimePurchaseOrder,
+    return requestPurchase({
+      createPurchaseOrder: createOneTimePurchaseOrder,
       processProductGrant,
       processProductGrantTimeoutMs: grantTimeoutMs,
       purchaseTimeoutMs,
       sku: normalizedSku,
     });
+  }
+
+  async function purchaseSubscription({
+    sku,
+    offerId,
+    processProductGrant,
+    processProductGrantTimeoutMs: grantTimeoutMs = processProductGrantTimeoutMs,
+  }: AppsInTossIapPurchaseSubscriptionOptions) {
+    const normalizedSku = normalizeRequiredSku(sku);
+    if (typeof processProductGrant !== "function")
+      throw new AppsInTossIapBridgeError({
+        code: "IAP_PRODUCT_GRANT_REQUIRED",
+        message: "Apps in Toss IAP product grant processor is required.",
+      });
+    const iap = await getIap();
+    const createPurchaseOrder = iap.createSubscriptionPurchaseOrder;
+    if (!createPurchaseOrder)
+      throw new AppsInTossIapBridgeError({
+        code: "IAP_SUBSCRIPTION_UNAVAILABLE",
+        message: "Apps in Toss subscription purchase is unavailable.",
+      });
+    assertSupported(createPurchaseOrder, {
+      code: "IAP_SUBSCRIPTION_UNSUPPORTED",
+      message: "Subscription purchase is unsupported in this runtime.",
+    });
+    return requestPurchase({
+      createPurchaseOrder,
+      processProductGrant,
+      purchaseKind: "subscription",
+      processProductGrantTimeoutMs: grantTimeoutMs,
+      purchaseTimeoutMs,
+      sku: normalizedSku,
+      offerId: normalizeOptionalString(offerId),
+    });
+  }
+
+  async function getSubscriptionInfo({ orderId }: { orderId: string }) {
+    const normalizedOrderId = normalizeRequiredOrderId(orderId);
+    const iap = await getIap();
+    const getInfo = iap.getSubscriptionInfo;
+    if (!getInfo)
+      throw new AppsInTossIapBridgeError({
+        code: "IAP_SUBSCRIPTION_UNAVAILABLE",
+        message: "Subscription status query is unavailable.",
+      });
+    assertSupported(getInfo, {
+      code: "IAP_SUBSCRIPTION_UNSUPPORTED",
+      message: "Subscription status query is unsupported in this runtime.",
+    });
+    try {
+      const response = await withPromiseTimeout({
+        code: "IAP_SUBSCRIPTION_QUERY_TIMEOUT",
+        message: "Subscription status query timed out.",
+        promise: getInfo({ params: { orderId: normalizedOrderId } }),
+        timeoutMs: getSubscriptionInfoTimeoutMs,
+      });
+      if (response === undefined)
+        throw new AppsInTossIapBridgeError({
+          code: "IAP_SUBSCRIPTION_UNSUPPORTED",
+          message: "Subscription status query is unsupported in this runtime.",
+        });
+      const info = response.subscription;
+      if (
+        !info ||
+        ![
+          "ACTIVE",
+          "EXPIRED",
+          "IN_GRACE_PERIOD",
+          "ON_HOLD",
+          "PAUSED",
+          "REVOKED",
+        ].includes(info.status) ||
+        !Number.isFinite(info.catalogId) ||
+        typeof info.isAccessible !== "boolean" ||
+        typeof info.isAutoRenew !== "boolean" ||
+        !(info.expiresAt === null || typeof info.expiresAt === "string") ||
+        !(
+          info.gracePeriodExpiresAt === null ||
+          typeof info.gracePeriodExpiresAt === "string"
+        )
+      ) {
+        throw new AppsInTossIapBridgeError({
+          code: "IAP_SUBSCRIPTION_INVALID_RESPONSE",
+          message: "Subscription status response is invalid.",
+        });
+      }
+      return {
+        catalogId: info.catalogId,
+        status: info.status,
+        expiresAt: info.expiresAt,
+        isAutoRenew: info.isAutoRenew,
+        gracePeriodExpiresAt: info.gracePeriodExpiresAt,
+        isAccessible: info.isAccessible,
+      };
+    } catch (cause) {
+      if (cause instanceof AppsInTossIapBridgeError) throw cause;
+      throw new AppsInTossIapBridgeError({
+        code: "IAP_SUBSCRIPTION_QUERY_FAILED",
+        message: "Subscription status query failed.",
+        cause,
+      });
+    }
   }
 
   async function completeProductGrant({
@@ -306,7 +481,9 @@ export function createAppsInTossIapBridge({
         code: "IAP_COMPLETE_PRODUCT_GRANT_UNSUPPORTED",
         message:
           "Apps in Toss product grant completion is not supported in this runtime.",
-        promise: completeProductGrant({ params: { orderId: normalizedOrderId } }),
+        promise: completeProductGrant({
+          params: { orderId: normalizedOrderId },
+        }),
         timeoutMs: completeProductGrantTimeoutMs,
       });
       if (result === undefined) {
@@ -452,6 +629,8 @@ export function createAppsInTossIapBridge({
     completeProductGrant,
     getProducts,
     purchaseOneTime,
+    purchaseSubscription,
+    getSubscriptionInfo,
     restorePendingOrders,
   };
 }
@@ -529,7 +708,9 @@ export function createAppsInTossIapGrantClient<TResult = unknown>({
       return post("complete", endpoints.completeEndpoint, {
         orderId: normalizeRequiredOrderId(orderId),
         ...(providerPayload === undefined ? {} : { providerPayload }),
-        ...(normalizeOptionalString(sku) ? { sku: normalizeOptionalString(sku) } : {}),
+        ...(normalizeOptionalString(sku)
+          ? { sku: normalizeOptionalString(sku) }
+          : {}),
       });
     },
     grant({ orderId, providerPayload, requestId, sku, source }) {
@@ -556,14 +737,18 @@ export function createAppsInTossIapGrantClient<TResult = unknown>({
   };
 }
 
-function requestOneTimePurchase({
-  createOneTimePurchaseOrder,
+function requestPurchase({
+  purchaseKind = "one-time",
+  createPurchaseOrder,
+  offerId,
   processProductGrant,
   processProductGrantTimeoutMs,
   purchaseTimeoutMs,
   sku,
 }: {
-  createOneTimePurchaseOrder: AppsInTossIapCreateOneTimePurchaseOrder;
+  purchaseKind?: "one-time" | "subscription";
+  createPurchaseOrder: AppsInTossIapCreateSubscriptionPurchaseOrder;
+  offerId?: string;
   processProductGrant: AppsInTossIapProcessProductGrant;
   processProductGrantTimeoutMs: number;
   purchaseTimeoutMs?: number;
@@ -573,6 +758,7 @@ function requestOneTimePurchase({
     let cleanup = createCleanupOnce();
     let productGrantCompleted = false;
     let purchaseResult: AppsInTossIapPurchaseResult | undefined;
+    let grantedSubscriptionId: string | undefined;
     let settled = false;
     const clearPurchaseTimeout =
       purchaseTimeoutMs && purchaseTimeoutMs > 0
@@ -581,7 +767,7 @@ function requestOneTimePurchase({
               settleReject(
                 new AppsInTossIapBridgeError({
                   code: "IAP_PURCHASE_TIMEOUT",
-                  message: "Apps in Toss one-time purchase timed out.",
+                  message: `Apps in Toss ${purchaseKind} purchase timed out.`,
                 }),
               );
             },
@@ -590,13 +776,13 @@ function requestOneTimePurchase({
         : () => undefined;
 
     try {
-      const nextCleanup = createOneTimePurchaseOrder({
+      const nextCleanup = createPurchaseOrder({
         onError: (error) => {
           settleReject(
             new AppsInTossIapBridgeError({
               cause: error,
               code: "IAP_PURCHASE_FAILED",
-              message: "Apps in Toss one-time purchase failed.",
+              message: `Apps in Toss ${purchaseKind} purchase failed.`,
             }),
           );
         },
@@ -607,7 +793,7 @@ function requestOneTimePurchase({
               new AppsInTossIapBridgeError({
                 cause: event,
                 code: "IAP_PURCHASE_INVALID_EVENT",
-                message: "Apps in Toss one-time purchase event was invalid.",
+                message: `Apps in Toss ${purchaseKind} purchase event was invalid.`,
               }),
             );
             return;
@@ -620,17 +806,24 @@ function requestOneTimePurchase({
           }
         },
         options: {
-          processProductGrant: async ({ orderId }) => {
+          ...(offerId ? { offerId } : {}),
+          processProductGrant: async ({ orderId, subscriptionId }) => {
+            if (settled) return false;
             try {
               const granted = await runProductGrant({
                 orderId: normalizeRequiredOrderId(orderId),
                 processProductGrant,
-                providerPayload: { orderId },
+                providerPayload: {
+                  orderId,
+                  ...(subscriptionId ? { subscriptionId } : {}),
+                },
+                ...(subscriptionId ? { subscriptionId } : {}),
                 sku,
                 source: "purchase",
                 timeoutMs: processProductGrantTimeoutMs,
               });
               productGrantCompleted = granted;
+              grantedSubscriptionId = subscriptionId;
               resolvePurchaseIfReady();
               return granted;
             } catch (error) {
@@ -650,14 +843,19 @@ function requestOneTimePurchase({
         new AppsInTossIapBridgeError({
           cause: error,
           code: "IAP_PURCHASE_FAILED",
-          message: "Apps in Toss one-time purchase failed.",
+          message: `Apps in Toss ${purchaseKind} purchase failed.`,
         }),
       );
     }
 
     function resolvePurchaseIfReady() {
       if (purchaseResult && productGrantCompleted) {
-        settleResolve(purchaseResult);
+        settleResolve({
+          ...purchaseResult,
+          ...(grantedSubscriptionId
+            ? { subscriptionId: grantedSubscriptionId }
+            : {}),
+        });
       }
     }
 
@@ -695,6 +893,7 @@ async function runProductGrant({
   orderId,
   processProductGrant,
   providerPayload,
+  subscriptionId,
   sku,
   source,
   timeoutMs,
@@ -712,6 +911,7 @@ async function runProductGrant({
         processProductGrant({
           orderId: normalizedOrderId,
           providerPayload,
+          ...(subscriptionId ? { subscriptionId } : {}),
           sku: normalizedSku,
           source,
         }),
@@ -768,12 +968,62 @@ async function withPromiseTimeout<T>({
 
 function normalizeProduct(value: unknown): AppsInTossIapProduct {
   const record = objectRecord(value);
+  const type = ["CONSUMABLE", "NON_CONSUMABLE", "SUBSCRIPTION"].includes(
+    String(record.type),
+  )
+    ? (record.type as AppsInTossIapProductType)
+    : undefined;
+  const subscription =
+    type === "SUBSCRIPTION" ? normalizeSubscriptionProduct(record) : {};
   return {
+    ...(type ? { type } : {}),
+    ...subscription,
     description: stringCandidate(record.description) ?? "",
-    displayAmount: stringCandidate(record.displayAmount, record.display_amount) ?? "",
+    displayAmount:
+      stringCandidate(record.displayAmount, record.display_amount) ?? "",
     displayName: stringCandidate(record.displayName, record.display_name) ?? "",
     iconUrl: stringCandidate(record.iconUrl, record.icon_url) ?? "",
     sku: normalizeRequiredSku(stringCandidate(record.sku)),
+  };
+}
+
+function normalizeSubscriptionProduct(record: Record<string, unknown>) {
+  if (!["WEEKLY", "MONTHLY", "YEARLY"].includes(String(record.renewalCycle))) {
+    throw new AppsInTossIapBridgeError({
+      code: "IAP_SUBSCRIPTION_INVALID_RESPONSE",
+      message: "Subscription renewal cycle is invalid.",
+    });
+  }
+  const offers = Array.isArray(record.offers)
+    ? (record.offers.map((value) => {
+        const offer = objectRecord(value);
+        if (
+          !["FREE_TRIAL", "NEW_SUBSCRIPTION", "RETURNING"].includes(
+            String(offer.type),
+          ) ||
+          !stringCandidate(offer.offerId) ||
+          !stringCandidate(offer.period) ||
+          (offer.type !== "FREE_TRIAL" && !stringCandidate(offer.displayAmount))
+        ) {
+          throw new AppsInTossIapBridgeError({
+            code: "IAP_SUBSCRIPTION_INVALID_RESPONSE",
+            message: "Subscription offer is invalid.",
+          });
+        }
+        return {
+          type: offer.type,
+          offerId: offer.offerId,
+          period: offer.period,
+          ...(offer.type !== "FREE_TRIAL"
+            ? { displayAmount: offer.displayAmount }
+            : {}),
+        };
+      }) as AppsInTossIapSubscriptionProduct["offers"])
+    : undefined;
+  return {
+    renewalCycle:
+      record.renewalCycle as AppsInTossIapSubscriptionProduct["renewalCycle"],
+    ...(offers ? { offers } : {}),
   };
 }
 
@@ -784,7 +1034,10 @@ function normalizePendingOrder(value: unknown): AppsInTossIapPendingOrder {
     orderId: normalizeRequiredOrderId(
       stringCandidate(record.orderId, record.order_id),
     ),
-    ...(stringCandidate(record.paymentCompletedDate, record.payment_completed_date)
+    ...(stringCandidate(
+      record.paymentCompletedDate,
+      record.payment_completed_date,
+    )
       ? {
           paymentCompletedDate: stringCandidate(
             record.paymentCompletedDate,
@@ -866,10 +1119,14 @@ function productGrantSucceeded(outcome: AppsInTossIapProductGrantOutcome) {
 }
 
 function restoreResultSucceeded(result: AppsInTossIapRestoredOrderResult) {
-  return result.granted && (result.completed || result.completionDeferred === true);
+  return (
+    result.granted && (result.completed || result.completionDeferred === true)
+  );
 }
 
-function assertIapAvailable(iap?: AppsInTossIapSdk): asserts iap is AppsInTossIapSdk {
+function assertIapAvailable(
+  iap?: AppsInTossIapSdk,
+): asserts iap is AppsInTossIapSdk {
   if (!iap) {
     throw new AppsInTossIapBridgeError({
       code: "IAP_SDK_UNAVAILABLE",
