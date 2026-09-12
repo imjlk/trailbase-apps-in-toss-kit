@@ -77,7 +77,8 @@ Proxy의 promotion grant·status endpoint는 `tossUserKey` 대신 `anonKey`를 �
 유지합니다. 키 누락·식별자 폐기 시에는 명시적으로 결과를 확인해야 하며 첫 지급 결과가
 불명확하다는 이유로 새 키를 만들면 안 됩니다.
 
-Endpoint를 사용하기 전에 다음 Sampo 생성 proxy 이미지를 배포하세요. 로컬 계약·SQL
+Endpoint를 사용하기 전에 게시된 proxy `0.2.0` 또는 호환성을 검토한 이후 버전을
+선택하세요. 로컬 계약·SQL
 테스트를 제공하지만 rollout 전 컨슈머 앱의 sandbox·실제 앱 bootstrap, 알림 동의,
 프로모션 검증은 별도로 필요합니다.
 

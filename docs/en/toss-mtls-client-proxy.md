@@ -360,11 +360,10 @@ The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.2.0` and expl
 opts into the generic mTLS relay. `/internal/mtls/request` remains behind the
 same internal bearer authentication; forward mode still requires a token.
 Bun is pinned to `1.4.2` across local tooling, CI, and the container. The Compose
-copy-in template points to the already released proxy `0.1.12`; use the next
-Sampo-generated image version when deploying the changes in this source tree.
-Image `0.1.12` does not contain the API Core 0.2 changes described here. After the
-normal Sampo release publishes the new image, pin that published version in the
-consumer-owned Compose file before enabling the updated adapters.
+copy-in template now pins the published proxy `0.2.0`, which includes the API Core
+0.2 compatibility, anonymous-recipient and recovery adapters. Update the
+consumer-owned image pin and reconcile migrations/WASM guests before enabling
+those flows. Historical image `0.1.12` does not include these changes.
 
 Single Smart Message requests accept one of `tossUserKey`, `userKey`, or
 `anonKey`. The proxy corrects api-core 0.2.0's `x-user-key` header to the official
