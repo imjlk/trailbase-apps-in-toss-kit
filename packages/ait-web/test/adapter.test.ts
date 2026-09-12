@@ -134,7 +134,11 @@ test("purchase success requires a usable original order ID and preserves native 
   const f = fixture();
   const setResult = (data: unknown) => {
     (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => {
-      setTimeout(() => options.onEvent({ type: "success", data }), 1);
+      setTimeout(() => {
+        options.onEvent({ type: "success", data });
+        const id = (data as any)?.orderId ?? (data as any)?.order_id;
+        if (typeof id === "string") void options.options.processProductGrant({ orderId: id });
+      }, 1);
       // An absent SDK disposer is tolerated for the purchase bridge too.
     });
   };
@@ -149,4 +153,70 @@ test("purchase success requires a usable original order ID and preserves native 
 test("future string login referrers reach the backend unchanged", async () => {
   const f = fixture(); f.api.TossAuth.login = async () => ({ authorizationCode: "real-code", referrer: "FUTURE_FLOW" });
   expect(await f.make().login()).toEqual({ authorizationCode: "real-code", referrer: "FUTURE_FLOW" });
+});
+
+for (const subscription of [false, true]) {
+  for (const granted of [false, true]) {
+    test(`${subscription ? "subscription" : "purchase"} waits for backend ${granted} after early SDK success`, async () => {
+      const f = fixture(); let settleGrant!: (value: boolean) => void; let cleanups = 0; let backendCalls = 0;
+      const deferred = new Promise<boolean>(resolve => { settleGrant = resolve; });
+      const method = subscription ? "createSubscriptionPurchaseOrder" : "createOneTimePurchaseOrder";
+      (f.api.IAP as any)[method] = available((options: any) => {
+        void options.options.processProductGrant({ orderId: "same-order" });
+        void options.options.processProductGrant({ orderId: "same-order" });
+        options.onEvent({ type: "success", data: { orderId: "same-order" } });
+        return () => { cleanups++; };
+      });
+      const adapter = f.make(); const input = { sku: "sku", processProductGrant: () => { backendCalls++; return deferred; } };
+      const result = subscription ? adapter.subscribe(input) : adapter.purchase(input);
+      let settled = false; void result.then(() => { settled = true; }, () => { settled = true; });
+      await new Promise(resolve => setTimeout(resolve, 1));
+      expect(settled).toBe(false); expect(cleanups).toBe(0); expect(backendCalls).toBe(1);
+      settleGrant(granted);
+      if (granted) expect((await result).orderId).toBe("same-order");
+      else await expect(result).rejects.toMatchObject({ code: "SDK_ERROR" });
+      expect(cleanups).toBe(1);
+    });
+  }
+}
+
+test("a different order's grant cannot complete a success event", async () => {
+  const f = fixture(); let backendCalls = 0;
+  (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => {
+    options.onEvent({ type: "success", data: { orderId: "other" } });
+    void options.options.processProductGrant({ orderId: "original" });
+    return () => {};
+  });
+  await expect(f.make().purchase({ sku: "sku", processProductGrant: async () => { backendCalls++; return true; } })).rejects.toMatchObject({ code: "INVALID_RESULT" });
+  expect(backendCalls).toBe(0);
+});
+
+test("timeout prevents new late grants even if the SDK supplies no disposer", async () => {
+  const f = fixture(); let callback: any; let backendCalls = 0;
+  (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => { callback = options.options.processProductGrant; });
+  await expect(f.make(5).purchase({ sku: "sku", processProductGrant: async () => { backendCalls++; return true; } })).rejects.toMatchObject({ code: "TIMEOUT" });
+  expect(await callback({ orderId: "late" })).toBe(false); expect(backendCalls).toBe(0);
+});
+
+test("queued grant IDs cannot be changed by SDK mutation", async () => {
+  const f = fixture(); const seen: unknown[] = [];
+  (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => {
+    const input = { orderId: "original" };
+    void options.options.processProductGrant(input);
+    input.orderId = "mutated";
+    options.onEvent({ type: "success", data: { orderId: "original" } });
+    return () => {};
+  });
+  const result = await f.make().purchase({ sku: "sku", processProductGrant: async input => { seen.push(input); return true; } });
+  expect(result.orderId).toBe("original"); expect(seen).toEqual([{ orderId: "original" }]);
+});
+
+test("SDK startup errors stop queued new grants", async () => {
+  const f = fixture(); let calls = 0;
+  (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => {
+    void options.options.processProductGrant({ orderId: "queued" });
+    throw new Error("SDK startup failed");
+  });
+  await expect(f.make().purchase({ sku: "sku", processProductGrant: async () => { calls++; return true; } })).rejects.toMatchObject({ code: "SDK_ERROR" });
+  expect(calls).toBe(0);
 });

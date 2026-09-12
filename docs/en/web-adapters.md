@@ -97,3 +97,5 @@ not establish real-device login, payment, notification or ad eligibility. Perfor
 console QR/device checks before a consumer rollout.
 
 Login preserves future string referrers as well as DEFAULT/SANDBOX. Purchase results require a usable original order ID (including an order_id compatibility alias); other native result metadata is preserved. A missing SDK disposer is tolerated, and supplied disposers are called once.
+
+Purchase/subscription completion waits for both a valid success event and literal-true backend grant for the same order, in either arrival order. Repeated native grant callbacks for that order share one in-flight result. A timeout prevents new late grant callbacks from starting; already-running backend work still requires reconciliation.
