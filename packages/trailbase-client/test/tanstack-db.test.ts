@@ -416,3 +416,24 @@ test("cancellation remains immediate while the header provider is unresolved", a
   await new Promise((resolve) => setTimeout(resolve, 5));
   expect(Xhr.instances).toHaveLength(0);
 });
+
+
+test("filtered subscribeAll fallback forwards cancellation to a signal-aware record API", async () => {
+  const abort = new AbortController();
+  const api = createTrailbaseRecordApiWithXhrSse({
+    apiBaseUrl: "http://localhost:4000", apiName: "items",
+    fallbackRecordApi: {
+      list: async () => ({ records: [] }),
+      subscribe: async (_id, options) => new ReadableStream({
+        start(controller) {
+          options?.signal?.addEventListener("abort", () => controller.close(), { once: true });
+        },
+      }),
+    },
+  });
+  const stream = await api.subscribeAll!({ filters: [{ owner: "me" }], signal: abort.signal });
+  const reader = stream.getReader();
+  abort.abort();
+  expect(await reader.read()).toEqual({ done: true, value: undefined });
+  reader.releaseLock();
+});

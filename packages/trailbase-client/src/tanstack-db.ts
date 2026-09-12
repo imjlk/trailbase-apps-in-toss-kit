@@ -59,7 +59,7 @@ export function createTrailbaseRecordApiWithXhrSse<Row>({
       if (property === "subscribeAll") {
         return (opts?: { filters?: unknown[]; signal?: AbortSignal }) =>
           (opts?.filters?.length ?? 0) > 0
-            ? target.subscribeAll?.(opts) ?? target.subscribe("*")
+            ? target.subscribeAll?.(opts) ?? target.subscribe("*", { signal: opts?.signal })
             : subscribeRecordEvents({
                 apiBaseUrl,
                 apiName,
