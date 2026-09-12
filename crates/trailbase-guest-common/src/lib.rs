@@ -8,6 +8,7 @@ use trailbase_wasm::http::IntoBody;
 
 pub mod analytics_events;
 pub mod anonymous_identity;
+pub mod app_rewards;
 pub mod apps_in_toss_login;
 pub mod apps_in_toss_messages;
 pub mod apps_in_toss_proxy;

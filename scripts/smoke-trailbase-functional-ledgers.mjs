@@ -1,5 +1,6 @@
 #!/usr/bin/env bun
 
+import assert from "node:assert/strict";
 import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -7,6 +8,7 @@ import path from "node:path";
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const templateDir = path.join(root, "templates", "trailbase", "sql");
 const templates = [
+  "app_reward_attempts.sql",
   "message_templates.sql",
   "notification_template_agreements.sql",
   "message_outbox.core.sql",
@@ -48,6 +50,8 @@ try {
           "promotion_campaigns",
           "promotion_reward_ledger",
           "iap_orders",
+          "app_reward_attempts",
+          "app_reward_grants",
         ],
         checkedIndexes: [
           "idx_message_outbox_ready_dispatch",
@@ -57,6 +61,7 @@ try {
           "idx_promotion_campaigns_active_feature_window",
           "idx_promotion_reward_ledger_campaign_status",
           "idx_iap_orders_product_status",
+          "idx_app_reward_attempts_owner_placement",
         ],
         sampleRows: {
           messageTemplates: countRows("message_templates"),
@@ -65,6 +70,8 @@ try {
           promotionCampaigns: countRows("promotion_campaigns"),
           promotionRewardLedger: countRows("promotion_reward_ledger"),
           iapOrders: countRows("iap_orders"),
+          appRewardAttempts: countRows("app_reward_attempts"),
+          appRewardGrants: countRows("app_reward_grants"),
         },
       },
       null,
@@ -76,6 +83,9 @@ try {
 }
 
 function verifySchema() {
+  assertTable("app_reward_attempts");
+  assertTable("app_reward_grants");
+  assertIndex("app_reward_attempts", "idx_app_reward_attempts_owner_placement");
   assertTable("iap_subscription_events");
   assertTable("iap_subscription_entitlements");
   assertTable("anonymous_identities");
@@ -114,6 +124,11 @@ function verifySchema() {
 function verifySampleRows() {
   const userId = new Uint8Array([1, 2, 3, 4]);
   db.query("INSERT INTO _user (id) VALUES (?1)").run(userId);
+  const attempt = "a".repeat(48);
+  db.query("INSERT INTO app_reward_attempts VALUES (?1,?2,'daily','AD','v1','coin',10,100,1100)").run(attempt, userId);
+  db.query("INSERT INTO app_reward_grants VALUES (?1,200)").run(attempt);
+  assert.equal(db.query("INSERT OR IGNORE INTO app_reward_grants VALUES (?1,201)").run(attempt).changes, 0);
+  assert.equal(db.query("SELECT sum(a.reward_amount) AS credits FROM app_reward_grants g JOIN app_reward_attempts a ON a.id=g.attempt_id").get().credits, 10);
   db.query(
     `INSERT INTO message_templates (
       template_code, purpose, status, requires_agreement, agreement_template_code,
