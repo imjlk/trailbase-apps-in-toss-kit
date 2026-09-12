@@ -309,13 +309,15 @@ record_apis: [{
       headers: { authorization: `Bearer ${alpha.auth_token}`, "CSRF-Token": alpha.csrf_token },
     });
     assert.equal(deniedReward.status, 403);
-    assert.equal((await deniedReward.json()).error.code, "OPERATION_HELD");
+    assert.equal((await deniedReward.json()).error?.code, "OPERATION_HELD");
   } else {
     assert.deepEqual(await request("/kit-smoke/rewards", { tokens: alpha, method: "POST" }), {
       schemaOk: true, replaySame: true, scopeDenied: true, granted: true,
     });
   }
-  checks.push("app reward tables/index coexistence, server issuance, once-only grant and scoped replay");
+  checks.push(operationsHold
+    ? "app reward entry denied with OPERATION_HELD under external hold"
+    : "app reward tables/index coexistence, server issuance, once-only grant and scoped replay");
   const refreshed = await request("/api/auth/v1/refresh", {
     method: "POST",
     body: { refresh_token: alpha.refresh_token },
