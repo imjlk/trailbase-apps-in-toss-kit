@@ -37,7 +37,7 @@
   intentionally promoted.
 - `profiles` is an app-owned pattern, not a kit runtime requirement. When an app uses it, store public
   profile fields there and keep private fields such as `anonymous_hash_hmac` out of public views.
-- Track application auth state separately from `_user.verified`, for example `anonymous`,
+- Track application auth state separately from TrailBase email verification, for example `anonymous`,
   `toss_linked`, `email_linked`, or `disabled`. Custom WASM endpoints must reject disabled app users
   even if TrailBase still accepts an old auth token until the client bootstraps again.
 - Do not add app-owned `users` auth tables. If a consumer already has one, migrate product fields and
@@ -59,6 +59,10 @@
   rotation in `login_anonymous_auth_user_with_password_rotation`; the ensure helper only creates or
   loads the verified auth user. The compatibility `upsert_verified_auth_user_tx` API still refreshes
   the password hash for callers that have not moved rotation to the login helper.
+- TrailBase 0.31.2 removed `_user.verified` in favor of `unverified_email`. Use the
+  kit auth helpers, which detect both schemas, instead of app-local inserts. Rebuild
+  components with guest runtime 0.6.1 when moving to the verified 0.33.14 server.
+  New component binaries are not compatible with pre-0.32 hosts.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
 - For verified anonymous bootstrap, use `anonymous_identity::verify_anonymous_hash` before
   creating/authenticating `_user`; preserve the existing HMAC of `ait:<hash>` and aliases.

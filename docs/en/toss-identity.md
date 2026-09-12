@@ -34,16 +34,22 @@ HMACed AppsInToss anonymous hash:
 - service-managed password: server-only credential derived from a separate secret.
 
 The synthetic email is a TrailBase auth identifier, not a contact address. Do not send mail to it,
-display it to users, or treat `_user.verified = true` as proof that a human email address was
-verified. The flag only means the service-managed credential may use TrailBase's normal login flow.
+display it to users, or treat its TrailBase verification state as proof that a human
+email address was verified. Legacy servers use `_user.verified`; TrailBase 0.31.2+
+uses `email` for verified addresses and `unverified_email` for pending addresses.
+For a synthetic address, either representation only enables the normal login flow.
 
 The credential exists to drive TrailBase's official auth flow. Do not send the service-managed
 password to the client, and do not reimplement TrailBase JWT signing or `_session` writes in app
 code.
 
 Use `ensure_verified_auth_user_tx` when creating or loading the anonymous `_user` during bootstrap.
-It looks up an existing synthetic email first, updates only `_user.verified` when needed, and creates
-or refreshes the password hash only when the initial lookup misses. That missing-row path still uses
+It detects both schemas and looks up the synthetic address first. On legacy servers
+it updates `_user.verified`; on 0.31.2+ it promotes an unverified-only synthetic
+address to `email` and clears `unverified_email`. It preserves an existing verified
+address, pending email changes and password hash, and rejects ambiguous unverified
+rows. It creates or refreshes the password hash only when the initial lookup misses.
+That missing-row path still uses
 an atomic upsert so concurrent first-bootstrap requests remain idempotent. The compatibility
 `upsert_verified_auth_user_tx` helper keeps its legacy password refresh semantics for callers that
 have not moved secret rotation to the rotation login helper.

@@ -59,20 +59,32 @@ pub fn upsert_verified_auth_user_tx(
     tx: &mut Transaction,
     credentials: &AnonymousTrailbaseUserCredentials,
 ) -> ApiResult<TrailBaseAuthUser> {
-    upsert_verified_auth_user_inner_tx(tx, credentials)
+    let schema = auth_user_schema_tx(tx)?;
+    if schema == AuthUserSchema::VerifiedEmail
+        && let Some(existing) = load_auth_user_by_email_tx(tx, &credentials.email, schema)?
+        && !existing.verified
+    {
+        verify_existing_auth_user_tx(tx, &credentials.email, schema)?;
+    }
+    upsert_verified_auth_user_inner_tx(tx, credentials, schema)
 }
 
 pub fn ensure_verified_auth_user_tx(
     tx: &mut Transaction,
     credentials: &AnonymousTrailbaseUserCredentials,
 ) -> ApiResult<TrailBaseAuthUser> {
-    match ensure_verified_auth_user_action(load_auth_user_by_email_tx(tx, &credentials.email)?) {
+    let schema = auth_user_schema_tx(tx)?;
+    match ensure_verified_auth_user_action(load_auth_user_by_email_tx(
+        tx,
+        &credentials.email,
+        schema,
+    )?) {
         EnsureVerifiedAuthUserAction::ReturnExisting(user) => Ok(user),
         EnsureVerifiedAuthUserAction::VerifyExisting => {
-            verify_existing_auth_user_tx(tx, &credentials.email)
+            verify_existing_auth_user_tx(tx, &credentials.email, schema)
         }
         EnsureVerifiedAuthUserAction::UpsertMissing => {
-            upsert_verified_auth_user_inner_tx(tx, credentials)
+            upsert_verified_auth_user_inner_tx(tx, credentials, schema)
         }
     }
 }
@@ -80,16 +92,24 @@ pub fn ensure_verified_auth_user_tx(
 fn load_auth_user_by_email_tx(
     tx: &mut Transaction,
     email: &str,
+    schema: AuthUserSchema,
 ) -> ApiResult<Option<TrailBaseAuthUserRow>> {
-    let (sql, params) = auth_user_lookup_statement(email);
+    let (sql, params) = auth_user_lookup_statement(email, schema);
     let rows = db::tx_query(tx, &sql, &params)?;
+    if rows.len() > 1 && db::integer(&rows[0][2], "verified")? == 0 {
+        return Err(internal("Ambiguous unverified service identity"));
+    }
     rows.first()
         .map(|row| trailbase_auth_user_row_from_row(row))
         .transpose()
 }
 
-fn verify_existing_auth_user_tx(tx: &mut Transaction, email: &str) -> ApiResult<TrailBaseAuthUser> {
-    let (sql, params) = verify_existing_auth_user_statement(email);
+fn verify_existing_auth_user_tx(
+    tx: &mut Transaction,
+    email: &str,
+    schema: AuthUserSchema,
+) -> ApiResult<TrailBaseAuthUser> {
+    let (sql, params) = verify_existing_auth_user_statement(email, schema);
     let rows = db::tx_query(tx, &sql, &params)?;
     let row = rows
         .first()
@@ -100,8 +120,9 @@ fn verify_existing_auth_user_tx(tx: &mut Transaction, email: &str) -> ApiResult<
 fn upsert_verified_auth_user_inner_tx(
     tx: &mut Transaction,
     credentials: &AnonymousTrailbaseUserCredentials,
+    schema: AuthUserSchema,
 ) -> ApiResult<TrailBaseAuthUser> {
-    let (sql, params) = upsert_verified_auth_user_statement(credentials);
+    let (sql, params) = upsert_verified_auth_user_statement(credentials, schema);
     let rows = db::tx_query(tx, &sql, &params)?;
     let row = rows
         .first()
@@ -132,39 +153,75 @@ fn ensure_verified_auth_user_action(
     }
 }
 
-fn auth_user_lookup_statement(email: &str) -> (String, Vec<Value>) {
-    (
-        "SELECT id, email, verified
-         FROM _user
-         WHERE email = ?1
-         LIMIT 1"
-            .to_string(),
-        vec![Value::Text(email.to_string())],
-    )
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AuthUserSchema {
+    LegacyVerifiedFlag,
+    VerifiedEmail,
 }
 
-fn verify_existing_auth_user_statement(email: &str) -> (String, Vec<Value>) {
-    (
-        "UPDATE _user
-         SET verified = 1
-         WHERE email = ?1
-         RETURNING id, email"
-            .to_string(),
-        vec![Value::Text(email.to_string())],
-    )
+fn auth_user_schema_tx(tx: &mut Transaction) -> ApiResult<AuthUserSchema> {
+    let rows = db::tx_query(tx, "PRAGMA table_info(_user)", &[])?;
+    let columns = rows
+        .iter()
+        .filter_map(|row| match row.get(1) {
+            Some(Value::Text(name)) => Some(name.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if columns.contains(&"verified") {
+        Ok(AuthUserSchema::LegacyVerifiedFlag)
+    } else if columns.contains(&"unverified_email") {
+        Ok(AuthUserSchema::VerifiedEmail)
+    } else {
+        Err(internal("Unsupported TrailBase auth user schema"))
+    }
+}
+
+fn auth_user_lookup_statement(email: &str, schema: AuthUserSchema) -> (String, Vec<Value>) {
+    let sql = match schema {
+        AuthUserSchema::LegacyVerifiedFlag => {
+            "SELECT id, email, verified FROM _user WHERE email = ?1 LIMIT 1"
+        }
+        AuthUserSchema::VerifiedEmail => {
+            "SELECT id, COALESCE(email,unverified_email), CASE WHEN email=?1 THEN 1 ELSE 0 END
+            FROM _user WHERE email=?1 OR (email IS NULL AND unverified_email=?1)
+            ORDER BY CASE WHEN email=?1 THEN 0 ELSE 1 END,id LIMIT 2"
+        }
+    };
+    (sql.into(), vec![Value::Text(email.into())])
+}
+
+fn verify_existing_auth_user_statement(
+    email: &str,
+    schema: AuthUserSchema,
+) -> (String, Vec<Value>) {
+    let sql = match schema {
+        AuthUserSchema::LegacyVerifiedFlag => "UPDATE _user SET verified = 1 WHERE email = ?1 RETURNING id, email",
+        AuthUserSchema::VerifiedEmail => "UPDATE _user SET email=?1, unverified_email=NULL
+            WHERE id=(SELECT id FROM _user WHERE email IS NULL AND unverified_email=?1 ORDER BY id LIMIT 1)
+            RETURNING id,email",
+    };
+    (sql.into(), vec![Value::Text(email.into())])
 }
 
 fn upsert_verified_auth_user_statement(
     credentials: &AnonymousTrailbaseUserCredentials,
+    schema: AuthUserSchema,
 ) -> (String, Vec<Value>) {
+    let sql = match schema {
+        AuthUserSchema::LegacyVerifiedFlag => {
+            "INSERT INTO _user (email, password_hash, verified)
+            VALUES (?1, hash_password(?2), 1) ON CONFLICT(email) DO UPDATE SET
+            password_hash = excluded.password_hash, verified = 1 RETURNING id, email"
+        }
+        AuthUserSchema::VerifiedEmail => {
+            "INSERT INTO _user (email, password_hash)
+            VALUES (?1, hash_password(?2)) ON CONFLICT(email) DO UPDATE SET
+            password_hash = excluded.password_hash RETURNING id, email"
+        }
+    };
     (
-        "INSERT INTO _user (email, password_hash, verified)
-         VALUES (?1, hash_password(?2), 1)
-         ON CONFLICT(email) DO UPDATE SET
-           password_hash = excluded.password_hash,
-           verified = 1
-         RETURNING id, email"
-            .to_string(),
+        sql.into(),
         vec![
             Value::Text(credentials.email.clone()),
             Value::Text(credentials.password.clone()),
@@ -190,12 +247,18 @@ pub fn rehash_auth_user_password_tx(
     tx: &mut Transaction,
     credentials: &AnonymousTrailbaseUserCredentials,
 ) -> ApiResult<()> {
+    let schema = auth_user_schema_tx(tx)?;
+    let sql = match schema {
+        AuthUserSchema::LegacyVerifiedFlag => {
+            "UPDATE _user SET password_hash = hash_password(?2), verified = 1 WHERE email = ?1"
+        }
+        AuthUserSchema::VerifiedEmail => {
+            "UPDATE _user SET password_hash = hash_password(?2) WHERE email = ?1"
+        }
+    };
     let changed = db::tx_execute(
         tx,
-        "UPDATE _user
-         SET password_hash = hash_password(?2),
-             verified = 1
-         WHERE email = ?1",
+        sql,
         &[
             Value::Text(credentials.email.clone()),
             Value::Text(credentials.password.clone()),
@@ -492,7 +555,8 @@ mod tests {
 
     #[test]
     fn auth_user_lookup_statement_does_not_hash_password() {
-        let (sql, params) = auth_user_lookup_statement("anon@example.test");
+        let (sql, params) =
+            auth_user_lookup_statement("anon@example.test", AuthUserSchema::LegacyVerifiedFlag);
         let lowered = sql.to_ascii_lowercase();
 
         assert!(lowered.contains("select id, email, verified"));
@@ -504,7 +568,10 @@ mod tests {
 
     #[test]
     fn verify_existing_auth_user_statement_only_updates_verified_flag() {
-        let (sql, params) = verify_existing_auth_user_statement("anon@example.test");
+        let (sql, params) = verify_existing_auth_user_statement(
+            "anon@example.test",
+            AuthUserSchema::LegacyVerifiedFlag,
+        );
         let lowered = sql.to_ascii_lowercase();
 
         assert!(lowered.contains("update _user"));
@@ -522,7 +589,8 @@ mod tests {
             email: "anon@example.test".to_string(),
             password: "service-managed-password".to_string(),
         };
-        let (sql, params) = upsert_verified_auth_user_statement(&credentials);
+        let (sql, params) =
+            upsert_verified_auth_user_statement(&credentials, AuthUserSchema::LegacyVerifiedFlag);
         let lowered = sql.to_ascii_lowercase();
 
         assert!(lowered.contains("insert into _user"));
@@ -623,5 +691,92 @@ mod tests {
         assert!(normalize_link_reason("nope").is_err());
         assert!(normalize_bootstrap_bucket_key("").is_err());
         assert!(normalize_bootstrap_bucket_key(&"x".repeat(257)).is_err());
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_tests {
+    use super::*;
+    use crate::sql_test_support::query;
+    use rusqlite::{Connection, functions::FunctionFlags};
+
+    fn database(schema: AuthUserSchema) -> Connection {
+        let db = Connection::open_in_memory().unwrap();
+        let extra = match schema {
+            AuthUserSchema::LegacyVerifiedFlag => "verified INTEGER NOT NULL DEFAULT 0",
+            AuthUserSchema::VerifiedEmail => "unverified_email TEXT",
+        };
+        db.execute_batch(&format!("CREATE TABLE _user (id BLOB PRIMARY KEY DEFAULT(randomblob(16)),email TEXT UNIQUE,password_hash TEXT,{extra}) STRICT")).unwrap();
+        db.create_scalar_function("hash_password", 1, FunctionFlags::SQLITE_UTF8, |ctx| {
+            Ok(format!("test-hash:{}", ctx.get::<String>(0)?))
+        })
+        .unwrap();
+        db
+    }
+    #[test]
+    fn service_credentials_work_in_both_auth_schemas() {
+        for schema in [
+            AuthUserSchema::LegacyVerifiedFlag,
+            AuthUserSchema::VerifiedEmail,
+        ] {
+            let db = database(schema);
+            let credentials = AnonymousTrailbaseUserCredentials {
+                email: "anon@test.invalid".into(),
+                password: "first".into(),
+            };
+            let (sql, params) = upsert_verified_auth_user_statement(&credentials, schema);
+            let first = query(&db, &sql, &params);
+            assert_eq!(first.len(), 1);
+            let (sql, params) = auth_user_lookup_statement(&credentials.email, schema);
+            let loaded = query(&db, &sql, &params);
+            assert_eq!(loaded[0][0], first[0][0]);
+            assert_eq!(loaded[0][2], rusqlite::types::Value::Integer(1));
+            let changed = AnonymousTrailbaseUserCredentials {
+                password: "rotated".into(),
+                ..credentials
+            };
+            let (sql, params) = upsert_verified_auth_user_statement(&changed, schema);
+            assert_eq!(query(&db, &sql, &params)[0][0], first[0][0]);
+            assert_eq!(
+                db.query_row("SELECT password_hash FROM _user", [], |r| r
+                    .get::<_, String>(0))
+                    .unwrap(),
+                "test-hash:rotated"
+            );
+        }
+    }
+    #[test]
+    fn modern_schema_promotes_only_an_unverified_service_principal() {
+        let db = database(AuthUserSchema::VerifiedEmail);
+        db.execute("INSERT INTO _user (unverified_email,password_hash) VALUES ('anon@test.invalid','unchanged')",[]).unwrap();
+        db.execute("INSERT INTO _user (email,unverified_email) VALUES ('verified@test.invalid','pending@test.invalid')",[]).unwrap();
+        let (sql, params) =
+            auth_user_lookup_statement("pending@test.invalid", AuthUserSchema::VerifiedEmail);
+        assert!(query(&db, &sql, &params).is_empty());
+        let (sql, params) =
+            auth_user_lookup_statement("anon@test.invalid", AuthUserSchema::VerifiedEmail);
+        let pending = query(&db, &sql, &params);
+        assert_eq!(pending[0][2], rusqlite::types::Value::Integer(0));
+        let (sql, params) =
+            verify_existing_auth_user_statement("anon@test.invalid", AuthUserSchema::VerifiedEmail);
+        assert_eq!(query(&db, &sql, &params)[0][0], pending[0][0]);
+        assert_eq!(
+            db.query_row(
+                "SELECT password_hash FROM _user WHERE email='anon@test.invalid'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "unchanged"
+        );
+        assert_eq!(
+            db.query_row(
+                "SELECT count(*) FROM _user WHERE unverified_email='anon@test.invalid'",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+            0
+        );
     }
 }
