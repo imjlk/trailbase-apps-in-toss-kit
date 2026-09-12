@@ -56,6 +56,9 @@ The identifier must be a valid UTF-8 ledger primary key of at most 512 bytes wit
 surrounding whitespace, control characters or BOM. Use `order_id` for IAP and the
 ledger `id` for messages/promotions. Never pass a Toss user key, HMAC or sealed value.
 Fingerprints are not secrets, authorization tokens, or proof of payment.
+They omit literal IDs but do not conceal predictable IDs: an observer can guess an
+ID and re-hash it. Use high-entropy ledger keys and never rely on this fingerprint
+as a privacy boundary for a sensitive or guessable identifier.
 
 Operators can inspect an inquiry using the fingerprint alone:
 
@@ -66,7 +69,8 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/ledger-doct
 ```
 
 Fingerprint lookup scans only primary keys, up to the explicit limit (default
-10,000; maximum 100,000). If the match is outside the inspected range, the tool
+10,000; maximum 100,000). Legacy IDs outside the fingerprint contract are skipped
+but still count toward the scan limit. If the match is outside the inspected range, the tool
 returns `DIAGNOSTIC_LOOKUP_LIMIT_REACHED`, not “record absent.” Use an authorized
 direct record-ID lookup for larger ledgers or add a consumer-owned indexed mapping.
 No diagnostic-ID mapping table or migration is required by this kit.

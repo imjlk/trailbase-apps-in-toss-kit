@@ -51,6 +51,9 @@ UTF-8 `kit-ledger-diagnostic-v1\0<kind>\0<record-id>`를 해시합니다. 원장
 512바이트 이하의 유효한 UTF-8이어야 하며 주변 공백·제어 문자·BOM을 포함할 수 없습니다.
 IAP는 `order_id`, 메시지·프로모션은 원장의 `id`를 사용합니다. Toss user key, HMAC이나
 sealed 값을 넘기지 마세요. Fingerprint는 비밀값·인증 토큰·결제 증명이 아닙니다.
+원본 ID를 직접 출력하지는 않지만 추측 가능한 ID는 다시 해시해 알아낼 수 있습니다.
+충분히 무작위인 원장 키를 사용하고 민감하거나 예측 가능한 식별자를 숨기는 보안 경계로
+fingerprint를 사용하지 마세요.
 
 운영자는 fingerprint만으로 문의를 조회할 수 있습니다.
 
@@ -61,6 +64,7 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/ledger-doct
 ```
 
 Fingerprint 조회는 기본 키만 지정한 한도까지 검사합니다. 기본 10,000개, 최대 100,000개입니다.
+형식을 벗어난 과거 ID는 건너뛰지만 검색 한도에는 포함합니다.
 검사 범위 밖에 결과가 있을 수 있으면 “행 없음” 대신 `DIAGNOSTIC_LOOKUP_LIMIT_REACHED`를
 반환합니다. 큰 원장은 권한 있는 직접 record-ID 조회를 사용하거나 소비 앱 소유의 인덱스
 매핑을 추가하세요. kit은 진단 ID 매핑 테이블이나 마이그레이션을 요구하지 않습니다.

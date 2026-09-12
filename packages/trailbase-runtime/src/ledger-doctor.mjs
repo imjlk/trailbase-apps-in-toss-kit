@@ -42,7 +42,12 @@ function selectRecordId(db, kind, recordId, diagnosticId, scanLimit) {
   const [table, id] = LEDGERS[kind];
   const rows = db.query(`SELECT "${id}" AS id FROM "${table}" ORDER BY "${id}" LIMIT ?`).all(scanLimit + 1);
   for (const row of rows.slice(0, scanLimit)) {
-    if (createLedgerDiagnosticId(kind, row.id) === diagnosticId) return row.id;
+    try {
+      if (createLedgerDiagnosticId(kind, row.id) === diagnosticId) return row.id;
+    } catch (error) {
+      // Invalid legacy IDs cannot match, but still consume the bounded scan budget.
+      if (!(error instanceof LedgerDiagnosticError) || error.code !== 'INVALID_RECORD_ID') throw error;
+    }
   }
   if (rows.length > scanLimit) fail('DIAGNOSTIC_LOOKUP_LIMIT_REACHED');
   return null;
@@ -78,11 +83,13 @@ function inspectIap(db, id, now, unit) {
       authorizesAccess: false };
   }
   const verified = ['PENDING_GRANT', 'GRANTED', 'REFUNDED'].includes(row.status) && ['PAYMENT_COMPLETED', 'PURCHASED', 'REFUNDED'].includes(report.providerStatus);
-  const actions = !verified ? ['verify-order-with-provider'] :
-    report.refunded || row.status === 'REFUNDED' ? ['review-refund-policy'] :
-      report.locallyGranted && !report.completionConfirmed ? ['confirm-existing-grant-completion'] :
-        row.status === 'GRANTED' && !report.locallyGranted ? ['reconcile-grant-history-without-regrant'] :
-          !report.locallyGranted ? ['review-local-grant-transaction'] : ['none'];
+  let actions;
+  if (!verified) actions = ['verify-order-with-provider'];
+  else if (report.refunded || row.status === 'REFUNDED') actions = ['review-refund-policy'];
+  else if (report.locallyGranted && !report.completionConfirmed) actions = ['confirm-existing-grant-completion'];
+  else if (row.status === 'GRANTED' && !report.locallyGranted) actions = ['reconcile-grant-history-without-regrant'];
+  else if (!report.locallyGranted) actions = ['review-local-grant-transaction'];
+  else actions = ['none'];
   if (report.subscription.needsReconciliation) actions.push('reconcile-subscription-events');
   return { record: report, actions };
 }
@@ -110,7 +117,7 @@ function messageAgreement(db, id) {
   const template = db.query(`SELECT t.status, t.purpose=m.purpose AS purpose_matches, t.requires_agreement,
     ${codeColumn ? `t."${codeColumn}"` : 'NULL'} AS agreement_code, m.user_id, m.purpose
     FROM message_outbox m LEFT JOIN message_templates t ON t.template_code=m.template_code WHERE m.id=?`).get(id);
-  report.templatePresent = template?.status != null;
+  report.templatePresent = template?.status !== undefined && template.status !== null;
   if (!report.templatePresent) return report;
   Object.assign(report, { templateStatus: known(template.status, ['DRAFT', 'APPROVED', 'PAUSED', 'RETIRED']),
     purposeMatches: template.purpose_matches === 1, requiresAgreement: template.requires_agreement !== 0 });
@@ -151,8 +158,11 @@ function inspectMessage(db, id, now, unit) {
   const terminal = ['SENT', 'SKIPPED', 'CANCELLED'].includes(row.status);
   const uncertain = ['UNKNOWN', 'DISPATCHING'].includes(record.lease.status) || record.providerStatus === 'UNKNOWN' ||
     (row.status === 'LOCKED' && (!record.lease.present || record.lease.dispatchStarted));
-  const actions = terminal ? ['none'] : uncertain ? ['reconcile-uncertain-dispatch-without-resend'] :
-    row.status === 'LOCKED' && record.lease.status === 'CLAIMED' && record.lease.expired ? ['review-expired-unstarted-claim'] : ['recheck-dispatch-gates-and-current-attempt'];
+  let actions;
+  if (terminal) actions = ['none'];
+  else if (uncertain) actions = ['reconcile-uncertain-dispatch-without-resend'];
+  else if (row.status === 'LOCKED' && record.lease.status === 'CLAIMED' && record.lease.expired) actions = ['review-expired-unstarted-claim'];
+  else actions = ['recheck-dispatch-gates-and-current-attempt'];
   return { record, actions };
 }
 

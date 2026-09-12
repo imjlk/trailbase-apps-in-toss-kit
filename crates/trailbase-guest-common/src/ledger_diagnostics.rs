@@ -4,7 +4,7 @@ use sha2::{Digest, Sha256};
 
 use crate::responses::{ApiResult, bad_request};
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum LedgerKind {
     Iap,
     Promotion,
@@ -21,7 +21,8 @@ impl LedgerKind {
     }
 }
 
-/// Match the private operator CLI's diagnostic ID without exposing the record ID.
+/// Match the private operator CLI's fingerprint without printing the literal ID.
+/// This is not concealment: predictable record IDs can be guessed and re-hashed.
 /// Ownership checks belong in the authenticated consumer endpoint that returns it.
 pub fn ledger_diagnostic_id(kind: LedgerKind, record_id: &str) -> ApiResult<String> {
     if record_id.is_empty()

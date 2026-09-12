@@ -140,6 +140,17 @@ test('diagnostic fingerprint lookup is bounded and cannot silently report absenc
   } finally { db.close(); }
 });
 
+test('malformed legacy IDs cannot block a later valid fingerprint match or bypass the scan limit', () => {
+  const db = database();
+  try {
+    iap(db, ' legacy-whitespace'); iap(db, 'valid-order');
+    const diagnosticId = createLedgerDiagnosticId('iap', 'valid-order');
+    expect(inspect(db, 'iap', undefined, { diagnosticId, scanLimit: 2 }).diagnosticId).toBe(diagnosticId);
+    expect(() => inspect(db, 'iap', undefined, { diagnosticId, scanLimit: 1 })).toThrow('DIAGNOSTIC_LOOKUP_LIMIT_REACHED');
+    expect(() => inspect(db, 'iap', ' legacy-whitespace')).toThrow('INVALID_RECORD_ID');
+  } finally { db.close(); }
+});
+
 test('timestamp units are explicit, numeric overflow is withheld, and missing schema fails clearly', () => {
   const db = database();
   try {
