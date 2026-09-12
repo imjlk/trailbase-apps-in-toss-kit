@@ -240,3 +240,13 @@ Before changing a consumer TrailBase app, inspect:
 - `apps/trailbase/traildepot-template/migrations/main/`
 - optional `apps/trailbase/traildepot-template/migrations/analytics/`
 - Root `package.json` TrailBase helpers, especially container-side CLI aliases such as `trail`
+
+## Encryption-key rotation
+
+Use `trailbase_toss_identity::TossIdentityKeyRing` for opt-in v1/v2 readers and new
+v2 writers, and `reseal::reseal_identity_batch_tx` for bounded CAS maintenance of
+private Toss/anonymous ciphertext. Deploy all readers before writers, keep old
+keys for retained backups, and save the per-table/rotation cursor in the same
+transaction. Never log the cursor (anonymous cursors are HMACs), keys, plaintext
+or ciphertext. HMAC lookup-key rotation is a separate account-mapping migration.
+See `docs/en/identity-key-rotation.md` and its matching Korean document.
