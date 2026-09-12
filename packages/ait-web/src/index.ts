@@ -89,17 +89,17 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
     async purchase({ sku, processProductGrant }: WebPurchaseOptions): Promise<IapCreateOneTimePurchaseOrderResult> {
       const product = requiredText(sku, "purchase SKU", 256);
       if (typeof processProductGrant !== "function") throw new WebAdapterError("INVALID_INPUT", "purchase grant");
-      return invoke("purchase", api => eventResult("purchase", eventTimeoutMs, (resolve, reject) =>
-        required(api.IAP?.createOneTimePurchaseOrder, "purchase")({ options: { sku: product, processProductGrant: grantCallback(processProductGrant) },
-          onEvent: event => { const result = event?.type === "success" ? purchaseResult(event.data) : null; if (result) resolve(result); else reject(new WebAdapterError("INVALID_RESULT", "purchase")); }, onError: reject })));
+      return invoke("purchase", api => purchaseFlow("purchase", eventTimeoutMs, processProductGrant, handlers =>
+        required(api.IAP?.createOneTimePurchaseOrder, "purchase")({ options: { sku: product, processProductGrant: handlers.grant },
+          onEvent: handlers.onEvent, onError: handlers.onError })));
     },
     async subscribe(options: WebPurchaseOptions & { offerId?: string }): Promise<IapCreateSubscriptionPurchaseOrderResult> {
       const sku = requiredText(options.sku, "subscription SKU", 256);
       if (typeof options.processProductGrant !== "function") throw new WebAdapterError("INVALID_INPUT", "subscription grant");
       const offerId = options.offerId === undefined ? undefined : requiredText(options.offerId, "subscription offer", 256);
-      return invoke("subscription", api => eventResult("subscription", eventTimeoutMs, (resolve, reject) =>
-        required(api.IAP?.createSubscriptionPurchaseOrder, "subscription")({ options: { sku, offerId, processProductGrant: grantCallback(options.processProductGrant) },
-          onEvent: event => { const result = event?.type === "success" ? purchaseResult(event.data) : null; if (result) resolve(result); else reject(new WebAdapterError("INVALID_RESULT", "subscription")); }, onError: reject })));
+      return invoke("subscription", api => purchaseFlow("subscription", eventTimeoutMs, options.processProductGrant, handlers =>
+        required(api.IAP?.createSubscriptionPurchaseOrder, "subscription")({ options: { sku, offerId, processProductGrant: handlers.grant },
+          onEvent: handlers.onEvent, onError: handlers.onError })));
     },
     getPendingOrders: () => invoke("pending orders", api => required(api.IAP?.getPendingOrders, "pending orders")()),
     getProducts: () => invoke("products", api => required(api.IAP?.getProductItemList, "products")()),
@@ -129,8 +129,58 @@ function purchaseResult(value: unknown): IapCreateOneTimePurchaseOrderResult | n
   if (typeof orderId !== "string" || !orderId.trim() || orderId.trim() !== orderId || orderId.length > 256) return null;
   return { ...data, orderId } as unknown as IapCreateOneTimePurchaseOrderResult;
 }
-function grantCallback(grant: WebPurchaseOptions["processProductGrant"]): WebPurchaseOptions["processProductGrant"] {
-  return async input => { try { return (await grant(input)) === true; } catch { return false; } };
+interface PurchaseHandlers {
+  grant: WebPurchaseOptions["processProductGrant"];
+  onEvent: (event: { type: "success"; data: IapCreateOneTimePurchaseOrderResult }) => void;
+  onError: (error: unknown) => void;
+}
+function purchaseFlow(operation: string, timeout: number, grant: WebPurchaseOptions["processProductGrant"], start: (handlers: PurchaseHandlers) => void | (() => void)): Promise<IapCreateOneTimePurchaseOrderResult> {
+  return eventResult(operation, timeout, (resolve, reject) => {
+    let active = true;
+    let candidate: IapCreateOneTimePurchaseOrderResult | null = null;
+    let grantOrderId: string | undefined;
+    let pendingGrant: Promise<boolean> | undefined;
+    const fail = (code: WebAdapterErrorCode) => { if (active) { active = false; reject(new WebAdapterError(code, operation)); } };
+    const finish = (granted: boolean) => {
+      if (!active) return;
+      if (!granted) { fail("SDK_ERROR"); return; }
+      if (candidate && candidate.orderId === grantOrderId) { active = false; resolve(candidate); }
+    };
+    let cleanup: void | (() => void);
+    try { cleanup = start({
+      grant(input) {
+        const id = input?.orderId;
+        if (!active) return id === grantOrderId && pendingGrant ? pendingGrant : false;
+        if (typeof id !== "string" || !id.trim() || id.trim() !== id || id.length > 256 ||
+            (grantOrderId !== undefined && grantOrderId !== id) || (candidate && candidate.orderId !== id)) {
+          fail("INVALID_RESULT"); return false;
+        }
+        if (input.subscriptionId !== undefined && (typeof input.subscriptionId !== "string" || !input.subscriptionId.trim() || input.subscriptionId.trim() !== input.subscriptionId || input.subscriptionId.length > 256)) {
+          fail("INVALID_RESULT"); return false;
+        }
+        // Snapshot identifiers before yielding; an SDK must not mutate a queued grant.
+        const grantInput = { orderId: id, ...(input.subscriptionId === undefined ? {} : { subscriptionId: input.subscriptionId }) };
+        // Native callbacks may repeat; the backend remains idempotent across flows.
+        if (pendingGrant) return pendingGrant;
+        grantOrderId = id;
+        pendingGrant = Promise.resolve().then(() => active ? grant(grantInput) : false).then(value => value === true, () => false);
+        void pendingGrant.then(finish);
+        return pendingGrant;
+      },
+      onEvent(event) {
+        if (!active) return;
+        const result = event?.type === "success" ? purchaseResult(event.data) : null;
+        if (!result || (grantOrderId !== undefined && grantOrderId !== result.orderId) ||
+            (candidate && candidate.orderId !== result.orderId)) { fail("INVALID_RESULT"); return; }
+        candidate = result;
+        if (pendingGrant) void pendingGrant.then(finish);
+      },
+      onError: () => fail("SDK_ERROR"),
+    }); } catch (error) { active = false; throw error; }
+    // Always provide a disposer to stop late new grants after timeout, including
+    // SDK implementations without cleanup. In-flight backend work cannot be undone.
+    return () => { active = false; if (typeof cleanup === "function") cleanup(); };
+  });
 }
 function requiredText(value: string, operation: string, max: number): string {
   if (typeof value !== "string" || !value.trim() || value.length > max || value.trim() !== value) throw new WebAdapterError("INVALID_INPUT", operation);

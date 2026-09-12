@@ -244,7 +244,7 @@ Before changing a consumer TrailBase app, inspect:
 ## WebView SDK 3 adapters
 
 For WebView consumers, use `@trailbase-apps-in-toss-kit/ait-web` with the consumer's
-`@apps-in-toss/web-framework` 3.x dependency; keep RN adapters on their separate
+`@apps-in-toss/web-framework >=3.4.0 <4` dependency; keep RN adapters on their separate
 framework line. The factory covers SDK Storage, login/anonymous identity,
 notification agreement, one-time/subscription IAP and sharing. It loads current
 SDK namespaces lazily, checks availability, requires a backend grant callback,
