@@ -105,7 +105,7 @@ canonical principal; merging anonymous progress or currency is a server-owned ap
 policy, not a client-side copy operation. `disconnect()` clears local credentials
 and current user resources. It does not invoke Toss unlink or revoke server tokens;
 perform authenticated server unlink/revocation separately and enforce disabled
-accounts in backend endpoints. See [Toss Login](https://developers-apps-in-toss.toss.im/login/intro.html).
+accounts in backend endpoints. See [Toss Login](https://developers-apps-in-toss.toss.im/guide/authentication/intro).
 After disconnect, use an explicit start/sign-in action. `dispose()` closes the
 lifecycle without deleting persisted credentials, so normal app termination does
 not sign the user out.

@@ -100,7 +100,7 @@ const subscription = AppState.addEventListener('change', (next) => {
 익명 진행도·재화 통합은 서버에서 처리할 앱 정책이며 클라이언트 복사 작업이 아닙니다.
 `disconnect()`는 로컬 인증 정보와 현재 사용자 리소스를 정리합니다. Toss 연결 해제나 서버
 토큰 폐기는 별도 인증된 서버 경로에서 처리하고, 백엔드도 disabled 계정을 차단해야 합니다.
-[토스 로그인](https://developers-apps-in-toss.toss.im/login/intro.html)을 참고하세요.
+[토스 로그인](https://developers-apps-in-toss.toss.im/guide/authentication/intro)을 참고하세요.
 Disconnect 이후에는 명시적인 시작·로그인 동작을 사용합니다. `dispose()`는 저장된 인증
 정보를 지우지 않고 lifecycle만 종료하므로 일반적인 앱 종료가 로그아웃이 되지 않습니다.
 정리 실패를 포함해 dispose는 최종 동작입니다. 반복 호출은 같은 정리 결과를 반환하므로
