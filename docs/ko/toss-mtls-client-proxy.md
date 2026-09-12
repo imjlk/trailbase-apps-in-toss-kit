@@ -359,7 +359,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 
 ## API Core 0.2 호환성
 
-프록시는 `@ait-kit/api-core`와 `api-client`를 `0.2.0`으로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.2.0`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 이미 출시된 프록시 `0.1.12`를

@@ -29,7 +29,8 @@
     "skills:check": "bun scripts/check-agent-skills.mjs --target codex --all",
     "skills:check:agent": "bun scripts/check-agent-skills.mjs",
     "skills:validate": "bun scripts/validate-agent-skills.mjs",
-    "packages:typecheck": "tsc --project tsconfig.json"
+    "packages:typecheck": "tsc --project tsconfig.json",
+    "trailbase:wasm:smoke": "bun scripts/smoke-trailbase-wasm.mjs"
   },
   "devDependencies": {
     "@apps-in-toss/framework": "2.10.10",

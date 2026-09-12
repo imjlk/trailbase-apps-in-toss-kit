@@ -356,7 +356,7 @@ normalization or multi-step flow handling.
 
 ## API Core 0.2 Compatibility
 
-The proxy pins `@ait-kit/api-core` and `api-client` to `0.2.0` and explicitly
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.2.0` and explicitly
 opts into the generic mTLS relay. `/internal/mtls/request` remains behind the
 same internal bearer authentication; forward mode still requires a token.
 Bun is pinned to `1.4.2` across local tooling, CI, and the container. The Compose

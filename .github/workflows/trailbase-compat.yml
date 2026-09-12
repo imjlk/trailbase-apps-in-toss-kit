@@ -15,6 +15,9 @@ on:
       - "package.json"
       - "rust-toolchain.toml"
       - "scripts/check-trailbase-version-policy.mjs"
+      - "scripts/smoke-trailbase-wasm.mjs"
+      - "templates/trailbase/sql/**"
+      - "services/toss-mtls-client-proxy/**"
       - "scripts/snapshot-trailbase-release.mjs"
       - "scripts/sync-trailbase-rust-policy.mjs"
   workflow_dispatch:
@@ -128,3 +131,20 @@ jobs:
 
       - name: Check WASI build
         run: cargo check --workspace --target wasm32-wasip2
+
+  runtime-smoke:
+    name: Run TrailBase WASM integration smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - name: Setup mise tools
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+      - name: Install workspace dependencies
+        run: bun install --frozen-lockfile
+      - name: Run isolated guest, auth, Record API and SSE checks
+        run: bun run trailbase:wasm:smoke

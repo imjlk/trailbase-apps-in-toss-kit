@@ -17,10 +17,10 @@ inputs.
 These values are policy values for this kit.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.31.1`
-- Last verified TrailBase release date: `2026-07-25`
-- Upstream latest TrailBase server: `0.31.1`
-- Upstream latest TrailBase release date: `2026-07-25`
+- Last verified TrailBase server: `0.33.14`
+- Last verified TrailBase release date: `2026-09-10`
+- Upstream latest TrailBase server: `0.33.14`
+- Upstream latest TrailBase release date: `2026-09-10`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -31,10 +31,11 @@ The manual server compatibility values are mirrored in
 `data/trailbase-compat-policy.json`. That file is intentionally not generated
 from the upstream latest release, because latest upstream and supported-by-this-kit
 are different signals.
-TrailBase `0.31.1` is currently tracked as upstream latest and last verified for
-this kit after the analytics multi-database migration, healthcheck, and SQLite
-verification smoke test. This does not raise the kit minimum; consumer apps
-must still test their own copied Compose, auth, Record API, and WASM surfaces.
+TrailBase `0.33.14` is now the last version verified with the disposable kit
+WASM/auth/Record API/SSE fixture. Run `bun run trailbase:wasm:smoke` to reproduce
+it with Docker. The smoke uses explicit proxy stub mode and never touches a
+consumer checkout or deployment. Consumer device and production checks remain
+app-owned; the kit minimum stays TBD.
 
 Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
 `mise` is the preferred developer entrypoint for installing the repo toolchain,
@@ -47,16 +48,16 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.31.1`
+- `trailbase-server-github-release`: `0.33.14`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
-- `trailbase-wasm`: `0.5.1`
+- `trailbase-wasm`: `0.6.1`
 
 <!-- renovate: datasource=crate depName=trailbase-client versioning=cargo -->
-- `trailbase-client`: `0.10.0`
+- `trailbase-client`: `0.10.1`
 
 <!-- renovate: datasource=npm depName=trailbase versioning=npm -->
-- `trailbase-js-client`: `0.14.0`
+- `trailbase-js-client`: `0.14.1`
 
 If you edit these Renovate marker blocks or `renovate.json`, validate the
 configuration with `bun run renovate:validate`. The command installs the
@@ -79,9 +80,9 @@ be committed as a dependency.
   for compatibility with older servers such as `0.28.6`; switch the runtime
   command only after the minimum supported server is raised past versions that
   lack `--depot`.
-- The latest Rust client is `0.10.0`, the latest JS client is `0.14.0`, and
-  `trailbase-wasm` remains `0.5.1`. The kit's optional JS peer range
-  `>=0.12.1 <1` already admits `0.14.0`.
+- The latest Rust client is `0.10.1`, the latest JS client is `0.14.1`, and
+  `trailbase-wasm` is now `0.6.1`. The kit's optional JS peer range
+  `>=0.12.1 <1` already admits `0.14.1`.
 
 ## Release Watch Outputs
 
@@ -117,10 +118,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbase/trailbase:0.31.1
+  --image trailbase/trailbase:0.33.14
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.31.1
+  --version 0.33.14
 ```
 
 In non-strict mode the script warns and exits successfully. In strict mode it
@@ -138,3 +139,36 @@ upper bound.
 - Run Rust WASM guest checks against the policy toolchain.
 - Run consumer smoke tests with a real or stub TrailBase instance.
 - Update templates only after compatibility is verified.
+
+## Guest ABI and Auth Migration
+
+TrailBase 0.32 changed the component interface. This checkout now builds with
+`trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;
+0.33.14 is the verified pairing. Rebuild all consumer Rust components and update
+the first-party auth-ui component following the upstream component instructions.
+Keep a consumer on its previous kit/server pair until that coordinated migration
+is ready. The unchanged TBD minimum policy is not a claim that new components run
+on pre-0.32 servers.
+
+TrailBase 0.31.2 replaced `_user.verified` with a separate `unverified_email`
+column; non-null `email` now represents a verified address. The kit detects the
+schema inside the transaction. Legacy helpers still use the verified flag; modern
+helpers write the verified service email directly and can promote an existing
+unverified-only service principal without resetting its password. They do not
+overwrite a verified account's pending email change or silently choose between
+ambiguous unverified service identities. Official login and password rotation
+remain the token authority.
+
+The reviewed upstream delta also includes nested JSON subscription fixes in
+0.31.3, recycled Rust guest state and auth-ui metadata changes in 0.32, stronger
+refresh-token entropy and OAuth/cookie fixes in 0.33, and admin UI/SQL tooling
+changes through 0.33.14. No Postgres compatibility claim is added; this kit's SQL
+and integration smoke remain SQLite-based. Keep request/user state out of global
+Rust guest caches because guest instances may serve multiple requests.
+
+The CI smoke compiles `compat_smoke` only with the explicit `compat-smoke` feature,
+starts disposable Docker containers on a private network with a loopback host
+port, applies the functional-ledger templates, checks auth/ACL/SSE, and removes its
+containers/network/depot afterward. Never install this fixture in a real service.
+It does not validate actual Toss certificates, purchases, auth-ui UX, or a
+consumer's full application migrations.
