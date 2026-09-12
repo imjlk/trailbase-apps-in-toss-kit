@@ -65,6 +65,8 @@ test('subscription projection is reported as stored data, never an authorization
     expect(report.record.subscription.storedAccessFlag).toBe(true);
     expect(report.record.subscription.authorizesAccess).toBe(false);
     expect(report.recoveryPlan.actions).toContain('reconcile-subscription-events');
+    db.exec('UPDATE iap_orders SET completed_at=20');
+    expect(inspect(db, 'iap', 'order-1').recoveryPlan.actions).toEqual(['reconcile-subscription-events']);
   } finally { db.close(); }
 });
 
@@ -75,6 +77,9 @@ test('promotion recovery only refers to the original transaction and hides its k
     expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['query-original-promotion-transaction']);
     db.exec('UPDATE promotion_reward_ledger SET provider_transaction_key=NULL');
     expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
+    db.exec("UPDATE promotion_reward_ledger SET status='success',provider_status='GRANTED',granted_at=20");
+    expect(inspect(db, 'promotion', 'promotion-1').record.providerStatus).toBe('GRANTED');
+    expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['none']);
   } finally { db.close(); }
 });
 
@@ -106,6 +111,40 @@ test('agreement metadata is scoped to the user/template without claiming permiss
     expect(report.record.agreement.authorizesDispatch).toBe(false);
     db.exec("UPDATE notification_template_agreements SET user_id=X'02'");
     expect(inspect(db, 'message', 'message-1').record.agreement.functionalOptedIn).toBe(false);
+  } finally { db.close(); }
+});
+
+test('legacy template and agreement columns use the same fallback as the production gate', () => {
+  const db = database();
+  try {
+    message(db);
+    db.exec(`CREATE TABLE message_templates(template_code TEXT PRIMARY KEY,purpose TEXT,status TEXT,requires_agreement INTEGER);
+      INSERT INTO message_templates VALUES('reminder','FUNCTIONAL','APPROVED',1);
+      CREATE TABLE notification_template_agreements(user_id BLOB,agreement_template_code TEXT,status TEXT);
+      INSERT INTO notification_template_agreements VALUES(X'01','reminder','OPTED_IN');`);
+    expect(inspect(db, 'message', 'message-1').record.agreement.functionalOptedIn).toBe(true);
+    db.exec("UPDATE notification_template_agreements SET status='OPTED_OUT'");
+    expect(inspect(db, 'message', 'message-1').record.agreement.functionalOptedIn).toBe(false);
+  } finally { db.close(); }
+});
+
+test('marketing consent is inspected independently of missing or unmatched template registries', () => {
+  const db = database();
+  try {
+    message(db);
+    db.exec(`UPDATE message_outbox SET purpose='MARKETING';
+      CREATE TABLE notification_consents(user_id BLOB,purpose TEXT,status TEXT);
+      INSERT INTO notification_consents VALUES(X'01','MARKETING','OPTED_IN');`);
+    let agreement = inspect(db, 'message', 'message-1').record.agreement;
+    expect(agreement.templateRegistryAvailable).toBe(false);
+    expect(agreement.marketingOptedIn).toBe(true);
+    expect(agreement.authorizesDispatch).toBe(false);
+    db.exec(sql('message_templates.sql'));
+    agreement = inspect(db, 'message', 'message-1').record.agreement;
+    expect(agreement.templatePresent).toBe(false);
+    expect(agreement.marketingOptedIn).toBe(true);
+    db.exec("UPDATE notification_consents SET status='OPTED_OUT'");
+    expect(inspect(db, 'message', 'message-1').record.agreement.marketingOptedIn).toBe(false);
   } finally { db.close(); }
 });
 

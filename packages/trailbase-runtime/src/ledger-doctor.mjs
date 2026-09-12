@@ -30,7 +30,7 @@ function integer(value) { return Number.isSafeInteger(value) && value >= 0 ? val
 function normalizedProvider(value) {
   return known(typeof value === 'string' ? value.trim().toUpperCase() : '', [
     'PAYMENT_COMPLETED', 'PURCHASED', 'REFUNDED', 'PENDING', 'NOT_FOUND', 'FAILED', 'ERROR', 'UNKNOWN',
-    'SUCCESS', 'SENT', 'CANCELLED', 'SKIPPED', 'READY', 'PROCESSING',
+    'SUCCESS', 'GRANTED', 'SENT', 'CANCELLED', 'SKIPPED', 'READY', 'PROCESSING',
   ]);
 }
 
@@ -90,7 +90,10 @@ function inspectIap(db, id, now, unit) {
   else if (row.status === 'GRANTED' && !report.locallyGranted) actions = ['reconcile-grant-history-without-regrant'];
   else if (!report.locallyGranted) actions = ['review-local-grant-transaction'];
   else actions = ['none'];
-  if (report.subscription.needsReconciliation) actions.push('reconcile-subscription-events');
+  if (report.subscription.needsReconciliation) {
+    actions = actions.filter(action => action !== 'none');
+    actions.push('reconcile-subscription-events');
+  }
   return { record: report, actions };
 }
 
@@ -110,28 +113,33 @@ function inspectPromotion(db, id, now, unit) {
 
 function messageAgreement(db, id) {
   const templates = columns(db, 'message_templates');
-  const report = { templateRegistryAvailable: Boolean(templates), authorizesDispatch: false };
+  const message = db.query('SELECT user_id, purpose, template_code FROM message_outbox WHERE id=?').get(id);
+  const report = { templateRegistryAvailable: Boolean(templates), authorizesDispatch: false,
+    functionalOptedIn: null, marketingOptedIn: null };
+  // The production gate checks marketing consent even without a template registry.
+  if (columns(db, 'notification_consents')) {
+    requireColumns(db, 'notification_consents', ['user_id', 'purpose', 'status']);
+    report.marketingOptedIn = Boolean(db.query("SELECT 1 FROM notification_consents WHERE user_id=? AND purpose='MARKETING' AND status='OPTED_IN'").get(message.user_id));
+  }
   if (!templates) return report;
   requireColumns(db, 'message_templates', ['template_code', 'purpose', 'status', 'requires_agreement']);
-  const codeColumn = templates.has('notification_template_code') ? 'notification_template_code' : templates.has('agreement_template_code') ? 'agreement_template_code' : null;
-  const template = db.query(`SELECT t.status, t.purpose=m.purpose AS purpose_matches, t.requires_agreement,
-    ${codeColumn ? `t."${codeColumn}"` : 'NULL'} AS agreement_code, m.user_id, m.purpose
-    FROM message_outbox m LEFT JOIN message_templates t ON t.template_code=m.template_code WHERE m.id=?`).get(id);
+  // Legacy registries use their template_code when no explicit agreement-code column exists.
+  let codeColumn = 'template_code';
+  if (templates.has('notification_template_code')) codeColumn = 'notification_template_code';
+  else if (templates.has('agreement_template_code')) codeColumn = 'agreement_template_code';
+  const template = db.query(`SELECT status, purpose=? AS purpose_matches, requires_agreement,
+    "${codeColumn}" AS agreement_code FROM message_templates WHERE template_code=?`).get(message.purpose, message.template_code);
   report.templatePresent = template?.status !== undefined && template.status !== null;
   if (!report.templatePresent) return report;
   Object.assign(report, { templateStatus: known(template.status, ['DRAFT', 'APPROVED', 'PAUSED', 'RETIRED']),
     purposeMatches: template.purpose_matches === 1, requiresAgreement: template.requires_agreement !== 0 });
   const agreements = columns(db, 'notification_template_agreements');
-  const agreementCode = agreements?.has('template_code') ? 'template_code' : agreements?.has('agreement_template_code') ? 'agreement_template_code' : null;
-  report.functionalOptedIn = null;
+  let agreementCode = null;
+  if (agreements?.has('template_code')) agreementCode = 'template_code';
+  else if (agreements?.has('agreement_template_code')) agreementCode = 'agreement_template_code';
   if (agreements && agreementCode && template.agreement_code) {
     requireColumns(db, 'notification_template_agreements', ['user_id', 'status']);
-    report.functionalOptedIn = Boolean(db.query(`SELECT 1 FROM notification_template_agreements WHERE user_id=? AND "${agreementCode}"=? AND status='OPTED_IN'`).get(template.user_id, template.agreement_code));
-  }
-  report.marketingOptedIn = null;
-  if (columns(db, 'notification_consents')) {
-    requireColumns(db, 'notification_consents', ['user_id', 'purpose', 'status']);
-    report.marketingOptedIn = Boolean(db.query("SELECT 1 FROM notification_consents WHERE user_id=? AND purpose='MARKETING' AND status='OPTED_IN'").get(template.user_id));
+    report.functionalOptedIn = Boolean(db.query(`SELECT 1 FROM notification_template_agreements WHERE user_id=? AND "${agreementCode}"=? AND status='OPTED_IN'`).get(message.user_id, template.agreement_code));
   }
   return report;
 }
