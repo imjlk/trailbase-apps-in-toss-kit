@@ -1,4 +1,3 @@
-pub mod app_rewards;
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use hmac::{Hmac, KeyInit, Mac};
@@ -9,6 +8,7 @@ use trailbase_wasm::http::IntoBody;
 
 pub mod analytics_events;
 pub mod anonymous_identity;
+pub mod app_rewards;
 pub mod apps_in_toss_login;
 pub mod apps_in_toss_messages;
 pub mod apps_in_toss_proxy;

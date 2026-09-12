@@ -198,3 +198,16 @@ fn grant_unique_constraint_and_sql_time_fence_defend_duplicate_writes() {
     db.execute("DELETE FROM _user WHERE id=X'01'", []).unwrap();
     assert_eq!(count(&db), 0);
 }
+
+#[test]
+fn claim_before_issue_time_rejects_before_policy_without_a_server_error() {
+    let mut db = database();
+    let attempt = issue(&mut db);
+    let error = claim_attempt(&mut db, &[1], "daily", &attempt.id, 99, |_, _| {
+        panic!("stale clock reached policy")
+    })
+    .unwrap_err();
+    assert_eq!(error.code, "REWARD_NOT_CLAIMABLE");
+    assert_eq!(count(&db), 0);
+    assert!(parse_attempt(&[]).is_err());
+}

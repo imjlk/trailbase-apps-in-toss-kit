@@ -44,6 +44,7 @@ pub struct AppRewardAttempt {
     pub reward_unit: String,
     pub reward_amount: i64,
     pub expires_at: i64,
+    pub created_at: i64,
     pub granted_at: Option<i64>,
 }
 
@@ -51,7 +52,7 @@ pub(crate) const INSERT_ATTEMPT: &str = "INSERT INTO app_reward_attempts
     (id,user_id,placement_id,source,policy_version,reward_unit,reward_amount,created_at,expires_at)
     VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)";
 pub(crate) const FIND_ATTEMPT: &str = "SELECT a.id,a.placement_id,a.source,a.policy_version,
-    a.reward_unit,a.reward_amount,a.expires_at,g.granted_at
+    a.reward_unit,a.reward_amount,a.expires_at,g.granted_at,a.created_at
     FROM app_reward_attempts a LEFT JOIN app_reward_grants g ON g.attempt_id=a.id
     WHERE a.id=?1 AND a.user_id=?2 AND a.placement_id=?3";
 pub(crate) const INSERT_GRANT: &str = "INSERT INTO app_reward_grants (attempt_id,granted_at)
@@ -86,10 +87,7 @@ fn issue_attempt<T: RewardDatabase>(
         .ok_or_else(|| bad_request("INVALID_REWARD_OFFER", "Reward expiry overflow"))?;
     let mut random = [0u8; 24];
     fill_random(&mut random);
-    let id = random
-        .iter()
-        .map(|v| format!("{v:02x}"))
-        .collect::<String>();
+    let id = hex::encode(random);
     let attempt = AppRewardAttempt {
         id,
         placement_id: placement.into(),
@@ -98,6 +96,7 @@ fn issue_attempt<T: RewardDatabase>(
         reward_unit: offer.unit,
         reward_amount: offer.amount,
         expires_at: expires,
+        created_at: now,
         granted_at: None,
     };
     tx.execute_reward(
@@ -125,7 +124,7 @@ fn find_attempt<T: RewardDatabase>(
     placement: &str,
     id: &str,
 ) -> ApiResult<Option<AppRewardAttempt>> {
-    validate_context(user, placement, 0)?;
+    validate_scope(user, placement)?;
     validate_id(id)?;
     let rows = tx.query_reward(FIND_ATTEMPT, &scope_params(user, placement, id))?;
     rows.first().map(|row| parse_attempt(row)).transpose()
@@ -151,6 +150,12 @@ fn claim_attempt<T: RewardDatabase>(
     if attempt.granted_at.is_some() {
         return Ok(attempt);
     }
+    if now < attempt.created_at {
+        return Err(forbidden(
+            "REWARD_NOT_CLAIMABLE",
+            "Reward attempt is not claimable at this time",
+        ));
+    }
     if attempt.expires_at <= now {
         return Err(forbidden("REWARD_EXPIRED", "Reward attempt expired"));
     }
@@ -163,7 +168,10 @@ fn claim_attempt<T: RewardDatabase>(
     let mut params = scope_params(user, placement, id);
     params.push(Value::Integer(now));
     if tx.execute_reward(INSERT_GRANT, &params)? != 1 {
-        return Err(internal("Reward grant was not inserted"));
+        return Err(forbidden(
+            "REWARD_NOT_CLAIMABLE",
+            "Reward attempt is not claimable at this time",
+        ));
     }
     // The ledger row IS the app credit. Do not invoke another grant after commit.
     Ok(AppRewardAttempt {
@@ -251,7 +259,17 @@ fn identifier(value: &str) -> bool {
             .all(|v| v.is_ascii_alphanumeric() || b"._-".contains(&v))
 }
 fn validate_context(user: &[u8], placement: &str, now: i64) -> ApiResult<()> {
-    if user.is_empty() || !identifier(placement) || now < 0 {
+    validate_scope(user, placement)?;
+    if now < 0 {
+        return Err(bad_request(
+            "INVALID_REWARD_CONTEXT",
+            "Invalid reward context",
+        ));
+    }
+    Ok(())
+}
+fn validate_scope(user: &[u8], placement: &str) -> ApiResult<()> {
+    if user.is_empty() || !identifier(placement) {
         return Err(bad_request(
             "INVALID_REWARD_CONTEXT",
             "Invalid reward context",
@@ -273,6 +291,9 @@ fn validate_id(id: &str) -> ApiResult<()> {
     Ok(())
 }
 fn parse_attempt(row: &[Value]) -> ApiResult<AppRewardAttempt> {
+    if row.len() != 9 {
+        return Err(internal("Unexpected reward row width"));
+    }
     let source = match db::text(&row[2], "source")?.as_str() {
         "AD" => AppRewardSource::Ad,
         "SHARE" => AppRewardSource::Share,
@@ -287,6 +308,7 @@ fn parse_attempt(row: &[Value]) -> ApiResult<AppRewardAttempt> {
         reward_amount: db::integer(&row[5], "reward_amount")?,
         expires_at: db::integer(&row[6], "expires_at")?,
         granted_at: db::nullable_integer(&row[7])?,
+        created_at: db::integer(&row[8], "created_at")?,
     })
 }
 
