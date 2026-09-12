@@ -1,0 +1,38 @@
+name: Consumer upgrade tools
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/consumer-tools.yml"
+      - "scripts/*consumer*"
+      - "scripts/lib/consumer-*.mjs"
+      - "templates/trailbase/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/consumer-tools.yml"
+      - "scripts/*consumer*"
+      - "scripts/lib/consumer-*.mjs"
+      - "templates/trailbase/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: consumer-tools-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test consumer upgrade tools
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.2"
+      - run: bun test scripts/compare-consumer-templates.test.mjs scripts/consumer-upgrade-plan.test.mjs

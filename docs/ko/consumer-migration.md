@@ -136,6 +136,57 @@ checker를 실행하세요.
 bun scripts/check-consumer-submodule.mjs /path/to/consumer --strict
 ```
 
+## 세 버전 업그레이드 계획
+
+소비 앱의 gitlink를 바꾸기 전에 이전 kit 커밋을 기록하세요. `KIT_PREVIOUS_COMMIT`을
+해당 커밋으로 설정하고 새 kit 체크아웃에서 실행합니다.
+
+```bash
+bun scripts/plan-consumer-upgrade.mjs /path/to/consumer \
+  --from "$KIT_PREVIOUS_COMMIT" --to HEAD \
+  --mapping apps/trailbase/kit-template-map.json
+```
+
+명시적 매핑은 위에서 설명한 `exact`, `compose-service`, `env-subset` 모드를 사용합니다.
+이전·새 템플릿은 커밋된 Git 객체에서 읽고, 세 번째 입력은 앱이 직접 수정한 내용을 포함한
+소비 앱의 현재 파일입니다. `--from`은 `--to`의 조상이어야 합니다. Shallow checkout이면
+필요한 이력을 먼저 가져오세요. 도구는 파일 스테이징, gitlink 갱신, 소비 앱 파일 쓰기,
+마이그레이션 실행, 제안한 검증 명령 실행을 수행하지 않습니다.
+
+| 상태 | 의미 |
+| --- | --- |
+| `unchanged` | 관련 변경 없음 |
+| `consumer-only` | 반영할 kit 변경 없이 앱에서만 수정 |
+| `already-applied` | 관련 kit 변경이 이미 반영됨 |
+| `update-required` | 소비 앱에서 kit 변경 반영 검토 필요 |
+| `mergeable-update` | 양쪽이 수정됐지만 Git의 텍스트 3-way 병합에는 충돌 없음 |
+| `conflict` | 양쪽 수정이 충돌하거나 추가·삭제에 대한 판단 필요 |
+| `kit-removed` | kit에서 삭제됨. 앱 파일을 자동 삭제하지 말 것 |
+| `missing-consumer` | 템플릿은 그대로지만 매핑된 소비 앱 파일이 없음 |
+
+보고서는 kit과 소비 앱의 변경 줄 범위를 구분합니다. Compose 줄 번호는 원본 파일이 아닌
+선택한 서비스·볼륨 범위를 기준으로 합니다. 텍스트 비교이며 YAML·SQL의 의미 검증은
+아닙니다. Anchor, 상속과 앱의 실제 동작은 따로 검토해야 합니다. 환경변수는 키 이름과
+변경 분류만 보여주고 값은 출력하지 않습니다. Env 모드는 활성 할당을 비교하며 같은 키는
+마지막 할당을 사용합니다. 주석과 앱 전용 키는 비교 범위 밖입니다. 텍스트·JSON 출력 모두
+파일 본문이나 내용 해시를 포함하지 않습니다. 임시 비교 파일에도 소비 앱 본문이나 비밀값
+대신 불투명한 줄 ID만 저장합니다.
+서비스·볼륨별로 별도 행을 만들어 하나가 삭제돼도 다른 변경을 숨기지 않습니다.
+Exact 모드는 Git의 실행 권한 비트와 소비 앱 파일 권한도 비교합니다.
+매핑 파일 자체에도 같은 경로 범위·크기·UTF-8 제약을 적용합니다.
+
+이미 반영한 경우를 제외한 SQL 변경은 소비 앱의 새 순방향 마이그레이션 검토 항목으로
+표시합니다. `mergeable-update`여도 과거 마이그레이션을 덮어써도 된다는 의미는 아닙니다.
+매핑에 없는 신규·삭제 템플릿도 사용 여부 검토 목록에 표시하며, 선택적 템플릿을 자동으로
+필수화하지 않습니다.
+
+`--json`은 버전이 있는 구조화 보고서를 출력합니다. `--strict`는 조정·마이그레이션·미매핑
+템플릿 검토가 남으면 종료 코드 1을 반환합니다. 기본 advisory 모드는 비교 성공 시 0,
+잘못된 ref·지원하지 않는 입력·잘못된 매핑은 2를 반환합니다. 매핑 경로는 각 루트 안에
+있어야 하며 입력은 1 MiB 이하 UTF-8 텍스트 파일이어야 합니다. 보고서와 함께
+[Release Doctor](release-doctor.md), 두 커밋 사이 changeset/changelog, 소비 앱의
+마이그레이션·인증/ACL·기능 smoke 검증을 확인하세요.
+
 ## 완료 기준
 
 - 도입 앱의 gitlink가 의도한 kit 커밋을 가리킵니다.

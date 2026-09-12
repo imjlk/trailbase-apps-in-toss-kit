@@ -16,6 +16,10 @@ const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptsDir, "..");
 const compareScript = path.join(scriptsDir, "compare-consumer-templates.mjs");
 const templateMapExample = "templates/trailbase/release/kit-template-map.example.json";
+const proxyImageLine = readFileSync(
+  path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"), "utf8",
+).split("\n").find(line => /^\s+image:.*\/toss-mtls-client-proxy:/.test(line));
+if (!proxyImageLine) throw new Error("Expected the shared proxy image in its Compose template");
 
 describe("compare-consumer-templates", () => {
   test("compose-service mode scopes drift to the mapped service and volumes", () => {
@@ -67,7 +71,7 @@ describe("compare-consumer-templates", () => {
       expect(result.status).toBe(0);
       expect(result.stdout).toContain("0.1.5");
       expect(result.stdout).toContain(
-        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.10",
+        `-${proxyImageLine}`,
       );
       expect(result.stdout).toContain(
         "+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.5",
@@ -112,7 +116,7 @@ describe("compare-consumer-templates", () => {
       expect(result.stdout).toContain("drift: 1");
       expect(result.stdout).toContain("missing: 0");
       expect(result.stdout).not.toContain(
-        "-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.10",
+        `-${proxyImageLine}`,
       );
       expect(result.stdout).not.toContain(
         "+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.1.5",
