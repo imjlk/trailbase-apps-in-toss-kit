@@ -1,5 +1,46 @@
 # trailbase-guest-common
 
+## 0.10.0 — 2026-09-12
+
+### Minor changes
+
+- [e6d6104](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/e6d6104d6274e03a29d773ab61a842574c1c5ee1) Add server-issued app-owned AD/SHARE reward attempts, mandatory server offer and
+  eligibility policies, owner/placement-scoped receipt lookup and atomic once-only
+  local credits. SDK events and attempt IDs are not server evidence of viewing or
+  sharing; consumers must supply an explicit eligibility and quota policy.
+  
+  Copy app_reward_attempts.sql as a new private migration and rebuild WASM guests.
+  A grant ledger row is the credit itself: keep optional balance projections in the
+  same transaction and never issue an external payment after committing it. Preserve
+  receipt lookup during pauses and reconcile lost responses with the original ID.
+  These helpers do not manage platform-paid rewards or Toss promotion payments. — Thanks @imjlk!
+- [c3a5e91](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/c3a5e91a7450036fe2e7008c93c199a8ea77d09c) Add explicit per-feature entry, external dispatch, existing-result settlement and
+  read-only status controls. Missing or stale policies block mutations. Copy the
+  private operation_policies.sql migration, rebuild WASM and connect checks inside
+  all handler/worker authorization transactions. Enable the built-in IAP grant,
+  message enqueue/dispatch and promotion entry guards with
+  KIT_OPERATION_POLICIES_ENABLED=1; inspect operation_policy_integration() at startup.
+  Policy expiry uses database time internally. Set KIT_OPERATIONS_HOLD=1 outside
+  the backup before starting a restored database; status lookup remains available.
+  
+  Add a Release Doctor restore checkpoint check and an old-SQLite-backup rehearsal.
+  Require an independent durable witness, paused dispatch and reconciled original
+  transaction IDs before operator resume. The check never sends, grants or resumes
+  work, and passing supplied evidence does not replace the consumer's durable
+  write-ahead witness and backup protocol. — Thanks @imjlk!
+
+### Patch changes
+
+- [1bcc37f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1bcc37f38dc8be64e510dd1ca60c441cb5e355ff) Treat an explicit failed promotion response as failed even when it includes a
+  contradictory success status. Treat a message response without a success flag or
+  recognized status as UNKNOWN instead of inventing a successful dispatch. Keep
+  unknown outcomes for reconciliation with the existing request/transaction key;
+  do not blindly resend or allocate a new promotion key.
+  
+  Shared synthetic wire fixtures now verify Rust normalizers, proxy compatibility
+  responses, client transport and ledger diagnostics together. Rebuild consumer WASM
+  guests to adopt the corrected parsing. No SQL migration or proxy upgrade is required. — Thanks @imjlk!
+
 ## 0.9.0 — 2026-09-12
 
 ### Minor changes

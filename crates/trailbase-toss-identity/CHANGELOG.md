@@ -1,5 +1,24 @@
 # trailbase-toss-identity
 
+## 0.10.0 — 2026-09-12
+
+### Minor changes
+
+- [b16dac5](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/b16dac5ea0d1069034972cc8bd99b2e157b4deb6) Add an opt-in identity encryption key ring with an authenticated v2 key ID,
+  explicit legacy-v1 reader and bounded restartable reseal batches for the private
+  Toss/anonymous identity templates. Existing single-key v1 APIs remain unchanged.
+  Deploy compatible readers before new writers; keep older keys for retained data
+  and backups. Rebuild WASM and save batch cursors with ciphertext updates in the
+  same private transaction. Stop old writers and repeat a full sweep before retiring
+  keys. No identity-column migration is required; consumers own optional job state.
+  
+  HMAC lookup keys, account ownership and revocation state are unchanged. Do not
+  log private cursors, ciphertext or keys. A rollback must retain v2-capable readers. — Thanks @imjlk!
+
+### Patch changes
+
+- Updated dependencies: trailbase-guest-common (Cargo)@0.10.0
+
 ## 0.9.0 — 2026-09-12
 
 ### Minor changes

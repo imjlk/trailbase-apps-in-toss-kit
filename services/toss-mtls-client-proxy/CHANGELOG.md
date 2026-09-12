@@ -1,5 +1,24 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.3.0 — 2026-09-12
+
+### Minor changes
+
+- [f8f028e](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/f8f028ed9c7cefbd3580a1c47c38f92897d1c75e) Expose additive proxy version and adapter-capability metadata on authenticated health
+  responses. Use the Release Doctor proxy-capabilities check before adopting anonymous
+  verification, promotion recovery or other new adapter contracts. Legacy health responses
+  without metadata require a proxy upgrade or an explicitly optional transitional check.
+  
+  Pass the internal URL/token through environment variables. Checks use bounded read-only
+  health requests, reject redirects and omit secrets/upstream response bodies from reports.
+  Capabilities describe this binary, not upstream reachability, configured campaign access
+  or user eligibility. No SQL migration is required; publish and select the new proxy image
+  before making capability checks mandatory. — Thanks @imjlk!
+
+### Patch changes
+
+- Updated dependencies: trailbase-runtime (npm)@0.4.0
+
 ## 0.2.0 — 2026-09-12
 
 ### Minor changes
