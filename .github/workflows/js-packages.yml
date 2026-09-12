@@ -6,7 +6,8 @@ on:
       - ".github/workflows/js-packages.yml"
       - "bun.lock"
       - "package.json"
-      - "tsconfig.json"
+      - "tsconfig*.json"
+      - "scripts/check-sdk-minimum.mjs"
       - "packages/**"
   push:
     branches:
@@ -15,7 +16,8 @@ on:
       - ".github/workflows/js-packages.yml"
       - "bun.lock"
       - "package.json"
-      - "tsconfig.json"
+      - "tsconfig*.json"
+      - "scripts/check-sdk-minimum.mjs"
       - "packages/**"
   workflow_dispatch:
 
@@ -49,3 +51,6 @@ jobs:
 
       - name: Check package sources against installed SDK types
         run: bun run packages:typecheck
+
+      - name: Check package sources against minimum supported RN SDK types
+        run: bun run packages:typecheck:minimum

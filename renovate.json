@@ -116,6 +116,11 @@
       "labels": ["dependencies", "apps-in-toss", "manual-review"],
       "dependencyDashboardApproval": true,
       "automerge": false
+    },
+    {
+      "description": "Keep the declared minimum RN SDK fixture fixed; update it only with the support policy",
+      "matchDepNames": ["@apps-in-toss/framework-min-supported"],
+      "enabled": false
     }
   ]
 }
