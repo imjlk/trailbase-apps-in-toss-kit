@@ -77,7 +77,9 @@ describe("toss-mtls-client-proxy", () => {
     const req = request("GET", PROXY_ENDPOINTS.health);
     const res = await handleRequest(req, { mode: "stub", internalToken: "" });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true, mode: "stub" });
+    expect(res.body).toMatchObject({ ok: true, mode: "stub", kit: { contractVersion: 1 } });
+    expect(res.body.kit.proxyVersion).toBe((await import("../package.json")).default.version);
+    expect(res.body.kit.capabilities).toContain("promotion.status");
   });
 
   test("requires an internal token in forward mode", () => {

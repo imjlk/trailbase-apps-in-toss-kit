@@ -131,3 +131,41 @@ still avoid printing tokens, certificates, raw Toss identifiers, HMACs, or
 sealed values.
 
 For private IAP, promotion and message inquiries, use the [read-only Ledger Doctor](ledger-doctor.md).
+
+## Proxy Capability Preflight
+
+Use `createProxyCapabilitiesCheck` from `trailbase-runtime/release-doctor` or
+`trailbase-runtime/proxy-capabilities` to verify the internal proxy before enabling
+a new adapter flow. JSON configuration supports the same check:
+
+```json
+{
+  "type": "proxy-capabilities",
+  "name": "Required proxy adapters",
+  "urlEnv": "MTLS_PROXY_URL",
+  "tokenEnv": "MTLS_PROXY_TOKEN",
+  "expectedMode": "forward",
+  "requiredCapabilities": ["anonymous-key.verify", "promotion.status"],
+  "timeout": 5000
+}
+```
+
+Provide the token in the process environment; config accepts its variable name,
+never an inline token or custom fetch function. The URL must be an HTTP(S) origin
+with no credentials, path, query or fragment. The check sends only an authenticated
+GET to `/internal/apps-in-toss/health`, rejects redirects, bounds the entire request
+including response-body reads, and limits the response to 16 KiB. Error reports omit
+the token, URL, response body and transport error details.
+
+`minimumVersion` optionally requires a stable `MAJOR.MINOR.PATCH` proxy version.
+Feature names are checked independently of the version. Invalid/missing metadata,
+unknown contract versions, a different mode or missing required capabilities fail
+the check. Proxy 0.2.0 and earlier do not expose this new metadata. Publish and select
+an image containing capability support before making this check mandatory. During
+a staged adoption, an explicit `"required": false` reports failures as warnings.
+
+Capabilities identify adapter contracts implemented by the running binary. They do
+not establish upstream availability, certificate validity, campaign configuration,
+notification agreement, payment evidence or user eligibility. Keep those checks in
+the existing application and integration flows. This preflight never grants, sends
+or invokes an upstream API.
