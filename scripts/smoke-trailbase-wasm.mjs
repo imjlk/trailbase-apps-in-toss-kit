@@ -19,6 +19,8 @@ const image =
   process.env.TRAILBASE_SMOKE_IMAGE || "trailbase/trailbase:0.33.14";
 const root = path.resolve(import.meta.dirname, "..");
 const scratch = await mkdtemp(path.join(tmpdir(), "trailbase-kit-smoke-"));
+const runtimeRoot = await mkdtemp(path.join(tmpdir(), "kit-smoke-runtime-"));
+const operationsHold = process.env.KIT_SMOKE_OPERATIONS_HOLD === "1";
 const suffix = randomUUID().slice(0, 8);
 const network = `kit-smoke-${suffix}`;
 const server = `${network}-server`;
@@ -64,6 +66,7 @@ try {
     path.join(scratch, "wasm/compat_smoke.wasm"),
   );
   const templates = [
+    "operation_policies.sql",
     "app_reward_attempts.sql",
     "message_templates.sql",
     "notification_template_agreements.sql",
@@ -99,6 +102,9 @@ record_apis: [{
     read_access_rule: "_ROW_.owner = _USER_.id"
   }]\n`,
   );
+  await writeFile(path.join(runtimeRoot, "settings.json"), JSON.stringify({
+    KIT_OPERATION_POLICIES_ENABLED: "1", KIT_OPERATIONS_HOLD: operationsHold ? "1" : "0",
+  }));
   docker("network", "create", network);
   networkCreated = true;
   docker(
@@ -132,6 +138,8 @@ record_apis: [{
     "127.0.0.1::4000",
     "-v",
     `${scratch}:/app/traildepot`,
+    "-v",
+    `${runtimeRoot}:/run/kit-runtime:ro`,
     image,
     "/app/trail",
     "--data-dir",
@@ -139,6 +147,8 @@ record_apis: [{
     "run",
     "--address",
     "0.0.0.0:4000",
+    "--runtime-root-fs",
+    "/run/kit-runtime",
     "--runtime-threads",
     "2",
     "--demo",
@@ -182,6 +192,15 @@ record_apis: [{
     );
     return value;
   };
+  const policy = await request("/kit-smoke/policy", { method: "POST" });
+  assert.deepEqual(policy, {
+    enabled: true, held: operationsHold,
+    entryCode: operationsHold ? "OPERATION_HELD" : "OPERATION_PAUSED",
+    dispatchCode: operationsHold ? "OPERATION_HELD" : "OPERATION_PAUSED",
+    leasedDispatchCode: operationsHold ? "OPERATION_HELD" : "OPERATION_PAUSED",
+    settlementAllowed: !operationsHold, expiredDenied: true, statusAllowed: true,
+  });
+  checks.push("WASM-mounted operation policy, built-in dispatch gates, database expiry and status during hold");
   const alpha = await request("/kit-smoke/bootstrap?seed=alpha", {
     method: "POST",
   });
@@ -284,10 +303,21 @@ record_apis: [{
   checks.push(
     "Record API ownership/read-only ACL and SSE insert/update/delete",
   );
-  assert.deepEqual(await request("/kit-smoke/rewards", { tokens: alpha, method: "POST" }), {
-    schemaOk: true, replaySame: true, scopeDenied: true, granted: true,
-  });
-  checks.push("app reward tables/index coexistence, server issuance, once-only grant and scoped replay");
+  if (operationsHold) {
+    const deniedReward = await fetch(`${base}/kit-smoke/rewards`, {
+      method: "POST", signal: AbortSignal.timeout(15000),
+      headers: { authorization: `Bearer ${alpha.auth_token}`, "CSRF-Token": alpha.csrf_token },
+    });
+    assert.equal(deniedReward.status, 403);
+    assert.equal((await deniedReward.json()).error?.code, "OPERATION_HELD");
+  } else {
+    assert.deepEqual(await request("/kit-smoke/rewards", { tokens: alpha, method: "POST" }), {
+      schemaOk: true, replaySame: true, scopeDenied: true, granted: true,
+    });
+  }
+  checks.push(operationsHold
+    ? "app reward entry denied with OPERATION_HELD under external hold"
+    : "app reward tables/index coexistence, server issuance, once-only grant and scoped replay");
   const refreshed = await request("/api/auth/v1/refresh", {
     method: "POST",
     body: { refresh_token: alpha.refresh_token },
@@ -325,4 +355,5 @@ record_apis: [{
     docker("image", "rm", proxyImage);
   } catch {}
   await rm(scratch, { recursive: true, force: true });
+  await rm(runtimeRoot, { recursive: true, force: true });
 }

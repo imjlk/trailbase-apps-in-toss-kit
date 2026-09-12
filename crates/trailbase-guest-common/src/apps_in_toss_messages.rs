@@ -428,6 +428,11 @@ pub fn enqueue_message_outbox_tx(
     tx: &mut Transaction,
     input: MessageOutboxEnqueueInput<'_>,
 ) -> ApiResult<MessageOutboxRecord> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::SmartMessage,
+        crate::operation_policy::OperationPhase::Entry,
+    )?;
     let record = normalize_message_outbox_enqueue_input(input)?;
     let (sql, params) = message_outbox_enqueue_statement(&record);
     let rows = db::tx_query(tx, &sql, &params)?;
@@ -442,6 +447,11 @@ pub fn claim_ready_message_outbox_tx(
     limit: i64,
     now: i64,
 ) -> ApiResult<Vec<MessageOutboxRecord>> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::SmartMessage,
+        crate::operation_policy::OperationPhase::Dispatch,
+    )?;
     let (select_sql, select_params) = message_outbox_claim_ready_ids_statement(limit, now)?;
     let rows = db::tx_query(tx, &select_sql, &select_params)?;
     let ids = rows

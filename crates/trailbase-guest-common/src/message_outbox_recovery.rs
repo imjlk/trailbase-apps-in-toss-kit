@@ -104,6 +104,11 @@ pub fn begin_message_outbox_dispatch_tx(
     attempt: &MessageOutboxAttempt,
     now: i64,
 ) -> ApiResult<bool> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::SmartMessage,
+        crate::operation_policy::OperationPhase::Dispatch,
+    )?;
     Ok(db::tx_execute(tx, START_DISPATCH, &attempt_params(attempt, now))? == 1)
 }
 

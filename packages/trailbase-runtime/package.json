@@ -9,7 +9,8 @@
     "./dev-runner": "./src/dev-runner.mjs",
     "./release-doctor": "./src/release-doctor.mjs",
     "./proxy-capabilities": "./src/proxy-capabilities.mjs",
-    "./ledger-doctor": "./src/ledger-doctor.mjs"
+    "./ledger-doctor": "./src/ledger-doctor.mjs",
+    "./restore-checkpoint": "./src/restore-checkpoint.mjs"
   },
   "bin": {
     "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
