@@ -349,3 +349,70 @@ test("XHR subscription waits for response headers before allowing a snapshot", a
   expect(resolved).toBe(true);
   await stream.cancel();
 });
+
+test("a stalled XHR connection times out, aborts and retries before loading a snapshot", async () => {
+  const Base = createFakeXhrClass({});
+  let aborted = 0;
+  class Xhr extends Base {
+    override send() {
+      if (Xhr.instances.length > 1) { this.readyState = 2; this.onreadystatechange?.(); }
+    }
+    override abort() { aborted++; super.abort(); }
+  }
+  let lists = 0;
+  const errors: unknown[] = [];
+  const api = createTrailbaseRecordApiWithXhrSse({
+    apiBaseUrl: "http://localhost:4000", apiName: "items", connectionTimeoutMs: 10,
+    fallbackRecordApi: { list: async () => { lists++; return { records: [{ id: 1 }] }; }, subscribe: async () => new ReadableStream() },
+    XMLHttpRequestImpl: Xhr as unknown as typeof XMLHttpRequest,
+  });
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "stalled-xhr", recordApi: api, getKey: (row: { id: number }) => row.id,
+    reconnectDelayMs: 1, onSubscriptionError: (error) => errors.push(error),
+  }));
+  try {
+    await collection.preload();
+    expect(errors).toHaveLength(1);
+    expect(aborted).toBe(1);
+    expect(lists).toBe(1);
+    // The connection deadline must not terminate an established SSE stream.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(aborted).toBe(1);
+  } finally { await collection.cleanup(); }
+});
+
+test("collection cleanup aborts XHR before response headers", async () => {
+  const Base = createFakeXhrClass({});
+  let aborted = 0;
+  class Xhr extends Base { override send() {} override abort() { aborted++; super.abort(); } }
+  const api = createTrailbaseRecordApiWithXhrSse({
+    apiBaseUrl: "http://localhost:4000", apiName: "items",
+    fallbackRecordApi: { list: async () => { throw new Error("snapshot after cleanup"); }, subscribe: async () => new ReadableStream() },
+    XMLHttpRequestImpl: Xhr as unknown as typeof XMLHttpRequest,
+  });
+  const options = trailbaseRecordCollectionOptions({ id: "cancel-connecting", recordApi: api, getKey: (row: { id: number }) => row.id });
+  const sync = options.sync.sync({
+    begin() {}, commit() {}, write() {}, markReady() { throw new Error("ready after cleanup"); },
+    collection: { has: () => false },
+  });
+  await eventually(() => Xhr.instances.length === 1);
+  sync.cleanup();
+  await eventually(() => aborted === 1);
+});
+
+test("cancellation remains immediate while the header provider is unresolved", async () => {
+  const headers = deferred<Record<string, string>>();
+  const Xhr = createFakeXhrClass({});
+  const abort = new AbortController();
+  const api = createTrailbaseRecordApiWithXhrSse({
+    apiBaseUrl: "http://localhost:4000", apiName: "items", getHeaders: () => headers.promise,
+    fallbackRecordApi: { list: async () => ({ records: [] }), subscribe: async () => new ReadableStream() },
+    XMLHttpRequestImpl: Xhr as unknown as typeof XMLHttpRequest,
+  });
+  const pending = api.subscribe("*", { signal: abort.signal });
+  abort.abort();
+  await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+  headers.resolve({ authorization: "synthetic-test-token" });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  expect(Xhr.instances).toHaveLength(0);
+});

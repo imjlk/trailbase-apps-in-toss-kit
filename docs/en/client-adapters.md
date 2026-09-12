@@ -372,3 +372,8 @@ list; list-only filters do not constrain `subscribe("*")`. XHR subscriptions wai
 for successful response headers before starting the snapshot. A failed snapshot
 reports `onSubscriptionError`, closes the stream, and retries without marking the
 collection ready. Cleanup cancels streams and ignores late list responses.
+
+XHR SSE connection setup is cancellable through `subscribe(id, { signal })` and
+collection cleanup. `connectionTimeoutMs` defaults to 15 seconds and covers header
+resolution plus the wait for response headers; it does not expire an established
+stream. Stalled setup aborts the request and lets collection reconnection retry.

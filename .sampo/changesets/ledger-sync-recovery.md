@@ -19,3 +19,6 @@ is preserved; newly granted rows need explicit confirmation. Query promotion
 results with the persisted transaction key through the new status endpoint; missing
 keys require reconciliation rather than a new grant. Deploy the next proxy image
 before using that endpoint. No minimum TrailBase server change is required.
+
+Make XHR SSE connection setup abortable during cleanup and bound header resolution
+and response-header waits with a configurable 15-second connection deadline.
