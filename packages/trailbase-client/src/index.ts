@@ -189,6 +189,8 @@ export interface AppsInTossSessionManagerOptions<TUser = unknown> {
   anonymousHashStorageKey?: string;
   tossSessionStorageKey?: string;
   appSessionStorageKey?: string;
+  /** True only after authoritative authentication failure, not transport errors. */
+  isInvalidSessionError?: (error: unknown) => boolean;
 }
 
 export class AppsInTossLoginError extends Error {
@@ -348,6 +350,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   anonymousHashStorageKey = "trailbase.anonymousHash",
   tossSessionStorageKey = "trailbase.tossSession",
   appSessionStorageKey = "trailbase.appSession",
+  isInvalidSessionError = (error) => error instanceof TrailBaseHttpError && [401, 403].includes(error.status),
 }: AppsInTossSessionManagerOptions<TUser>) {
   const operations = createSessionOperationGuard();
   type Operation = SessionOperation;
@@ -364,12 +367,16 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     return anonymousHashPromise;
   }
 
-  async function read(op: Operation, key: string) {
+  async function requireCompleteStorage(op: Operation) {
     await storageTail;
     op.check();
     const marker = await storage.getItem(writeMarkerKey);
     op.check();
     if (marker) throw new AppSessionStorageIncompleteError();
+  }
+
+  async function read(op: Operation, key: string) {
+    await requireCompleteStorage(op);
     const session = await readStoredSession<TUser>(storage, key);
     op.check();
     return session;
@@ -409,10 +416,12 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     if (!stored) return null;
     let response: AppSessionManagerResponse<TUser>;
     try {
+      op.check();
       response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
       op.check();
     } catch (error) {
       op.check();
+      if (isInvalidSessionError(error) !== true) throw error;
       await clear(op, [tossSessionStorageKey]);
       return null;
     }
@@ -424,10 +433,12 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     if (!stored) return restoreToss(op);
     let response: AppSessionManagerResponse<TUser>;
     try {
+      op.check();
       response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
       op.check();
     } catch (error) {
       op.check();
+      if (isInvalidSessionError(error) !== true) throw error;
       await clear(op, stored.authProvider === "toss" ? [appSessionStorageKey, tossSessionStorageKey] : [appSessionStorageKey]);
       return null;
     }
@@ -435,6 +446,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   }
 
   async function bootstrapApp(op: Operation) {
+    await requireCompleteStorage(op);
     const hash = await anonymousHash();
     op.check();
     const response = await bootstrap(hash, { signal: op.signal });

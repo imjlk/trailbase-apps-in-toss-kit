@@ -17,3 +17,7 @@ No SQL migration or proxy rollout is required.
 Multi-key writes share one queue slot, and a persistent writePending marker blocks
 restoration of partially written credentials. Keep the marker with the session
 namespace and handle AppSessionStorageIncompleteError with clear/sign-in recovery.
+Preserve stored credentials on transient restore/foreground failures; provide
+isInvalidSessionError for custom authoritative revocation errors. Disconnect still
+attempts credential deletion when resource cleanup fails, and explicit anonymous
+bootstrap cannot make a partially written Toss mirror valid again.

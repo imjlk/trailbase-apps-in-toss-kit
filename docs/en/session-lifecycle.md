@@ -13,6 +13,12 @@ Each multi-key save/clear runs in one queue slot. A small
 or failed storage write. `AppSessionStorageIncompleteError` requires explicit
 `clearSessions()` or sign-in recovery; do not delete the marker by itself or restore
 individual keys manually. Keep this internal key in the same persistent namespace.
+Explicit anonymous bootstrap also refuses an incomplete namespace; clear it or
+perform a fresh Toss sign-in first. Storage key names and the marker must be distinct.
+Restoration preserves credentials on network, timeout and server failures. Only
+`isInvalidSessionError(error) === true` clears rejected credentials; by default this
+recognizes `TrailBaseHttpError` 401/403. Custom backend adapters should supply their
+own authoritative invalid/revoked-session predicate. Other errors remain retryable.
 
 `createAppsInTossSessionLifecycle` adds a single entry point for account transitions
 and foreground refresh. It is exported from the package root, `apps-in-toss`, and
@@ -106,6 +112,8 @@ not sign the user out.
 Disposal is final, including cleanup failure: repeated `dispose()` calls return
 the same cleanup outcome. Handle that failure in the app's teardown path; a disposed
 lifecycle cannot be reused or subscribed to again.
+Disconnect attempts credential deletion even if user-resource cleanup fails, then
+reports cleanup errors separately through the rejected operation.
 
 No schema migration or proxy deployment is required. Validate canonical-account
 upgrades, delayed A-account requests after switching to B, changed subscription

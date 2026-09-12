@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { createAppsInTossSessionManager, StaleAppSessionOperationError, AppSessionStorageIncompleteError, type AppsInTossSessionManagerOptions } from "../src/index";
+import { createAppsInTossSessionManager, StaleAppSessionOperationError, AppSessionStorageIncompleteError, TrailBaseHttpError, type AppsInTossSessionManagerOptions } from "../src/index";
 import { createAppsInTossSessionLifecycle } from "../src/session-lifecycle";
 
 type User = { id: string };
@@ -177,6 +177,76 @@ test("get-or-sign-in recovers incomplete storage through fresh Toss login withou
   expect(logins).toBe(1);
   expect(bootstraps).toBe(0);
   expect(stored.get("trailbase.appSession.writePending")).toBe("");
+});
+
+test("transient resume and cold-restore errors preserve credentials for a retry", async () => {
+  for (const outage of [new Error("offline"), new TrailBaseHttpError("unavailable", { status: 503, statusText: "Unavailable", payload: null })]) {
+    let failing = false;
+    let bootstraps = 0;
+    const { manager, stored } = setup({
+      loadSession: async () => { if (failing) throw outage; return response("B"); },
+      bootstrap: async () => { bootstraps++; return response("anonymous"); },
+    });
+    await manager.signInWithToss();
+    const before = stored.get("trailbase.appSession");
+    const lifecycle = createAppsInTossSessionLifecycle({ manager, getUserId: user => user.id,
+      clearUserData: () => {}, refreshEntitlements: async () => true });
+    await lifecycle.start();
+    failing = true;
+    await expect(lifecycle.resume()).rejects.toThrow();
+    expect(lifecycle.getSnapshot().scope).toBeNull();
+    expect(lifecycle.getSnapshot().phase).toBe("error");
+    expect(stored.get("trailbase.appSession")).toBe(before);
+    await expect(manager.getOrCreateAppSession()).rejects.toThrow();
+    expect(bootstraps).toBe(0);
+    failing = false;
+    expect((await lifecycle.resume())?.userId).toBe("B");
+    await lifecycle.dispose();
+  }
+});
+
+test("authoritative invalid credentials are cleared and custom rejection classification is supported", async () => {
+  for (const custom of [false, true]) {
+    const error = custom ? new Error("revoked") : new TrailBaseHttpError("revoked", { status: 401, statusText: "Unauthorized", payload: null });
+    const { manager, stored } = setup({ loadSession: async () => { throw error; },
+      ...(custom ? { isInvalidSessionError: (failure: unknown) => failure === error } : {}) });
+    await manager.signInWithToss();
+    expect(await manager.restoreStoredAppSession()).toBeNull();
+    expect(stored.get("trailbase.appSession")).toBe("");
+    expect(stored.get("trailbase.tossSession")).toBe("");
+  }
+});
+
+test("disconnect still clears credentials when either cache or subscription cleanup fails", async () => {
+  for (const cacheFailure of [false, true]) {
+    const { manager, stored } = setup();
+    let disconnecting = false;
+    const lifecycle = createAppsInTossSessionLifecycle({ manager, getUserId: user => user.id,
+      clearUserData: () => { if (cacheFailure && disconnecting) throw new Error("cache cleanup failed"); },
+      refreshEntitlements: async () => true });
+    const scope = (await lifecycle.signInWithToss())!;
+    if (!cacheFailure) await scope.registerCleanup(() => { throw new Error("subscription cleanup failed"); });
+    disconnecting = true;
+    await expect(lifecycle.disconnect()).rejects.toThrow("Disconnect cleanup failed");
+    expect(stored.get("trailbase.appSession")).toBe("");
+    expect(stored.get("trailbase.tossSession")).toBe("");
+    expect(await manager.restoreStoredTossSession()).toBeNull();
+    disconnecting = false;
+    await lifecycle.dispose();
+  }
+});
+
+test("explicit anonymous bootstrap cannot clear a marker over an inconsistent Toss mirror", async () => {
+  let bootstraps = 0;
+  const { manager, stored } = setup({ bootstrap: async () => { bootstraps++; return response("A"); } });
+  stored.set("trailbase.tossSession", JSON.stringify({ authProvider: "toss", authTokens: { authToken: "auth-B" }, user: { id: "B" } }));
+  stored.set("trailbase.appSession.writePending", "1");
+  await expect(manager.bootstrapAnonymousSession()).rejects.toBeInstanceOf(AppSessionStorageIncompleteError);
+  expect(bootstraps).toBe(0);
+  expect(stored.get("trailbase.appSession.writePending")).toBe("1");
+  await manager.clearSessions();
+  expect((await manager.bootstrapAnonymousSession()).user.id).toBe("A");
+  expect(stored.get("trailbase.tossSession")).toBe("");
 });
 
 test("account transition clears resources, isolates cache keys and ignores late request/SSE updates", async () => {

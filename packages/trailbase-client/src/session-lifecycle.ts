@@ -118,14 +118,17 @@ export function createAppsInTossSessionLifecycle<TUser, TEntitlements>({
     publish("transitioning");
     return operations.run(async operation => {
       try {
-        await cleanup;
-        operation.check();
         if (!acquire) {
-          await manager.clearSessions();
+          // Logout must erase credentials even if an unrelated disposer fails.
+          const results = await Promise.allSettled([cleanup, manager.clearSessions()]);
           operation.check();
+          const errors = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
+          if (errors.length) throw new AggregateError(errors.map(r => r.reason), "Disconnect cleanup failed");
           publish("idle");
           return null;
         }
+        await cleanup;
+        operation.check();
         const session = await acquire();
         operation.check();
         if (!session) throw new Error("Stored session is unavailable; explicit sign-in or bootstrap is required");
