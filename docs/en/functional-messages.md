@@ -185,3 +185,9 @@ Alimtalk, and Friendtalk counts. Completion stores the normalized response in
 `provider_response_json` when no raw response is supplied. Keep that field private.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
+Both enqueue paths remove reserved raw recipient fields (`tossUserKey`, `userKey`,
+`anonKey`) recursively from payload objects and arrays before persistence. Keep
+identity in the private HMAC/sealed columns. Consumer migrations should scrub those
+fields from any legacy payloads that already contain them; new enqueues do not
+rewrite historical rows on idempotency conflicts.

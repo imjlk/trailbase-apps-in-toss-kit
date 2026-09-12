@@ -378,3 +378,8 @@ The upstream `reachedFailReason` field and per-channel details remain available.
 A successful channel can coexist with failed channels; consumers must not retry
 an entire partially delivered message automatically. Functional notification
 agreement remains the consumer's responsibility before dispatch.
+
+In forward IAP lookups, the proxy never substitutes the requested SKU for a missing
+provider SKU. PAYMENT_COMPLETED/PURCHASED responses without a provider SKU return
+`ok: false` and `UNVERIFIED_IAP_ORDER`; retry verification before granting anything.
+Explicit stub mode keeps synthetic request-based products for local tests.
