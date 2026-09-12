@@ -116,9 +116,10 @@ The repository reference has been reviewed through `@apps-in-toss/framework`
 
 The July 2026 API update also allows promotion, Smart Message, and Toss Pay
 server APIs to identify users with an anonymous hash in addition to Toss Login
-`userKey`. Existing proxy adapters continue to use `userKey`; adding anonymous
-hash input is a separate API-surface change and must preserve the rule that raw
-identifiers are not logged or returned.
+`userKey`. The Smart Message adapter already accepts `anonKey` and forwards it
+through `x-anon-key`; its Toss Login recipient path uses `x-toss-user-key`.
+Anonymous identity verification and promotion input support remain separate feature
+changes. Raw identifiers must not be logged or returned.
 
 This reference refresh does not change the TrailBase minimum server policy. Consumer apps should
 still run app-level smoke tests before raising their own supported Apps in Toss

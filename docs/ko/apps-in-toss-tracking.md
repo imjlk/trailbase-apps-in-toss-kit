@@ -106,9 +106,10 @@ root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새
   이를 kit에서 사용하는 작업은 별도 기능 변경입니다.
 
 2026년 7월 API 변경으로 promotion, Smart Message, Toss Pay 서버 API는 Toss Login
-`userKey` 외에 익명 hash로도 사용자를 식별할 수 있습니다. 기존 proxy adapter는 계속
-`userKey`를 사용합니다. 익명 hash 입력 지원은 별도 API surface 변경으로 다루고, raw 식별자를
-로그하거나 응답으로 돌려주지 않는 규칙을 유지해야 합니다.
+`userKey` 외에 익명 hash로도 사용자를 식별할 수 있습니다. Smart Message adapter는 이미
+`anonKey`를 받아 `x-anon-key`로 전달하며, Toss Login 수신자는 `x-toss-user-key`를 사용합니다.
+익명 식별키 검증과 promotion 입력 지원은 별도 기능 변경입니다. raw 식별자를 로그하거나
+응답으로 돌려주지 않는 규칙을 유지해야 합니다.
 
 이번 reference 갱신은 TrailBase 최소 지원 서버 정책을 바꾸지 않습니다. 다만 컨슈머 앱의 지원 Apps in Toss
 SDK/runtime policy는 앱 단위 smoke test 이후에만 올리세요.
