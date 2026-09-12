@@ -171,3 +171,5 @@ not establish upstream availability, certificate validity, campaign configuratio
 notification agreement, payment evidence or user eligibility. Keep those checks in
 the existing application and integration flows. This preflight never grants, sends
 or invokes an upstream API.
+
+The Node CLI remains self-contained when run from a git submodule; no npm install is required. Minimum versions use strict SemVer precedence (including prereleases and ignoring build metadata), limited to 128 characters and safe integer core components.

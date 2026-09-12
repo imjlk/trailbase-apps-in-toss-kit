@@ -1,10 +1,9 @@
-import semver from "semver";
+import { compareVersions, parseVersion } from "./internal/semver.mjs";
 
 const HEALTH_PATH = "/internal/apps-in-toss/health";
 const MAX_BODY_BYTES = 16 * 1024;
 const CAPABILITY = /^[a-z][a-z0-9.-]{0,63}$/;
-const validVersion = value => typeof value === "string" && value.length <= 128 &&
-  /^\d/.test(value) && value.trim() === value && semver.valid(value) !== null;
+const validVersion = value => parseVersion(value) !== null;
 const failure = message => ({ ok: false, failures: [message] });
 
 export function evaluateProxyCapabilities(health, {
@@ -24,7 +23,7 @@ export function evaluateProxyCapabilities(health, {
       kit.capabilities.some(value => typeof value !== "string" || !CAPABILITY.test(value))) {
     return failure("Proxy capability metadata is invalid");
   }
-  if (minimumVersion && !semver.gte(kit.proxyVersion, minimumVersion)) {
+  if (minimumVersion && compareVersions(kit.proxyVersion, minimumVersion) < 0) {
     return failure("Proxy version is below the required minimum");
   }
   const missing = requiredCapabilities.filter(value => !kit.capabilities.includes(value));
