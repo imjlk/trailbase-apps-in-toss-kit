@@ -84,7 +84,8 @@ The identity binding prevents a subsequent Toss login from changing the recovery
 recipient. Missing keys or revoked identities require explicit reconciliation;
 never allocate another key merely because the first outcome is unknown.
 
-Deploy the next Sampo-generated proxy image before using these endpoints. Local
+Select the published proxy `0.2.0` or a reviewed compatible later release before
+using these endpoints. Local
 contract/SQL tests are provided; consuming apps still need sandbox/real-app
 bootstrap, notification-agreement, and promotion tests before rollout.
 
