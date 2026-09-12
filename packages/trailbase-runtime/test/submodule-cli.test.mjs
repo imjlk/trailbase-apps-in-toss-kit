@@ -12,7 +12,11 @@ test("Node submodule CLI and capability evaluator need no package installation",
   try {
     for (const entry of ["src", "bin", "package.json"]) cpSync(join(source, entry), join(root, entry), { recursive: true });
     const cli = join(root, "bin/release-doctor.mjs");
-    const run = args => spawnSync("node", args, { cwd: root, encoding: "utf8", env: { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" } });
+    const run = args => {
+      const result = spawnSync("node", args, { cwd: root, encoding: "utf8", timeout: 15000, env: { ...process.env, NODE_PATH: "", NODE_OPTIONS: "" } });
+      if (result.error) throw result.error;
+      return result;
+    };
     const help = run([cli, "--help"]);
     expect(help.stderr).toBe(""); expect(help.status).toBe(0); expect(help.stdout).toContain("Usage:");
     const envFile = join(root, "synthetic.env");

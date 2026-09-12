@@ -21,7 +21,8 @@ export function compareVersions(left, right) {
     if (a.core[i] !== b.core[i]) return a.core[i] > b.core[i] ? 1 : -1;
   }
   if (!a.prerelease.length || !b.prerelease.length) {
-    return a.prerelease.length === b.prerelease.length ? 0 : a.prerelease.length ? -1 : 1;
+    if (a.prerelease.length === b.prerelease.length) return 0;
+    return a.prerelease.length ? -1 : 1;
   }
   for (let i = 0; i < Math.max(a.prerelease.length, b.prerelease.length); i++) {
     const x = a.prerelease[i]; const y = b.prerelease[i];
