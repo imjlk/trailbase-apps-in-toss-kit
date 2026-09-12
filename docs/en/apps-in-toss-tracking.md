@@ -114,11 +114,11 @@ The repository reference has been reviewed through `@apps-in-toss/framework`
   installed SDK types with `bun run packages:typecheck`. The installed SDK includes
   subscription purchase and status APIs; consuming them is a separate feature change.
 
-The July 2026 API update also allows promotion, Smart Message, and Toss Pay
-server APIs to identify users with an anonymous hash in addition to Toss Login
-`userKey`. Existing proxy adapters continue to use `userKey`; adding anonymous
-hash input is a separate API-surface change and must preserve the rule that raw
-identifiers are not logged or returned.
+The July 2026 API update allows anonymous recipients for promotion and Smart
+Message APIs. The kit now includes anonymous-key verification, private identity
+storage, typed message recipients, and anonymous promotion adapter support; see
+[Verified Anonymous Identity](anonymous-identity.md) for migrations and consent
+requirements. Public responses and logs must not contain raw identifiers.
 
 This reference refresh does not change the TrailBase minimum server policy. Consumer apps should
 still run app-level smoke tests before raising their own supported Apps in Toss

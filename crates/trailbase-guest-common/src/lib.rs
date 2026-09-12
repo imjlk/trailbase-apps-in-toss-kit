@@ -7,6 +7,7 @@ use trailbase_wasm::fetch;
 use trailbase_wasm::http::IntoBody;
 
 pub mod analytics_events;
+pub mod anonymous_identity;
 pub mod apps_in_toss_login;
 pub mod apps_in_toss_messages;
 pub mod apps_in_toss_proxy;
@@ -14,6 +15,7 @@ pub mod db;
 pub mod domain_events;
 pub mod iap_orders;
 pub mod message_outbox_recovery;
+pub mod message_recipients;
 pub mod promotion_campaigns;
 pub mod promotion_rewards;
 pub mod responses;

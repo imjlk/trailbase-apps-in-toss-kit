@@ -103,3 +103,5 @@ Use `trailbase-guest-common::toss_unlink` helpers to:
 Keep app-specific database updates in the consumer app. Typical handling is to look up
 `toss_identities.toss_user_key_hmac`, mark the matching row `REVOKED`, and record an audit/event row
 that omits the raw Toss `userKey`.
+
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).

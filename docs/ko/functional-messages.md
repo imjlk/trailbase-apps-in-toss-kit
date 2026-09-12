@@ -166,3 +166,5 @@ proxy timeout과 응답 처리 시간보다 길게 잡으세요. 기존 skip도 
 Rust 메시지 응답은 채널별 실패·content id와 SMS, Alimtalk, Friendtalk 집계를 유지합니다.
 Raw 응답을 제공하지 않으면 완료 시 정규화한 결과를 `provider_response_json`에 저장합니다.
 이 필드는 비공개로 유지하세요.
+
+[검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.

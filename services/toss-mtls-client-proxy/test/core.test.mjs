@@ -9,6 +9,8 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
   PROXY_ENDPOINTS,
+  ANONYMOUS_KEY_VERIFY_PATH,
+  TOSS_ANONYMOUS_KEY_VERIFY_PATH,
   PROMOTION_REWARD_STATUS_PATH,
   DEFAULT_PORT,
   SMART_MESSAGE_BULK_MAX_CONTEXTS,
@@ -767,6 +769,73 @@ describe("toss-mtls-client-proxy", () => {
       promotionCode: "campaign", tossUserKey: "test-user", amount: 10,
     }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret" }))
       .rejects.toThrow("providerTransactionKey is required");
+  });
+
+  test("anonymous verification requires both SUCCESS and a boolean result", async () => {
+    let upstreamResponse = { resultType: "SUCCESS", success: true };
+    let status = 200;
+    const upstream = http.createServer(async (req, res) => {
+      expect(req.url).toBe(TOSS_ANONYMOUS_KEY_VERIFY_PATH);
+      expect(req.headers["x-anon-key"]).toBe("verification-key");
+      expect(req.headers["x-toss-user-key"]).toBeUndefined();
+      req.resume();
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(JSON.stringify(upstreamResponse));
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const verify = () => handleRequest(request("POST", ANONYMOUS_KEY_VERIFY_PATH, { anonKey: "verification-key" },
+        { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect((await verify()).body).toEqual({ ok: true, valid: true, resultType: "SUCCESS", mode: "forward" });
+      upstreamResponse = { resultType: "SUCCESS", success: false };
+      expect((await verify()).body.valid).toBe(false);
+      for (const body of [
+        { resultType: "SUCCESS", success: "true" },
+        { resultType: "FAIL", success: true, error: { reason: "verification-key" } },
+        { valid: true },
+      ]) {
+        upstreamResponse = body;
+        const result = (await verify()).body;
+        expect(result.ok).toBe(false);
+        expect(result.valid).toBe(false);
+        expect(JSON.stringify(result)).not.toContain("verification-key");
+      }
+      upstreamResponse = { resultType: "SUCCESS", success: true };
+      status = 500;
+      expect((await verify()).body.valid).toBe(false);
+    });
+  });
+
+  test("anonymous verification uses explicit stub mode and internal authentication", async () => {
+    const body = { anonKey: "development-key" };
+    expect((await handleRequest(request("POST", ANONYMOUS_KEY_VERIFY_PATH, body), { mode: "stub", internalToken: "secret" })).status).toBe(401);
+    const result = await handleRequest(request("POST", ANONYMOUS_KEY_VERIFY_PATH, body, { authorization: "Bearer secret" }), { mode: "stub", internalToken: "secret" });
+    expect(result.body.mode).toBe("stub");
+    expect(result.body.valid).toBe(true);
+    await expect(handleRequest(request("POST", ANONYMOUS_KEY_VERIFY_PATH, { anonKey: "" }), { mode: "stub", internalToken: "" })).rejects.toThrow("non-empty");
+  });
+
+  test("anonymous promotion uses only x-anon-key for grant and existing-key recovery", async () => {
+    const paths = [];
+    const upstream = http.createServer(async (req, res) => {
+      paths.push(req.url);
+      expect(req.headers["x-anon-key"]).toBe("anonymous-recipient");
+      expect(req.headers["x-toss-user-key"]).toBeUndefined();
+      expect(req.headers["x-user-key"]).toBeUndefined();
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: req.url === TOSS_ENDPOINTS.promotionResult ? "SUCCESS" : { key: "transaction-key" } }));
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const body = { anonKey: "anonymous-recipient", promotionCode: "campaign", amount: 10 };
+      const config = { mode: "forward", internalToken: "secret", upstreamBaseUrl };
+      const grant = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, body, { authorization: "Bearer secret" }), config);
+      expect(grant.body.providerStatus).toBe("GRANTED");
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionGetKey, TOSS_ENDPOINTS.promotionExecute, TOSS_ENDPOINTS.promotionResult]);
+      paths.length = 0;
+      await handleRequest(request("POST", PROMOTION_REWARD_STATUS_PATH, { ...body, providerTransactionKey: "transaction-key" }, { authorization: "Bearer secret" }), config);
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
+      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, { ...body, tossUserKey: "login-key" }, { authorization: "Bearer secret" }), config)).rejects.toThrow("exactly one");
+    });
   });
 
   test("stub iap order status returns payable status", async () => {

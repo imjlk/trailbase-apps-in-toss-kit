@@ -69,3 +69,5 @@ kit's integration opinion:
 
 English docs live in `docs/en/`. Korean translations with the same filenames
 live in `docs/ko/`.
+
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).

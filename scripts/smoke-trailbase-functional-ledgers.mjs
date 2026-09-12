@@ -14,6 +14,9 @@ const templates = [
   "promotion_campaigns.sql",
   "promotion_reward_ledger.sql",
   "iap_orders.sql",
+  "anonymous_identities.sql",
+  "message_outbox_recipients.migration.sql",
+  "promotion_reward_recipients.sql",
 ];
 
 const db = new Database(":memory:");
@@ -72,6 +75,8 @@ try {
 }
 
 function verifySchema() {
+  assertTable("anonymous_identities");
+  assertTable("promotion_reward_recipients");
   assertTable("message_outbox_attempts");
   assertIndex("message_outbox_attempts", "idx_message_outbox_attempts_expiry");
   for (const table of [

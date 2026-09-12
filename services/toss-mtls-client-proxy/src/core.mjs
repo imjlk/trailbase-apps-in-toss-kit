@@ -22,3 +22,5 @@ export {
   TOSS_ENDPOINTS,
   createTossMtlsCore,
 } from "@ait-kit/api-core";
+
+export { ANONYMOUS_KEY_VERIFY_PATH, TOSS_ANONYMOUS_KEY_VERIFY_PATH } from "./anonymous-key.mjs";

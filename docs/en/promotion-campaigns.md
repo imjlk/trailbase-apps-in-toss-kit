@@ -168,3 +168,5 @@ A transport failure during the original grant can lose the key before the caller
 persists it. That case requires operator/provider reconciliation; do not retry
 with a new key. The status endpoint does not make the combined original grant
 flow atomic across a network interruption.
+
+See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).

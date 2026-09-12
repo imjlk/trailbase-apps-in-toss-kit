@@ -352,3 +352,5 @@ Record API wrapper는 응답의 `cursor`를 유지해야 합니다. `records`만
 `subscribe("*")`를 제한하지 않습니다. XHR 구독은 성공 응답 헤더를 받은 뒤 스냅샷을
 조회합니다. 조회 실패는 `onSubscriptionError`에 전달하며 stream을 닫고 준비 완료
 표시 없이 재시도합니다. Cleanup 이후에 끝난 목록 요청은 무시합니다.
+
+[검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
