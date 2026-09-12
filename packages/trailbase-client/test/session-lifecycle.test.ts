@@ -164,6 +164,21 @@ test("failure before acquiring a scope clears caches once", async () => {
   expect(() => lifecycle.subscribe(() => {})).toThrow("disposed");
 });
 
+test("get-or-sign-in recovers incomplete storage through fresh Toss login without anonymous fallback", async () => {
+  let logins = 0;
+  let bootstraps = 0;
+  const { manager, stored } = setup({
+    appLogin: async () => { logins++; return { authorizationCode: "fresh", referrer: "DEFAULT" }; },
+    bootstrap: async () => { bootstraps++; return response("anonymous"); },
+  });
+  stored.set("trailbase.appSession.writePending", "1");
+  const session = await manager.getOrSignInWithToss();
+  expect(session.user.id).toBe("B");
+  expect(logins).toBe(1);
+  expect(bootstraps).toBe(0);
+  expect(stored.get("trailbase.appSession.writePending")).toBe("");
+});
+
 test("account transition clears resources, isolates cache keys and ignores late request/SSE updates", async () => {
   const { manager } = setup();
   const events: string[] = [];

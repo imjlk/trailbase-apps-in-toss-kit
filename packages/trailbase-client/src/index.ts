@@ -462,7 +462,15 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     bootstrapAnonymousSession: () => operations.run(bootstrapApp),
     getOrCreateAppSession: () => operations.run(async op => (await restoreApp(op)) ?? bootstrapApp(op)),
     signInWithToss: () => operations.run(signIn),
-    getOrSignInWithToss: () => operations.run(async op => (await restoreToss(op)) ?? signIn(op)),
+    getOrSignInWithToss: () => operations.run(async op => {
+      let restored;
+      try { restored = await restoreToss(op); }
+      catch (error) {
+        if (!(error instanceof AppSessionStorageIncompleteError)) throw error;
+        op.check();
+      }
+      return restored ?? signIn(op);
+    }),
     clearSessions: () => operations.run(op => clear(op, [tossSessionStorageKey, appSessionStorageKey])),
     cancelPendingOperations: operations.cancel,
   };
