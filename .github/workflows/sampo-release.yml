@@ -76,6 +76,8 @@ jobs:
         if: steps.sampo.outputs.released == 'true'
         shell: bash
         run: |
+          git diff --exit-code
+          git diff --cached --exit-code
           git fetch origin release/main
           git checkout --detach origin/release/main
           bun install --lockfile-only --ignore-scripts
