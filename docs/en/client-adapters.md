@@ -381,3 +381,7 @@ XHR SSE connection setup is cancellable through `subscribe(id, { signal })` and
 collection cleanup. `connectionTimeoutMs` defaults to 15 seconds and covers header
 resolution plus the wait for response headers; it does not expire an established
 stream. Stalled setup aborts the request and lets collection reconnection retry.
+
+## Account lifecycle
+
+Use [Account Changes and App Foreground](session-lifecycle.md) for guarded requests, user-scoped caches, subscription cleanup, and authoritative revalidation on app foreground.

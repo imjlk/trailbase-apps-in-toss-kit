@@ -1,3 +1,12 @@
+import { createSessionOperationGuard, type SessionOperation } from "./session-operation";
+export { StaleAppSessionOperationError } from "./session-operation";
+export {
+  createAppsInTossSessionLifecycle,
+  type AppUserScope,
+  type ManagedAppSession,
+  type AppSessionLifecycleSnapshot,
+  type AppsInTossSessionLifecycleOptions,
+} from "./session-lifecycle";
 export type JsonValue =
   | null
   | boolean
@@ -169,23 +178,32 @@ export interface AppsInTossSessionManagerOptions<TUser = unknown> {
   storage: KeyValueStorage;
   appLogin: () => Promise<unknown>;
   getIsTossLoginIntegratedService?: () => Promise<unknown>;
-  loadSession: (input: AppSessionLoadInput) => Promise<AppSessionManagerResponse<TUser>>;
-  bootstrap: (anonymousHash: string) => Promise<AppSessionManagerResponse<TUser>>;
+  loadSession: (input: AppSessionLoadInput, options?: { signal: AbortSignal }) => Promise<AppSessionManagerResponse<TUser>>;
+  bootstrap: (anonymousHash: string, options?: { signal: AbortSignal }) => Promise<AppSessionManagerResponse<TUser>>;
   completeTossLogin: (input: {
     anonymousHash: string;
     authorizationCode: string;
     referrer: AppsInTossReferrer;
-  }) => Promise<AppSessionManagerResponse<TUser>>;
+  }, options?: { signal: AbortSignal }) => Promise<AppSessionManagerResponse<TUser>>;
   createAnonymousHash?: () => string;
   anonymousHashStorageKey?: string;
   tossSessionStorageKey?: string;
   appSessionStorageKey?: string;
+  /** True only after authoritative authentication failure, not transport errors. */
+  isInvalidSessionError?: (error: unknown) => boolean;
 }
 
 export class AppsInTossLoginError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "AppsInTossLoginError";
+  }
+}
+
+export class AppSessionStorageIncompleteError extends Error {
+  constructor() {
+    super("Session storage contains an incomplete write; clear sessions or sign in again");
+    this.name = "AppSessionStorageIncompleteError";
   }
 }
 
@@ -332,82 +350,141 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   anonymousHashStorageKey = "trailbase.anonymousHash",
   tossSessionStorageKey = "trailbase.tossSession",
   appSessionStorageKey = "trailbase.appSession",
+  isInvalidSessionError = (error) => error instanceof TrailBaseHttpError && [401, 403].includes(error.status),
 }: AppsInTossSessionManagerOptions<TUser>) {
-  async function restoreStoredTossSession() {
-    const storedSession = await readStoredSession<TUser>(storage, tossSessionStorageKey);
-    if (!storedSession) {
-      return null;
-    }
-    try {
-      const response = await loadSession(sessionLoadInput(storedSession));
-      await writeSession(storage, tossSessionStorageKey, response, "toss");
-      await writeSession(storage, appSessionStorageKey, response, "toss");
-      return withAuthProvider(response, "toss");
-    } catch {
-      await storage.setItem(tossSessionStorageKey, "");
-      return null;
-    }
+  const operations = createSessionOperationGuard();
+  type Operation = SessionOperation;
+  let storageTail: Promise<void> = Promise.resolve();
+  let anonymousHashPromise: Promise<string> | undefined;
+  const writeMarkerKey = `${appSessionStorageKey}.writePending`;
+  if (new Set([anonymousHashStorageKey, tossSessionStorageKey, appSessionStorageKey, writeMarkerKey]).size !== 4) {
+    throw new Error("Session storage keys and the internal write marker must be distinct");
   }
 
-  async function restoreStoredAppSession() {
-    const storedSession = await readStoredSession<TUser>(storage, appSessionStorageKey);
-    if (!storedSession) {
-      return await restoreStoredTossSession();
-    }
-    try {
-      const response = await loadSession(sessionLoadInput(storedSession));
-      await writeSession(storage, appSessionStorageKey, response, storedSession.authProvider);
-      return withAuthProvider(response, storedSession.authProvider);
-    } catch {
-      await storage.setItem(appSessionStorageKey, "");
-      if (storedSession.authProvider === "toss") {
-        await storage.setItem(tossSessionStorageKey, "");
-      }
-      return null;
-    }
+  function anonymousHash() {
+    anonymousHashPromise ??= resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash })
+      .catch(error => { anonymousHashPromise = undefined; throw error; });
+    return anonymousHashPromise;
   }
 
-  async function bootstrapAnonymousSession() {
-    const anonymousHash = await resolveAnonymousHash({
-      storage,
-      storageKey: anonymousHashStorageKey,
-      create: createHash,
+  async function requireCompleteStorage(op: Operation) {
+    await storageTail;
+    op.check();
+    const marker = await storage.getItem(writeMarkerKey);
+    op.check();
+    if (marker) throw new AppSessionStorageIncompleteError();
+  }
+
+  async function read(op: Operation, key: string) {
+    await requireCompleteStorage(op);
+    const session = await readStoredSession<TUser>(storage, key);
+    op.check();
+    return session;
+  }
+
+  function persist(op: Operation, task: () => Promise<void>) {
+    const result = storageTail.then(async () => {
+      op.check();
+      await task();
+      op.check();
     });
-    const response = await bootstrap(anonymousHash);
-    await writeSession(storage, appSessionStorageKey, response, "anonymous");
-    return withAuthProvider(response, "anonymous");
+    // A failed/cancelled write must not poison subsequent logout/login writes.
+    storageTail = result.catch(() => {});
+    return result;
   }
 
-  async function getOrCreateAppSession() {
-    return (await restoreStoredAppSession()) ?? (await bootstrapAnonymousSession());
+  async function save(op: Operation, response: AppSessionManagerResponse<TUser>, provider: AppAuthProvider) {
+    await persist(op, async () => {
+      await storage.setItem(writeMarkerKey, "1");
+      if (provider === "toss") await writeSession(storage, tossSessionStorageKey, response, provider);
+      await writeSession(storage, appSessionStorageKey, response, provider);
+      await storage.setItem(writeMarkerKey, "");
+    });
+    return withAuthProvider(response, provider);
   }
 
-  async function signInWithToss() {
-    const [anonymousHash, loginResult] = await Promise.all([
-      resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash }),
-      requestAppsInTossLogin({ appLogin, getIsTossLoginIntegratedService }),
+  async function clear(op: Operation, keys: string[]) {
+    await persist(op, async () => {
+      await storage.setItem(writeMarkerKey, "1");
+      for (const key of keys) await storage.setItem(key, "");
+      await storage.setItem(writeMarkerKey, "");
+    });
+  }
+
+  async function restoreToss(op: Operation) {
+    const stored = await read(op, tossSessionStorageKey);
+    if (!stored) return null;
+    let response: AppSessionManagerResponse<TUser>;
+    try {
+      op.check();
+      response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
+      op.check();
+    } catch (error) {
+      op.check();
+      if (isInvalidSessionError(error) !== true) throw error;
+      await clear(op, [tossSessionStorageKey]);
+      return null;
+    }
+    return save(op, response, "toss");
+  }
+
+  async function restoreApp(op: Operation) {
+    const stored = await read(op, appSessionStorageKey);
+    if (!stored) return restoreToss(op);
+    let response: AppSessionManagerResponse<TUser>;
+    try {
+      op.check();
+      response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
+      op.check();
+    } catch (error) {
+      op.check();
+      if (isInvalidSessionError(error) !== true) throw error;
+      await clear(op, stored.authProvider === "toss" ? [appSessionStorageKey, tossSessionStorageKey] : [appSessionStorageKey]);
+      return null;
+    }
+    return save(op, response, stored.authProvider);
+  }
+
+  async function bootstrapApp(op: Operation) {
+    await requireCompleteStorage(op);
+    const hash = await anonymousHash();
+    op.check();
+    const response = await bootstrap(hash, { signal: op.signal });
+    op.check();
+    return save(op, response, "anonymous");
+  }
+
+  async function signIn(op: Operation) {
+    const [hash, login] = await Promise.all([
+      anonymousHash(), requestAppsInTossLogin({
+        appLogin: () => { op.check(); return appLogin(); },
+        getIsTossLoginIntegratedService,
+      }),
     ]);
-    const response = await completeTossLogin({
-      anonymousHash,
-      authorizationCode: loginResult.authorizationCode,
-      referrer: loginResult.referrer,
-    });
-    await writeSession(storage, tossSessionStorageKey, response, "toss");
-    await writeSession(storage, appSessionStorageKey, response, "toss");
-    return withAuthProvider(response, "toss");
-  }
-
-  async function getOrSignInWithToss() {
-    return (await restoreStoredTossSession()) ?? (await signInWithToss());
+    op.check();
+    const response = await completeTossLogin({ anonymousHash: hash, authorizationCode: login.authorizationCode,
+      referrer: login.referrer }, { signal: op.signal });
+    op.check();
+    return save(op, response, "toss");
   }
 
   return {
-    restoreStoredTossSession,
-    restoreStoredAppSession,
-    bootstrapAnonymousSession,
-    getOrCreateAppSession,
-    signInWithToss,
-    getOrSignInWithToss,
+    restoreStoredTossSession: () => operations.run(restoreToss),
+    restoreStoredAppSession: () => operations.run(restoreApp),
+    bootstrapAnonymousSession: () => operations.run(bootstrapApp),
+    getOrCreateAppSession: () => operations.run(async op => (await restoreApp(op)) ?? bootstrapApp(op)),
+    signInWithToss: () => operations.run(signIn),
+    getOrSignInWithToss: () => operations.run(async op => {
+      let restored;
+      try { restored = await restoreToss(op); }
+      catch (error) {
+        if (!(error instanceof AppSessionStorageIncompleteError)) throw error;
+        op.check();
+      }
+      return restored ?? signIn(op);
+    }),
+    clearSessions: () => operations.run(op => clear(op, [tossSessionStorageKey, appSessionStorageKey])),
+    cancelPendingOperations: operations.cancel,
   };
 }
 

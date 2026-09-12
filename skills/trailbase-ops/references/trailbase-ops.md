@@ -86,6 +86,11 @@ current kit exports and docs:
 Use helpers that exist in the checked-out kit before writing app-specific code. Current helper
 surfaces include:
 
+- `createAppsInTossSessionLifecycle` for account transitions, scoped requests/cache keys,
+  subscription cleanup, and server entitlement/pending-work revalidation on foreground.
+  Use one manager per storage namespace; catch `StaleAppSessionOperationError` for
+  superseded auth operations. `disconnect()` is local cleanup, not server unlink.
+  See `docs/en/session-lifecycle.md` and its Korean counterpart.
 - `createAppsInTossSessionManager` for app session restore, anonymous bootstrap, and Toss login
   upgrade flows while preserving TrailBase `_user` as the authenticated principal.
 - `createAppsInTossKeyValueStorage`, `createMemoryKeyValueStorage`, and
