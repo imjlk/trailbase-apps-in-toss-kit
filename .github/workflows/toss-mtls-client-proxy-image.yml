@@ -3,6 +3,7 @@ name: toss-mtls-client-proxy image
 on:
   pull_request:
     paths:
+      - "fixtures/contracts/**"
       - ".github/workflows/toss-mtls-client-proxy-image.yml"
       - "package.json"
       - "bun.lock"
@@ -15,6 +16,7 @@ on:
       - "v*.*.*"
       - "toss-mtls-client-proxy-v*.*.*"
     paths:
+      - "fixtures/contracts/**"
       - ".github/workflows/toss-mtls-client-proxy-image.yml"
       - "package.json"
       - "bun.lock"

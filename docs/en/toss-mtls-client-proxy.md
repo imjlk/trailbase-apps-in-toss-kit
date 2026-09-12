@@ -383,3 +383,12 @@ In forward IAP lookups, the proxy never substitutes the requested SKU for a miss
 provider SKU. PAYMENT_COMPLETED/PURCHASED responses without a provider SKU return
 `ok: false` and `UNVERIFIED_IAP_ORDER`; retry verification before granting anything.
 Explicit stub mode keeps synthetic request-based products for local tests.
+
+## Shared Response Contracts
+
+The synthetic corpus under `fixtures/contracts/` is checked by Rust, the proxy,
+RN transport and ledger diagnostics. It covers provider aliases, missing payment
+SKU, explicit failures and partial message delivery. An explicit failed promotion
+response cannot become a grant through a contradictory status. A message response
+with neither an explicit result flag nor a status field remains UNKNOWN; reconcile its
+original request before any resend. These checks complement real provider tests.
