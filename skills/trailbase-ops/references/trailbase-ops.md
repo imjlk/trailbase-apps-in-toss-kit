@@ -161,6 +161,11 @@ helper exists in the checked-out package.
     restored backups, verify `operation_policy_integration()`, restart instances after changing
     settings, and reconcile an independent durable witness before operator resume. See the
     English/Korean `operation-policy.md` docs and runtime `restore-checkpoint` check.
+  - `app_reward_attempts.sql` with `trailbase_guest_common::app_rewards` for server-issued
+    app-owned AD/SHARE attempts and atomic once-only local credits. Require explicit server
+    offer/eligibility/transactional quota policies; client SDK events and attempt IDs are not
+    proof of viewing or sharing. The grant row is the credit, not a trigger for another payment.
+    Keep receipt lookup during pauses. See `docs/en/app-rewards.md` and `docs/ko/app-rewards.md`.
   For recoverable message workers, apply `message_outbox_attempts.sql` and use
   `message_outbox_recovery` leases. Commit the dispatch permit before sending; expired
   in-flight sends are UNKNOWN and must not be automatically resent. Stop legacy workers

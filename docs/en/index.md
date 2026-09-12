@@ -27,6 +27,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Design SQL migrations and Record API access | [schema-patterns.md](schema-patterns.md) |
 | Link anonymous users to Toss Login | [toss-identity.md](toss-identity.md) |
 | Model Toss promotion reward campaigns | [promotion-campaigns.md](promotion-campaigns.md) |
+| Issue app-owned ad/share credits once | [app-rewards.md](app-rewards.md) |
 | Persist in-app purchase order/grant state | [iap-orders.md](iap-orders.md) |
 | Add functional push/inbox messages | [functional-messages.md](functional-messages.md) |
 | Use RN/client-side adapters | [client-adapters.md](client-adapters.md) |

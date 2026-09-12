@@ -2,7 +2,7 @@
 use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde_json::{Value as JsonValue, json};
 use trailbase_guest_common::{
-    anonymous_identity, apps_in_toss_login, apps_in_toss_messages, apps_in_toss_proxy, db,
+    app_rewards, anonymous_identity, apps_in_toss_login, apps_in_toss_messages, apps_in_toss_proxy, db,
     message_outbox_recovery, operation_policy, responses, trailbase_auth,
 };
 use trailbase_wasm::db::Value;
@@ -30,6 +30,7 @@ impl Guest for CompatSmoke {
             }),
             routing::post("/kit-smoke/write", async |req| respond(write(req))),
             routing::post("/kit-smoke/policy", async |_| respond(policy_probe())),
+            routing::post("/kit-smoke/rewards", async |req| respond(reward_probe(req))),
             routing::post("/kit-smoke/toss-login", async |_| {
                 let result = apps_in_toss_proxy::toss_login_complete(
                     "http://kit-proxy:8787",
@@ -188,5 +189,61 @@ fn policy_probe() -> responses::ApiResult<JsonValue> {
         json!({"enabled":integration.enabled,"held":integration.external_hold,
         "entryCode":entry,"dispatchCode":dispatch,"leasedDispatchCode":leased_dispatch,
         "settlementAllowed":settlement,"expiredDenied":expired,"statusAllowed":status}),
+    )
+}
+
+fn reward_probe(req: Request) -> responses::ApiResult<JsonValue> {
+    let user = req
+        .user()
+        .ok_or_else(|| responses::unauthorized("AUTH_REQUIRED", "authentication required"))?;
+    if req.header("CSRF-Token").and_then(|h| h.to_str().ok()) != Some(user.csrf_token.as_str()) {
+        return Err(responses::forbidden("CSRF_REQUIRED", "csrf required"));
+    }
+    let user_id = URL_SAFE_NO_PAD
+        .decode(user.id.trim_end_matches('='))
+        .map_err(|_| responses::internal("invalid principal"))?;
+    let mut tx = db::tx()?;
+    let now = db::now_ms_tx(&mut tx)?;
+    let schema = db::tx_query(
+        &mut tx,
+        "SELECT count(*) FROM sqlite_master WHERE (type='table' AND name IN ('app_reward_attempts','app_reward_grants')) OR (type='index' AND name='idx_app_reward_attempts_owner_placement')",
+        &[],
+    )?;
+    let attempt = app_rewards::issue_app_reward_attempt_tx(
+        &mut tx,
+        &user_id,
+        "fixture",
+        app_rewards::AppRewardSource::Ad,
+        now,
+        |_| {
+            Ok(app_rewards::AppRewardOffer {
+                policy_version: "fixture".into(),
+                unit: "coin".into(),
+                amount: 10,
+                ttl_ms: 1000,
+            })
+        },
+    )?;
+    let first = app_rewards::claim_app_reward_attempt_tx(
+        &mut tx,
+        &user_id,
+        "fixture",
+        &attempt.id,
+        now,
+        |_, _| Ok(true),
+    )?;
+    let replay = app_rewards::claim_app_reward_attempt_tx(
+        &mut tx,
+        &user_id,
+        "fixture",
+        &attempt.id,
+        now + 2000,
+        |_, _| Err(responses::internal("duplicate reached policy")),
+    )?;
+    let other = app_rewards::find_app_reward_attempt_tx(&mut tx, &user_id, "other", &attempt.id)?;
+    db::tx_commit(&mut tx)?;
+    Ok(
+        json!({"schemaOk":db::integer(&schema[0][0],"schema_count")?==3,
+        "replaySame":first==replay,"scopeDenied":other.is_none(),"granted":first.granted_at.is_some()}),
     )
 }
