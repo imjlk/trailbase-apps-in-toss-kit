@@ -10,6 +10,7 @@ const templates = [
   "message_templates.sql",
   "notification_template_agreements.sql",
   "message_outbox.core.sql",
+  "message_outbox_attempts.sql",
   "promotion_campaigns.sql",
   "promotion_reward_ledger.sql",
   "iap_orders.sql",
@@ -39,12 +40,14 @@ try {
           "message_templates",
           "notification_template_agreements",
           "message_outbox",
+          "message_outbox_attempts",
           "promotion_campaigns",
           "promotion_reward_ledger",
           "iap_orders",
         ],
         checkedIndexes: [
           "idx_message_outbox_ready_dispatch",
+          "idx_message_outbox_attempts_expiry",
           "idx_notification_template_agreements_template_status",
           "idx_promotion_campaigns_active_feature",
           "idx_promotion_campaigns_active_feature_window",
@@ -69,6 +72,8 @@ try {
 }
 
 function verifySchema() {
+  assertTable("message_outbox_attempts");
+  assertIndex("message_outbox_attempts", "idx_message_outbox_attempts_expiry");
   for (const table of [
     "message_templates",
     "notification_template_agreements",

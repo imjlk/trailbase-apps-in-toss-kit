@@ -4,6 +4,8 @@ import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
 
+export const PROMOTION_REWARD_STATUS_PATH = "/internal/apps-in-toss/promotion/reward/status";
+
 export function createProxyServer(config = createConfig()) {
   validateConfig(config);
   const core = createCore(config);
@@ -56,6 +58,16 @@ export async function handleRequest(req, config = createConfig(), core = createC
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {
     const body = await readJson(req, requestBodyLimitBytes(config));
     return response(200, await core.promotionRewardGrant(body));
+  }
+
+  if (req.method === "POST" && url.pathname === PROMOTION_REWARD_STATUS_PATH) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    const key = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
+    if (!key) {
+      throw clientError("MISSING_PROMOTION_TRANSACTION_KEY", "providerTransactionKey is required for result lookup");
+    }
+    // api-core skips get-key and execute when an existing transaction key is supplied.
+    return response(200, await core.promotionRewardGrant({ ...body, providerTransactionKey: key }));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageSend) {

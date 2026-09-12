@@ -193,3 +193,159 @@ function createFakeXhrClass({
     }
   };
 }
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+async function eventually(check: () => boolean) {
+  for (let i = 0; i < 100; i++) {
+    if (check()) return;
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+  expect(check()).toBe(true);
+}
+
+test("actual TanStack collection reconciles missed updates and deletes on reconnect", async () => {
+  let subscription: ReadableStreamDefaultController<any>;
+  let subscriptions = 0;
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "reconnect", getKey: (row: { id: number; value: string }) => row.id,
+    reconnectDelayMs: 1,
+    recordApi: {
+      subscribe: async () => {
+        subscriptions++;
+        return new ReadableStream({ start(controller) { subscription = controller; } });
+      },
+      list: async () => ({ records: ++lists === 1
+        ? [{ id: 1, value: "old" }, { id: 2, value: "deleted offline" }]
+        : [{ id: 1, value: "new" }, { id: 3, value: "created offline" }] }),
+    },
+  }));
+  try {
+    await collection.preload();
+    expect(collection.has(2)).toBe(true);
+    subscription!.close();
+    await eventually(() => lists === 2 && collection.has(3));
+    expect(subscriptions).toBe(2);
+    expect(collection.get(1)?.value).toBe("new");
+    expect(collection.has(2)).toBe(false);
+  } finally { await collection.cleanup(); }
+});
+
+test("events received during a paginated snapshot win after every page is loaded", async () => {
+  const lastPage = deferred<{ records: { id: number; value: string }[] }>();
+  let subscription: ReadableStreamDefaultController<any>;
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "snapshot-ordering", getKey: (row: { id: number; value: string }) => row.id,
+    recordApi: {
+      subscribe: async () => new ReadableStream({ start(controller) { subscription = controller; } }),
+      list: async (options) => {
+        lists++;
+        if (lists === 1) return { records: [{ id: 1, value: "stale" }], cursor: "next" };
+        expect(options.pagination.cursor).toBe("next");
+        return lastPage.promise;
+      },
+    },
+  }));
+  try {
+    const preload = collection.preload();
+    await eventually(() => lists === 2);
+    subscription!.enqueue({ Update: { id: 1, value: "live" } });
+    subscription!.enqueue({ Delete: { id: 2, value: "deleted" } });
+    lastPage.resolve({ records: [{ id: 2, value: "stale" }] });
+    await preload;
+    await eventually(() => collection.get(1)?.value === "live" && !collection.has(2));
+    expect(lists).toBe(2);
+  } finally { await collection.cleanup(); }
+});
+
+test("a failed snapshot cancels its stream, reports the error, and retries without marking ready", async () => {
+  const errors: unknown[] = [];
+  let cancelled = 0;
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "snapshot-failure", getKey: (row: { id: number }) => row.id,
+    reconnectDelayMs: 1, onSubscriptionError: (error) => errors.push(error),
+    recordApi: {
+      subscribe: async () => new ReadableStream({ cancel() { cancelled++; } }),
+      list: async () => {
+        if (++lists === 1) throw new Error("list unavailable");
+        return { records: [{ id: 1 }] };
+      },
+    },
+  }));
+  try {
+    await collection.preload();
+    expect(lists).toBe(2);
+    expect(errors).toHaveLength(1);
+    expect(cancelled).toBe(1);
+    expect(collection.has(1)).toBe(true);
+  } finally { await collection.cleanup(); }
+});
+
+test("cleanup cancels a subscription that resolves late without loading a snapshot", async () => {
+  const pending = deferred<ReadableStream<any>>();
+  let cancelled = 0;
+  let lists = 0;
+  const options = trailbaseRecordCollectionOptions({
+    id: "late-stream", getKey: (row: { id: number }) => row.id,
+    recordApi: {
+      subscribe: () => pending.promise,
+      list: async () => { lists++; return { records: [] }; },
+    },
+  });
+  const sync = options.sync.sync({
+    begin() {}, commit() {}, write() { throw new Error("write after cleanup"); },
+    markReady() { throw new Error("ready after cleanup"); }, collection: { has: () => false },
+  });
+  sync.cleanup();
+  pending.resolve(new ReadableStream({ cancel() { cancelled++; } }));
+  await eventually(() => cancelled === 1);
+  expect(lists).toBe(0);
+});
+
+test("cleanup suppresses a late snapshot and readiness callback", async () => {
+  const snapshot = deferred<{ records: { id: number }[] }>();
+  let lists = 0;
+  let writes = 0;
+  const options = trailbaseRecordCollectionOptions({
+    id: "late-snapshot", getKey: (row: { id: number }) => row.id,
+    recordApi: {
+      subscribe: async () => new ReadableStream(),
+      list: () => { lists++; return snapshot.promise; },
+    },
+  });
+  const sync = options.sync.sync({
+    begin() {}, commit() {}, write() { writes++; }, markReady() { writes++; },
+    collection: { has: () => false },
+  });
+  await eventually(() => lists === 1);
+  sync.cleanup();
+  snapshot.resolve({ records: [{ id: 1 }] });
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  expect(writes).toBe(0);
+});
+
+test("XHR subscription waits for response headers before allowing a snapshot", async () => {
+  const Base = createFakeXhrClass({});
+  class Xhr extends Base { override send() {} }
+  const api = createTrailbaseRecordApiWithXhrSse({
+    apiBaseUrl: "http://localhost:4000", apiName: "items",
+    fallbackRecordApi: { list: async () => ({ records: [] }), subscribe: async () => new ReadableStream() },
+    XMLHttpRequestImpl: Xhr as unknown as typeof XMLHttpRequest,
+  });
+  let resolved = false;
+  const pending = api.subscribe("*").then((stream) => { resolved = true; return stream; });
+  await eventually(() => Xhr.instances.length === 1);
+  expect(resolved).toBe(false);
+  Xhr.instances[0].readyState = 2;
+  Xhr.instances[0].onreadystatechange?.();
+  const stream = await pending;
+  expect(resolved).toBe(true);
+  await stream.cancel();
+});

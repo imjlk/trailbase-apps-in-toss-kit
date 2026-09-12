@@ -16,7 +16,7 @@ export type TrailbaseEvent<Row> =
   | { Delete: Row };
 
 export interface TrailbaseRecordApi<Row> {
-  list: (opts?: any) => Promise<{ records: Row[] }>;
+  list: (opts?: any) => Promise<{ records: Row[]; cursor?: string | null }>;
   subscribe: (id: any) => Promise<ReadableStream<any>>;
   subscribeAll?: (opts?: any) => Promise<ReadableStream<any>>;
 }
@@ -78,6 +78,8 @@ export interface RecordCollectionOptions<Row, Key, Collection, Config> {
   getKey: (row: Row) => Key;
   snapshotListOptions?: unknown;
   snapshotEnabled?: boolean;
+  /** Replace reconciles a complete snapshot; merge keeps paginated/windowed callers compatible. */
+  snapshotMode?: "replace" | "merge";
   reconnectDelayMs?: number;
   gcTime?: number;
   rowUpdateMode?: "full" | "partial";
@@ -102,6 +104,7 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
   getKey,
   snapshotListOptions = { pagination: { limit: 10 } },
   snapshotEnabled = true,
+  snapshotMode = "replace",
   reconnectDelayMs = 3_000,
   gcTime = Number.POSITIVE_INFINITY,
   rowUpdateMode = "full",
@@ -119,94 +122,85 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
       sync: ({ begin, collection, commit, markReady, write }: TanstackSyncContext<Row, Key>) => {
         let cancelled = false;
         let reader: ReadableStreamDefaultReader<TrailbaseEvent<Row>> | undefined;
+        let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+        let wakeReconnect: (() => void) | undefined;
+        const knownKeys = new Set<Key>();
+        const cancel = () => { void reader?.cancel().catch(() => undefined); };
 
         const writeRow = (row: Row) => {
           const key = getKey(row);
           begin();
-          write({
-            type: collection.has(key) ? "update" : "insert",
-            value: row,
-          });
+          write({ type: collection.has(key) ? "update" : "insert", value: row });
           commit();
+          knownKeys.add(key);
         };
-
-        const deleteRow = (row: Row) => {
-          const key = getKey(row);
-          if (!collection.has(key)) {
-            return;
+        const deleteKey = (key: Key) => {
+          if (collection.has(key)) {
+            begin();
+            write({ type: "delete", key });
+            commit();
           }
-          begin();
-          write({ type: "delete", key });
-          commit();
+          knownKeys.delete(key);
         };
-
-        applySnapshotFromSync = (rows) => {
-          for (const row of normalizeSnapshotRows(rows)) {
-            writeRow(row);
-          }
+        const applyRows = (rows: Row | Row[] | null | undefined) => {
+          if (!cancelled) for (const row of normalizeSnapshotRows(rows)) writeRow(row);
         };
+        applySnapshotFromSync = applyRows;
+        cancelReader = cancel;
 
         const listen = async () => {
           while (!cancelled) {
             try {
               const stream = await recordApi.subscribe("*");
               if (cancelled) {
+                await stream.cancel();
                 return;
               }
-
               reader = stream.getReader();
-              cancelReader = () => {
-                void reader?.cancel().catch(() => undefined);
-              };
-
+              // Subscribe before fetching. The stream queues events until the
+              // snapshot has committed, so a late list cannot overwrite them.
+              if (snapshotEnabled) {
+                const rows = await readCollectionSnapshot(recordApi, snapshotListOptions, snapshotMode, () => cancelled);
+                if (cancelled) return;
+                if (snapshotMode === "replace") {
+                  const keys = new Set(rows.map(getKey));
+                  for (const key of knownKeys) if (!keys.has(key)) deleteKey(key);
+                }
+                applyRows(rows);
+              }
+              if (cancelled) return;
+              markReady();
               while (!cancelled) {
                 const { done, value } = await reader.read();
-                if (done || !value) {
-                  break;
-                }
-                applyTrailbaseEvent(value, { writeRow, deleteRow });
+                if (cancelled || done) break;
+                if (value) applyTrailbaseEvent(value, { writeRow, deleteRow: (row) => deleteKey(getKey(row)) });
               }
             } catch (error) {
-              onSubscriptionError?.(error);
+              if (!cancelled) onSubscriptionError?.(error);
             } finally {
-              cancelReader = undefined;
-              try {
-                reader?.releaseLock();
-              } catch {
-                // React Native streams can release locks while cancelling.
-              }
+              // A failed list must also close its subscription before retrying.
+              try { await reader?.cancel(); } catch { /* stream may already be errored */ }
+              try { reader?.releaseLock(); } catch { /* RN may release during cancellation */ }
               reader = undefined;
             }
-
             if (!cancelled) {
-              await delay(reconnectDelayMs);
+              await new Promise<void>((resolve) => {
+                wakeReconnect = resolve;
+                reconnectTimer = setTimeout(resolve, reconnectDelayMs);
+              });
+              wakeReconnect = undefined;
             }
           }
         };
-
-        const loadSnapshot = async () => {
-          try {
-            if (snapshotEnabled) {
-              const response = await recordApi.list(snapshotListOptions);
-              if (!cancelled) {
-                applySnapshotFromSync?.(response.records);
-              }
-            }
-          } finally {
-            markReady();
-          }
-        };
-
         void listen();
-        void loadSnapshot();
-
         return {
           cleanup: () => {
             cancelled = true;
-            applySnapshotFromSync = undefined;
-            cancelReader?.();
-            cancelReader = undefined;
-            void reader?.cancel().catch(() => undefined);
+            clearTimeout(reconnectTimer);
+            wakeReconnect?.();
+            cancel();
+            if (applySnapshotFromSync === applyRows) applySnapshotFromSync = undefined;
+            if (cancelReader === cancel) cancelReader = undefined;
           },
         };
       },
@@ -220,6 +214,30 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
       },
     },
   };
+}
+
+async function readCollectionSnapshot<Row>(
+  api: TrailbaseRecordApi<Row>,
+  options: unknown,
+  mode: "replace" | "merge",
+  cancelled: () => boolean,
+): Promise<Row[]> {
+  const opts = (options ?? {}) as { pagination?: { cursor?: string; offset?: number; limit?: number } };
+  if (mode === "replace" && (opts.pagination?.cursor || opts.pagination?.offset)) {
+    throw new Error("Snapshot replacement must start at the first page; use snapshotMode: merge for a window");
+  }
+  const rows: Row[] = [];
+  const seen = new Set<string>();
+  let pageOptions = opts;
+  while (!cancelled()) {
+    const page = await api.list(pageOptions);
+    rows.push(...page.records);
+    if (mode === "merge" || !page.cursor || page.records.length === 0) break;
+    if (seen.has(page.cursor)) throw new Error("TrailBase snapshot returned a repeated pagination cursor");
+    seen.add(page.cursor);
+    pageOptions = { ...opts, pagination: { ...opts.pagination, cursor: page.cursor } };
+  }
+  return rows;
 }
 
 export function applyTrailbaseEvent<Row>(
@@ -259,12 +277,22 @@ export async function subscribeRecordEvents<Row>({
     return fallback();
   }
 
-  return createTrailbaseXhrSseStream<TrailbaseEvent<Row>>({
+  let connected!: () => void;
+  let connectionFailed!: (error: Error) => void;
+  const ready = new Promise<void>((resolve, reject) => {
+    connected = resolve;
+    connectionFailed = reject;
+  });
+  const stream = createTrailbaseXhrSseStream<TrailbaseEvent<Row>>({
     url: `${normalizeTrailBaseUrl(apiBaseUrl)}/api/records/v1/${apiName}/subscribe/${encodeRecordId(id)}`,
     headers,
     getHeaders,
     XMLHttpRequestImpl,
+    onConnected: connected,
+    onConnectionError: connectionFailed,
   });
+  await ready;
+  return stream;
 }
 
 export function createTrailbaseXhrSseStream<T>({
@@ -273,12 +301,16 @@ export function createTrailbaseXhrSseStream<T>({
   getHeaders,
   XMLHttpRequestImpl = globalThis.XMLHttpRequest,
   errorMessage = "TrailBase SSE subscription failed",
+  onConnected,
+  onConnectionError,
 }: {
   url: string;
   headers?: Record<string, string>;
   getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   XMLHttpRequestImpl?: typeof XMLHttpRequest;
   errorMessage?: string;
+  onConnected?: () => void;
+  onConnectionError?: (error: Error) => void;
 }) {
   let xhr: XMLHttpRequest | undefined;
   let closed = false;
@@ -286,7 +318,9 @@ export function createTrailbaseXhrSseStream<T>({
   return new ReadableStream<T>({
     async start(controller) {
       if (!XMLHttpRequestImpl) {
-        controller.error(new Error("XMLHttpRequest is required for XHR SSE streams"));
+        const error = new Error("XMLHttpRequest is required for XHR SSE streams");
+        onConnectionError?.(error);
+        controller.error(error);
         return;
       }
 
@@ -297,9 +331,11 @@ export function createTrailbaseXhrSseStream<T>({
           ...(getHeaders ? await getHeaders() : {}),
         };
       } catch (error) {
+        onConnectionError?.(error instanceof Error ? error : new Error(String(error)));
         controller.error(error);
         return;
       }
+      if (closed) return;
 
       xhr = new XMLHttpRequestImpl();
       const parser = createSseParser((event) => {
@@ -324,6 +360,7 @@ export function createTrailbaseXhrSseStream<T>({
       const fail = (error: Error) => {
         if (!closed) {
           closed = true;
+          onConnectionError?.(error);
           controller.error(error);
         }
       };
@@ -331,6 +368,10 @@ export function createTrailbaseXhrSseStream<T>({
       xhr.onreadystatechange = () => {
         if (!xhr) {
           return;
+        }
+        // HEADERS_RECEIVED (2) confirms registration before collection.list().
+        if (xhr.readyState >= 2 && xhr.status >= 200 && xhr.status < 300) {
+          onConnected?.();
         }
         if (xhr.readyState === XMLHttpRequestImpl.LOADING) {
           const chunk = xhr.responseText.slice(responseOffset);
@@ -341,7 +382,7 @@ export function createTrailbaseXhrSseStream<T>({
           const chunk = xhr.responseText.slice(responseOffset);
           responseOffset = xhr.responseText.length;
           parser.push(chunk);
-          if (xhr.status >= 400) {
+          if (xhr.status < 200 || xhr.status >= 300) {
             fail(createXhrHttpError(xhr, errorMessage));
             return;
           }

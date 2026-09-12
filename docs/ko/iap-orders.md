@@ -33,3 +33,16 @@ TrailBase가 주문/지급 상태를 저장해야 한다면
   지급 payload를 공개 Record API view로 노출하지 마세요.
 - 고빈도 analytics와 분리하세요. IAP order/grant row는 기능성 원장이지 analytics sink event가
   아닙니다.
+
+## 지급과 완료 확인 복구
+
+`mark_iap_order_granted_tx`는 이제 `granted_at`만 기록하고 `completed_at`은 채우지
+않습니다. 로컬 재화 변경과 지급 표시를 같은 transaction에서 commit하세요. Toss의
+`completeProductGrant`가 성공하면 인증된 backend에서 `mark_iap_order_completed_tx`를
+호출하거나 서버에서 확인한 제공자 완료 상태를 저장하세요. 완료 helper는 로컬 지급이
+끝났고 환불되지 않은 주문만 받으며 재시도해도 최초 완료 확인 시각을 유지합니다.
+
+`GRANTED`이면서 `completed_at`이 null이면 Toss 완료 처리만 복구하고 재화를 다시
+지급하지 마세요. 두 helper 모두 호출 전에 주문 소유권을 검증해야 합니다. 이전 구현이
+두 시각을 함께 저장한 기존 행은 이력으로 유지하며 자동으로 지우지 않습니다. 기존 kit
+템플릿에는 스키마 변경이 필요하지 않습니다.

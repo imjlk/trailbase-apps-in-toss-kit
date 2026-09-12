@@ -136,3 +136,33 @@ claim한 뒤 반환된 row를 `template_code`, `purpose`, `provider` 기준으�
   <https://developers-apps-in-toss.toss.im/smart-message/intro.html#_2-1-%E1%84%8B%E1%85%A1%E1%86%AF%E1%84%85%E1%85%B5%E1%86%B7-%E1%84%83%E1%85%A9%E1%86%BC%E1%84%8B%E1%85%B4%E1%86%AB>
 - AppsInToss 알림 동의문 SDK:
   <https://developers-apps-in-toss.toss.im/bedrock/reference/framework/%EC%9D%B8%ED%84%B0%EB%A0%89%EC%85%98/requestNotificationAgreement.html>
+
+## 발송 처리권과 중단된 worker 복구
+
+`message_outbox_attempts.sql`을 새 migration으로 적용하고 모든 worker를 함께
+`trailbase_guest_common::message_outbox_recovery`로 전환하세요. 시도 기록은 product
+DB에 두고 Record API에는 공개하지 않습니다. 기존 outbox 행은 유지합니다.
+
+1. `claim_message_outbox_with_lease_tx`로 claim하고 commit합니다. 처리권은 outbox id와
+   증가하는 attempt number에 연결됩니다.
+2. 알림·마케팅 동의와 template gate를 다시 검사합니다. 거절되면
+   `skip_message_outbox_attempt_tx`를 호출합니다. 허용되면
+   `begin_message_outbox_dispatch_tx`를 호출하고 발송 전에 commit합니다. false가
+   반환되면 발송하지 않습니다.
+3. DB transaction 밖에서 proxy를 호출합니다. 새 transaction에서
+   `complete_message_outbox_attempt_tx`로 완료합니다. 늦거나 만료된 시도는 false를
+   반환하며 다른 시도를 덮을 수 없습니다. 결과는 명시적인 정합성 확인에 사용하고 새
+   메시지를 만들지 마세요.
+4. 앱 worker loop에서 `recover_expired_message_outbox_attempts_tx`를 실행합니다.
+   발송 허가를 받기 전 만료된 claim만 READY로 돌아갑니다. 발송 중 만료된 건은
+   FAILED와 provider_status UNKNOWN, UNKNOWN 시도로 기록합니다. 실제 발송됐을 수
+   있으므로 자동 claim에서 제외하며 의도적인 재시도 전에 결과를 확인해야 합니다.
+
+API 전환 전에 기존 worker를 중지하세요. `quarantine_legacy_message_outbox_locks_tx`는
+시도 기록이 없는 오래된 lock을 FAILED/UNKNOWN으로 격리하며 재발송하지 않습니다. Lease는
+proxy timeout과 응답 처리 시간보다 길게 잡으세요. 기존 skip도 종결된 행을 거부합니다.
+기존 완료 helper는 시도 식별자를 받지 않으므로 lease worker와 혼용하지 마세요.
+
+Rust 메시지 응답은 채널별 실패·content id와 SMS, Alimtalk, Friendtalk 집계를 유지합니다.
+Raw 응답을 제공하지 않으면 완료 시 정규화한 결과를 `provider_response_json`에 저장합니다.
+이 필드는 비공개로 유지하세요.

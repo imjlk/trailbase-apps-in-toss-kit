@@ -9,6 +9,7 @@ import { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import {
   PROXY_ENDPOINTS,
+  PROMOTION_REWARD_STATUS_PATH,
   DEFAULT_PORT,
   SMART_MESSAGE_BULK_MAX_CONTEXTS,
   TOSS_ENDPOINTS,
@@ -741,6 +742,31 @@ describe("toss-mtls-client-proxy", () => {
       expect(res.body.providerErrorCode).toBe("4112");
       expect(res.body.failureReason).toBe("4112");
     });
+  });
+
+  test("promotion recovery only looks up the existing transaction key", async () => {
+    const paths = [];
+    const server = http.createServer(async (req, res) => {
+      paths.push(req.url);
+      expect(await readRequestJson(req)).toEqual({ promotionCode: "campaign", key: "existing-key" });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: { status: "SUCCESS" } }));
+    });
+    await withServer(server, async (upstreamBaseUrl) => {
+      const response = await handleRequest(request("POST", PROMOTION_REWARD_STATUS_PATH, {
+        promotionCode: "campaign", providerTransactionKey: "existing-key", tossUserKey: "test-user",
+      }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
+      expect(response.body.providerTransactionKey).toBe("existing-key");
+      expect(response.body.providerStatus).toBe("GRANTED");
+    });
+  });
+
+  test("promotion result lookup rejects missing keys instead of creating a grant", async () => {
+    await expect(handleRequest(request("POST", PROMOTION_REWARD_STATUS_PATH, {
+      promotionCode: "campaign", tossUserKey: "test-user", amount: 10,
+    }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret" }))
+      .rejects.toThrow("providerTransactionKey is required");
   });
 
   test("stub iap order status returns payable status", async () => {

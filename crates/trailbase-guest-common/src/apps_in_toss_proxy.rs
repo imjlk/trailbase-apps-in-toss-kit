@@ -7,6 +7,7 @@ pub const TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH: &str =
     "/internal/apps-in-toss/toss-login/remove-by-user-key";
 pub const IAP_ORDER_STATUS_PATH: &str = "/internal/apps-in-toss/iap/order/status";
 pub const PROMOTION_REWARD_GRANT_PATH: &str = "/internal/apps-in-toss/promotion/reward/grant";
+pub const PROMOTION_REWARD_STATUS_PATH: &str = "/internal/apps-in-toss/promotion/reward/status";
 pub const SMART_MESSAGE_SEND_PATH: &str = "/internal/apps-in-toss/smart-message/send";
 pub const SMART_MESSAGE_BULK_SEND_PATH: &str = "/internal/apps-in-toss/smart-message/send-bulk";
 
@@ -71,6 +72,32 @@ pub async fn promotion_reward_grant(
     post_json_with_optional_bearer(
         &join_url(proxy_url, PROMOTION_REWARD_GRANT_PATH),
         payload,
+        bearer_token,
+    )
+    .await
+}
+
+/// Query the persisted transaction key. This endpoint cannot allocate or execute
+/// a promotion grant; keep the original key until its outcome is reconciled.
+pub async fn promotion_reward_status(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    promotion_code: &str,
+    provider_transaction_key: &str,
+    toss_user_key: &str,
+    provider_request_id: &str,
+) -> CommonResult<JsonValue> {
+    if provider_transaction_key.trim().is_empty() {
+        return Err("provider transaction key is required for result lookup".into());
+    }
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, PROMOTION_REWARD_STATUS_PATH),
+        json!({
+            "promotionCode": promotion_code,
+            "providerTransactionKey": provider_transaction_key,
+            "tossUserKey": toss_user_key,
+            "providerRequestId": provider_request_id,
+        }),
         bearer_token,
     )
     .await

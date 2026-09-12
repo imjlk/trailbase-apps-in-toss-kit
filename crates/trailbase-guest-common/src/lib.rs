@@ -13,6 +13,7 @@ pub mod apps_in_toss_proxy;
 pub mod db;
 pub mod domain_events;
 pub mod iap_orders;
+pub mod message_outbox_recovery;
 pub mod promotion_campaigns;
 pub mod promotion_rewards;
 pub mod responses;
@@ -166,3 +167,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_test_support;

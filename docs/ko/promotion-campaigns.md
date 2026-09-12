@@ -142,3 +142,15 @@ Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 �
 - `4112`, `4116`: 캠페인을 `EXHAUSTED`로 표시합니다.
 - `4104`, `4105`, `4108`, `4109`: 캠페인을 일시 중지합니다.
 - `4114`: 설정 오류로 보고, 재시도 전에 캠페인을 멈추거나 담당자에게 올립니다.
+
+## 기존 지급 결과 확인
+
+반환된 `providerTransactionKey`를 promotion ledger에 저장하세요.
+`apps_in_toss_proxy::promotion_reward_status`에 같은 campaign, 수신자, request id와
+transaction key를 전달하면 `POST /internal/apps-in-toss/promotion/reward/status`를
+호출합니다. 이 endpoint는 기존 키가 필수이며 Toss execution-result만 조회합니다.
+새 키를 만들거나 지급을 다시 실행하지 않습니다. 결과는 기존 원장 행에 반영하세요.
+
+최초 지급 중 통신이 끊기면 호출자가 저장하기 전에 키를 잃을 수 있습니다. 이 경우는
+운영자·제공자 확인이 필요하며 새 키로 재시도하면 안 됩니다. 결과 조회 endpoint가
+기존의 통합 지급 흐름 전체를 네트워크 중단에 대해 원자적으로 만드는 것은 아닙니다.

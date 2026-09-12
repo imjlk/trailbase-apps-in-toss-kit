@@ -154,3 +154,17 @@ error code. Consumers should map provider signals conservatively:
 - `4112`, `4116`: mark the campaign `EXHAUSTED`.
 - `4104`, `4105`, `4108`, `4109`: pause the campaign.
 - `4114`: treat as misconfiguration and pause or escalate before retrying.
+
+## Reconcile an Existing Grant
+
+Persist every returned `providerTransactionKey` in the promotion ledger. Use
+`apps_in_toss_proxy::promotion_reward_status` with the same campaign, recipient,
+request id, and transaction key to call
+`POST /internal/apps-in-toss/promotion/reward/status`. The endpoint requires an
+existing key and only queries Toss execution-result; it cannot allocate a key or
+execute another grant. Apply the result to the original ledger row.
+
+A transport failure during the original grant can lose the key before the caller
+persists it. That case requires operator/provider reconciliation; do not retry
+with a new key. The status endpoint does not make the combined original grant
+flow atomic across a network interruption.
