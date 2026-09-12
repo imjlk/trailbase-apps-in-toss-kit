@@ -15,3 +15,6 @@ legacy dispatch workers before enabling anonymous rows, preserve notification
 agreement checks for both recipient types, and deploy the next proxy image before
 using verification or anonymous promotion. Existing login rows remain unchanged.
 Consumer real-app/sandbox validation is still required before production rollout.
+
+Normalize anonymous enqueue identifiers before persistence so whitespace cannot
+bypass idempotency or break exact notification-template agreement lookup.

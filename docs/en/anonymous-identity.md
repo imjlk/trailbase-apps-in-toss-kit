@@ -87,3 +87,6 @@ never allocate another key merely because the first outcome is unknown.
 Deploy the next Sampo-generated proxy image before using these endpoints. Local
 contract/SQL tests are provided; consuming apps still need sandbox/real-app
 bootstrap, notification-agreement, and promotion tests before rollout.
+
+Anonymous enqueue trims message/template/request identifiers and treats blank
+optional IDs as absent, matching the existing login-recipient enqueue path.

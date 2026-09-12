@@ -79,6 +79,22 @@ pub fn enqueue_anonymous_message_outbox_tx(
     tx: &mut Transaction,
     input: AnonymousMessageOutboxEnqueueInput<'_>,
 ) -> ApiResult<MessageOutboxRecord> {
+    let params = anonymous_enqueue_params(input)?;
+    let rows = db::tx_query(tx, ENQUEUE_ANONYMOUS, &params)?;
+    rows.first()
+        .map(|row| message_outbox_record_from_row(row))
+        .transpose()?
+        .ok_or_else(|| {
+            bad_request(
+                "MESSAGE_IDEMPOTENCY_CONFLICT",
+                "message identity does not match existing request",
+            )
+        })
+}
+
+fn anonymous_enqueue_params(
+    input: AnonymousMessageOutboxEnqueueInput<'_>,
+) -> ApiResult<Vec<Value>> {
     if input.user.is_empty()
         || !input.payload.is_object()
         || [
@@ -95,38 +111,29 @@ pub fn enqueue_anonymous_message_outbox_tx(
             "user, identity, message codes and object payload are required",
         ));
     }
-    let rows = db::tx_query(
-        tx,
-        ENQUEUE_ANONYMOUS,
-        &[
-            input
-                .id
-                .map(|id| Value::Text(id.to_owned()))
-                .unwrap_or(Value::Null),
-            Value::Blob(input.user.to_vec()),
-            Value::Text(input.anonymous_hash_hmac.to_owned()),
-            input
-                .campaign_id
-                .map(|id| Value::Text(id.to_owned()))
-                .unwrap_or(Value::Null),
-            Value::Text(input.purpose.as_str().into()),
-            Value::Text(input.template_code.to_owned()),
-            Value::Text(input.payload.to_string()),
-            Value::Text(input.idempotency_key.to_owned()),
-            Value::Text(input.provider_request_id.to_owned()),
-            Value::Integer(input.not_before_at),
-            Value::Integer(input.now),
-        ],
-    )?;
-    rows.first()
-        .map(|row| message_outbox_record_from_row(row))
-        .transpose()?
-        .ok_or_else(|| {
-            bad_request(
-                "MESSAGE_IDEMPOTENCY_CONFLICT",
-                "message identity does not match existing request",
-            )
-        })
+    Ok(vec![
+        input
+            .id
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(|id| Value::Text(id.to_owned()))
+            .unwrap_or(Value::Null),
+        Value::Blob(input.user.to_vec()),
+        Value::Text(input.anonymous_hash_hmac.trim().to_owned()),
+        input
+            .campaign_id
+            .map(str::trim)
+            .filter(|id| !id.is_empty())
+            .map(|id| Value::Text(id.to_owned()))
+            .unwrap_or(Value::Null),
+        Value::Text(input.purpose.as_str().into()),
+        Value::Text(input.template_code.trim().to_owned()),
+        Value::Text(input.payload.to_string()),
+        Value::Text(input.idempotency_key.trim().to_owned()),
+        Value::Text(input.provider_request_id.trim().to_owned()),
+        Value::Integer(input.not_before_at),
+        Value::Integer(input.now),
+    ])
 }
 
 /// Use this same gate for both recipient types immediately before dispatch.
@@ -324,6 +331,51 @@ mod tests {
             db.execute(UPSERT_IDENTITY, params!["anon-hmac", [1u8], "sealed", 4])
                 .unwrap(),
             0
+        );
+    }
+
+    #[test]
+    fn anonymous_enqueue_normalizes_template_and_idempotency_identifiers() {
+        let db = database();
+        db.execute_batch(include_str!(
+            "../../../templates/trailbase/sql/anonymous_identities.sql"
+        ))
+        .unwrap();
+        db.execute_batch(include_str!(
+            "../../../templates/trailbase/sql/message_outbox_recipients.migration.sql"
+        ))
+        .unwrap();
+        db.execute(UPSERT_IDENTITY, params!["anon-hmac", [1u8], "sealed", 1])
+            .unwrap();
+        for padded in [true, false] {
+            let args = anonymous_enqueue_params(AnonymousMessageOutboxEnqueueInput {
+                id: Some(if padded { " row " } else { "another-row" }),
+                user: &[1],
+                anonymous_hash_hmac: if padded { " anon-hmac " } else { "anon-hmac" },
+                campaign_id: Some("  "),
+                purpose: MessagePurpose::Functional,
+                template_code: if padded { " reminder " } else { "reminder" },
+                payload: json!({}),
+                idempotency_key: if padded { " idem " } else { "idem" },
+                provider_request_id: if padded { " request " } else { "request" },
+                not_before_at: 1,
+                now: 1,
+            })
+            .unwrap();
+            let rows = crate::sql_test_support::query(&db, ENQUEUE_ANONYMOUS, &args);
+            assert_eq!(rows[0][0], rusqlite::types::Value::Text("row".into()));
+        }
+        let row = db.query_row("SELECT template_code,idempotency_key,provider_request_id,campaign_id FROM message_outbox", [], |r|
+            Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,Option<String>>(3)?))).unwrap();
+        assert_eq!(
+            row,
+            ("reminder".into(), "idem".into(), "request".into(), None)
+        );
+        assert_eq!(
+            db.query_row("SELECT count(*) FROM message_outbox", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            1
         );
     }
 
