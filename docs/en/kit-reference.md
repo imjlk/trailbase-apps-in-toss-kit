@@ -11,7 +11,7 @@ bun scripts/run-kit-reference.mjs --output /tmp/kit-reference.json
 The command uses disposable Docker containers, a private Docker network, temporary
 SQLite depots and synthetic SDK/provider fixtures. It never loads consumer checkout
 paths, deploys a service, calls real Toss payments or uses production certificates.
-The `Kit reference evidence` workflow runs it for reference changes and supports
+The `Kit reference evidence` workflow runs it for every pull request and main push, and supports
 manual dispatch before a release. Its redacted JSON artifact is retained for 30 days.
 
 The report records the source commit, lockfile SHA-256 values, installed Bun/Node/
@@ -32,7 +32,7 @@ Declared runtime bin files are executable so workspace linking preserves clean m
   authentication/CSRF boundaries, private Record API ACL and SSE mutations.
 - Server reward issuance, one-time local credit and receipt replay; separate normal
   and externally held operation modes. Held mode reports only the denial it exercises.
-- Real WASI nonce generation, legacy v1/older-v2 key reads, transactionally saved
+- Distinct real WASI nonces for two same-key/plaintext writes, legacy v1/older-v2 key reads, transactionally saved
   reseal cursor and ciphertext, repeat no-op, unchanged HMAC/business timestamps and
   preservation of revoked erasure tombstones.
 - Old-backup history-gap quarantine and original-ID reconciliation through runtime

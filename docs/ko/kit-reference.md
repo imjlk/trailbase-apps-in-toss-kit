@@ -9,7 +9,7 @@ bun scripts/run-kit-reference.mjs --output /tmp/kit-reference.json
 
 일회용 Docker 컨테이너·비공개 네트워크·임시 SQLite depot와 합성 SDK·제공사 fixture를
 사용합니다. 소비 앱 경로를 읽거나 서비스를 배포하거나 실제 토스 결제·운영 인증서를
-사용하지 않습니다. `Kit reference evidence` workflow는 참조 환경 변경 시 실행되며
+사용하지 않습니다. `Kit reference evidence` workflow는 모든 PR과 main push에서 실행되며
 릴리즈 전 수동 실행도 지원합니다. 비공개 값을 제외한 JSON artifact를 30일 보관합니다.
 
 보고서에는 소스 커밋, lockfile SHA-256, 설치된 Bun·Node·Rust·RN 최소/현재·Web SDK 버전,
@@ -28,7 +28,7 @@ bun scripts/run-kit-reference.mjs --output /tmp/kit-reference.json
   비공개 Record API ACL과 SSE 변경 이벤트.
 - 서버 보상 발급, 한 번의 로컬 지급과 영수증 재조회. 정상/외부 중단 모드를 분리하며
   중단 모드에는 실제 수행한 거절 검사만 기록합니다.
-- 실제 WASI 난수 nonce, 기존 v1·이전 v2 읽기, 같은 트랜잭션의 재암호화 cursor·암호문
+- 같은 키·평문으로 두 번 쓴 암호문의 서로 다른 실제 WASI nonce, 기존 v1·이전 v2 읽기, 같은 트랜잭션의 재암호화 cursor·암호문
   저장, 재시도 no-op, HMAC·업무 시각 유지와 철회된 삭제 표시 보존.
 - Runtime 테스트의 과거 백업 이력 차이 격리·원래 ID 대사, 공통 API fixture와 계정·세션
   생명주기 테스트.

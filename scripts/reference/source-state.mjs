@@ -40,3 +40,9 @@ export function parseFixtureEvidence(stdout) {
   if (!result || Array.isArray(result) || result.ok !== true) throw new Error("Reference fixture did not report success");
   return result;
 }
+
+export function validateRecordedEvidence(record, validate, reason) {
+  if (!record.ok) return;
+  try { record.evidence = validate(); }
+  catch { record.ok = false; record.reason = reason; }
+}

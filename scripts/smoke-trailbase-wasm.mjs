@@ -326,9 +326,9 @@ record_apis: [{
   assert.deepEqual(await request("/kit-smoke/keyring", { tokens: alpha, method: "POST" }), {
     legacyReadable: true, oldV2Readable: true, rewritten: 2, replayNoop: true,
     hmacUnchanged: true, timestampUnchanged: true, currentReadable: true,
-    cursorCommitted: true, tombstonePreserved: true,
+    cursorCommitted: true, tombstonePreserved: true, distinctNonces: true,
   });
-  checks.push("real WASI nonce generation, v1/v2 reads, transactional reseal/cursor, replay and tombstone preservation");
+  checks.push("distinct real WASI nonces, v1/v2 reads, transactional reseal/cursor, replay and tombstone preservation");
   const refreshed = await request("/api/auth/v1/refresh", {
     method: "POST",
     body: { refresh_token: alpha.refresh_token },

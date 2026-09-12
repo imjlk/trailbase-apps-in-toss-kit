@@ -1,18 +1,9 @@
 name: Kit reference evidence
 on:
+  # Cover every input, including future source, fixture and toolchain changes.
   pull_request:
-    paths:
-      - ".github/workflows/kit-reference.yml"
-      - "scripts/run-kit-reference.mjs"
-      - "scripts/reference/**"
-      - "crates/trailbase-toss-identity/examples/**"
   push:
     branches: [main]
-    paths:
-      - ".github/workflows/kit-reference.yml"
-      - "scripts/run-kit-reference.mjs"
-      - "scripts/reference/**"
-      - "crates/trailbase-toss-identity/examples/**"
   workflow_dispatch:
 permissions:
   contents: read

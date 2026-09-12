@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sourceState, requireStableSource, requireReportDestination, parseFixtureEvidence } from "./source-state.mjs";
+import { sourceState, requireStableSource, requireReportDestination, parseFixtureEvidence, validateRecordedEvidence } from "./source-state.mjs";
 
 test("evidence rejects modified and untracked source while allowing its output and Finder metadata", () => {
   const root = mkdtempSync(join(tmpdir(), "kit-source-evidence-"));
@@ -38,4 +38,14 @@ test("structured fixture failures cannot be promoted by a zero command exit", ()
   for (const value of ['{"ok":false}', '{}', '[]', 'not JSON']) {
     expect(() => parseFixtureEvidence(value)).toThrow();
   }
+});
+
+test("post-command validation failure remains failed in the individual evidence record", () => {
+  const record = { name: "WebView browser bundle", ok: true };
+  validateRecordedEvidence(record, () => { throw new Error("RN runtime found"); }, "Reference output validation failed");
+  expect(record).toMatchObject({ ok: false, reason: "Reference output validation failed" });
+  let called = false;
+  validateRecordedEvidence(record, () => { called = true; return {}; }, "unexpected");
+  expect(called).toBe(false);
+  expect(record.ok).toBe(false);
 });

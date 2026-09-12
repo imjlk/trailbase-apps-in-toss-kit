@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { sourceState, requireStableSource, requireReportDestination, parseFixtureEvidence } from "./reference/source-state.mjs";
+import { sourceState, requireStableSource, requireReportDestination, parseFixtureEvidence, validateRecordedEvidence } from "./reference/source-state.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const args = process.argv.slice(2);
@@ -33,17 +33,16 @@ function lockedRustVersions(name) {
   if (!versions.length) throw new Error("Required Rust lock metadata unavailable");
   return [...new Set(versions)];
 }
-function step(name, command, argv, { env, parseJson = false } = {}) {
+function step(name, command, argv, { env, parseJson = false, validate } = {}) {
   const started = performance.now(); const result = run(command, argv, env);
   const record = { name, ok: !result.error && result.status === 0, durationMilliseconds: Math.round(performance.now() - started) };
-  if (parseJson && record.ok) {
-    try { record.evidence = parseFixtureEvidence(result.stdout); }
-    catch { record.ok = false; record.reason = "Expected structured fixture output was unavailable"; }
-  }
+  if (parseJson) validateRecordedEvidence(record, () => parseFixtureEvidence(result.stdout), "Expected structured fixture output was unavailable");
+  if (validate) validateRecordedEvidence(record, validate, "Reference output validation failed");
   if (!record.ok && !record.reason) record.reason = "Reference command failed; run the named kit check for diagnostics";
   results.push(record);
   console.log(`${record.ok ? "PASS" : "FAIL"} ${name} (${record.durationMilliseconds} ms)`);
   if (!record.ok) throw new Error(record.reason);
+  return record;
 }
 const report = { schemaVersion: 1, scope: "kit-owned synthetic fixtures only", startedAt: new Date().toISOString(), ok: false,
   limitations: ["No consumer repository, production service, real payment, device eligibility or certificate readiness was validated", "Fixture timings are observations on this runner and are not production latency or throughput guarantees", "Passing evidence does not authorize release publication or automatic recovery/resume"], results };
@@ -67,13 +66,16 @@ try {
   step("Held WASM integration", "bun", ["run", "trailbase:wasm:smoke"], { env: { KIT_SMOKE_OPERATIONS_HOLD: "1" }, parseJson: true });
   step("Local fixture measurements", "bun", ["scripts/reference/benchmark.mjs"], { parseJson: true });
   const bundle = join(scratch, "bundle"); const meta = join(scratch, "bundle.json");
-  step("WebView browser bundle", "bun", ["build", "packages/ait-web/src/index.ts", "--target", "browser", "--splitting", `--outdir=${bundle}`, `--metafile=${meta}`]);
-  const graph = JSON.parse(readFileSync(meta, "utf8"));
-  const inputs = Object.keys(graph.inputs);
-  const rnRuntimeModules = inputs.filter(path => /(?:packages\/ait-rn\/|@apps-in-toss\/framework\/|react-native\/)/.test(path)).length;
-  if (rnRuntimeModules) throw new Error("Web bundle unexpectedly includes an RN runtime");
-  report.browserBundle = { modules: inputs.length, rnRuntimeModules,
-    totalBytes: Object.values(graph.outputs).reduce((total, item) => total + item.bytes, 0) };
+  report.browserBundle = step("WebView browser bundle", "bun", ["build", "packages/ait-web/src/index.ts", "--target", "browser", "--splitting", `--outdir=${bundle}`, `--metafile=${meta}`], {
+    validate: () => {
+      const graph = JSON.parse(readFileSync(meta, "utf8"));
+      const inputs = Object.keys(graph.inputs);
+      const rnRuntimeModules = inputs.filter(path => /(?:packages\/ait-rn\/|@apps-in-toss\/framework\/|react-native\/)/.test(path)).length;
+      if (rnRuntimeModules) throw new Error("Web bundle unexpectedly includes an RN runtime");
+      return { modules: inputs.length, rnRuntimeModules,
+        totalBytes: Object.values(graph.outputs).reduce((total, item) => total + item.bytes, 0) };
+    },
+  }).evidence;
   requireStableSource(report.source, sourceState(root, output));
   report.ok = true;
 } catch (error) {

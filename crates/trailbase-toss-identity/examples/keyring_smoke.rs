@@ -95,6 +95,16 @@ fn probe(req: Request) -> responses::ApiResult<JsonValue> {
         &[],
     )?;
     let sealed = db::text(&rows[0][1], "sealed")?;
+    let second = db::tx_query(
+        &mut tx,
+        "SELECT toss_user_key_sealed FROM toss_identities WHERE id='crypto-v2'",
+        &[],
+    )?;
+    let second_sealed = db::text(&second[0][0], "sealed")?;
+    let distinct_nonces = sealed.starts_with("v2.new.")
+        && second_sealed.starts_with("v2.new.")
+        && matches!((sealed.split('.').nth(2), second_sealed.split('.').nth(2)),
+            (Some(first), Some(second)) if first != second);
     let cursor = db::tx_query(
         &mut tx,
         "SELECT cursor,complete FROM smoke_reseal_cursor WHERE id=1",
@@ -111,7 +121,8 @@ fn probe(req: Request) -> responses::ApiResult<JsonValue> {
         "rewritten":first.rewritten,"replayNoop":replay.rewritten==0,
         "hmacUnchanged":db::text(&rows[0][0],"hmac")?==hmac,
         "timestampUnchanged":db::integer(&rows[0][2],"updated_at")?==4,
-        "currentReadable":ring.unseal(&sealed).map_err(responses::internal)?==plaintext,
+        "currentReadable":ring.unseal(&sealed).map_err(responses::internal)?==plaintext && ring.unseal(&second_sealed).map_err(responses::internal)?==plaintext,
+        "distinctNonces":distinct_nonces,
         "cursorCommitted":db::nullable_text(&cursor[0][0])?==first.next_cursor && db::integer(&cursor[0][1],"complete")?==1,
         "tombstonePreserved":db::text(&tombstone[0][0],"tombstone")?==TOSS_IDENTITY_REVOKED_SEALED_TOMBSTONE}),
     )
