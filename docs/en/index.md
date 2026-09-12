@@ -24,6 +24,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Run the Toss mTLS proxy safely | [toss-mtls-client-proxy.md](toss-mtls-client-proxy.md) |
 | Validate production env files | [production-env-validation.md](production-env-validation.md) |
 | Run preQA and release checks together | [release-doctor.md](release-doctor.md) |
+| Verify kit reference scenarios and retain release evidence | [kit-reference.md](kit-reference.md) |
 | Design SQL migrations and Record API access | [schema-patterns.md](schema-patterns.md) |
 | Link anonymous users to Toss Login | [toss-identity.md](toss-identity.md) |
 | Rotate identity encryption keys and reseal private rows | [identity-key-rotation.md](identity-key-rotation.md) |
