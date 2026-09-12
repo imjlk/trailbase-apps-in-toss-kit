@@ -153,6 +153,11 @@ helper exists in the checked-out package.
     provider grant ledgers, provider outcome persistence, and budget usage checks.
   - `iap_orders.sql` with `trailbase_guest_common::iap_orders` for order-status persistence and
     idempotent local grant marking.
+  - `app_reward_attempts.sql` with `trailbase_guest_common::app_rewards` for server-issued
+    app-owned AD/SHARE attempts and atomic once-only local credits. Require explicit server
+    offer/eligibility/transactional quota policies; client SDK events and attempt IDs are not
+    proof of viewing or sharing. The grant row is the credit, not a trigger for another payment.
+    Keep receipt lookup during pauses. See `docs/en/app-rewards.md` and `docs/ko/app-rewards.md`.
   For recoverable message workers, apply `message_outbox_attempts.sql` and use
   `message_outbox_recovery` leases. Commit the dispatch permit before sending; expired
   in-flight sends are UNKNOWN and must not be automatically resent. Stop legacy workers
