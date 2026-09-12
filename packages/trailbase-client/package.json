@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./apps-in-toss": "./src/apps-in-toss.ts",
+    "./session-lifecycle": "./src/session-lifecycle.ts",
     "./storage": "./src/storage.ts",
     "./tanstack-db": "./src/tanstack-db.ts",
     "./tanstack-query": "./src/tanstack-query.ts",

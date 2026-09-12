@@ -1,5 +1,11 @@
 export {
   createAppsInTossSessionManager,
+  createAppsInTossSessionLifecycle,
+  StaleAppSessionOperationError,
+  type AppUserScope,
+  type ManagedAppSession,
+  type AppSessionLifecycleSnapshot,
+  type AppsInTossSessionLifecycleOptions,
   normalizeAppsInTossErrorMessage,
   normalizeAppsInTossLoginResult,
   normalizeAppsInTossReferrer,

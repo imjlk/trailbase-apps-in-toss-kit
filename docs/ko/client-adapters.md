@@ -361,3 +361,7 @@ XHR SSE 연결 준비는 `subscribe(id, { signal })`과 collection cleanup으로
 있습니다. `connectionTimeoutMs` 기본값은 15초이며 인증 헤더 준비와 응답 헤더 대기에
 적용됩니다. 이미 연결된 스트림은 이 제한으로 종료되지 않습니다. 연결 준비가 멈추면
 요청을 중단하고 collection 재연결이 재시도합니다.
+
+## 계정 전환과 앱 복귀
+
+요청 무효화, 사용자별 캐시, 구독 정리, 앱 복귀 시 서버 재검증은 [계정 전환과 앱 복귀](session-lifecycle.md)를 참고하세요.
