@@ -374,3 +374,8 @@ reports `onSubscriptionError`, closes the stream, and retries without marking th
 collection ready. Cleanup cancels streams and ignores late list responses.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
+
+XHR SSE connection setup is cancellable through `subscribe(id, { signal })` and
+collection cleanup. `connectionTimeoutMs` defaults to 15 seconds and covers header
+resolution plus the wait for response headers; it does not expire an established
+stream. Stalled setup aborts the request and lets collection reconnection retry.
