@@ -139,6 +139,7 @@ function purchaseFlow(operation: string, timeout: number, grant: WebPurchaseOpti
     let active = true;
     let candidate: IapCreateOneTimePurchaseOrderResult | null = null;
     let grantOrderId: string | undefined;
+    let grantSubscriptionId: string | undefined;
     let pendingGrant: Promise<boolean> | undefined;
     const fail = (code: WebAdapterErrorCode) => { if (active) { active = false; reject(new WebAdapterError(code, operation)); } };
     const finish = (granted: boolean) => {
@@ -150,19 +151,21 @@ function purchaseFlow(operation: string, timeout: number, grant: WebPurchaseOpti
     try { cleanup = start({
       grant(input) {
         const id = input?.orderId;
-        if (!active) return id === grantOrderId && pendingGrant ? pendingGrant : false;
+        const subscriptionId = input?.subscriptionId;
+        if (!active) return id === grantOrderId && subscriptionId === grantSubscriptionId && pendingGrant ? pendingGrant : false;
         if (typeof id !== "string" || !id.trim() || id.trim() !== id || id.length > 256 ||
-            (grantOrderId !== undefined && grantOrderId !== id) || (candidate && candidate.orderId !== id)) {
+            (grantOrderId !== undefined && (grantOrderId !== id || grantSubscriptionId !== subscriptionId)) || (candidate && candidate.orderId !== id)) {
           fail("INVALID_RESULT"); return false;
         }
-        if (input.subscriptionId !== undefined && (typeof input.subscriptionId !== "string" || !input.subscriptionId.trim() || input.subscriptionId.trim() !== input.subscriptionId || input.subscriptionId.length > 256)) {
+        if (subscriptionId !== undefined && (typeof subscriptionId !== "string" || !subscriptionId.trim() || subscriptionId.trim() !== subscriptionId || subscriptionId.length > 256)) {
           fail("INVALID_RESULT"); return false;
         }
         // Snapshot identifiers before yielding; an SDK must not mutate a queued grant.
-        const grantInput = { orderId: id, ...(input.subscriptionId === undefined ? {} : { subscriptionId: input.subscriptionId }) };
+        const grantInput = { orderId: id, ...(subscriptionId === undefined ? {} : { subscriptionId }) };
         // Native callbacks may repeat; the backend remains idempotent across flows.
         if (pendingGrant) return pendingGrant;
         grantOrderId = id;
+        grantSubscriptionId = subscriptionId;
         pendingGrant = Promise.resolve().then(() => active ? grant(grantInput) : false).then(value => value === true, () => false);
         void pendingGrant.then(finish);
         return pendingGrant;

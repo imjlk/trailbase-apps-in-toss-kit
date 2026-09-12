@@ -220,3 +220,28 @@ test("SDK startup errors stop queued new grants", async () => {
   await expect(f.make().purchase({ sku: "sku", processProductGrant: async () => { calls++; return true; } })).rejects.toMatchObject({ code: "SDK_ERROR" });
   expect(calls).toBe(0);
 });
+
+for (const completed of [false, true]) {
+  test(`different subscription IDs cannot reuse a ${completed ? "completed" : "pending"} grant`, async () => {
+    const f = fixture(); let sdk: any; const seen: unknown[] = [];
+    let settleGrant!: (value: boolean) => void;
+    const deferred = new Promise<boolean>(resolve => { settleGrant = resolve; });
+    (f.api.IAP as any).createSubscriptionPurchaseOrder = available((options: any) => { sdk = options; });
+    const result = f.make().subscribe({ sku: "sku", processProductGrant: input => { seen.push(input); return deferred; } });
+    const outcome = result.then(value => ({ value }), error => ({ error }));
+    await new Promise(resolve => setTimeout(resolve, 1));
+    const original = { orderId: "order", subscriptionId: "subscription-a" };
+    const first = sdk.options.processProductGrant(original);
+    await Promise.resolve();
+    sdk.onEvent({ type: "success", data: { orderId: "order" } });
+    if (completed) { settleGrant(true); await result; }
+    expect(await sdk.options.processProductGrant({ ...original, subscriptionId: "subscription-b" })).toBe(false);
+    settleGrant(true);
+    expect(await first).toBe(true);
+    if (completed) {
+      expect(await sdk.options.processProductGrant(original)).toBe(true);
+      expect(await outcome).toMatchObject({ value: { orderId: "order" } });
+    } else expect(await outcome).toMatchObject({ error: { code: "INVALID_RESULT" } });
+    expect(seen).toEqual([original]);
+  });
+}
