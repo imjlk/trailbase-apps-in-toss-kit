@@ -365,6 +365,11 @@ pub fn insert_promotion_reward_ledger_tx(
     table: PromotionRewardLedgerTable,
     input: PromotionRewardLedgerInsert<'_>,
 ) -> ApiResult<PromotionRewardLedgerInsertResult> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::Promotion,
+        crate::operation_policy::OperationPhase::Entry,
+    )?;
     let record = normalize_promotion_reward_ledger_insert(input)?;
     let (sql, params) = promotion_reward_ledger_insert_statement(table, &record)?;
     let rows = db::tx_query(tx, &sql, &params)?;
