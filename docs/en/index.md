@@ -30,6 +30,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Persist in-app purchase order/grant state | [iap-orders.md](iap-orders.md) |
 | Add functional push/inbox messages | [functional-messages.md](functional-messages.md) |
 | Use RN/client-side adapters | [client-adapters.md](client-adapters.md) |
+| Use WebView SDK 3 adapters | [web-adapters.md](web-adapters.md) |
 | Handle account changes and app foreground | [session-lifecycle.md](session-lifecycle.md) |
 | Diagnose private IAP, promotion and message ledgers | [ledger-doctor.md](ledger-doctor.md) |
 | Configure detailed and AppsInToss analytics | [analytics.md](analytics.md) |
