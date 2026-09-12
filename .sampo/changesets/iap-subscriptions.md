@@ -16,3 +16,8 @@ events cannot overwrite current state; equal-time conflicts require reconciliati
 Client SDK status never independently authorizes server benefits. Subscription
 sandbox testing is unavailable, so validate the feature in the real Toss app
 before consumer rollout. The proxy remains internal and outbound-only.
+
+Prevent failed or fallback-only lookups from reserving new order IDs, and require
+verified order state when applying or reading subscription entitlements. Handle
+UNVERIFIED_IAP_ORDER for lookups that cannot establish a new owner mapping. Normalize
+offer fields consistently and reject unsupported explicit registration versions.

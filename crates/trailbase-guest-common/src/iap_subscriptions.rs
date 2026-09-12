@@ -3,6 +3,7 @@
 //! belong to the consumer ingress; this module must not be exposed directly.
 use crate::{
     db,
+    iap_orders::VERIFIED_IAP_ORDER_STATE,
     responses::{ApiResult, bad_request, internal},
 };
 use serde::{Deserialize, Serialize};
@@ -77,6 +78,17 @@ pub enum SubscriptionApplyOutcome {
 }
 
 pub fn parse_subscription_webhook(value: &JsonValue) -> ApiResult<SubscriptionWebhook> {
+    // Registration callbacks currently omit the version. If one is supplied,
+    // do not acknowledge a protocol the status-event handler cannot process.
+    if value
+        .get("eventVersion")
+        .is_some_and(|v| v.as_str() != Some("1.0"))
+    {
+        return Err(bad_request(
+            "INVALID_SUBSCRIPTION_WEBHOOK",
+            "unsupported subscription webhook version",
+        ));
+    }
     let mut event: SubscriptionWebhook = serde_json::from_value(value.clone()).map_err(|_| {
         bad_request(
             "INVALID_SUBSCRIPTION_WEBHOOK",
@@ -117,9 +129,17 @@ pub fn subscription_entitlement_for_user_tx(
     order_id: &str,
     user: &[u8],
 ) -> ApiResult<Option<SubscriptionEntitlement>> {
-    let rows = db::tx_query(tx, "SELECT o.product_id,e.status,e.access_granted,e.expires_at,e.auto_renew,e.occurred_at,e.needs_reconciliation
-        FROM iap_subscription_entitlements e JOIN iap_orders o ON o.order_id=e.order_id
-        WHERE e.order_id=?1 AND o.user_id=?2", &[Value::Text(order_id.into()),Value::Blob(user.to_vec())])?;
+    entitlement_for_user(tx, order_id, user)
+}
+
+fn entitlement_for_user(
+    store: &mut impl Store,
+    order_id: &str,
+    user: &[u8],
+) -> ApiResult<Option<SubscriptionEntitlement>> {
+    let rows = store.query(&format!("SELECT o.product_id,e.status,e.access_granted,e.expires_at,e.auto_renew,e.occurred_at,e.needs_reconciliation
+        FROM iap_subscription_entitlements e JOIN (SELECT * FROM iap_orders WHERE {VERIFIED_IAP_ORDER_STATE}) o ON o.order_id=e.order_id
+        WHERE e.order_id=?1 AND o.user_id=?2"), &[Value::Text(order_id.into()),Value::Blob(user.to_vec())])?;
     rows.first()
         .map(|r| {
             Ok(SubscriptionEntitlement {
@@ -180,7 +200,9 @@ fn apply_event(
         }
     }
     let order = store.query(
-        "SELECT product_id FROM iap_orders WHERE order_id=?1",
+        &format!(
+            "SELECT product_id FROM iap_orders WHERE order_id=?1 AND {VERIFIED_IAP_ORDER_STATE}"
+        ),
         &[Value::Text(event.order_id.clone())],
     )?;
     let Some(order) = order.first() else {
@@ -415,6 +437,83 @@ mod tests {
                 .unwrap(),
             1
         );
+    }
+    #[test]
+    fn unverified_orders_cannot_bind_or_expose_entitlements() {
+        for (status, provider) in [
+            ("NOT_FOUND", "NOT_FOUND"),
+            ("FAILED", "ERROR"),
+            ("UNKNOWN", "UNKNOWN"),
+            ("PENDING", "ORDER_IN_PROGRESS"),
+            ("GRANTED", "NOT_FOUND"),
+            ("FAILED", "PURCHASED"),
+        ] {
+            let mut db = database();
+            map_order(&db);
+            let e = event("2026-09-01T00:00:00", "ACTIVE");
+            db.execute(
+                "UPDATE iap_orders SET status=?1,provider_status=?2",
+                [status, provider],
+            )
+            .unwrap();
+            assert_eq!(
+                apply_event(&mut db, &e, 1).unwrap(),
+                SubscriptionApplyOutcome::UnmappedOrder
+            );
+            assert_eq!(
+                db.query_row("SELECT disposition FROM iap_subscription_events", [], |r| r
+                    .get::<_, String>(0))
+                    .unwrap(),
+                "RECEIVED"
+            );
+            assert!(
+                entitlement_for_user(&mut db, "order", &[1])
+                    .unwrap()
+                    .is_none()
+            );
+            db.execute(
+                "UPDATE iap_orders SET status='GRANTED',provider_status='PURCHASED'",
+                [],
+            )
+            .unwrap();
+            assert_eq!(
+                apply_event(&mut db, &e, 2).unwrap(),
+                SubscriptionApplyOutcome::Applied
+            );
+            assert!(
+                entitlement_for_user(&mut db, "order", &[1])
+                    .unwrap()
+                    .is_some()
+            );
+            assert!(
+                entitlement_for_user(&mut db, "order", &[2])
+                    .unwrap()
+                    .is_none()
+            );
+            // Also deny a projection created before the verification guard.
+            db.execute(
+                "UPDATE iap_orders SET status=?1,provider_status=?2",
+                [status, provider],
+            )
+            .unwrap();
+            assert!(
+                entitlement_for_user(&mut db, "order", &[1])
+                    .unwrap()
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn registration_only_accepts_absent_or_supported_version() {
+        let mut value = json!({"eventType":"callback.registration_verification","occurredAt":"2026-09-01T00:00:00"});
+        assert!(parse_subscription_webhook(&value).is_ok());
+        value["eventVersion"] = json!("1.0");
+        assert!(parse_subscription_webhook(&value).is_ok());
+        for version in [json!("2.0"), json!(null), json!(1), json!("")] {
+            value["eventVersion"] = version;
+            assert!(parse_subscription_webhook(&value).is_err());
+        }
     }
     #[test]
     fn stale_and_same_timestamp_conflicts_cannot_overwrite_current_status() {

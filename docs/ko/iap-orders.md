@@ -48,3 +48,10 @@ TrailBase가 주문/지급 상태를 저장해야 한다면
 템플릿에는 스키마 변경이 필요하지 않습니다.
 
 RN adapter와 비공개 웹훅·이용권한 원장은 [IAP 정기구독](iap-subscriptions.md)을 참고하세요.
+
+새 주문 행은 인증된 소유자로 범위를 제한한 서버 조회가 성공하고, 응답에 주문 ID/SKU와
+PAYMENT_COMPLETED, PURCHASED 또는 REFUNDED 상태가 있어야 생성됩니다. 실패·없음·알 수 없음·
+진행 중 상태나 요청값으로만 보완한 응답은 새 주문 ID를 선점할 수 없습니다. 일치하는 기존
+행도 갱신할 수 없으면 `upsert_iap_order_status_tx`는 `UNVERIFIED_IAP_ORDER`를 반환합니다.
+기존 소유자의 진단 정보 갱신은 지원합니다. 클라이언트 SDK 데이터나 인증된 소유자 식별자
+없이 조회한 응답을 이 헬퍼에 전달하지 마세요.
