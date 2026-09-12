@@ -1,5 +1,87 @@
 # trailbase-guest-common
 
+## 0.9.0 — 2026-09-12
+
+### Minor changes
+
+- [415decc](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/415decc0e44105d490767017e13137c20efd5a6d) Add RN subscription purchase and status-query bridges with per-API support checks,
+  subscription identifiers, renewal cycles and offers, while retaining one-time
+  purchase/restore behavior and older injected SDK support for existing methods.
+  
+  Add a private subscription webhook inbox and per-order entitlement projection.
+  Apply iap_subscriptions.sql after the order ledger as a new consumer migration.
+  Authenticate webhook ingress in the consumer, map renewal orders authoritatively,
+  and configure provider-local timestamp conversion explicitly. Duplicate/older
+  events cannot overwrite current state; equal-time conflicts require reconciliation.
+  Client SDK status never independently authorizes server benefits. Subscription
+  sandbox testing is unavailable, so validate the feature in the real Toss app
+  before consumer rollout. The proxy remains internal and outbound-only.
+  
+  Prevent failed or fallback-only lookups from reserving new order IDs, and require
+  verified order state when applying or reading subscription entitlements. Handle
+  UNVERIFIED_IAP_ORDER for lookups that cannot establish a new owner mapping. Normalize
+  offer fields consistently and reject unsupported explicit registration versions. — Thanks @imjlk!
+- [cfb560e](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/cfb560e4bb791e8f1e4980ae7a5522d82a54b56f) Verify Apps in Toss anonymous keys through the private proxy before bootstrap,
+  retaining the existing HMAC of ait:<hash> and canonical TrailBase user flow.
+  Add verified-key sealing, private identity storage, explicit message recipients,
+  and anonymous promotion grants/status lookup with request-local header adaptation.
+  
+  Apply anonymous_identities.sql, the one-time message_outbox_recipients migration,
+  and optional promotion_reward_recipients.sql as new consumer migrations. Stop
+  legacy dispatch workers before enabling anonymous rows, preserve notification
+  agreement checks for both recipient types, and deploy the next proxy image before
+  using verification or anonymous promotion. Existing login rows remain unchanged.
+  Consumer real-app/sandbox validation is still required before production rollout.
+  
+  Normalize anonymous enqueue identifiers before persistence so whitespace cannot
+  bypass idempotency or break exact notification-template agreement lookup.
+  
+  Strip raw recipient fields from both login and anonymous outbox payloads before
+  persistence, including nested context. Scrub any existing raw recipient fields
+  through a consumer-owned data migration; idempotent retries preserve historical rows. — Thanks @imjlk!
+- [ae4382f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/ae4382f25c4d7ea15d8dccef5e0da6cf847682f0) Upgrade trailbase-wasm to 0.6.1 and verify the 0.33.14 server with an isolated
+  component/auth/Record API/SSE integration smoke. Rebuild all consumer components
+  and coordinate the server/guest rollout; new binaries do not support pre-0.32
+  hosts. Update the first-party auth-ui component separately.
+  
+  Fix anonymous bootstrap and password rotation for the post-0.31.2 _user schema,
+  which replaced verified with unverified_email. Existing flag-based schemas remain
+  supported by the SQL helpers; verified principals and pending email changes are
+  preserved. Official auth endpoints still issue tokens. The last verified server
+  moves to 0.33.14; the manual kit minimum stays TBD. Consumer production/device and
+  full migration checks remain required before rollout.
+  
+  Trigger runtime smoke checks on client/parser dependency changes and verify the
+  read-only Record API ACL with valid auth, CSRF and a complete record payload. — Thanks @imjlk!
+- [6fb1b82](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6fb1b82e781c75e95af6cd6968f26c73f61cb609) Recover TanStack collections after SSE disconnects using complete paginated
+  snapshots, deletion reconciliation, and queued events with react-db 0.3.8. Set
+  snapshotMode to merge for partial lists; the default now treats limit as page size.
+  
+  Add optional message dispatch leases with attempt fencing and quarantine uncertain
+  in-flight sends instead of resending them. Apply message_outbox_attempts.sql as a
+  new consumer migration and stop legacy workers before adopting leased APIs. Rust
+  message responses now include channel failure details and content identifiers.
+  
+  Record local IAP grant and Toss completion separately. Existing completion history
+  is preserved; newly granted rows need explicit confirmation. Query promotion
+  results with the persisted transaction key through the new status endpoint; missing
+  keys require reconciliation rather than a new grant. Deploy the next proxy image
+  before using that endpoint. No minimum TrailBase server change is required.
+  
+  Make XHR SSE connection setup abortable during cleanup and bound header resolution
+  and response-header waits with a configurable 15-second connection deadline. — Thanks @imjlk!
+- [928f347](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/928f3478c76c655ee1dbee9887068d5f951c59dc) Add a read-only ledger doctor for private SQLite snapshots. Inspect IAP local grant
+  and completion state, stored subscription projections, original promotion transaction
+  availability, message attempts and agreement metadata without exposing raw identities,
+  provider keys, payloads or freeform failures. Recovery output is advisory and requires
+  a fresh authorized state read before invoking existing shared transition helpers.
+  
+  Add matching Rust and JavaScript inquiry fingerprints for order, promotion and outbox
+  record IDs. Return them only from ownership-checked endpoints; they are neither
+  authorization tokens nor secrets. Diagnostic lookup uses a bounded scan and reports
+  an incomplete lookup explicitly. Choose the consumer's timestamp unit and use a
+  consistent private SQLite backup. No schema migration or proxy deployment is required. — Thanks @imjlk!
+
 ## 0.8.1 — 2026-06-21
 
 ### Patch changes

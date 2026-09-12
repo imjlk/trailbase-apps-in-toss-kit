@@ -1,5 +1,45 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.4.0 — 2026-09-12
+
+### Minor changes
+
+- [415decc](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/415decc0e44105d490767017e13137c20efd5a6d) Add RN subscription purchase and status-query bridges with per-API support checks,
+  subscription identifiers, renewal cycles and offers, while retaining one-time
+  purchase/restore behavior and older injected SDK support for existing methods.
+  
+  Add a private subscription webhook inbox and per-order entitlement projection.
+  Apply iap_subscriptions.sql after the order ledger as a new consumer migration.
+  Authenticate webhook ingress in the consumer, map renewal orders authoritatively,
+  and configure provider-local timestamp conversion explicitly. Duplicate/older
+  events cannot overwrite current state; equal-time conflicts require reconciliation.
+  Client SDK status never independently authorizes server benefits. Subscription
+  sandbox testing is unavailable, so validate the feature in the real Toss app
+  before consumer rollout. The proxy remains internal and outbound-only.
+  
+  Prevent failed or fallback-only lookups from reserving new order IDs, and require
+  verified order state when applying or reading subscription entitlements. Handle
+  UNVERIFIED_IAP_ORDER for lookups that cannot establish a new owner mapping. Normalize
+  offer fields consistently and reject unsupported explicit registration versions. — Thanks @imjlk!
+
+### Patch changes
+
+- [12324f9](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/12324f91cad34dfad078d72ec7d7e7f471ecbccb) Refresh the RN SDK reference to 2.10.10, pin Bun 1.4.2, and check adapter sources
+  against the installed SDK types in CI. Upgrade the proxy to @ait-kit 0.2.0 while
+  preserving authenticated generic mTLS requests, the documented Smart Message
+  recipient header, and legacy partial-delivery failure fields. Anonymous message
+  requests use x-anon-key exclusively; consumers still enforce notification agreement.
+  
+  The Compose template keeps the already released proxy 0.1.12 as a baseline; that
+  image does not contain these source changes. After the next Sampo-generated proxy
+  image is published, update the consumer-owned image pin before using the new behavior.
+  No TrailBase schema migration or minimum supported server change is required.
+  
+  Forward IAP lookups no longer promote requested SKUs into provider evidence. Paid
+  responses without a provider SKU fail with UNVERIFIED_IAP_ORDER; retry verification
+  before granting products. Explicit stub mode remains available for local tests. — Thanks @imjlk!
+- Updated dependencies: trailbase-client (npm)@1.1.0
+
 ## 0.3.2 — 2026-06-23
 
 ### Patch changes

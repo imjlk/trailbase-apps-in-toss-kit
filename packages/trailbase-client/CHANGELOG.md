@@ -1,5 +1,63 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 1.1.0 — 2026-09-12
+
+### Minor changes
+
+- [c6148b0](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/c6148b04685014fc460dee3c63c8926d11781a4a) Add an optional account lifecycle that clears user caches and subscriptions,
+  isolates query keys by principal and session revision, ignores stale callbacks,
+  and refreshes backend entitlements and pending work before exposing a ready session.
+  On app foreground, revalidate the existing session instead of trusting cached SDK
+  subscription status. Disconnection clears local session credentials; server unlink,
+  revocation and anonymous-to-canonical data merge remain consumer responsibilities.
+  
+  Session manager operations now supersede earlier operations, pass AbortSignal to
+  backend callbacks, and serialize storage writes so delayed responses cannot restore
+  an old account. Handle StaleAppSessionOperationError as cancellation, use one manager
+  per storage namespace, and route auth transitions through the lifecycle when adopted.
+  No SQL migration or proxy rollout is required.
+  Multi-key writes share one queue slot, and a persistent writePending marker blocks
+  restoration of partially written credentials. Keep the marker with the session
+  namespace and handle AppSessionStorageIncompleteError with clear/sign-in recovery.
+  Preserve stored credentials on transient restore/foreground failures; provide
+  isInvalidSessionError for custom authoritative revocation errors. Disconnect still
+  attempts credential deletion when resource cleanup fails, and explicit anonymous
+  bootstrap cannot make a partially written Toss mirror valid again. — Thanks @imjlk!
+- [6fb1b82](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6fb1b82e781c75e95af6cd6968f26c73f61cb609) Recover TanStack collections after SSE disconnects using complete paginated
+  snapshots, deletion reconciliation, and queued events with react-db 0.3.8. Set
+  snapshotMode to merge for partial lists; the default now treats limit as page size.
+  
+  Add optional message dispatch leases with attempt fencing and quarantine uncertain
+  in-flight sends instead of resending them. Apply message_outbox_attempts.sql as a
+  new consumer migration and stop legacy workers before adopting leased APIs. Rust
+  message responses now include channel failure details and content identifiers.
+  
+  Record local IAP grant and Toss completion separately. Existing completion history
+  is preserved; newly granted rows need explicit confirmation. Query promotion
+  results with the persisted transaction key through the new status endpoint; missing
+  keys require reconciliation rather than a new grant. Deploy the next proxy image
+  before using that endpoint. No minimum TrailBase server change is required.
+  
+  Make XHR SSE connection setup abortable during cleanup and bound header resolution
+  and response-header waits with a configurable 15-second connection deadline. — Thanks @imjlk!
+
+### Patch changes
+
+- [12324f9](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/12324f91cad34dfad078d72ec7d7e7f471ecbccb) Refresh the RN SDK reference to 2.10.10, pin Bun 1.4.2, and check adapter sources
+  against the installed SDK types in CI. Upgrade the proxy to @ait-kit 0.2.0 while
+  preserving authenticated generic mTLS requests, the documented Smart Message
+  recipient header, and legacy partial-delivery failure fields. Anonymous message
+  requests use x-anon-key exclusively; consumers still enforce notification agreement.
+  
+  The Compose template keeps the already released proxy 0.1.12 as a baseline; that
+  image does not contain these source changes. After the next Sampo-generated proxy
+  image is published, update the consumer-owned image pin before using the new behavior.
+  No TrailBase schema migration or minimum supported server change is required.
+  
+  Forward IAP lookups no longer promote requested SKUs into provider evidence. Paid
+  responses without a provider SKU fail with UNVERIFIED_IAP_ORDER; retry verification
+  before granting products. Explicit stub mode remains available for local tests. — Thanks @imjlk!
+
 ## 1.0.0 — 2026-06-23
 
 ### Major changes
