@@ -18,3 +18,7 @@ Consumer real-app/sandbox validation is still required before production rollout
 
 Normalize anonymous enqueue identifiers before persistence so whitespace cannot
 bypass idempotency or break exact notification-template agreement lookup.
+
+Strip raw recipient fields from both login and anonymous outbox payloads before
+persistence, including nested context. Scrub any existing raw recipient fields
+through a consumer-owned data migration; idempotent retries preserve historical rows.
