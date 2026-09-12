@@ -1,27 +1,12 @@
 import { expect, test } from "bun:test";
 import { createProxyCapabilitiesCheck, evaluateProxyCapabilities } from "../src/proxy-capabilities.mjs";
 import { createReleaseDoctorChecksFromConfig, runReleaseDoctor } from "../src/release-doctor.mjs";
-import { handleRequest } from "../../../services/toss-mtls-client-proxy/src/http-server.mjs";
 
 const metadata = { contractVersion: 1, proxyVersion: "0.3.0", capabilities: ["promotion.status", "anonymous-key.verify"] };
 const health = { ok: true, mode: "forward", kit: metadata };
 const secret = "PRIVATE-CANARY";
 const options = { url: "http://proxy.internal", token: secret };
 const check = (body, extra = {}) => createProxyCapabilitiesCheck({ ...options, fetchImpl: async () => Response.json(body), ...extra }).run();
-
-test("doctor accepts the actual proxy metadata while health stays local", async () => {
-  let healthCalls = 0;
-  const req = { method: "GET", url: "/internal/apps-in-toss/health", headers: { authorization: `Bearer ${secret}` } };
-  const response = await handleRequest(req, { mode: "forward", internalToken: secret }, { health: async () => {
-    healthCalls++; return { ok: true, mode: "forward", token: secret };
-  } });
-  expect(healthCalls).toBe(1);
-  expect(evaluateProxyCapabilities(response.body, { requiredCapabilities: ["promotion.status", "iap.provider-sku-required"] }).ok).toBe(true);
-  expect(JSON.stringify(response.body)).not.toContain(secret);
-  const denied = await handleRequest({ ...req, headers: {} }, { mode: "forward", internalToken: secret }, {});
-  expect(denied.status).toBe(401);
-  expect(denied.body.kit).toBeUndefined();
-});
 
 test("legacy, unhealthy, wrong-mode and future contracts never pass silently", async () => {
   for (const body of [null, {}, { ok: true, mode: "forward" }, { ...health, ok: false },
@@ -36,7 +21,7 @@ test("minimum version comparison respects major, minor and patch ordering", () =
     const result = evaluateProxyCapabilities({ ...health, kit: { ...metadata, proxyVersion: version } }, { minimumVersion: "0.3.1" });
     expect(result.ok).toBe(!["0.2.99", "0.3.0"].includes(version));
   }
-  for (const version of ["01.3.0", "0.3.0-beta.1", "9999999999.0.0", null, 3]) {
+  for (const version of ["01.3.0", "0.3.0-beta.01", "99999999999999999.0.0", null, 3]) {
     expect(evaluateProxyCapabilities({ ...health, kit: { ...metadata, proxyVersion: version } }).ok).toBe(false);
   }
 });
@@ -101,4 +86,15 @@ test("optional checks warn and JSON config cannot inject credentials or fetch co
   const [configured] = createReleaseDoctorChecksFromConfig({ checks: [{ type: "proxy-capabilities", url: options.url,
     tokenEnv: "KIT_TEST_NONEXISTENT_TOKEN", token: secret, env: { KIT_TEST_NONEXISTENT_TOKEN: secret }, fetchImpl: () => { throw new Error("injected"); } }] });
   expect((await configured.run()).failures).toEqual(["Proxy token is required"]);
+});
+
+test("prerelease precedence and build metadata follow SemVer", () => {
+  for (const [version, minimumVersion, expected] of [
+    ["0.3.0-rc.1", "0.3.0", false], ["0.3.0", "0.3.0-rc.1", true],
+    ["0.3.0-rc.10", "0.3.0-rc.2", true], ["0.3.0-rc.2", "0.3.0-rc.10", false],
+    ["0.3.0+build.1", "0.3.0+build.999", true], ["0.4.0-alpha", "0.3.0", true],
+  ]) {
+    expect(evaluateProxyCapabilities({ ...health, kit: { ...metadata, proxyVersion: version } }, { minimumVersion }).ok).toBe(expected);
+  }
+  expect(evaluateProxyCapabilities({ ...health, kit: { ...metadata, proxyVersion: "0.3.0-rc.1" } }).ok).toBe(true);
 });

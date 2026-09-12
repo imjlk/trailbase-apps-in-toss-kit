@@ -157,7 +157,9 @@ GET to `/internal/apps-in-toss/health`, rejects redirects, bounds the entire req
 including response-body reads, and limits the response to 16 KiB. Error reports omit
 the token, URL, response body and transport error details.
 
-`minimumVersion` optionally requires a stable `MAJOR.MINOR.PATCH` proxy version.
+`minimumVersion` optionally requires a minimum SemVer proxy version. Prerelease
+precedence is respected (`0.3.0-rc.1` is below `0.3.0`); build metadata does not
+change precedence. Without a minimum, valid prerelease metadata is accepted.
 Feature names are checked independently of the version. Invalid/missing metadata,
 unknown contract versions, a different mode or missing required capabilities fail
 the check. Proxy 0.2.0 and earlier do not expose this new metadata. Publish and select

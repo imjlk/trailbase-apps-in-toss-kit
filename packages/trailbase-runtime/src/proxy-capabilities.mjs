@@ -1,14 +1,17 @@
+import semver from "semver";
+
 const HEALTH_PATH = "/internal/apps-in-toss/health";
 const MAX_BODY_BYTES = 16 * 1024;
 const CAPABILITY = /^[a-z][a-z0-9.-]{0,63}$/;
-const VERSION = /^(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})\.(0|[1-9]\d{0,8})$/;
+const validVersion = value => typeof value === "string" && value.length <= 128 &&
+  /^\d/.test(value) && value.trim() === value && semver.valid(value) !== null;
 const failure = message => ({ ok: false, failures: [message] });
 
 export function evaluateProxyCapabilities(health, {
   expectedMode = "forward", minimumVersion, requiredCapabilities = [],
 } = {}) {
   if (!["stub", "forward"].includes(expectedMode) ||
-      (minimumVersion !== undefined && (typeof minimumVersion !== "string" || !VERSION.test(minimumVersion))) ||
+      (minimumVersion !== undefined && !validVersion(minimumVersion)) ||
       !Array.isArray(requiredCapabilities) || requiredCapabilities.length > 100 ||
       requiredCapabilities.some(value => typeof value !== "string" || !CAPABILITY.test(value))) {
     return failure("Invalid proxy capability requirements");
@@ -16,16 +19,13 @@ export function evaluateProxyCapabilities(health, {
   if (health?.ok !== true || health.mode !== expectedMode) return failure("Proxy health or mode did not match requirements");
   const kit = health.kit;
   if (kit?.contractVersion !== 1) return failure("Proxy has no supported kit capability contract; upgrade the proxy");
-  if (typeof kit.proxyVersion !== "string" || !VERSION.test(kit.proxyVersion) ||
+  if (!validVersion(kit.proxyVersion) ||
       !Array.isArray(kit.capabilities) || kit.capabilities.length > 100 ||
       kit.capabilities.some(value => typeof value !== "string" || !CAPABILITY.test(value))) {
     return failure("Proxy capability metadata is invalid");
   }
-  if (minimumVersion) {
-    const current = kit.proxyVersion.split(".").map(Number);
-    const minimum = minimumVersion.split(".").map(Number);
-    const firstDifference = current.findIndex((value, index) => value !== minimum[index]);
-    if (firstDifference >= 0 && current[firstDifference] < minimum[firstDifference]) return failure("Proxy version is below the required minimum");
+  if (minimumVersion && !semver.gte(kit.proxyVersion, minimumVersion)) {
+    return failure("Proxy version is below the required minimum");
   }
   const missing = requiredCapabilities.filter(value => !kit.capabilities.includes(value));
   if (missing.length) return failure(`Missing proxy capabilities: ${missing.join(", ")}`);
@@ -75,6 +75,7 @@ export function createProxyCapabilitiesCheck({
       const deadline = new Promise(resolve => {
         timer = setTimeout(() => { controller.abort(); resolve(failure("Proxy health request timed out")); }, timeout);
       });
+      // The race handles late rejections; unconditional cleanup also cancels stalled bodies.
       return await Promise.race([work, deadline]);
     } catch {
       // URLs, tokens, response bodies and transport errors may contain secrets.
