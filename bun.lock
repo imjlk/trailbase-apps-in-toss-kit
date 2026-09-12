@@ -6,13 +6,14 @@
       "name": "trailbase-apps-in-toss-kit",
       "devDependencies": {
         "@apps-in-toss/framework": "2.10.10",
+        "@apps-in-toss/framework-min-supported": "npm:@apps-in-toss/framework@2.5.0",
         "@types/node": "24",
         "typescript": "7.0.2",
       },
     },
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
-      "version": "0.3.2",
+      "version": "0.4.0",
       "peerDependencies": {
         "@apps-in-toss/framework": ">=2.5.0",
         "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
@@ -20,7 +21,7 @@
     },
     "packages/trailbase-client": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-client",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "dependencies": {
         "@tanstack/react-db": "0.3.8",
       },
@@ -35,7 +36,7 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.2.6",
+      "version": "0.3.0",
       "bin": {
         "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
         "trailbase-release-doctor": "./bin/release-doctor.mjs",
@@ -45,7 +46,7 @@
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.1.12",
+      "version": "0.2.0",
       "dependencies": {
         "@ait-kit/api-client": "0.2.0",
         "@ait-kit/api-core": "0.2.0",
@@ -65,7 +66,11 @@
 
     "@apps-in-toss/analytics": ["@apps-in-toss/analytics@2.10.10", "", { "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" } }, "sha512-8pRDr1TwLpl9Sd2dLJiPR6EzfNLLAXkhXKlkzWX10SLs6zp/RIngjloA7Fjm32ObZCAXF8Diww1ez4/hg+NEYQ=="],
 
+    "@apps-in-toss/cli": ["@apps-in-toss/cli@2.5.0", "", { "dependencies": { "@apps-in-toss/ait-format": "1.0.0", "@apps-in-toss/plugins": "2.5.0", "@apps-in-toss/web-config": "2.5.0", "@clack/prompts": "^0.10.0", "@granite-js/utils": "1.0.20", "@sentry/cli": "^2.46.0", "clipanion": "^4.0.0-rc.4", "dedent": "^1.6.0", "execa": "9.3.0", "fast-glob": "^3.3.2", "jscodeshift": "^17.3.0", "source-map": "^0.8.0-beta.0", "unzipper": "^0.12.3", "uuidv7": "^1.0.2" } }, "sha512-K5qF/geIiEeAHzSZ04kezJsw4UVLelNI+cbAAnpqUxL2PHTydpGi4TMPw4uz41qzX0f1MFj4Ktg+FWlAK9k2dA=="],
+
     "@apps-in-toss/framework": ["@apps-in-toss/framework@2.10.10", "", { "dependencies": { "@apps-in-toss/analytics": "2.10.10", "@apps-in-toss/native-modules": "2.10.10", "@apps-in-toss/plugins": "2.10.10", "@apps-in-toss/react-native-cli": "2.10.10", "@apps-in-toss/types": "2.10.10", "@apps-in-toss/user-scripts": "^2.10.10", "es-hangul": "^2.3.2" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@toss/tds-react-native": ">=2.0.0", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" }, "bin": { "ait": "./bin/ait.js" } }, "sha512-6M4E4F0uzTA+W0zKHoMusTUv7eH01z9+7vNzCLHjGKvQt15K38bjF/E5Aouk8AKpJQSWwsg4MvzIA6CNJMyW7Q=="],
+
+    "@apps-in-toss/framework-min-supported": ["@apps-in-toss/framework@2.5.0", "", { "dependencies": { "@apps-in-toss/analytics": "2.5.0", "@apps-in-toss/cli": "2.5.0", "@apps-in-toss/native-modules": "2.5.0", "@apps-in-toss/plugins": "2.5.0", "@apps-in-toss/types": "2.5.0", "@apps-in-toss/user-scripts": "^2.5.0", "es-hangul": "^2.3.2" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@toss/tds-react-native": ">=2.0.0", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" }, "bin": { "ait": "./bin/ait.js" } }, "sha512-qFzFoX9sNFCGUOCyZrcgywq4ucEVsaK+Kenv2tQJjiJj0jkqAUXMIrztetWbu6H0FVo4mC9KpvYnrRd3jeiDZA=="],
 
     "@apps-in-toss/native-modules": ["@apps-in-toss/native-modules@2.10.10", "", { "dependencies": { "@apps-in-toss/types": "2.10.10", "brick-module": "0.5.2", "es-toolkit": "^1.39.3" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "react": "*", "react-native": "*" } }, "sha512-4nJOEY/dd56FUzlPRVEJmVOc0pXUibkxCtzVMHRj77M/th43qCrA2pMrv0cC6/a5vte5W1cOS+WjiunSYQTfHw=="],
 
@@ -2281,6 +2286,18 @@
 
     "zod": ["zod@4.4.3", "", {}, "sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ=="],
 
+    "@apps-in-toss/cli/@apps-in-toss/plugins": ["@apps-in-toss/plugins@2.5.0", "", { "dependencies": { "@apps-in-toss/ait-format": "1.0.0", "@apps-in-toss/plugin-compat": "2.5.0", "@granite-js/plugin-core": "1.0.20", "@granite-js/plugin-micro-frontend": "1.0.20", "@granite-js/plugin-sentry": "1.0.20", "@granite-js/utils": "1.0.20", "archiver": "^7.0.1", "connect": "^3.7.0", "esbuild": "0.25.5", "execa": "9.3.0", "picocolors": "^1.1.1", "uuidv7": "^1.0.2" } }, "sha512-XuLHamcCTsE+JW577IMr2TwYTwSeFKFqg+VeecVvNJra2MJcqjz4FTHgaAJ/I5NqNmBWGfMOFoTlBY1FRC7Eng=="],
+
+    "@apps-in-toss/cli/@apps-in-toss/web-config": ["@apps-in-toss/web-config@2.5.0", "", { "dependencies": { "@babel/core": "7.23.9", "@babel/traverse": "^7.26.9", "@babel/types": "^7.26.9", "@granite-js/utils": "1.0.20", "cosmiconfig": "^9.0.0", "cosmiconfig-typescript-loader": "^5.1.0" } }, "sha512-wW9UBYSkEfMuzzkDK4JDBemesDKC25dd/SrC+lbnfwb45VTn72XbMBr+KkxyEmH9TTH/QyNb06pXkkOUxmgFRg=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/analytics": ["@apps-in-toss/analytics@2.5.0", "", { "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "@types/react": "*", "brick-module": "*", "react": "*", "react-native": "*" } }, "sha512-gbr2wvYCiUkGbxJWJvLZ+kwgmXDgqfyUzWc03D4U8MlIl0IlKsTQp9xjUgfI5Pej1XWuCazCsVLRa1qOhWNKzA=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/native-modules": ["@apps-in-toss/native-modules@2.5.0", "", { "dependencies": { "@apps-in-toss/types": "2.5.0", "brick-module": "0.5.2", "es-toolkit": "^1.39.3" }, "peerDependencies": { "@granite-js/native": "*", "@granite-js/react-native": "*", "react": "*", "react-native": "*" } }, "sha512-7R4QqNlDn6zDsPgNNEyIolhlBQ5e1OCUbRFbOHvAqBJpC6aPHz2miQLrSkYbUvKPiMixnFGU/sR19IrZ1/8i7Q=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/plugins": ["@apps-in-toss/plugins@2.5.0", "", { "dependencies": { "@apps-in-toss/ait-format": "1.0.0", "@apps-in-toss/plugin-compat": "2.5.0", "@granite-js/plugin-core": "1.0.20", "@granite-js/plugin-micro-frontend": "1.0.20", "@granite-js/plugin-sentry": "1.0.20", "@granite-js/utils": "1.0.20", "archiver": "^7.0.1", "connect": "^3.7.0", "esbuild": "0.25.5", "execa": "9.3.0", "picocolors": "^1.1.1", "uuidv7": "^1.0.2" } }, "sha512-XuLHamcCTsE+JW577IMr2TwYTwSeFKFqg+VeecVvNJra2MJcqjz4FTHgaAJ/I5NqNmBWGfMOFoTlBY1FRC7Eng=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/types": ["@apps-in-toss/types@2.5.0", "", {}, "sha512-BJI8QjOfLJQGE3HTrXAOXEwdGg8dUxXIJ/1FlIfBkP5izeq4+TWX1J1LJMkVv8rGCNK9i2doy0KMXhCi6Jl1kA=="],
+
     "@babel/core/@babel/code-frame": ["@babel/code-frame@7.29.7", "", { "dependencies": { "@babel/helper-validator-identifier": "^7.29.7", "js-tokens": "^4.0.0", "picocolors": "^1.1.1" } }, "sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw=="],
 
     "@babel/core/@babel/generator": ["@babel/generator@7.29.7", "", { "dependencies": { "@babel/parser": "^7.29.7", "@babel/types": "^7.29.7", "@jridgewell/gen-mapping": "^0.3.12", "@jridgewell/trace-mapping": "^0.3.28", "jsesc": "^3.0.2" } }, "sha512-DkXD5OJQaAQIdZ1bt3UZdEnHAn9Imd3IVBdX03UFe+ony9Ojw5pzr9YVKGDY1jt+Gcn/FnGkNf8r+Vj5NOJWtQ=="],
@@ -2930,6 +2947,10 @@
     "whatwg-url-without-unicode/punycode": ["punycode@2.3.1", "", {}, "sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg=="],
 
     "whatwg-url-without-unicode/webidl-conversions": ["webidl-conversions@5.0.0", "", {}, "sha512-VlZwKPCkYKxQgeSbH5EyngOmRp7Ww7I9rQLERETtf5ofd9pGeswWiOtogpEO850jziPRarreGxn5QIiTqpb2wA=="],
+
+    "@apps-in-toss/cli/@apps-in-toss/plugins/@apps-in-toss/plugin-compat": ["@apps-in-toss/plugin-compat@2.5.0", "", { "dependencies": { "@babel/runtime": "^7", "@granite-js/plugin-core": "1.0.20", "@granite-js/utils": "1.0.20", "@react-native-async-storage/async-storage-1.18.2": "npm:@react-native-async-storage/async-storage@1.18.2", "@react-native-community/blur-4.3.2": "npm:@react-native-community/blur@4.3.2", "@react-native/codegen-0.72.6": "npm:@react-native/codegen@0.72.6", "@react-native/js-polyfills-0.72.1": "npm:@react-native/js-polyfills@0.72.1", "@react-native/normalize-colors-0.72.0": "npm:@react-native/normalize-colors@0.72.0", "@react-navigation/elements-1.3.9": "npm:@react-navigation/elements@1.3.9", "@react-navigation/native-6.0.13": "npm:@react-navigation/native@6.0.13", "@react-navigation/native-stack-6.9.0": "npm:@react-navigation/native-stack@6.9.0", "@shopify/flash-list-1.6.2": "npm:@shopify/flash-list@1.6.2", "assert": "2.1.0", "browserify-zlib": "0.2.0", "buffer": "6.0.3", "enhanced-resolve": "^5.18.1", "es-toolkit": "^1.44.0", "events": "3.3.0", "https-browserify": "1.0.0", "lottie-react-native-6.4.0": "npm:lottie-react-native@6.4.0", "path-browserify": "1.0.1", "react-18.2.0": "npm:react@18.2.0", "react-dom-18.2.0": "npm:react-dom@18.2.0", "react-native-0.72.6": "npm:react-native@0.72.6", "react-native-fast-image-8.6.3": "npm:react-native-fast-image@8.6.3", "react-native-gesture-handler-2.8.0": "npm:react-native-gesture-handler@2.8.0", "react-native-pager-view-6.1.2": "npm:react-native-pager-view@6.1.2", "react-native-safe-area-context-4.7.4": "npm:react-native-safe-area-context@4.7.4", "react-native-screens-3.27.0": "npm:react-native-screens@3.27.0", "react-native-svg-13.14.0": "npm:react-native-svg@13.14.0", "react-native-video-6.0.0-alpha.6": "npm:react-native-video@6.0.0-alpha.6", "react-native-webview-13.6.3": "npm:react-native-webview@13.6.3", "react18-use": "^0.4.1", "stream-browserify": "3.0.0", "stream-http": "3.2.0", "url": "0.11.0", "use-effect-event": "^2.0.3", "util": "0.12.5" } }, "sha512-G+nyfR3enQ0AX1adJSizV9DfklPVbM99LBxF3KgSO1o80/Bd/iZAZjgtoiFtVJTDLkugDyO7MFQ5ouGSs6wynw=="],
+
+    "@apps-in-toss/framework-min-supported/@apps-in-toss/plugins/@apps-in-toss/plugin-compat": ["@apps-in-toss/plugin-compat@2.5.0", "", { "dependencies": { "@babel/runtime": "^7", "@granite-js/plugin-core": "1.0.20", "@granite-js/utils": "1.0.20", "@react-native-async-storage/async-storage-1.18.2": "npm:@react-native-async-storage/async-storage@1.18.2", "@react-native-community/blur-4.3.2": "npm:@react-native-community/blur@4.3.2", "@react-native/codegen-0.72.6": "npm:@react-native/codegen@0.72.6", "@react-native/js-polyfills-0.72.1": "npm:@react-native/js-polyfills@0.72.1", "@react-native/normalize-colors-0.72.0": "npm:@react-native/normalize-colors@0.72.0", "@react-navigation/elements-1.3.9": "npm:@react-navigation/elements@1.3.9", "@react-navigation/native-6.0.13": "npm:@react-navigation/native@6.0.13", "@react-navigation/native-stack-6.9.0": "npm:@react-navigation/native-stack@6.9.0", "@shopify/flash-list-1.6.2": "npm:@shopify/flash-list@1.6.2", "assert": "2.1.0", "browserify-zlib": "0.2.0", "buffer": "6.0.3", "enhanced-resolve": "^5.18.1", "es-toolkit": "^1.44.0", "events": "3.3.0", "https-browserify": "1.0.0", "lottie-react-native-6.4.0": "npm:lottie-react-native@6.4.0", "path-browserify": "1.0.1", "react-18.2.0": "npm:react@18.2.0", "react-dom-18.2.0": "npm:react-dom@18.2.0", "react-native-0.72.6": "npm:react-native@0.72.6", "react-native-fast-image-8.6.3": "npm:react-native-fast-image@8.6.3", "react-native-gesture-handler-2.8.0": "npm:react-native-gesture-handler@2.8.0", "react-native-pager-view-6.1.2": "npm:react-native-pager-view@6.1.2", "react-native-safe-area-context-4.7.4": "npm:react-native-safe-area-context@4.7.4", "react-native-screens-3.27.0": "npm:react-native-screens@3.27.0", "react-native-svg-13.14.0": "npm:react-native-svg@13.14.0", "react-native-video-6.0.0-alpha.6": "npm:react-native-video@6.0.0-alpha.6", "react-native-webview-13.6.3": "npm:react-native-webview@13.6.3", "react18-use": "^0.4.1", "stream-browserify": "3.0.0", "stream-http": "3.2.0", "url": "0.11.0", "use-effect-event": "^2.0.3", "util": "0.12.5" } }, "sha512-G+nyfR3enQ0AX1adJSizV9DfklPVbM99LBxF3KgSO1o80/Bd/iZAZjgtoiFtVJTDLkugDyO7MFQ5ouGSs6wynw=="],
 
     "@babel/core/debug/ms": ["ms@2.1.3", "", {}, "sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA=="],
 

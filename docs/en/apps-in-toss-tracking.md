@@ -161,3 +161,19 @@ for this repository so generated PRs trigger downstream `pull_request` checks.
 - Review TDS package guidance before updating non-game app templates.
 - Run consumer app smoke tests before raising any app-supported SDK/runtime
   version policy.
+
+## RN SDK Compatibility Matrix
+
+CI compiles the actual kit adapter/client sources and type contracts against both
+the reviewed SDK pin and the declared minimum `@apps-in-toss/framework@2.5.0`.
+The minimum package is an exact development-only npm alias; `tsconfig.sdk-min.json`
+redirects SDK imports during that typecheck. `check-sdk-minimum.mjs` verifies the
+installed fixture, peer lower bound and mapping so the check cannot silently turn
+into another latest-version test. Renovate leaves this lower-bound fixture fixed.
+
+Run `bun run packages:typecheck` and `bun run packages:typecheck:minimum`. Update the
+fixture together with the peer support policy when intentionally raising the minimum.
+The alias is not a runtime SDK dependency. Passing both compilers demonstrates type
+compatibility at the two tested versions; retain per-method availability guards and
+real-device checks for the APIs a consumer enables. This does not prove every
+intermediate version, device or native feature is available.
