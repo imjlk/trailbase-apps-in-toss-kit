@@ -22,8 +22,9 @@ try {
   if (!options.consumerRoot || !options.from || !options.mapping) throw new Error(usage);
   let mapping;
   try { mapping = JSON.parse(readFileSync(resolve(options.consumerRoot, options.mapping), 'utf8')); }
-  catch { throw new Error('Could not read mapping JSON.'); }
-  const plan = buildUpgradePlan({ ...options, mapping, kitRoot: resolve(dirname(fileURLToPath(import.meta.url)), '..') });
+  catch (error) { throw new Error(error instanceof SyntaxError ? 'Mapping contains invalid JSON.' : 'Could not read the mapping file.'); }
+  const plan = buildUpgradePlan({ consumerRoot: options.consumerRoot, from: options.from, to: options.to, mapping,
+    kitRoot: resolve(dirname(fileURLToPath(import.meta.url)), '..') });
   console.log(options.json ? JSON.stringify(plan, null, 2) : renderUpgradePlan(plan));
   if (options.strict && plan.requiresReview) process.exitCode = 1;
 } catch (error) {

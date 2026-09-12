@@ -165,7 +165,8 @@ files, executes migrations, or runs the suggested validation commands.
 | `missing-consumer` | A mapped file is absent even though its template is unchanged |
 
 The report separates kit and consumer hunk line ranges. Compose ranges refer to
-the selected service/volume scope, not the original file's line numbers. This is
+the selected service/volume scope, not the original file's line numbers. Each
+service and volume has its own row so removal of one does not hide other changes. This is
 a textual comparison, not semantic YAML or SQL validation; anchors, inheritance,
 and application behavior still require review. Environment reports show key names
 and change classifications, never values. Env mode compares active assignments

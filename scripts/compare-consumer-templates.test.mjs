@@ -18,7 +18,8 @@ const compareScript = path.join(scriptsDir, "compare-consumer-templates.mjs");
 const templateMapExample = "templates/trailbase/release/kit-template-map.example.json";
 const proxyImageLine = readFileSync(
   path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"), "utf8",
-).split("\n").find(line => /^\s+image:/.test(line));
+).split("\n").find(line => /^\s+image:.*\/toss-mtls-client-proxy:/.test(line));
+if (!proxyImageLine) throw new Error("Expected the shared proxy image in its Compose template");
 
 describe("compare-consumer-templates", () => {
   test("compose-service mode scopes drift to the mapped service and volumes", () => {

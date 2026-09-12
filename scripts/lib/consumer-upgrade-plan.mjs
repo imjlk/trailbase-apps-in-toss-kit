@@ -48,17 +48,10 @@ function kitFile(root, ref, path) {
   return text(result.stdout);
 }
 
-function scope(value, check) {
+function scope(value, check, component) {
   if (value === null || check.mode !== 'compose-service') return value;
-  const service = extractYamlMappingEntry(value, 'services', check.service);
-  if (!service) throw new Error('A mapped Compose service is absent; review the mapping before planning.');
-  const sections = [`services:\n${service}`];
-  for (const name of check.volumes ?? []) {
-    const volume = extractYamlMappingEntry(value, 'volumes', name);
-    if (!volume) throw new Error('A mapped Compose volume is absent; review the mapping before planning.');
-    sections.push(`volumes:\n${volume}`);
-  }
-  return sections.join('\n');
+  const entry = extractYamlMappingEntry(value, component.section, component.name);
+  return entry ? `${component.section}:\n${entry}` : null;
 }
 
 function state(base, next, consumer) {
@@ -116,7 +109,8 @@ function validateCheck(check) {
   if (!MODES.has(mode)) throw new Error('Unsupported mapping mode.');
   if (mode === 'compose-service' && (typeof check.service !== 'string' || !check.service.trim())) throw new Error('compose-service requires a service name.');
   if (check.volumes !== undefined && (!Array.isArray(check.volumes) || check.volumes.some(v => typeof v !== 'string' || !v.trim()))) throw new Error('volumes must contain nonempty names.');
-  const consumers = check.consumers ?? check.candidates ?? [check.consumer ?? check.candidate];
+  const single = check.consumer ?? check.candidate;
+  const consumers = check.consumers ?? check.candidates ?? (single === undefined ? [] : [single]);
   if (!Array.isArray(consumers) || !consumers.length) throw new Error('Each mapping needs consumer paths.');
   return { ...check, template, mode, consumers: consumers.map(relativePath) };
 }
@@ -135,9 +129,14 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
     const oldText = kitFile(kitRoot, base, check.template);
     const newText = kitFile(kitRoot, target, check.template);
     if (oldText === null && newText === null) throw new Error('Mapped template is absent from both kit commits.');
-    for (const consumer of check.consumers) {
+    const components = check.mode === 'compose-service' ? [
+      { section: 'services', name: check.service },
+      ...(check.volumes ?? []).map(name => ({ section: 'volumes', name })),
+    ] : [null];
+    for (const consumer of check.consumers) for (const component of components) {
       const localText = consumerFile(consumerRoot, consumer);
-      const [oldScope, newScope, localScope] = [oldText, newText, localText].map(value => scope(value, check));
+      const [oldScope, newScope, localScope] = [oldText, newText, localText].map(value => scope(value, check, component));
+      if (component && oldScope === null && newScope === null) throw new Error('Mapped Compose entry is absent from both kit commits.');
       let status = state(oldScope, newScope, localScope);
       let details;
       if (check.mode === 'env-subset') {
@@ -155,9 +154,9 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
         if (status === 'both-changed') status = lines.mergeable ? 'mergeable-update' : 'conflict';
         details = { kitHunks: lines.kitHunks, consumerHunks: lines.consumerHunks };
       }
-      const kitChanged = oldText !== newText;
+      const kitChanged = oldScope !== newScope;
       const migration = check.template.endsWith('.sql') && kitChanged && status !== 'already-applied';
-      files.push({ template: check.template, consumer, mode: check.mode, status, kitChanged,
+      files.push({ template: check.template, consumer, mode: check.mode, ...(component ? { scope: component } : {}), status, kitChanged,
         consumerChanged: oldScope !== localScope, ...details,
         action: migration ? 'Review a new consumer-owned forward migration; do not overwrite historical SQL.' :
           ['update-required', 'mergeable-update'].includes(status) ? 'Review kit changes and preserve consumer customization.' :
@@ -181,7 +180,7 @@ export function buildUpgradePlan({ kitRoot, consumerRoot, from, to = 'HEAD', map
 export function renderUpgradePlan(plan) {
   const lines = [`Consumer upgrade plan: ${plan.from} -> ${plan.to}`, 'Read-only; no consumer files, migrations, or deployments are changed.', ''];
   for (const file of plan.files) {
-    lines.push(`${file.status}: ${file.consumer}`, `  kit: ${file.template}`, `  ${file.action}`);
+    lines.push(`${file.status}: ${file.consumer}${file.scope ? ` [${file.scope.section}.${file.scope.name}]` : ''}`, `  kit: ${file.template}`, `  ${file.action}`);
     if (file.envKeys) for (const key of file.envKeys) lines.push(`  env ${key.key}: ${key.status}`);
     else for (const side of ['kitHunks', 'consumerHunks']) for (const h of file[side]) lines.push(`  ${side}: old ${h.baseStart}+${h.baseLines} -> new ${h.changedStart}+${h.changedLines}`);
   }

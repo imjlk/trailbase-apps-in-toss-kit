@@ -103,6 +103,21 @@ describe('three-way consumer upgrade planning', () => {
     });
   });
 
+  test('removed Compose services and volumes do not suppress other upgrade rows', () => {
+    const base = 'services:\n  proxy:\n    image: proxy:1\nvolumes:\n  certs:\n';
+    const next = 'services:\n  renamed:\n    image: proxy:2\n';
+    fixture({ [template]: base }, { [template]: next }, { 'local.txt': base }, options => {
+      const p = plan(options, { mode: 'compose-service', service: 'proxy', volumes: ['certs'] });
+      expect(p.files.map(f => f.status)).toEqual(['kit-removed', 'kit-removed']);
+      expect(p.files.map(f => f.scope.name)).toEqual(['proxy', 'certs']);
+      expect(p.requiresReview).toBe(true);
+    });
+    fixture({ [template]: base }, {}, { 'local.txt': next }, options => {
+      const p = plan(options, { mode: 'compose-service', service: 'proxy', volumes: ['certs'] });
+      expect(p.files.map(f => f.status)).toEqual(['missing-consumer', 'missing-consumer']);
+    });
+  });
+
   test('never emits exact-mode consumer content, including secrets embedded in unknown fields', () => {
     fixture({ [template]: 'old\n' }, { [template]: 'new\n' }, { 'local.txt': 'arbitrary-secret-value\n' }, options => {
       expect(JSON.stringify(plan(options))).not.toContain('arbitrary-secret-value');
