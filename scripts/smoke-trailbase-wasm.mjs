@@ -49,6 +49,8 @@ try {
     "wasm32-wasip2",
     "--release",
   ]);
+  run("cargo", ["build", "-p", "trailbase-toss-identity", "--example", "keyring_smoke",
+    "--features", "compat-smoke", "--target", "wasm32-wasip2", "--release"]);
   docker(
     "build",
     "-f",
@@ -63,8 +65,11 @@ try {
     path.join(root, "target/wasm32-wasip2/release/examples/compat_smoke.wasm"),
     path.join(scratch, "wasm/compat_smoke.wasm"),
   );
+  await copyFile(path.join(root, "target/wasm32-wasip2/release/examples/keyring_smoke.wasm"),
+    path.join(scratch, "wasm/keyring_smoke.wasm"));
   const templates = [
     "app_reward_attempts.sql",
+    "toss_identities.sql",
     "message_templates.sql",
     "notification_template_agreements.sql",
     "message_outbox.core.sql",
@@ -86,7 +91,7 @@ try {
   ).join("\n");
   await writeFile(
     path.join(scratch, "migrations/main/U1750000000__kit.sql"),
-    `${sql}\nCREATE TABLE smoke_items (id INTEGER PRIMARY KEY, owner BLOB NOT NULL REFERENCES _user(id), value TEXT NOT NULL) STRICT;\n`,
+    `${sql}\nCREATE TABLE smoke_items (id INTEGER PRIMARY KEY, owner BLOB NOT NULL REFERENCES _user(id), value TEXT NOT NULL) STRICT;\nCREATE TABLE smoke_reseal_cursor (id INTEGER PRIMARY KEY,cursor TEXT,complete INTEGER NOT NULL) STRICT;\n`,
   );
   await writeFile(
     path.join(scratch, "config.textproto"),
@@ -288,6 +293,12 @@ record_apis: [{
     schemaOk: true, replaySame: true, scopeDenied: true, granted: true,
   });
   checks.push("app reward tables/index coexistence, server issuance, once-only grant and scoped replay");
+  assert.deepEqual(await request("/kit-smoke/keyring", { tokens: alpha, method: "POST" }), {
+    legacyReadable: true, oldV2Readable: true, rewritten: 2, replayNoop: true,
+    hmacUnchanged: true, timestampUnchanged: true, currentReadable: true,
+    cursorCommitted: true, tombstonePreserved: true,
+  });
+  checks.push("real WASI nonce generation, v1/v2 reads, transactional reseal/cursor, replay and tombstone preservation");
   const refreshed = await request("/api/auth/v1/refresh", {
     method: "POST",
     body: { refresh_token: alpha.refresh_token },
@@ -296,7 +307,10 @@ record_apis: [{
   checks.push(
     "official token refresh and combined functional-ledger migrations",
   );
-  console.log(JSON.stringify({ ok: true, image, checks }, null, 2));
+  const serverImageId = docker("image", "inspect", image, "--format", "{{.Id}}");
+  const proxyImageId = docker("image", "inspect", proxyImage, "--format", "{{.Id}}");
+  console.log(JSON.stringify({ ok: true, image, serverImageId, proxyImageId,
+    proxyMode: "source-built-stub", checks }, null, 2));
 } catch (error) {
   if (createdContainers.includes(server)) {
     const logResult = spawnSync("docker", ["logs", server], {

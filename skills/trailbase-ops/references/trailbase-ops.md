@@ -242,3 +242,12 @@ keys for retained backups, and save the per-table/rotation cursor in the same
 transaction. Never log the cursor (anonymous cursors are HMACs), keys, plaintext
 or ciphertext. HMAC lookup-key rotation is a separate account-mapping migration.
 See `docs/en/identity-key-rotation.md` and its matching Korean document.
+
+## Kit reference evidence
+
+Before preparing release evidence, run `bun scripts/run-kit-reference.mjs --output
+/tmp/kit-reference.json` from a committed kit checkout. It records only synthetic
+fixture results, source/lock/image versions, bundle bytes and local measurements.
+The WASM compatibility guests are disposable and must never be copied to consumers.
+Passing this reference does not verify production providers, authorize release or
+replace consumer/device/restore checks. See the English/Korean `kit-reference.md`.
