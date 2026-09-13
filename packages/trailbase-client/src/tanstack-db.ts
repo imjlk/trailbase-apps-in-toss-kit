@@ -21,10 +21,18 @@ export interface TrailbaseRecordApi<Row> {
   subscribeAll?: (opts?: any) => Promise<ReadableStream<any>>;
 }
 
+// Accept both official SDK options and the adapter extension. The SDK may
+// ignore signal; signal-aware fallbacks still receive it for cancellation.
+export interface TrailbaseFallbackRecordApi<Row> {
+  list: TrailbaseRecordApi<Row>["list"];
+  subscribe: (id: any, options?: { signal?: AbortSignal; onLoss?: () => void }) => Promise<ReadableStream<any>>;
+  subscribeAll?: TrailbaseRecordApi<Row>["subscribeAll"];
+}
+
 export interface XhrSseRecordApiOptions<Row> {
   apiBaseUrl: string;
   apiName: string;
-  fallbackRecordApi: TrailbaseRecordApi<Row>;
+  fallbackRecordApi: TrailbaseFallbackRecordApi<Row>;
   headers?: Record<string, string>;
   getHeaders?: () => Record<string, string> | Promise<Record<string, string>>;
   XMLHttpRequestImpl?: typeof XMLHttpRequest;

@@ -28,6 +28,13 @@
         "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
       },
     },
+    "packages/release-tools": {
+      "name": "@trailbase-apps-in-toss-kit/release-tools",
+      "version": "0.0.0",
+      "dependencies": {
+        "@apps-in-toss/ait-format": "1.0.0",
+      },
+    },
     "packages/trailbase-client": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-client",
       "version": "1.1.0",
@@ -867,6 +874,8 @@
     "@trailbase-apps-in-toss-kit/ait-rn": ["@trailbase-apps-in-toss-kit/ait-rn@workspace:packages/ait-rn"],
 
     "@trailbase-apps-in-toss-kit/ait-web": ["@trailbase-apps-in-toss-kit/ait-web@workspace:packages/ait-web"],
+
+    "@trailbase-apps-in-toss-kit/release-tools": ["@trailbase-apps-in-toss-kit/release-tools@workspace:packages/release-tools"],
 
     "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy": ["@trailbase-apps-in-toss-kit/toss-mtls-client-proxy@workspace:services/toss-mtls-client-proxy"],
 
