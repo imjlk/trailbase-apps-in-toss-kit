@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/trailbase-client
 
+## 1.1.1 — 2026-09-13
+
+### Patch changes
+
+- [a704fca](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/a704fcabbc348006e4b29b772a7741f77687c793) Accept the official TrailBase 0.14 record API as the RN XHR SSE fallback without requiring it to implement the adapter's AbortSignal option. Cancellation remains handled by the XHR adapter and collection lifecycle; no app-local type cast is needed when upgrading the SDK. — Thanks @imjlk!
+
 ## 1.1.0 — 2026-09-12
 
 ### Minor changes
