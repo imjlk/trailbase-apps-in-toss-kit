@@ -80,3 +80,5 @@ live in `docs/ko/`.
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).
 
 See [IAP Subscriptions](iap-subscriptions.md) for RN adapters and the private webhook/entitlement ledger.
+
+See [Consumer AIT releases](consumer-releases.md) for Sampo lockstep validation and verified artifact uploads.
