@@ -1,5 +1,40 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.4.0 — 2026-09-12
+
+### Minor changes
+
+- [c3a5e91](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/c3a5e91a7450036fe2e7008c93c199a8ea77d09c) Add explicit per-feature entry, external dispatch, existing-result settlement and
+  read-only status controls. Missing or stale policies block mutations. Copy the
+  private operation_policies.sql migration, rebuild WASM and connect checks inside
+  all handler/worker authorization transactions. Enable the built-in IAP grant,
+  message enqueue/dispatch and promotion entry guards with
+  KIT_OPERATION_POLICIES_ENABLED=1; inspect operation_policy_integration() at startup.
+  Policy expiry uses database time internally. Set KIT_OPERATIONS_HOLD=1 outside
+  the backup before starting a restored database; status lookup remains available.
+  
+  Add a Release Doctor restore checkpoint check and an old-SQLite-backup rehearsal.
+  Require an independent durable witness, paused dispatch and reconciled original
+  transaction IDs before operator resume. The check never sends, grants or resumes
+  work, and passing supplied evidence does not replace the consumer's durable
+  write-ahead witness and backup protocol. — Thanks @imjlk!
+- [f8f028e](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/f8f028ed9c7cefbd3580a1c47c38f92897d1c75e) Expose additive proxy version and adapter-capability metadata on authenticated health
+  responses. Use the Release Doctor proxy-capabilities check before adopting anonymous
+  verification, promotion recovery or other new adapter contracts. Legacy health responses
+  without metadata require a proxy upgrade or an explicitly optional transitional check.
+  
+  Pass the internal URL/token through environment variables. Checks use bounded read-only
+  health requests, reject redirects and omit secrets/upstream response bodies from reports.
+  Capabilities describe this binary, not upstream reachability, configured campaign access
+  or user eligibility. No SQL migration is required; publish and select the new proxy image
+  before making capability checks mandatory. — Thanks @imjlk!
+
+### Patch changes
+
+- [316bf78](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/316bf78805b9222a97366ebe5f01674c5b63f1ab) Keep declared Node CLI entrypoints executable in the source checkout, so frozen
+  Bun workspace installation does not alter their tracked file modes before reference
+  verification. Direct Node and package-bin invocation behavior is otherwise unchanged. — Thanks @imjlk!
+
 ## 0.3.0 — 2026-09-12
 
 ### Minor changes
