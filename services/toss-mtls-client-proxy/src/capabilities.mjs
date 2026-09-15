@@ -9,6 +9,8 @@ export const PROXY_CAPABILITIES = Object.freeze([
   "iap.order-status",
   "iap.provider-sku-required",
   "promotion.grant",
+  "promotion.prepare",
+  "promotion.execute",
   "promotion.status",
   "promotion.anonymous-recipient",
   "smart-message.send",

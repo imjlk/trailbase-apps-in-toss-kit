@@ -1,7 +1,7 @@
-import { clientError } from "@ait-kit/api-core";
+import { TOSS_ENDPOINTS, clientError } from "@ait-kit/api-core";
 
 export const ANONYMOUS_KEY_VERIFY_PATH = "/internal/apps-in-toss/anonymous-key/verify";
-export const TOSS_ANONYMOUS_KEY_VERIFY_PATH = "/api-partner/v1/apps-in-toss/users/anon-key/verify";
+export const TOSS_ANONYMOUS_KEY_VERIFY_PATH = TOSS_ENDPOINTS.anonKeyVerify;
 
 export function requireAnonymousKey(value) {
   if (typeof value !== "string" || !value.trim() || value.length > 4096 || /[\r\n\x00]/.test(value)) {
@@ -10,16 +10,16 @@ export function requireAnonymousKey(value) {
   return value.trim();
 }
 
+// Thin compatibility layer over api-core's verifyAnonKey: preserves the
+// proxy's public response shape ({ok, valid, resultType, mode}) and never
+// relays provider error text (it may echo the supplied identifier).
 export async function verifyAnonymousKey(body, core, mode) {
   const anonKey = requireAnonymousKey(body?.anonKey);
-  if (mode === "stub") return { ok: true, valid: true, resultType: "SUCCESS", mode: "stub" };
-  const result = await core.genericMtlsRequest({
-    method: "POST", path: TOSS_ANONYMOUS_KEY_VERIFY_PATH, headers: { "x-anon-key": anonKey },
-  });
-  if (result.status >= 200 && result.status < 300 && result.body?.resultType === "SUCCESS"
-      && typeof result.body.success === "boolean") {
-    return { ok: true, valid: result.body.success, resultType: "SUCCESS", mode: "forward" };
+  const result = await core.verifyAnonKey({ anonKey });
+  if (result.ok) {
+    return { ok: true, valid: result.valid, resultType: "SUCCESS", mode };
   }
-  // Never relay provider error text: it may echo the supplied identifier.
-  return { ok: false, valid: false, error: "ANONYMOUS_KEY_VERIFICATION_FAILED", mode: "forward" };
+  // Provider failures (transport, FAIL envelopes, malformed payloads) stay
+  // opaque: "no verdict" is never "invalid", and reasons stay internal.
+  return { ok: false, valid: false, error: "ANONYMOUS_KEY_VERIFICATION_FAILED", mode };
 }

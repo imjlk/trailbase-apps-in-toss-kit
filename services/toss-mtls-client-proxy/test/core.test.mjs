@@ -820,7 +820,13 @@ describe("toss-mtls-client-proxy", () => {
     const paths = [];
     const upstream = http.createServer(async (req, res) => {
       paths.push(req.url);
-      expect(req.headers["x-anon-key"]).toBe("anonymous-recipient");
+      // get-key takes no recipient header (official contract); execute and
+      // result carry the anonymous recipient natively via api-core 0.3.
+      if (req.url !== TOSS_ENDPOINTS.promotionGetKey) {
+        expect(req.headers["x-anon-key"]).toBe("anonymous-recipient");
+      } else {
+        expect(req.headers["x-anon-key"]).toBeUndefined();
+      }
       expect(req.headers["x-toss-user-key"]).toBeUndefined();
       expect(req.headers["x-user-key"]).toBeUndefined();
       await readRequestJson(req);
@@ -836,7 +842,7 @@ describe("toss-mtls-client-proxy", () => {
       paths.length = 0;
       await handleRequest(request("POST", PROMOTION_REWARD_STATUS_PATH, { ...body, providerTransactionKey: "transaction-key" }, { authorization: "Bearer secret" }), config);
       expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
-      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, { ...body, tossUserKey: "login-key" }, { authorization: "Bearer secret" }), config)).rejects.toThrow("exactly one");
+      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, { ...body, tossUserKey: "login-key" }, { authorization: "Bearer secret" }), config)).rejects.toThrow("provide exactly one promotion recipient");
     });
   });
 
@@ -892,7 +898,7 @@ describe("toss-mtls-client-proxy", () => {
   });
   }
 
-  test("forward IAP uses the provider SKU even when the request names a more valuable product", async () => {
+  test("forward IAP rejects payable orders paid for a different product", async () => {
     const upstream = http.createServer((req, res) => {
       req.resume();
       res.writeHead(200, { "content-type": "application/json" });
@@ -904,8 +910,10 @@ describe("toss-mtls-client-proxy", () => {
       const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
         { orderId: "order-1", sku: "expensive-product", tossUserKey: "synthetic-user" },
         { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
-      expect(result.body.ok).toBe(true);
+      expect(result.body.ok).toBe(false);
+      expect(result.body.error).toBe("UNVERIFIED_IAP_ORDER");
       expect(result.body.sku).toBe("cheap-product");
+      expect(result.body.failureReason).toContain("different product");
     });
   });
 
@@ -1034,7 +1042,7 @@ describe("toss-mtls-client-proxy", () => {
     await expect(handleRequest(request("POST", PROXY_ENDPOINTS.smartMessageSend, {
       tossUserKey: "login-recipient", anonKey: "anonymous-recipient", templateSetCode: "reminder", context: {},
     }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret" }))
-      .rejects.toThrow("exactly one");
+      .rejects.toThrow("at most one of userKey, tossUserKey, or anonKey");
   });
 
   test("generic relay still requires the configured internal token", async () => {
