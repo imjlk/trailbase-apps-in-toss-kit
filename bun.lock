@@ -14,7 +14,7 @@
     },
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "dependencies": {
         "@ait-kit/sdk": "^0.2.0",
       },
@@ -25,7 +25,7 @@
     },
     "packages/ait-web": {
       "name": "@trailbase-apps-in-toss-kit/ait-web",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": {
         "@ait-kit/sdk": "^0.2.0",
       },
