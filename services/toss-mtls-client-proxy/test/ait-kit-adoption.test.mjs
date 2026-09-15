@@ -189,6 +189,30 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("anonymous status failures never echo the recipient key", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4111", reason: "anon-status-key not found" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          promotionCode: "campaign",
+          providerTransactionKey: "failed-key",
+          anonKey: "anon-status-key",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("NOT_FOUND");
+      expect(JSON.stringify(res.body)).not.toContain("anon-status-key");
+    });
+  });
+
   test("anonymous grants honor the promotionAmount compatibility alias", async () => {
     const bodies = [];
     const upstreamServer = http.createServer(async (req, res) => {

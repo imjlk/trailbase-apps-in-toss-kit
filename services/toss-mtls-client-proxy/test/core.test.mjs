@@ -898,7 +898,7 @@ describe("toss-mtls-client-proxy", () => {
   });
   }
 
-  test("forward IAP uses the provider SKU even when the request names a more valuable product", async () => {
+  test("forward IAP rejects payable orders paid for a different product", async () => {
     const upstream = http.createServer((req, res) => {
       req.resume();
       res.writeHead(200, { "content-type": "application/json" });
@@ -910,8 +910,10 @@ describe("toss-mtls-client-proxy", () => {
       const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
         { orderId: "order-1", sku: "expensive-product", tossUserKey: "synthetic-user" },
         { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
-      expect(result.body.ok).toBe(true);
+      expect(result.body.ok).toBe(false);
+      expect(result.body.error).toBe("UNVERIFIED_IAP_ORDER");
       expect(result.body.sku).toBe("cheap-product");
+      expect(result.body.failureReason).toContain("different product");
     });
   });
 

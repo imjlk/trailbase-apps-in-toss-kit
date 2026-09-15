@@ -194,13 +194,19 @@ async function promotionRewardStatus(core, body) {
     throw clientError("MISSING_PROMOTION_TRANSACTION_KEY", "providerTransactionKey is required for result lookup");
   }
   const status = await core.promotionRewardStatus({ ...body, providerTransactionKey: key });
-  if (!status.ok) return status;
+  // Anonymous recipients must never leak back through provider-echoed
+  // failure fields; the old grant-based path redacted, so this does too.
+  if (!status.ok) {
+    return body?.anonKey !== undefined
+      ? redactRecipient(status, requireAnonymousKey(body.anonKey))
+      : status;
+  }
   // Legacy ledger consumers classify anything besides GRANTED/PENDING as
   // failed, so an indeterminate (UNKNOWN) outcome must stay PENDING here —
   // never finalized as failed while the grant may still land.
   const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
   const providerRequestId = typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
-  return {
+  const mapped = {
     ok: true,
     ...(providerRequestId !== undefined ? { providerRequestId } : {}),
     providerStatus,
@@ -209,6 +215,9 @@ async function promotionRewardStatus(core, body) {
     checkedAt: status.checkedAt,
     ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
   };
+  return body?.anonKey !== undefined
+    ? redactRecipient(mapped, requireAnonymousKey(body.anonKey))
+    : mapped;
 }
 
 // Legacy IAP wire shape: keep the 0.2 response fields, drop the 0.3
@@ -217,15 +226,19 @@ async function promotionRewardStatus(core, body) {
 function legacyIapResponse(result) {
   if (!result.ok) return result;
   const payable = PAYABLE_IAP_STATUSES.has(String(result.providerStatus).trim().toUpperCase());
-  if (payable && (!result.sku || result.verificationCode === "ORDER_ID_MISMATCH")) {
+  const skuMismatch = result.skuCheck?.status === "MISMATCHED";
+  if (payable && (!result.sku || skuMismatch || result.verificationCode === "ORDER_ID_MISMATCH")) {
     return {
       ok: false,
       orderId: result.orderId,
+      ...(result.sku !== undefined ? { sku: result.sku } : {}),
       providerStatus: "ERROR",
       error: "UNVERIFIED_IAP_ORDER",
       failureReason: result.verificationCode === "ORDER_ID_MISMATCH"
         ? "Toss order response named a different order ID"
-        : "Toss order response omitted the product SKU",
+        : skuMismatch
+          ? "Toss order was paid for a different product than requested"
+          : "Toss order response omitted the product SKU",
     };
   }
   const legacy = {
