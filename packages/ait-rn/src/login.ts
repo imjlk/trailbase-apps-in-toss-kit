@@ -63,18 +63,18 @@ export function createAppsInTossLoginBridge({
   const resolvedProduction =
     production ?? isProductionEnv(resolveRuntimeEnv({ env, production }));
 
-  // The SDK call (module acquisition, result validation, error propagation)
-  // is delegated to @ait-kit/sdk's identity adapter; this bridge keeps only
-  // the TrailBase policy: production fail-closed vs dev fallbacks and the
-  // login-integration check (no @ait-kit/sdk equivalent).
-  const identity = createReactNativeIdentity(
-    appLogin ? { framework: { TossAuth: { login: appLogin } } } : {},
-  );
+  // Default-path SDK calls (module acquisition, result validation, error
+  // propagation) are delegated to @ait-kit/sdk's identity adapter; an
+  // injected appLogin keeps the local direct call, matching the other
+  // injection seams. This bridge keeps the TrailBase policy either way:
+  // production fail-closed vs dev fallbacks and the login-integration
+  // check (no @ait-kit/sdk equivalent).
+  const identity = createReactNativeIdentity();
 
   return {
     async appLogin(): Promise<AppsInTossLoginResult> {
       try {
-        return await identity.login();
+        return await (appLogin ? appLogin() : identity.login());
       } catch (error) {
         if (
           isSdkError(error) &&

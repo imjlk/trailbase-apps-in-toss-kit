@@ -724,11 +724,16 @@ export function createAppsInTossIapBridge({
   > {
     let orders: { orders: import("@ait-kit/sdk").IapPendingOrder[] };
     try {
-      orders = await createReactNativeIap({
-        grant: async () => {
-          throw new Error("grant must not run for pending-order listing");
-        },
-      }).getPendingOrders();
+      orders = await withPromiseTimeout({
+        code: "IAP_GET_PENDING_ORDERS_UNSUPPORTED",
+        message: "Apps in Toss pending order restore is not supported.",
+        promise: createReactNativeIap({
+          grant: async () => {
+            throw new Error("grant must not run for pending-order listing");
+          },
+        }).getPendingOrders(),
+        timeoutMs: getPendingOrdersTimeoutMs,
+      });
     } catch (error) {
       if (isSdkError(error)) {
         throw new AppsInTossIapBridgeError({
@@ -759,10 +764,13 @@ export function createAppsInTossIapBridge({
 function purchaseSdkError(error: unknown, kind: "one-time" | "subscription") {
   if (isSdkError(error)) {
     if (error.code === "SDK_UNAVAILABLE") {
+      // Module-load failures keep the shared IAP_SDK_UNAVAILABLE code the
+      // local path used, so consumers can distinguish a missing SDK
+      // installation from an unavailable purchase method.
       return new AppsInTossIapBridgeError({
         cause: error,
-        code: "IAP_PURCHASE_UNAVAILABLE",
-        message: `Apps in Toss ${kind} purchase is not available.`,
+        code: "IAP_SDK_UNAVAILABLE",
+        message: "Apps in Toss IAP module is not available.",
       });
     }
     if (error.code === "UNSUPPORTED") {

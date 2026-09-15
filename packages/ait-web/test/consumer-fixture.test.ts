@@ -35,7 +35,10 @@ describe("web consumer fixture", () => {
         }
         if (!/\.ts$/.test(entry.name)) continue;
         const content = readFileSync(entryPath, "utf8");
-        if (content.includes("@ait-kit/sdk/rn") || content.includes('import("@apps-in-toss/framework")')) {
+        // Quoted specifiers catch both static and dynamic imports; the
+        // quotes keep "@apps-in-toss/framework" from matching the web
+        // package's longer "@apps-in-toss/web-framework" specifier.
+        if (content.includes("@ait-kit/sdk/rn") || content.includes("\"@apps-in-toss/framework\"")) {
           offenders.push(entryPath);
         }
       }

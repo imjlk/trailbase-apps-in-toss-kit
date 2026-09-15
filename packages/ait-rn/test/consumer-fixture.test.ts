@@ -53,7 +53,8 @@ describe("RN consumer fixture", () => {
         }
         if (!/\.ts$/.test(entry.name)) continue;
         const content = readFileSync(entryPath, "utf8");
-        if (content.includes("@ait-kit/sdk/web") || content.includes("@apps-in-toss/web-framework")) {
+        // Quoted specifiers catch static imports too, not only dynamic ones.
+        if (content.includes("@ait-kit/sdk/web") || content.includes("\"@apps-in-toss/web-framework\"")) {
           offenders.push(entryPath);
         }
       }

@@ -98,7 +98,12 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
       try {
         hash = (await sdkIdentity.getAnonymousKey()).hash;
       } catch (error) {
-        throw mapSdkError("anonymous identity", error);
+        // Malformed provider results keep the INVALID_RESULT category the
+        // local validation used; only availability/invocation failures map
+        // to UNSUPPORTED / SDK_ERROR.
+        throw error instanceof SdkError && error.code === "INVALID_ANONYMOUS_KEY"
+          ? new WebAdapterError("INVALID_RESULT", "anonymous identity")
+          : mapSdkError("anonymous identity", error);
       }
       if (typeof hash !== "string" || !hash || hash.trim() !== hash ||
           hash.length > 4096 || /[\x00-\x1f\x7f]/.test(hash)) throw new WebAdapterError("INVALID_RESULT", "anonymous identity");
