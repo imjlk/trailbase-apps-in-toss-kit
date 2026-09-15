@@ -736,13 +736,19 @@ export function createAppsInTossIapBridge({
       });
     } catch (error) {
       if (isSdkError(error)) {
+        // Module-load failures keep the shared IAP_SDK_UNAVAILABLE code the
+        // local path used; only method-level unavailability maps to the
+        // pending-orders-specific code.
         throw new AppsInTossIapBridgeError({
           cause: error,
           code:
             error.code === "SDK_UNAVAILABLE"
-              ? "IAP_GET_PENDING_ORDERS_UNAVAILABLE"
+              ? "IAP_SDK_UNAVAILABLE"
               : "IAP_GET_PENDING_ORDERS_UNSUPPORTED",
-          message: "Apps in Toss pending order restore is not supported.",
+          message:
+            error.code === "SDK_UNAVAILABLE"
+              ? "Apps in Toss IAP module is not available."
+              : "Apps in Toss pending order restore is not supported.",
         });
       }
       throw new AppsInTossIapBridgeError({
@@ -774,10 +780,15 @@ function purchaseSdkError(error: unknown, kind: "one-time" | "subscription") {
       });
     }
     if (error.code === "UNSUPPORTED") {
+      // Subscription purchases keep their dedicated capability code, matching
+      // the injected path and the previous default flow.
       return new AppsInTossIapBridgeError({
         cause: error,
-        code: "IAP_PURCHASE_UNSUPPORTED",
-        message: `Apps in Toss ${kind} purchase is not supported in this runtime.`,
+        code: kind === "subscription" ? "IAP_SUBSCRIPTION_UNSUPPORTED" : "IAP_PURCHASE_UNSUPPORTED",
+        message:
+          kind === "subscription"
+            ? "Subscription purchase is unsupported in this runtime."
+            : `Apps in Toss ${kind} purchase is not supported in this runtime.`,
       });
     }
   }
