@@ -1,5 +1,5 @@
 ---
-npm/toss-mtls-client-proxy: minor
+npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy: minor
 ---
 
 Adopt the shared @ait-kit 0.3 API contracts and Node mTLS transport.

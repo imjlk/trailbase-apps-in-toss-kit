@@ -189,6 +189,59 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("anonymous grants honor the promotionAmount compatibility alias", async () => {
+    const bodies = [];
+    const upstreamServer = http.createServer(async (req, res) => {
+      const body = await readRequestJson(req);
+      bodies.push({ url: req.url, body });
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "alias-key" } }));
+        return;
+      }
+      if (req.url === TOSS_ENDPOINTS.promotionExecute) {
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "alias-key" } }));
+        return;
+      }
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+          anonKey: "alias-recipient",
+          promotionCode: "campaign",
+          promotionAmount: 77,
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.providerStatus).toBe("GRANTED");
+      const execute = bodies.find((call) => call.url === TOSS_ENDPOINTS.promotionExecute);
+      expect(execute.body).toEqual({ promotionCode: "campaign", key: "alias-key", amount: 77 });
+    });
+  });
+
+  test("UNKNOWN status outcomes stay PENDING for legacy ledger consumers", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      // Malformed verdict: api-core maps it to UNKNOWN, not a definite failure.
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SOMETHING_ELSE" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          promotionCode: "campaign",
+          providerTransactionKey: "unknown-key",
+          anonKey: "anon-recipient",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("PENDING");
+      expect(res.body.status).toBe("UNKNOWN");
+    });
+  });
+
   test("promotion status uses only the result endpoint with the persisted key", async () => {
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {

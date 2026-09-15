@@ -137,7 +137,7 @@ async function promotionReward(core, config, body) {
   const executed = await core.promotionExecuteReward({
     providerTransactionKey: prepared.providerTransactionKey,
     promotionCode: body.promotionCode,
-    amount: body.amount,
+    amount: body.amount ?? body.promotionAmount,
     anonKey,
   });
   if (!executed.ok) {
@@ -195,12 +195,15 @@ async function promotionRewardStatus(core, body) {
   }
   const status = await core.promotionRewardStatus({ ...body, providerTransactionKey: key });
   if (!status.ok) return status;
-  // Legacy callers read providerStatus; keep status too for new consumers.
+  // Legacy ledger consumers classify anything besides GRANTED/PENDING as
+  // failed, so an indeterminate (UNKNOWN) outcome must stay PENDING here —
+  // never finalized as failed while the grant may still land.
+  const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
   const providerRequestId = typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
   return {
     ok: true,
     ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-    providerStatus: status.status,
+    providerStatus,
     status: status.status,
     providerTransactionKey: status.providerTransactionKey,
     checkedAt: status.checkedAt,
