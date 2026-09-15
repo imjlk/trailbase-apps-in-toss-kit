@@ -1,3 +1,4 @@
+import { createReactNativeIdentity } from "@ait-kit/sdk/rn";
 import { createAnonymousHash } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
   defaultFrameworkFunction,
@@ -5,6 +6,7 @@ import {
   type AppsInTossGetIsTossLoginIntegratedService,
 } from "./internal/framework";
 import { isProductionEnv, resolveRuntimeEnv } from "./internal/runtime";
+import { isSdkError } from "./internal/sdk-errors";
 
 export type {
   AppsInTossAppLogin,
@@ -61,21 +63,33 @@ export function createAppsInTossLoginBridge({
   const resolvedProduction =
     production ?? isProductionEnv(resolveRuntimeEnv({ env, production }));
 
+  // The SDK call (module acquisition, result validation, error propagation)
+  // is delegated to @ait-kit/sdk's identity adapter; this bridge keeps only
+  // the TrailBase policy: production fail-closed vs dev fallbacks and the
+  // login-integration check (no @ait-kit/sdk equivalent).
+  const identity = createReactNativeIdentity(
+    appLogin ? { framework: { TossAuth: { login: appLogin } } } : {},
+  );
+
   return {
     async appLogin(): Promise<AppsInTossLoginResult> {
-      const resolvedAppLogin =
-        appLogin ?? (await defaultFrameworkFunction("appLogin"));
-
-      if (!resolvedAppLogin) {
-        return handleLoginBridgeUnavailable({
-          createDevFallback,
-          production: resolvedProduction,
-        });
-      }
-
       try {
-        return await resolvedAppLogin();
+        return await identity.login();
       } catch (error) {
+        if (
+          isSdkError(error) &&
+          (error.code === "SDK_UNAVAILABLE" || error.code === "UNSUPPORTED")
+        ) {
+          if (resolvedProduction) {
+            throw new AppsInTossLoginBridgeError({
+              cause: error,
+              code: "APP_LOGIN_UNAVAILABLE",
+              message:
+                "Apps in Toss appLogin is not available in this runtime.",
+            });
+          }
+          return createDevFallback();
+        }
         if (resolvedProduction) {
           throw new AppsInTossLoginBridgeError({
             cause: error,
@@ -89,7 +103,7 @@ export function createAppsInTossLoginBridge({
     async getIsTossLoginIntegratedService() {
       const resolvedCheck =
         getIsTossLoginIntegratedService ??
-        (await defaultFrameworkFunction("getIsTossLoginIntegratedService"));
+          (await defaultFrameworkFunction("getIsTossLoginIntegratedService"));
 
       if (!resolvedCheck) {
         return undefined;
@@ -110,24 +124,6 @@ export function createAppsInTossLoginBridge({
       }
     },
   };
-}
-
-async function handleLoginBridgeUnavailable({
-  createDevFallback,
-  production,
-}: {
-  createDevFallback: () =>
-    | AppsInTossLoginResult
-    | Promise<AppsInTossLoginResult>;
-  production: boolean;
-}): Promise<AppsInTossLoginResult> {
-  if (production) {
-    throw new AppsInTossLoginBridgeError({
-      code: "APP_LOGIN_UNAVAILABLE",
-      message: "Apps in Toss appLogin is not available in this runtime.",
-    });
-  }
-  return createDevFallback();
 }
 
 function createDefaultLoginFallback() {

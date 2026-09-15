@@ -1,3 +1,5 @@
+import { SdkError } from "@ait-kit/sdk";
+import { createWebIdentity, createWebShare, createWebStorage } from "@ait-kit/sdk/web";
 import type { AppsInTossLoginResult, KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import type { IapCreateOneTimePurchaseOrderResult, IapCreateSubscriptionPurchaseOrderResult, NotificationAgreementResult } from "@apps-in-toss/web-framework";
 
@@ -37,18 +39,45 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
   }
   let sdkPromise: Promise<AppsInTossWebSdk> | undefined;
   const sdk = () => sdkPromise ??= loadSdk().catch(() => { sdkPromise = undefined; throw new WebAdapterError("UNSUPPORTED", "load"); });
+  // Shared loader feeding the @ait-kit/sdk web adapters (identity lookup,
+  // storage, sharing): one memoized SDK load backs every delegated
+  // operation, matching the local lazy-load semantics. Failures clear the
+  // memo so a later call retries.
+  const sharedSdkLoader = async () => {
+    try {
+      return { available: true as const, module: await sdk() };
+    } catch (error) {
+      return { available: false as const, reason: "web sdk unavailable" };
+    }
+  };
+  const sdkIdentity = createWebIdentity({ framework: sharedSdkLoader });
+  const sdkStorage = createWebStorage({ framework: sharedSdkLoader });
+  const sdkShare = createWebShare({ framework: sharedSdkLoader });
+  const mapSdkError = (operation: string, error: unknown): WebAdapterError =>
+    error instanceof SdkError && (error.code === "SDK_UNAVAILABLE" || error.code === "UNSUPPORTED")
+      ? new WebAdapterError("UNSUPPORTED", operation)
+      : new WebAdapterError("SDK_ERROR", operation);
   async function invoke<T>(operation: string, action: (api: AppsInTossWebSdk) => T | Promise<T>): Promise<T> {
     try { return await action(await sdk()); }
     catch (error) { throw error instanceof WebAdapterError ? error : new WebAdapterError("SDK_ERROR", operation); }
   }
   const storageKey = (key: string) => `${appKey}.${requiredText(key, "storage key", 256)}`;
+  // Storage delegated to @ait-kit/sdk's web storage adapter (lazy module
+  // acquisition, verbatim keys); the appKey namespacing stays here.
   const storage: KeyValueStorage & { removeItem(key: string): Promise<void> } = {
-    getItem: key => invoke("storage.get", api => required(api.Storage?.getItem, "storage.get")(storageKey(key))),
-    setItem: (key, value) => invoke("storage.set", api => {
+    getItem: async key => {
+      try { return await sdkStorage.get(storageKey(key)); }
+      catch (error) { throw mapSdkError("storage.get", error); }
+    },
+    setItem: async (key, value) => {
       if (typeof value !== "string") throw new WebAdapterError("INVALID_INPUT", "storage value");
-      return required(api.Storage?.setItem, "storage.set")(storageKey(key), value);
-    }),
-    removeItem: key => invoke("storage.remove", api => required(api.Storage?.removeItem, "storage.remove")(storageKey(key))),
+      try { await sdkStorage.set(storageKey(key), value); }
+      catch (error) { throw mapSdkError("storage.set", error); }
+    },
+    removeItem: async key => {
+      try { await sdkStorage.remove(storageKey(key)); }
+      catch (error) { throw mapSdkError("storage.remove", error); }
+    },
   };
   return {
     storage,
@@ -62,15 +91,20 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
       });
     },
     async anonymousHash(): Promise<string> {
-      return invoke("anonymous identity", async api => {
-        const result = await required(api.User?.getAnonymousKey, "anonymous identity")();
-        const hash = result?.hash;
-        if (result?.type !== "HASH" || typeof hash !== "string" || !hash || hash.trim() !== hash ||
-            hash.length > 4096 || /[\x00-\x1f\x7f]/.test(hash)) throw new WebAdapterError("INVALID_RESULT", "anonymous identity");
-        const normalized = hash.startsWith("ait:") ? hash : `ait:${hash}`;
-        if (normalized.length <= 4 || normalized.slice(4).trim() !== normalized.slice(4)) throw new WebAdapterError("INVALID_RESULT", "anonymous identity");
-        return normalized;
-      });
+      // Lookup delegated to @ait-kit/sdk's web identity adapter (module
+      // acquisition, HASH-shape validation); the ait: prefix policy and the
+      // strict length/whitespace checks stay here.
+      let hash: string;
+      try {
+        hash = (await sdkIdentity.getAnonymousKey()).hash;
+      } catch (error) {
+        throw mapSdkError("anonymous identity", error);
+      }
+      if (typeof hash !== "string" || !hash || hash.trim() !== hash ||
+          hash.length > 4096 || /[\x00-\x1f\x7f]/.test(hash)) throw new WebAdapterError("INVALID_RESULT", "anonymous identity");
+      const normalized = hash.startsWith("ait:") ? hash : `ait:${hash}`;
+      if (normalized.length <= 4 || normalized.slice(4).trim() !== normalized.slice(4)) throw new WebAdapterError("INVALID_RESULT", "anonymous identity");
+      return normalized;
     },
     async requestNotificationAgreement(templateCode: string): Promise<WebNotificationAgreement> {
       const code = requiredText(templateCode, "notification template", 256);
@@ -106,12 +140,28 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
     getSubscriptionInfo: (orderId: string) => invoke("subscription status", api => required(api.IAP?.getSubscriptionInfo, "subscription status")({ params: { orderId: requiredText(orderId, "order ID", 256) } })),
     /** Call only after the backend confirms the original order's durable grant. */
     completeProductGrant: (orderId: string) => invoke("grant acknowledgement", api => required(api.IAP?.completeProductGrant, "grant acknowledgement")({ params: { orderId: requiredText(orderId, "order ID", 256) } })),
-    createShareLink: (path: string) => invoke("share link", api => {
+    // Sharing delegated to @ait-kit/sdk's web share adapter (intoss://
+    // path validation, link pass-through, result mapping); the explicit
+    // INVALID_INPUT checks stay local for API compatibility.
+    createShareLink: async (path: string) => {
       if (!requiredText(path, "share path", 2048).startsWith("intoss://")) throw new WebAdapterError("INVALID_INPUT", "share path");
-      return required(api.Share?.createLink, "share link")({ path });
-    }),
+      try { return await sdkShare.createLink(path); }
+      catch (error) {
+        throw error instanceof SdkError && error.code === "INVALID_SHARE_PATH"
+          ? new WebAdapterError("INVALID_INPUT", "share path")
+          : mapSdkError("share link", error);
+      }
+    },
     /** A resolved share sheet does not prove sharing or authorize a reward. */
-    share: (message: string) => invoke("share", api => required(api.Share?.sendMessage, "share")({ message: requiredText(message, "share message", 4096) })),
+    share: async (message: string) => {
+      const text = requiredText(message, "share message", 4096);
+      let result: Awaited<ReturnType<typeof sdkShare.sendMessage>>;
+      try { result = await sdkShare.sendMessage(text); }
+      catch (error) { throw mapSdkError("share", error); }
+      // "closed" (@ait-kit/sdk 0.2.x) and "completed" (later releases) both
+      // mean the SDK share call finished; only "failed" is an error here.
+      if (result.status === "failed") throw new WebAdapterError("SDK_ERROR", "share");
+    },
   };
 }
 export type AppsInTossWebAdapter = ReturnType<typeof createAppsInTossWebAdapter>;

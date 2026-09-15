@@ -1,3 +1,4 @@
+import { createReactNativeStorage } from "@ait-kit/sdk/rn";
 import {
   createAppsInTossKeyValueStorage,
   type AppsInTossStorageBridge,
@@ -88,6 +89,21 @@ export function createAppsInTossSessionStorage({
       production,
     }),
     tossSessionStorageKey,
+  };
+}
+
+/**
+ * Native storage bridge backed by @ait-kit/sdk's React Native storage
+ * adapter (lazy official-module acquisition, verbatim keys). Pass this as
+ * `storage` to `createAppsInTossSessionStorage` instead of wiring the
+ * official `Storage` namespace by hand.
+ */
+export function createAppsInTossSdkStorageBridge(): AppsInTossStorageBridge {
+  const sdkStorage = createReactNativeStorage();
+  return {
+    getItem: (key) => sdkStorage.get(key),
+    removeItem: (key) => sdkStorage.remove(key),
+    setItem: (key, value) => sdkStorage.set(key, value),
   };
 }
 

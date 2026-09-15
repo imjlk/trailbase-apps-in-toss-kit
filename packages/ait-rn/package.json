@@ -27,5 +27,8 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "dependencies": {
+    "@ait-kit/sdk": "^0.2.0"
   }
 }
