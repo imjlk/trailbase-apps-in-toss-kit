@@ -1,12 +1,13 @@
+import { createReactNativeIdentity } from "@ait-kit/sdk/rn";
 import {
   createAnonymousHash,
   type KeyValueStorage,
 } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
-  defaultFrameworkFunction,
   type AppsInTossGetAnonymousKey,
 } from "./internal/framework";
 import { isProductionRuntime } from "./internal/runtime";
+import { isSdkError } from "./internal/sdk-errors";
 
 export type { AppsInTossGetAnonymousKey } from "./internal/framework";
 
@@ -90,6 +91,21 @@ export async function resolveAppsInTossAnonymousHash({
     if (production) {
       if (error instanceof AppsInTossIdentityError) {
         throw error;
+      }
+      if (isSdkError(error)) {
+        // The @ait-kit/sdk default path validates the provider result:
+        // below-minimum app versions surface as UNSUPPORTED and anything
+        // uninterpretable (the "ERROR" sentinel included) as
+        // INVALID_ANONYMOUS_KEY, which collapses into the invalid-response
+        // category here.
+        throw new AppsInTossIdentityError({
+          cause: error,
+          code:
+            error.code === "UNSUPPORTED"
+              ? "ANONYMOUS_KEY_UNSUPPORTED"
+              : "ANONYMOUS_KEY_INVALID_RESPONSE",
+          message: "Apps in Toss anonymous key request failed.",
+        });
       }
       throw new AppsInTossIdentityError({
         cause: error,
@@ -199,7 +215,25 @@ function isAppSessionStorageKey(
   return key === appSessionStorageKey;
 }
 
-async function defaultGetAnonymousKey() {
-  const getAnonymousKey = await defaultFrameworkFunction("getAnonymousKey");
-  return getAnonymousKey?.();
+/**
+ * Default anonymous-key lookup delegated to @ait-kit/sdk's identity
+ * adapter: it acquires the official framework module (converting the flat
+ * RN exports), validates the { type: "HASH", hash } shape, and maps the
+ * below-minimum-version `undefined` sentinel to UNSUPPORTED. Injected
+ * `getAnonymousKey` functions bypass the adapter and keep TrailBase's
+ * precise sentinel taxonomy (ERROR / INVALID_CATEGORY).
+ */
+async function defaultGetAnonymousKey(): Promise<
+  Awaited<ReturnType<AppsInTossGetAnonymousKey>>
+> {
+  try {
+    return await createReactNativeIdentity().getAnonymousKey();
+  } catch (error) {
+    if (isSdkError(error) && error.code === "SDK_UNAVAILABLE") {
+      // Function-absent and module-absent both surface as "no key" so the
+      // existing production/dev fallback split keeps applying.
+      return undefined;
+    }
+    throw error;
+  }
 }

@@ -1,8 +1,14 @@
+import { createReactNativeIap } from "@ait-kit/sdk/rn";
+import type {
+  IapPurchaseResult,
+  IapGrantCallback,
+} from "@ait-kit/sdk";
 import {
   createCleanupOnce,
   isAppsInTossBridgeSupported,
   withBridgeTimeout,
 } from "./internal/event-bridge";
+import { isSdkError } from "./internal/sdk-errors";
 import {
   postAppsInTossJson,
   type AppsInTossHeaders,
@@ -332,6 +338,15 @@ export function createAppsInTossIapBridge({
         message: "Apps in Toss IAP product grant processor is required.",
       });
     }
+    if (!IAP) {
+      return purchaseViaAitKitSdk({
+        grantTimeoutMs,
+        kind: "one-time",
+        processProductGrant,
+        sku: normalizedSku,
+      });
+    }
+
     const iap = await getIap();
     const createOneTimePurchaseOrder = iap.createOneTimePurchaseOrder;
     if (!createOneTimePurchaseOrder) {
@@ -368,6 +383,16 @@ export function createAppsInTossIapBridge({
         code: "IAP_PRODUCT_GRANT_REQUIRED",
         message: "Apps in Toss IAP product grant processor is required.",
       });
+    if (!IAP) {
+      return purchaseViaAitKitSdk({
+        grantTimeoutMs,
+        kind: "subscription",
+        offerId: normalizeOptionalString(offerId),
+        processProductGrant,
+        sku: normalizedSku,
+      });
+    }
+
     const iap = await getIap();
     const createPurchaseOrder = iap.createSubscriptionPurchaseOrder;
     if (!createPurchaseOrder)
@@ -587,6 +612,9 @@ export function createAppsInTossIapBridge({
   }
 
   async function getPendingOrders() {
+    if (!IAP) {
+      return pendingOrdersViaAitKitSdk();
+    }
     const iap = await getIap();
     const getPendingOrders = iap.getPendingOrders;
     if (!getPendingOrders) {
@@ -633,6 +661,204 @@ export function createAppsInTossIapBridge({
     getSubscriptionInfo,
     restorePendingOrders,
   };
+
+  /**
+   * Default-path purchase flow delegated to @ait-kit/sdk's IAP adapter
+   * (module acquisition, event settle-once, order/grant matching, single
+   * deadline, cleanup). The TrailBase grant policy stays here: the
+   * consumer callback runs under TrailBase's grant timeout with the
+   * provider payload and source bookkeeping. An injected `IAP` module
+   * keeps the local synchronous flow instead — injection seams carry
+   * their own semantics and preserve the synchronous registration
+   * contract.
+   */
+  async function purchaseViaAitKitSdk({
+    grantTimeoutMs,
+    kind,
+    offerId,
+    processProductGrant,
+    sku,
+  }: {
+    grantTimeoutMs: number;
+    kind: "one-time" | "subscription";
+    offerId?: string;
+    processProductGrant: AppsInTossIapProcessProductGrant;
+    sku: string;
+  }): Promise<AppsInTossIapPurchaseResult> {
+    const grant: IapGrantCallback = async (target) => {
+      const granted = await runProductGrant({
+        orderId: target.orderId,
+        processProductGrant,
+        providerPayload: {
+          orderId: target.orderId,
+          ...(target.subscriptionId ? { subscriptionId: target.subscriptionId } : {}),
+        },
+        ...(target.subscriptionId ? { subscriptionId: target.subscriptionId } : {}),
+        sku: target.sku,
+        source: "purchase",
+        timeoutMs: grantTimeoutMs,
+      });
+      if (!granted) {
+        throw new Error("grant rejected");
+      }
+    };
+    const adapter = createReactNativeIap({
+      grant,
+      // TrailBase installs no hard checkout deadline unless configured.
+      purchaseTimeoutMs: purchaseTimeoutMs && purchaseTimeoutMs > 0 ? purchaseTimeoutMs : 0,
+    });
+    let result: IapPurchaseResult;
+    try {
+      result =
+        kind === "subscription"
+          ? await adapter.purchaseSubscription(sku, offerId)
+          : await adapter.purchaseOneTime(sku);
+    } catch (error) {
+      throw purchaseSdkError(error, kind);
+    }
+    return mapAitKitPurchaseResult(result, kind, sku);
+  }
+
+  async function pendingOrdersViaAitKitSdk(): Promise<
+    AppsInTossIapPendingOrder[]
+  > {
+    let orders: { orders: import("@ait-kit/sdk").IapPendingOrder[] };
+    try {
+      orders = await withPromiseTimeout({
+        code: "IAP_GET_PENDING_ORDERS_UNSUPPORTED",
+        message: "Apps in Toss pending order restore is not supported.",
+        promise: createReactNativeIap({
+          grant: async () => {
+            throw new Error("grant must not run for pending-order listing");
+          },
+        }).getPendingOrders(),
+        timeoutMs: getPendingOrdersTimeoutMs,
+      });
+    } catch (error) {
+      if (isSdkError(error)) {
+        // Module-load failures keep the shared IAP_SDK_UNAVAILABLE code the
+        // local path used; only method-level unavailability maps to the
+        // pending-orders-specific code.
+        throw new AppsInTossIapBridgeError({
+          cause: error,
+          code:
+            error.code === "SDK_UNAVAILABLE"
+              ? "IAP_SDK_UNAVAILABLE"
+              : "IAP_GET_PENDING_ORDERS_UNSUPPORTED",
+          message:
+            error.code === "SDK_UNAVAILABLE"
+              ? "Apps in Toss IAP module is not available."
+              : "Apps in Toss pending order restore is not supported.",
+        });
+      }
+      throw new AppsInTossIapBridgeError({
+        cause: error,
+        code: "IAP_GET_PENDING_ORDERS_FAILED",
+        message: "Apps in Toss pending order restore failed.",
+      });
+    }
+    return orders.orders.map((order) =>
+      normalizePendingOrder({
+        orderId: order.orderId,
+        paymentCompletedDate: order.paymentCompletedDate,
+        sku: order.sku,
+      }),
+    );
+  }
+}
+
+function purchaseSdkError(error: unknown, kind: "one-time" | "subscription") {
+  if (isSdkError(error)) {
+    if (error.code === "SDK_UNAVAILABLE") {
+      // Module-load failures keep the shared IAP_SDK_UNAVAILABLE code the
+      // local path used, so consumers can distinguish a missing SDK
+      // installation from an unavailable purchase method.
+      return new AppsInTossIapBridgeError({
+        cause: error,
+        code: "IAP_SDK_UNAVAILABLE",
+        message: "Apps in Toss IAP module is not available.",
+      });
+    }
+    if (error.code === "UNSUPPORTED") {
+      // Subscription purchases keep their dedicated capability code, matching
+      // the injected path and the previous default flow.
+      return new AppsInTossIapBridgeError({
+        cause: error,
+        code: kind === "subscription" ? "IAP_SUBSCRIPTION_UNSUPPORTED" : "IAP_PURCHASE_UNSUPPORTED",
+        message:
+          kind === "subscription"
+            ? "Subscription purchase is unsupported in this runtime."
+            : `Apps in Toss ${kind} purchase is not supported in this runtime.`,
+      });
+    }
+  }
+  return new AppsInTossIapBridgeError({
+    cause: error,
+    code: "IAP_PURCHASE_FAILED",
+    message: `Apps in Toss ${kind} purchase failed.`,
+  });
+}
+
+/**
+ * Maps @ait-kit/sdk purchase outcomes onto the TrailBase error taxonomy.
+ * Grant outcomes lose the timeout/failed distinction (the sdk reports
+ * grant_failed with a reason string); that merge is documented in the
+ * migration notes — the restore flow keeps the precise codes.
+ */
+function mapAitKitPurchaseResult(
+  result: IapPurchaseResult,
+  kind: "one-time" | "subscription",
+  requestSku: string,
+): AppsInTossIapPurchaseResult {
+  switch (result.status) {
+    case "completed":
+      return {
+        ...(Number.isFinite(result.success.amount)
+          ? { amount: result.success.amount }
+          : {}),
+        ...(result.success.currency ? { currency: result.success.currency } : {}),
+        ...(result.success.displayAmount
+          ? { displayAmount: result.success.displayAmount }
+          : {}),
+        ...(result.success.displayName
+          ? { displayName: result.success.displayName }
+          : {}),
+        ...(Number.isFinite(result.success.fraction)
+          ? { fraction: result.success.fraction }
+          : {}),
+        ...(result.success.miniAppIconUrl !== undefined
+          ? { miniAppIconUrl: result.success.miniAppIconUrl }
+          : {}),
+        orderId: normalizeRequiredOrderId(result.orderId),
+        sku: normalizeRequiredSku(requestSku),
+        ...(result.subscriptionId !== undefined
+          ? { subscriptionId: result.subscriptionId }
+          : {}),
+      };
+    case "grant_failed":
+      throw new AppsInTossIapBridgeError({
+        cause: result.reason,
+        code: "IAP_PRODUCT_GRANT_FAILED",
+        message: "Apps in Toss product grant was not completed.",
+      });
+    case "unknown":
+      throw new AppsInTossIapBridgeError({
+        cause: result.reason,
+        code: "IAP_PURCHASE_TIMEOUT",
+        message: `Apps in Toss ${kind} purchase timed out.`,
+      });
+    default:
+      // canceled and failed both surface as IAP_PURCHASE_FAILED, matching
+      // the local flow, which treats every provider rejection identically.
+      throw new AppsInTossIapBridgeError({
+        cause:
+          result.status === "failed"
+            ? { code: result.code, reason: result.reason }
+            : result,
+        code: "IAP_PURCHASE_FAILED",
+        message: `Apps in Toss ${kind} purchase failed.`,
+      });
+  }
 }
 
 export type AppsInTossIapGrantOperation = "complete" | "grant" | "pending";

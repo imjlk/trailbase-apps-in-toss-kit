@@ -1,3 +1,4 @@
+import { createReactNativeAds } from "@ait-kit/sdk/rn";
 import {
   defaultFrameworkFunction,
   type AppsInTossLoadFullScreenAd,
@@ -9,6 +10,7 @@ import {
   isAppsInTossBridgeSupported,
   withBridgeTimeout,
 } from "./internal/event-bridge";
+import { isSdkError } from "./internal/sdk-errors";
 import {
   type AppsInTossHeaders,
   type AppsInTossJsonFetcher,
@@ -389,6 +391,23 @@ export function shouldUseAppsInTossMockAd({
   return isDev;
 }
 
+/**
+ * Load flow split by acquisition:
+ *
+ * - Default path (no injected function) delegates to @ait-kit/sdk's
+ *   React Native ads adapter, which owns module acquisition, the
+ *   settle-once event flow, one deadline budget across loading and
+ *   waiting, and subscription cleanup. Only the TrailBase error taxonomy
+ *   is mapped.
+ * - Injected `loadFullScreenAd` keeps the local synchronous-registration
+ *   flow: the public contract registers within the caller's tick (the sdk
+ *   adapter always hops through its async loader), and injections carry
+ *   their own semantics.
+ *
+ * The show flow stays local in both cases: its interstitial-completion
+ * heuristics, event timeline, and timestamps are TrailBase policy with no
+ * @ait-kit/sdk equivalent.
+ */
 async function loadFullScreenAdAsync({
   adGroupId,
   loadFullScreenAd,
@@ -398,15 +417,16 @@ async function loadFullScreenAdAsync({
   loadFullScreenAd?: AppsInTossLoadFullScreenAd;
   timeoutMs: number;
 }) {
-  const resolvedLoadFullScreenAd =
-    loadFullScreenAd ?? (await defaultFrameworkFunction("loadFullScreenAd"));
-  if (!resolvedLoadFullScreenAd) {
-    throw new AppsInTossAdBridgeError({
-      code: "AD_LOAD_UNAVAILABLE",
-      message: "Apps in Toss loadFullScreenAd is not available.",
-    });
+  if (!loadFullScreenAd) {
+    const ads = createReactNativeAds({ loadTimeoutMs: timeoutMs });
+    try {
+      return await ads.loadFullScreenAd(adGroupId);
+    } catch (error) {
+      throw adsLoadBridgeError(error);
+    }
   }
-  assertAdSupported(resolvedLoadFullScreenAd, {
+
+  assertAdSupported(loadFullScreenAd, {
     code: "AD_LOAD_UNSUPPORTED",
     message: "Apps in Toss full-screen ad loading is not supported.",
   });
@@ -427,7 +447,7 @@ async function loadFullScreenAdAsync({
     });
 
     try {
-      const nextCleanup = resolvedLoadFullScreenAd({
+      const nextCleanup = loadFullScreenAd({
         onError: (error) =>
           settleReject(
             new AppsInTossAdBridgeError({
@@ -476,6 +496,35 @@ async function loadFullScreenAdAsync({
       cleanup();
       reject(error);
     }
+  });
+}
+
+function adsLoadBridgeError(error: unknown): unknown {
+  if (isSdkError(error)) {
+    const codeBySdkCode = {
+      SDK_UNAVAILABLE: "AD_LOAD_UNAVAILABLE",
+      UNSUPPORTED: "AD_LOAD_UNSUPPORTED",
+      AD_LOAD_TIMEOUT: "AD_LOAD_TIMEOUT"
+    } as const;
+    const code =
+      codeBySdkCode[error.code as keyof typeof codeBySdkCode] ?? "AD_LOAD_FAILED";
+    const messageByCode = {
+      AD_LOAD_UNAVAILABLE: "Apps in Toss loadFullScreenAd is not available.",
+      AD_LOAD_UNSUPPORTED:
+        "Apps in Toss full-screen ad loading is not supported.",
+      AD_LOAD_TIMEOUT: "Apps in Toss full-screen ad load timed out.",
+      AD_LOAD_FAILED: "Apps in Toss full-screen ad load failed."
+    } as const;
+    return new AppsInTossAdBridgeError({
+      cause: error.cause,
+      code,
+      message: messageByCode[code],
+    });
+  }
+  return new AppsInTossAdBridgeError({
+    cause: error,
+    code: "AD_LOAD_FAILED",
+    message: "Apps in Toss full-screen ad load failed.",
   });
 }
 

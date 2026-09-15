@@ -19,3 +19,4 @@
 *.pfx
 /mtls/
 /certs/
+docs/.DS_Store
