@@ -64,10 +64,10 @@ canonical user로 옮기는 transaction은 앱이 소유하며 동의를 다시 
 ## 익명 프로모션과 결과 조회
 
 Proxy의 promotion grant·status endpoint는 `tossUserKey` 대신 `anonKey`를 받습니다.
-둘을 함께 전달하면 거부합니다. api-core 0.2.0은 아직 로그인 키 형태의 promotion 입력을
-요구하므로 요청별 transport adapter가 공식 promotion API 세 곳의 수신자 헤더만
-변경합니다. 기존 거래키·결과·재시도 의미는 api-core에 유지합니다. 공유 수신자 상태나
-앱 컨테이너의 인증서 접근은 추가하지 않습니다.
+둘을 함께 전달하면 거부합니다. api-core 0.3.0의 3단계 프로모션 계약이 익명 수신자를
+직접 지원하므로 프록시는 prepare → execute → status를 통해 공식 수신자 헤더를
+그대로 전달합니다. 기존 거래키·결과·재시도 의미는 api-core에 유지합니다. 공유 수신자
+상태나 앱 컨테이너의 인증서 접근은 추가하지 않습니다.
 
 기존 `_user` 기준 promotion ledger 행을 만들고 같은 transaction에서
 `bind_anonymous_promotion_recipient_tx`를 호출합니다. 반환된 provider 거래키를
@@ -77,7 +77,7 @@ Proxy의 promotion grant·status endpoint는 `tossUserKey` 대신 `anonKey`를 �
 유지합니다. 키 누락·식별자 폐기 시에는 명시적으로 결과를 확인해야 하며 첫 지급 결과가
 불명확하다는 이유로 새 키를 만들면 안 됩니다.
 
-Endpoint를 사용하기 전에 게시된 proxy `0.2.0` 또는 호환성을 검토한 이후 버전을
+Endpoint를 사용하기 전에 게시된 proxy `0.3.0` 이상 또는 호환성을 검토한 이후 버전을
 선택하세요. 로컬 계약·SQL
 테스트를 제공하지만 rollout 전 컨슈머 앱의 sandbox·실제 앱 bootstrap, 알림 동의,
 프로모션 검증은 별도로 필요합니다.

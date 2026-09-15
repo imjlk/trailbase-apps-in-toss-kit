@@ -1,12 +1,13 @@
 import http from "node:http";
-import { createTossMtlsCore, clientError, TOSS_ENDPOINTS, publicError as corePublicError } from "@ait-kit/api-core";
+import { createTossMtlsCore, clientError, publicError as corePublicError, upstreamError } from "@ait-kit/api-core";
+import { NodeMtlsTransportError } from "@ait-kit/api-client/node";
 import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
 import { ANONYMOUS_KEY_VERIFY_PATH, requireAnonymousKey, verifyAnonymousKey } from "./anonymous-key.mjs";
 import { proxyCapabilityMetadata } from "./capabilities.mjs";
 
-export const PROMOTION_REWARD_STATUS_PATH = "/internal/apps-in-toss/promotion/reward/status";
+const PAYABLE_IAP_STATUSES = new Set(["PAYMENT_COMPLETED", "PURCHASED"]);
 
 export function createProxyServer(config = createConfig()) {
   validateConfig(config);
@@ -59,15 +60,9 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.iapOrderStatus) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    // A requested SKU is not provider evidence. api-core 0.2 otherwise copies
-    // it into successful responses when Toss omits the actual product ID.
-    const result = await core.iapOrderStatus(config.mode === "forward" ? { ...body, sku: undefined } : body);
-    if (config.mode === "forward" && result.ok &&
-        ["PAYMENT_COMPLETED", "PURCHASED"].includes(String(result.providerStatus).trim().toUpperCase()) && !result.sku) {
-      return response(200, { ...result, ok: false, providerStatus: "ERROR", error: "UNVERIFIED_IAP_ORDER",
-        failureReason: "Toss order response omitted the product SKU" });
-    }
-    return response(200, result);
+    // api-core 0.3 separates provider evidence (verified/skuCheck) from the
+    // request expectation; the proxy keeps its legacy wire shape on top.
+    return response(200, legacyIapResponse(await core.iapOrderStatus(body)));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {
@@ -75,14 +70,19 @@ export async function handleRequest(req, config = createConfig(), core = createC
     return response(200, await promotionReward(core, config, body));
   }
 
-  if (req.method === "POST" && url.pathname === PROMOTION_REWARD_STATUS_PATH) {
+  if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionPrepareReward) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    const key = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
-    if (!key) {
-      throw clientError("MISSING_PROMOTION_TRANSACTION_KEY", "providerTransactionKey is required for result lookup");
-    }
-    // api-core skips get-key and execute when an existing transaction key is supplied.
-    return response(200, await promotionReward(core, config, { ...body, providerTransactionKey: key }));
+    return response(200, await core.promotionPrepareReward(body));
+  }
+
+  if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionExecuteReward) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    return response(200, await core.promotionExecuteReward(body));
+  }
+
+  if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardStatus) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    return response(200, await promotionRewardStatus(core, body));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.smartMessageSend) {
@@ -98,8 +98,9 @@ export async function handleRequest(req, config = createConfig(), core = createC
   return response(404, { ok: false, error: "NOT_FOUND" });
 }
 
-function createCore(config, anonymousPromotion = false) {
-  const transport = createNodeMtlsClient(config);
+function createCore(config) {
+  // api-core 0.3 emits the official recipient headers (x-toss-user-key /
+  // x-anon-key) itself, so the transport passes through unmodified.
   return createTossMtlsCore({
     // This authenticated internal proxy intentionally exposes the generic relay.
     allowRawMtls: true,
@@ -111,41 +112,129 @@ function createCore(config, anonymousPromotion = false) {
     iapOrderStatusRetryDelayMs: config.iapOrderStatusRetryDelayMs,
     debug: config.debug,
     log: (message, fields) => console.info(`[toss-mtls-client-proxy] ${message}`, fields),
-    mtlsClient: {
-      request(url, init) {
-        // api-core 0.2.0 emits x-user-key for single messages. The official
-        // messenger API still requires x-toss-user-key (api/push).
-        if (new URL(url).pathname === TOSS_ENDPOINTS.messageSend) {
-          const headers = new Headers(init.headers);
-          if (headers.has("x-user-key")) {
-            headers.set("x-toss-user-key", headers.get("x-user-key"));
-            headers.delete("x-user-key");
-          }
-          return transport.request(url, { ...init, headers });
-        }
-        if (anonymousPromotion && [TOSS_ENDPOINTS.promotionGetKey, TOSS_ENDPOINTS.promotionExecute, TOSS_ENDPOINTS.promotionResult].includes(new URL(url).pathname)) {
-          const headers = new Headers(init.headers);
-          const key = headers.get("x-toss-user-key");
-          if (key) headers.set("x-anon-key", key);
-          headers.delete("x-toss-user-key");
-          return transport.request(url, { ...init, headers });
-        }
-        return transport.request(url, init);
-      },
-    },
+    mtlsClient: createNodeMtlsClient(config),
   });
 }
 
+// Legacy grant wire shape. Non-anonymous grants pass through the unchanged
+// core API; anonymous grants orchestrate the 0.3 prepare -> execute ->
+// status flow so every upstream call carries x-anon-key natively.
 async function promotionReward(core, config, body) {
   if (body?.anonKey === undefined) return core.promotionRewardGrant(body);
   const anonKey = requireAnonymousKey(body.anonKey);
   if (body.tossUserKey !== undefined || body.userKey !== undefined) {
     throw clientError("INVALID_PROMOTION_RECIPIENT", "provide exactly one promotion recipient");
   }
-  // api-core 0.2.0's promotion adapter requires tossUserKey. Adapt only its
-  // transport header within this request; preserve its status/key recovery logic.
-  const result = await createCore(config, true).promotionRewardGrant({ ...body, anonKey: undefined, tossUserKey: anonKey });
-  return redactRecipient(result, anonKey);
+  if (config.mode !== "forward") {
+    // Stub mode keeps the deterministic legacy grant response; no transport
+    // is consulted, so header mapping is irrelevant here.
+    const stub = await core.promotionRewardGrant({ ...body, anonKey: undefined, tossUserKey: anonKey });
+    return redactRecipient(stub, anonKey);
+  }
+
+  const prepared = await core.promotionPrepareReward({});
+  if (!prepared.ok) return redactRecipient(prepared, anonKey);
+  const executed = await core.promotionExecuteReward({
+    providerTransactionKey: prepared.providerTransactionKey,
+    promotionCode: body.promotionCode,
+    amount: body.amount,
+    anonKey,
+  });
+  if (!executed.ok) {
+    // Explicit provider rejection (e.g. 4112): no grant happened; surface
+    // the legacy execute-failure shape with the provider's codes.
+    return redactRecipient(
+      {
+        ok: false,
+        providerStatus: "PROMOTION_EXECUTE_FAILED",
+        providerTransactionKey: executed.providerTransactionKey,
+        ...(executed.failureReason !== undefined ? { failureReason: executed.failureReason } : {}),
+        ...(executed.providerErrorCode !== undefined
+          ? { providerErrorCode: executed.providerErrorCode }
+          : {}),
+      },
+      anonKey,
+    );
+  }
+  // SUBMITTED or UNKNOWN: the grant may or may not have been applied — the
+  // status lookup with the persisted transaction key decides the outcome,
+  // exactly the recovery path ledger callers use after a lost response.
+  const status = await core.promotionRewardStatus({
+    providerTransactionKey: prepared.providerTransactionKey,
+    promotionCode: body.promotionCode,
+    anonKey,
+  });
+  return redactRecipient(legacyGrantFromStatus(status, body), anonKey);
+}
+
+function legacyGrantFromStatus(status, request) {
+  const providerRequestId = typeof request?.providerRequestId === "string" ? request.providerRequestId : undefined;
+  if (!status.ok) {
+    return {
+      ok: false,
+      ...(providerRequestId !== undefined ? { providerRequestId } : {}),
+      providerStatus: "FAILED",
+      providerTransactionKey: status.providerTransactionKey,
+      failureReason: status.failureReason ?? "promotion status could not be determined",
+    };
+  }
+  const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
+  return {
+    ok: providerStatus !== "FAILED",
+    ...(providerRequestId !== undefined ? { providerRequestId } : {}),
+    providerStatus,
+    providerTransactionKey: status.providerTransactionKey,
+    ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
+  };
+}
+
+async function promotionRewardStatus(core, body) {
+  const key = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
+  if (!key) {
+    throw clientError("MISSING_PROMOTION_TRANSACTION_KEY", "providerTransactionKey is required for result lookup");
+  }
+  const status = await core.promotionRewardStatus({ ...body, providerTransactionKey: key });
+  if (!status.ok) return status;
+  // Legacy callers read providerStatus; keep status too for new consumers.
+  const providerRequestId = typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
+  return {
+    ok: true,
+    ...(providerRequestId !== undefined ? { providerRequestId } : {}),
+    providerStatus: status.status,
+    status: status.status,
+    providerTransactionKey: status.providerTransactionKey,
+    checkedAt: status.checkedAt,
+    ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
+  };
+}
+
+// Legacy IAP wire shape: keep the 0.2 response fields, drop the 0.3
+// verification internals, and enforce the proxy's paid-order policy
+// (a paid order without provider SKU evidence is never payable here).
+function legacyIapResponse(result) {
+  if (!result.ok) return result;
+  const payable = PAYABLE_IAP_STATUSES.has(String(result.providerStatus).trim().toUpperCase());
+  if (payable && (!result.sku || result.verificationCode === "ORDER_ID_MISMATCH")) {
+    return {
+      ok: false,
+      orderId: result.orderId,
+      providerStatus: "ERROR",
+      error: "UNVERIFIED_IAP_ORDER",
+      failureReason: result.verificationCode === "ORDER_ID_MISMATCH"
+        ? "Toss order response named a different order ID"
+        : "Toss order response omitted the product SKU",
+    };
+  }
+  const legacy = {
+    ok: true,
+    orderId: result.orderId,
+    providerStatus: result.providerStatus,
+  };
+  if (result.sku !== undefined) legacy.sku = result.sku;
+  if (result.statusDeterminedAt !== undefined) legacy.statusDeterminedAt = result.statusDeterminedAt;
+  if (result.reason !== undefined) legacy.reason = result.reason;
+  if (result.attempts !== undefined) legacy.attempts = result.attempts;
+  return legacy;
 }
 
 function redactRecipient(value, recipient) {
@@ -170,6 +259,17 @@ function compatibleMessageResponse(result) {
 }
 
 function publicError(error) {
+  if (error instanceof NodeMtlsTransportError) {
+    // Map the shared transport's failure codes onto the proxy's envelope.
+    switch (error.code) {
+      case "TIMEOUT":
+        return { status: 504, code: "UPSTREAM_TIMEOUT", message: "Upstream request timed out" };
+      case "RESPONSE_TOO_LARGE":
+        return { status: 502, code: "UPSTREAM_RESPONSE_TOO_LARGE", message: "Upstream response was too large" };
+      default:
+        return { status: 502, code: "UPSTREAM_REQUEST_FAILED", message: "Upstream request failed" };
+    }
+  }
   const safeError = corePublicError(error);
   if (safeError.status === 500 && safeError.code === "APPS_IN_TOSS_API_ERROR") {
     return {

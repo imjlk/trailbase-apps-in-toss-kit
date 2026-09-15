@@ -354,23 +354,37 @@ Use the AppsInToss adapter endpoints when their request and response shape fits 
 generic relay for other Toss mTLS APIs, or add a small adapter when an API needs repeated
 normalization or multi-step flow handling.
 
-## API Core 0.2 Compatibility
+## API Core 0.3 Contracts
 
-The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.2.0` and explicitly
-opts into the generic mTLS relay. `/internal/mtls/request` remains behind the
-same internal bearer authentication; forward mode still requires a token.
-Bun is pinned to `1.4.2` across local tooling, CI, and the container. The Compose
-copy-in template now pins the published proxy `0.2.0`, which includes the API Core
-0.2 compatibility, anonymous-recipient and recovery adapters. Update the
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.3.0` and
+explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
+behind the same internal bearer authentication; forward mode still requires a
+token. Bun is pinned to `1.4.2` across local tooling, CI, and the container.
+The Compose copy-in template pins the published proxy image; update the
 consumer-owned image pin and reconcile migrations/WASM guests before enabling
-those flows. Historical image `0.1.12` does not include these changes.
+new flows.
+
+The local Node mTLS client is replaced by `@ait-kit/api-client/node`'s
+transport: one overall deadline covers DNS, connect, TLS, headers, and the
+entire response body; a response that breaks mid-body, exceeds the size
+budget, or outlives the deadline fails closed with the proxy's existing
+`UPSTREAM_*` error envelope. Certificate files are still loaded by this
+repository; the transport receives PEM contents.
 
 Single Smart Message requests accept one of `tossUserKey`, `userKey`, or
-`anonKey`. The proxy corrects api-core 0.2.0's `x-user-key` header to the official
-`x-toss-user-key` header for the single messenger endpoint; anonymous requests
-use only `x-anon-key`. See the [official message API](https://developers-apps-in-toss.toss.im/api/push).
-Remove this narrow compatibility adapter when a verified upstream release
-emits the documented header itself.
+`anonKey`. api-core 0.3 emits the official `x-toss-user-key`/`x-anon-key`
+headers itself, so the proxy no longer rewrites recipient headers. See the
+[official message API](https://developers-apps-in-toss.toss.im/api/push).
+
+Promotion flows now use api-core 0.3's three-step contract. The legacy
+`promotion/reward/grant` endpoint keeps its wire shape; anonymous grants
+internally run prepare → execute → status so every upstream call carries the
+official recipient headers. New endpoints `promotion/reward/prepare`,
+`promotion/reward/execute`, and `promotion/reward/status` let ledger callers
+persist the transaction key between prepare and execute and recover a lost
+execute response by re-querying status with the saved key. Grant ownership,
+idempotency, and concurrent-execution checks remain TrailBase's
+responsibility.
 
 Partial delivery still returns `failureReason` and `failures[].reachFailReason`.
 The upstream `reachedFailReason` field and per-channel details remain available.
@@ -378,10 +392,12 @@ A successful channel can coexist with failed channels; consumers must not retry
 an entire partially delivered message automatically. Functional notification
 agreement remains the consumer's responsibility before dispatch.
 
-In forward IAP lookups, the proxy never substitutes the requested SKU for a missing
-provider SKU. PAYMENT_COMPLETED/PURCHASED responses without a provider SKU return
-`ok: false` and `UNVERIFIED_IAP_ORDER`; retry verification before granting anything.
-Explicit stub mode keeps synthetic request-based products for local tests.
+In forward IAP lookups, api-core 0.3 separates provider evidence
+(`verified`, `skuCheck`) from request expectations. The proxy keeps its legacy
+wire shape on top: PAYMENT_COMPLETED/PURCHASED responses without a provider SKU
+(or naming a different order ID) return `ok: false` and `UNVERIFIED_IAP_ORDER`;
+retry verification before granting anything. Explicit stub mode keeps synthetic
+request-based products for local tests.
 
 ## Health Metadata
 
