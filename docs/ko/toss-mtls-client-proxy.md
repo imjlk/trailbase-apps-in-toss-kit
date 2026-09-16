@@ -357,9 +357,9 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 다른 Toss mTLS API는 일반 relay를 사용하거나, 반복적인 정리나 여러 단계 흐름(multi-step flow)
 처리가 필요한 API에는 작은 어댑터를 추가하세요.
 
-## API Core 0.3 계약
+## API Core 0.4 계약
 
-프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.3.0`으로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.4.2`로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를
@@ -367,17 +367,26 @@ Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프�
 WASM guest를 함께 확인하세요.
 
 로컬 Node mTLS 클라이언트는 `@ait-kit/api-client/node`의 전송으로 교체했습니다.
-DNS, 연결, TLS, 헤더, 응답 body 전체를 하나의 전체 timeout이포함하며하며, body가
+DNS, 연결, TLS, 헤더, 응답 body 전체를 하나의 전체 timeout이 포함하며, body가
 중간에 끊기거나 크기 제한을 넘거나 timeout을 넘는 요청은 기존 `UPSTREAM_*` 오류
-envelope로 실패합니다. 인증서 파일은 이 저장소가 계속 로드하며 전송에는 PEM 내용을
-전달합니다.
+envelope로 실패합니다. fetch `Response`로 변환할 수 없는 응답(예: 600처럼 범위 밖
+업스트림 상태)도 전송 계층의 typed 오류로 실패 닫힘됩니다. 로컬/테스트 업스트림용
+plain-HTTP 경로도 같은 보장을 따르며 204/205/304를 null-body 응답으로 처리합니다.
+인증서 파일은 이 저장소가 계속 로드하며 전송에는 PEM 내용을 전달합니다.
 
 단건 Smart Message 요청은 `tossUserKey`, `userKey`, `anonKey` 중 하나를 받습니다.
-api-core 0.3가 공식 `x-toss-user-key`/`x-anon-key` 헤더를 직접 사용하므로 프록시는
+api-core가 공식 `x-toss-user-key`/`x-anon-key` 헤더를 직접 사용하므로 프록시는
 더 이상 수신자 헤더를 보정하지 않습니다.
 [공식 메시지 API](https://developers-apps-in-toss.toss.im/api/push)를 참고하세요.
 
-프로모션은 api-core 0.3의 3단계 계약을 사용합니다. 기존 `promotion/reward/grant`
+메시지 결과는 3분류를 따릅니다. 확정 발송(`SENT`), 확정 실패(`FAILED`, 4xx와 명시적
+거절 포함), 결과 미확정(`UNKNOWN`과 내부 `error: "INVALID_RESPONSE"` 마커 — 5xx,
+빈/HTML body, 상충하는 상태 별칭, 근거 없는 성공 응답). 프록시는 내부 `error` 마커를
+`failureReason`/`providerErrorCode` 옆에 그대로 전달하고, 5xx 응답은 발송 시각
+주장 없이 요청 시각(`requestedAt`)만 맥락으로 보존합니다. kit의 Rust 파서는 UNKNOWN
+결과를 outbox 원장에 격리합니다. [기능성 메시지](functional-messages.md)를 참고하세요.
+
+프로모션은 api-core의 3단계 계약을 사용합니다. 기존 `promotion/reward/grant`
 엔드포인트의 응답 형태는 유지되며, 익명 grant는 내부적으로 prepare → execute →
 status를 실행해 모든 업스트림 호출이 공식 수신자 헤더를 담습니다. 새 엔드포인트
 `promotion/reward/prepare`, `promotion/reward/execute`, `promotion/reward/status`로
@@ -390,8 +399,11 @@ TrailBase의 책임입니다.
 다른 채널 실패가 함께 발생할 수 있으므로 부분 발송 메시지 전체를 자동 재시도하지
 마세요. 기능성 알림 동의를 발송 전에 확인하는 책임은 컨슈머 앱에 있습니다.
 
-forward IAP 조회는 api-core 0.3가 제공자 근거(`verified`, `skuCheck`)와 요청 기대값을
-분리합니다. 프록시는 그 위에 기존 응답 형태를 유지합니다. 제공자 SKU가 없거나 주문
+forward IAP 조회는 api-core가 제공자 근거(`verified`, `skuCheck`)와 요청 기대값을
+분리하고 근거를 엄격하게 읽습니다. orderId/status/SKU가 실제 문자열이 아니면(단일
+요소 배열 포함) `INVALID_RESPONSE`이며, 조회 실패 envelope(`FAIL`, `ERROR`,
+`NETWORK_ERROR` 등)은 모순된 success 페이로드가 함께 와도 근거를 만들지 않습니다.
+프록시는 그 위에 기존 응답 형태를 유지합니다. 제공자 SKU가 없거나 주문
 ID가 다른 PAYMENT_COMPLETED/PURCHASED 응답은 `ok: false`와 `UNVERIFIED_IAP_ORDER`를
 반환하므로 상품을 지급하기 전에 서버 검증을 다시 수행하세요. 명시적인 stub 모드는
 로컬 테스트용 요청 기반 상품 응답을 유지합니다.
