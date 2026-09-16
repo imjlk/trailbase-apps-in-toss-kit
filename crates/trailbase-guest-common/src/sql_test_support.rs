@@ -19,8 +19,8 @@ pub fn database() -> Connection {
     db
 }
 
-pub fn query(db: &Connection, sql: &str, params: &[Value]) -> Vec<Vec<rusqlite::types::Value>> {
-    let params: Vec<rusqlite::types::Value> = params
+fn to_rusqlite_params(params: &[Value]) -> Vec<rusqlite::types::Value> {
+    params
         .iter()
         .map(|value| match value {
             Value::Null => rusqlite::types::Value::Null,
@@ -29,16 +29,24 @@ pub fn query(db: &Connection, sql: &str, params: &[Value]) -> Vec<Vec<rusqlite::
             Value::Text(v) => v.clone().into(),
             Value::Blob(v) => v.clone().into(),
         })
-        .collect();
+        .collect()
+}
+
+pub fn query(db: &Connection, sql: &str, params: &[Value]) -> Vec<Vec<rusqlite::types::Value>> {
     let mut statement = db.prepare(sql).unwrap();
     let count = statement.column_count();
     statement
-        .query_map(params_from_iter(params), |row| {
+        .query_map(params_from_iter(to_rusqlite_params(params)), |row| {
             (0..count).map(|i| row.get(i)).collect()
         })
         .unwrap()
         .map(Result::unwrap)
         .collect()
+}
+
+pub fn execute(db: &Connection, sql: &str, params: &[Value]) -> usize {
+    db.execute(sql, params_from_iter(to_rusqlite_params(params)))
+        .unwrap()
 }
 
 pub fn insert_outbox(db: &Connection, id: &str, status: &str, attempts: i64) {

@@ -128,15 +128,27 @@ pub fn complete_message_outbox_attempt_tx(
         ));
     }
     let mut params = attempt_params(attempt, now);
-    params.push(Value::Text(
-        if response.is_sent() { "SENT" } else { "FAILED" }.into(),
-    ));
+    params.push(Value::Text(message_attempt_status(response).into()));
     params.push(Value::Text("DISPATCHING".into()));
     if db::tx_execute(tx, FINISH_ATTEMPT, &params)? != 1 {
         return Ok(false);
     }
     complete_message_outbox_tx(tx, &attempt.outbox.id, response, raw_response_json, now)?;
     Ok(true)
+}
+
+/// Attempt completion mirrors the outbox outcome taxonomy: SENT only for a
+/// confirmed send, UNKNOWN when the delivery outcome is unconfirmed (the
+/// same isolation the lease-expiry recovery leaves), FAILED only for a
+/// confirmed failure.
+fn message_attempt_status(response: &MessageProviderResponse) -> &'static str {
+    if response.is_sent() {
+        "SENT"
+    } else if response.is_unknown() {
+        "UNKNOWN"
+    } else {
+        "FAILED"
+    }
 }
 
 /// Skip only before dispatch, for example when notification agreement is absent.
@@ -192,6 +204,7 @@ fn attempt_params(attempt: &MessageOutboxAttempt, now: i64) -> Vec<Value> {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
+    use crate::apps_in_toss_messages::parse_message_proxy_response;
     use crate::sql_test_support::{database, insert_outbox};
     use rusqlite::params;
 
@@ -305,6 +318,147 @@ mod tests {
             )
             .unwrap(),
             "UNKNOWN"
+        );
+    }
+
+    fn response(body: serde_json::Value) -> MessageProviderResponse {
+        parse_message_proxy_response(&body, "row", None)
+    }
+
+    fn complete_outbox(
+        db: &rusqlite::Connection,
+        response: &MessageProviderResponse,
+        now: i64,
+    ) -> usize {
+        let (sql, params) = crate::apps_in_toss_messages::message_outbox_complete_statement(
+            "row", response, None, now,
+        );
+        crate::sql_test_support::execute(db, &sql, &params)
+    }
+
+    #[test]
+    fn attempt_status_mapping_keeps_unknown_distinct_from_failure() {
+        let sent = response(serde_json::json!({
+            "ok": true, "providerStatus": "SENT", "providerRequestId": "row"
+        }));
+        let failed = response(serde_json::json!({
+            "ok": false, "providerStatus": "FAILED", "providerRequestId": "row"
+        }));
+        let unknown = response(serde_json::json!({
+            "ok": false, "providerStatus": "UNKNOWN", "providerRequestId": "row"
+        }));
+        assert_eq!(message_attempt_status(&sent), "SENT");
+        assert_eq!(message_attempt_status(&failed), "FAILED");
+        assert_eq!(message_attempt_status(&unknown), "UNKNOWN");
+    }
+
+    #[test]
+    fn unknown_completion_records_unknown_attempt_and_quarantined_outbox() {
+        let db = database();
+        seed(&db, "row", true);
+        let unknown = response(serde_json::json!({
+            "ok": false,
+            "providerStatus": "UNKNOWN",
+            "error": "INVALID_RESPONSE",
+            "providerRequestId": "row"
+        }));
+        // Same statement sequence complete_message_outbox_attempt_tx runs:
+        // finish the attempt with the mapped status, then complete outbox.
+        assert_eq!(
+            db.execute(
+                FINISH_ATTEMPT,
+                params![
+                    "row",
+                    1,
+                    80,
+                    message_attempt_status(&unknown),
+                    "DISPATCHING"
+                ]
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(
+            db.query_row(
+                "SELECT status FROM message_outbox_attempts WHERE outbox_id = 'row'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "UNKNOWN"
+        );
+        assert_eq!(complete_outbox(&db, &unknown, 80), 1);
+        assert_eq!(
+            db.query_row(
+                "SELECT status, provider_status, sent_at, failed_at
+                 FROM message_outbox WHERE id = 'row'",
+                [],
+                |r| {
+                    Ok((
+                        r.get::<_, String>(0)?,
+                        r.get::<_, Option<String>>(1)?,
+                        r.get::<_, Option<i64>>(2)?,
+                        r.get::<_, Option<i64>>(3)?,
+                    ))
+                }
+            )
+            .unwrap(),
+            (
+                "FAILED".to_string(),
+                Some("UNKNOWN".to_string()),
+                None,
+                None
+            )
+        );
+        // Recovery never requeues the quarantined row.
+        assert_eq!(db.execute(RECOVER_OUTBOX, [100]).unwrap(), 0);
+    }
+
+    #[test]
+    fn late_unknown_response_cannot_revert_a_confirmed_send() {
+        let db = database();
+        seed(&db, "row", true);
+        let sent = response(serde_json::json!({
+            "ok": true, "providerStatus": "SENT", "providerRequestId": "row", "sentAt": 60
+        }));
+        assert_eq!(
+            db.execute(
+                FINISH_ATTEMPT,
+                params!["row", 1, 70, message_attempt_status(&sent), "DISPATCHING"]
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(complete_outbox(&db, &sent, 70), 1);
+
+        // A late UNKNOWN result for the settled attempt is fenced out and
+        // the ledger keeps the confirmed SENT outcome.
+        let unknown = response(serde_json::json!({
+            "ok": false, "providerStatus": "UNKNOWN", "providerRequestId": "row"
+        }));
+        assert_eq!(
+            db.execute(
+                FINISH_ATTEMPT,
+                params![
+                    "row",
+                    1,
+                    90,
+                    message_attempt_status(&unknown),
+                    "DISPATCHING"
+                ]
+            )
+            .unwrap(),
+            0
+        );
+        assert_eq!(complete_outbox(&db, &unknown, 90), 0);
+        assert_eq!(
+            db.query_row(
+                "SELECT status, sent_at FROM message_outbox WHERE id = 'row'",
+                [],
+                |r| Ok((r.get::<_, String>(0)?, r.get::<_, Option<i64>>(1)?))
+            )
+            .unwrap(),
+            ("SENT".to_string(), Some(60))
         );
     }
 }

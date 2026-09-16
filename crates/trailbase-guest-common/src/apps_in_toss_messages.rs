@@ -140,6 +140,14 @@ impl MessageProviderResponse {
     pub fn is_sent(&self) -> bool {
         self.ok && self.provider_status == "SENT"
     }
+
+    /// Delivery outcome is unconfirmed: neither a proven send nor a proven
+    /// failure. Completion stores the quarantine pair (outbox `FAILED` for
+    /// queue exclusion plus `provider_status = 'UNKNOWN'`) instead of a
+    /// confirmed failure, and never fabricates a sent/failed timestamp.
+    pub fn is_unknown(&self) -> bool {
+        self.provider_status == "UNKNOWN"
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,12 +235,20 @@ pub fn parse_message_proxy_response(
             .to_string()
         });
     let provider_status = normalize_provider_status(&raw_status, ok);
+    // An unconfirmed outcome must not fabricate a delivery timestamp: any
+    // sentAt in such a response is untrustworthy provider echo, and the
+    // caller's fallback marks request time, not delivery time.
+    let sent_at = if provider_status == "UNKNOWN" {
+        None
+    } else {
+        read_i64_path(value, &["sentAt"]).or(fallback_sent_at)
+    };
     MessageProviderResponse {
         ok: ok && provider_status == "SENT",
         provider_request_id,
         provider_status,
         result_type: read_string_path(value, &["resultType"]),
-        sent_at: read_i64_path(value, &["sentAt"]).or(fallback_sent_at),
+        sent_at,
         failure_reason: read_string_path(
             value,
             &[
@@ -302,6 +318,14 @@ pub fn parse_message_proxy_response(
 
 pub fn normalize_provider_status(status: &str, ok: bool) -> String {
     let normalized = status.trim().to_ascii_uppercase();
+    // `ok` describes the proxy call/response envelope, not the delivery
+    // outcome. An UNKNOWN outcome must survive an ok:false envelope (broken
+    // body, timeout, uninterpretable upstream response) instead of
+    // collapsing into a confirmed failure; symmetrically ok:true never
+    // confirms a send on its own because is_sent() also requires SENT.
+    if normalized == "UNKNOWN" {
+        return "UNKNOWN".to_string();
+    }
     if !ok {
         return "FAILED".to_string();
     }
@@ -802,12 +826,16 @@ pub fn complete_message_outbox_tx(
     Ok(())
 }
 
-fn message_outbox_complete_statement(
+pub(crate) fn message_outbox_complete_statement(
     outbox_id: &str,
     response: &MessageProviderResponse,
     raw_response_json: Option<&str>,
     now: i64,
 ) -> (String, Vec<Value>) {
+    // UNKNOWN completions keep outbox status FAILED only to exclude the row
+    // from the dispatch queue; provider_status preserves the unconfirmed
+    // outcome, and no sent_at/failed_at timestamp is fabricated for it
+    // (failed_at marks a confirmed failure, updated_at the observation).
     let sent_at = response.sent_at.unwrap_or(now);
     let status = if response.is_sent() { "SENT" } else { "FAILED" };
     (
@@ -817,7 +845,7 @@ fn message_outbox_complete_statement(
              provider_request_id = ?3,
              provider_status = ?4,
              sent_at = CASE WHEN ?2 = 'SENT' THEN ?5 ELSE sent_at END,
-             failed_at = CASE WHEN ?2 = 'FAILED' THEN ?7 ELSE failed_at END,
+             failed_at = CASE WHEN ?2 = 'FAILED' AND ?4 = 'FAILED' THEN ?7 ELSE failed_at END,
              failure_reason = ?6,
              provider_result_type = ?8,
              provider_msg_count = ?9,
@@ -1233,6 +1261,71 @@ mod tests {
     }
 
     #[test]
+    fn unknown_provider_status_survives_ok_false_envelope() {
+        let response = parse_message_proxy_response(
+            &json!({
+              "ok": false,
+              "providerStatus": "UNKNOWN",
+              "error": "INVALID_RESPONSE",
+              "providerRequestId": "message-123"
+            }),
+            "fallback",
+            Some(999),
+        );
+        assert!(!response.ok);
+        assert!(!response.is_sent());
+        assert!(response.is_unknown());
+        assert_eq!(response.provider_status, "UNKNOWN");
+        assert_eq!(response.provider_request_id, "message-123");
+        // The proxy's internal envelope error stays in failure_reason and
+        // never masquerades as a provider error code.
+        assert_eq!(response.failure_reason.as_deref(), Some("INVALID_RESPONSE"));
+        assert_eq!(response.provider_error_code, None);
+        // No delivery timestamp is fabricated for an unknown outcome.
+        assert_eq!(response.sent_at, None);
+    }
+
+    #[test]
+    fn ok_true_with_unknown_provider_status_is_not_a_confirmed_send() {
+        let response = parse_message_proxy_response(
+            &json!({
+              "ok": true,
+              "providerStatus": "UNKNOWN",
+              "providerRequestId": "msg-3"
+            }),
+            "fallback",
+            Some(999),
+        );
+        assert!(!response.ok);
+        assert!(!response.is_sent());
+        assert!(response.is_unknown());
+        assert_eq!(response.sent_at, None);
+    }
+
+    #[test]
+    fn explicit_failures_and_conflicting_statuses_stay_failed() {
+        for status in ["FAILED", "FAIL", "ERROR", "HTTP_TIMEOUT", "SENT"] {
+            let response = parse_message_proxy_response(
+                &json!({ "ok": false, "providerStatus": status }),
+                "fallback",
+                None,
+            );
+            assert_eq!(response.provider_status, "FAILED", "{status}");
+            assert!(!response.is_unknown());
+        }
+    }
+
+    #[test]
+    fn unknown_status_is_case_insensitive() {
+        let response = parse_message_proxy_response(
+            &json!({ "ok": false, "providerStatus": " unknown " }),
+            "fallback",
+            None,
+        );
+        assert!(response.is_unknown());
+    }
+
+    #[test]
     fn message_outbox_complete_statement_only_matches_locked_rows() {
         let response = parse_message_proxy_response(
             &json!({
@@ -1537,7 +1630,96 @@ mod tests {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod sql_tests {
     use super::*;
-    use crate::sql_test_support::{database, insert_outbox};
+    use crate::sql_test_support::{database, execute, insert_outbox, query};
+    use serde_json::json;
+
+    fn complete(db: &rusqlite::Connection, id: &str, response: &MessageProviderResponse, now: i64) {
+        let (sql, params) = message_outbox_complete_statement(id, response, None, now);
+        assert_eq!(execute(db, &sql, &params), 1);
+    }
+
+    fn outbox_row(db: &rusqlite::Connection, id: &str) -> MessageOutboxRecord {
+        let rows = query(
+            db,
+            "SELECT id, user_id, toss_user_key_hmac, toss_user_key_sealed, campaign_id,
+               purpose, template_code, payload_json, idempotency_key, status, provider,
+               provider_request_id, provider_status, attempts, not_before_at, locked_at,
+               created_at, updated_at
+             FROM message_outbox WHERE id = ?1",
+            &[Value::Text(id.to_string())],
+        );
+        let row: Vec<Value> = rows[0]
+            .iter()
+            .map(|value| match value {
+                rusqlite::types::Value::Null => Value::Null,
+                rusqlite::types::Value::Integer(v) => Value::Integer(*v),
+                rusqlite::types::Value::Real(v) => Value::Real(*v),
+                rusqlite::types::Value::Text(v) => Value::Text(v.clone()),
+                rusqlite::types::Value::Blob(v) => Value::Blob(v.clone()),
+            })
+            .collect();
+        message_outbox_record_from_row(&row).unwrap()
+    }
+
+    fn raw_columns(db: &rusqlite::Connection, id: &str) -> (Option<i64>, Option<i64>, i64) {
+        let rows = query(
+            db,
+            "SELECT sent_at, failed_at, updated_at FROM message_outbox WHERE id = ?1",
+            &[Value::Text(id.to_string())],
+        );
+        let sent_at = match &rows[0][0] {
+            rusqlite::types::Value::Integer(v) => Some(*v),
+            _ => None,
+        };
+        let failed_at = match &rows[0][1] {
+            rusqlite::types::Value::Integer(v) => Some(*v),
+            _ => None,
+        };
+        let updated_at = match &rows[0][2] {
+            rusqlite::types::Value::Integer(v) => *v,
+            _ => unreachable!("updated_at is NOT NULL"),
+        };
+        (sent_at, failed_at, updated_at)
+    }
+
+    fn sent_response() -> MessageProviderResponse {
+        parse_message_proxy_response(
+            &json!({
+              "ok": true,
+              "providerRequestId": "sent-1",
+              "providerStatus": "SENT",
+              "sentAt": 555
+            }),
+            "fallback",
+            None,
+        )
+    }
+
+    fn failed_response() -> MessageProviderResponse {
+        parse_message_proxy_response(
+            &json!({
+              "ok": false,
+              "providerRequestId": "failed-1",
+              "providerStatus": "FAILED",
+              "failureReason": "rejected"
+            }),
+            "fallback",
+            None,
+        )
+    }
+
+    fn unknown_response() -> MessageProviderResponse {
+        parse_message_proxy_response(
+            &json!({
+              "ok": false,
+              "providerRequestId": "unknown-1",
+              "providerStatus": "UNKNOWN",
+              "error": "INVALID_RESPONSE"
+            }),
+            "fallback",
+            Some(444),
+        )
+    }
 
     #[test]
     fn skip_preserves_all_terminal_states() {
@@ -1576,5 +1758,93 @@ mod sql_tests {
                 .unwrap()
                 .contains("private")
         );
+    }
+
+    #[test]
+    fn sent_completion_records_sent_status_and_timestamp() {
+        let db = database();
+        insert_outbox(&db, "row", "LOCKED", 1);
+        complete(&db, "row", &sent_response(), 600);
+        let record = outbox_row(&db, "row");
+        assert_eq!(record.status, "SENT");
+        assert_eq!(record.provider_status.as_deref(), Some("SENT"));
+        assert_eq!(record.locked_at, None);
+        assert_eq!(raw_columns(&db, "row"), (Some(555), None, 600));
+    }
+
+    #[test]
+    fn confirmed_failure_records_failed_status_and_timestamp() {
+        let db = database();
+        insert_outbox(&db, "row", "LOCKED", 1);
+        complete(&db, "row", &failed_response(), 700);
+        let record = outbox_row(&db, "row");
+        assert_eq!(record.status, "FAILED");
+        assert_eq!(record.provider_status.as_deref(), Some("FAILED"));
+        assert_eq!(raw_columns(&db, "row"), (None, Some(700), 700));
+    }
+
+    #[test]
+    fn unknown_outcome_quarantines_without_failure_timestamp_or_resend() {
+        let db = database();
+        insert_outbox(&db, "row", "LOCKED", 1);
+        complete(&db, "row", &unknown_response(), 800);
+        let record = outbox_row(&db, "row");
+        // FAILED excludes the row from the dispatch queue; provider_status
+        // keeps the unconfirmed outcome distinct from a confirmed failure.
+        assert_eq!(record.status, "FAILED");
+        assert_eq!(record.provider_status.as_deref(), Some("UNKNOWN"));
+        // Neither a sent timestamp nor a failure timestamp is fabricated;
+        // updated_at records when the outcome was observed.
+        assert_eq!(raw_columns(&db, "row"), (None, None, 800));
+
+        // The quarantined row is never auto-requeued: the ready claim only
+        // matches READY rows.
+        let ready = query(
+            &db,
+            "SELECT id FROM message_outbox WHERE status = 'READY' AND not_before_at <= ?1",
+            &[Value::Integer(900)],
+        );
+        assert!(ready.is_empty());
+
+        // A second completion cannot overwrite the terminal row.
+        let (sql, params) = message_outbox_complete_statement("row", &sent_response(), None, 900);
+        assert_eq!(execute(&db, &sql, &params), 0);
+    }
+
+    #[test]
+    fn unparseable_response_completes_as_unknown_outcome() {
+        let db = database();
+        insert_outbox(&db, "row", "LOCKED", 1);
+        let response = parse_message_proxy_response(&json!({}), "row", Some(444));
+        assert!(response.is_unknown());
+        complete(&db, "row", &response, 810);
+        let record = outbox_row(&db, "row");
+        assert_eq!(record.status, "FAILED");
+        assert_eq!(record.provider_status.as_deref(), Some("UNKNOWN"));
+        assert_eq!(raw_columns(&db, "row"), (None, None, 810));
+    }
+
+    #[test]
+    fn partial_delivery_stays_sent_with_failure_diagnostics() {
+        let db = database();
+        insert_outbox(&db, "row", "LOCKED", 1);
+        let response = parse_message_proxy_response(
+            &json!({
+              "ok": true,
+              "providerRequestId": "row",
+              "providerStatus": "SENT",
+              "sentAt": 555,
+              "sentPushCount": 0,
+              "sentInboxCount": 1,
+              "failures": [{"channel": "sentPush", "reachFailReason": "FIXTURE_BLOCKED"}]
+            }),
+            "fallback",
+            None,
+        );
+        assert!(response.is_sent());
+        complete(&db, "row", &response, 600);
+        let record = outbox_row(&db, "row");
+        assert_eq!(record.status, "SENT");
+        assert_eq!(raw_columns(&db, "row"), (Some(555), None, 600));
     }
 }
