@@ -139,6 +139,20 @@ async function promotionReward(core, config, body) {
     return redactRecipient(stub, anonKey);
   }
 
+  // A caller-supplied transaction key means a previous grant already
+  // reached execute; retrying with prepare+execute would issue a second
+  // reward. Route saved keys straight through the status lookup, matching
+  // the previous grant implementation's existing-key path.
+  const savedKey = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
+  if (savedKey) {
+    const status = await core.promotionRewardStatus({
+      providerTransactionKey: savedKey,
+      promotionCode: body.promotionCode,
+      anonKey,
+    });
+    return redactRecipient(legacyGrantFromStatus(status, body), anonKey);
+  }
+
   const prepared = await core.promotionPrepareReward({});
   if (!prepared.ok) {
     const providerRequestId =

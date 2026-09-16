@@ -521,6 +521,34 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("anonymous grants with a saved key reconcile without re-executing", async () => {
+    // A retry carrying the ledger-saved transaction key must only look the
+    // result up — prepare/execute would issue a duplicate reward.
+    const paths = [];
+    const upstreamServer = http.createServer(async (req, res) => {
+      paths.push(req.url);
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+          anonKey: "anon-saved-key-recipient",
+          amount: 5,
+          promotionCode: "campaign",
+          providerTransactionKey: "ledger-saved-key",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("GRANTED");
+      expect(res.body.providerTransactionKey).toBe("ledger-saved-key");
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
+      expect(JSON.stringify(res.body)).not.toContain("anon-saved-key-recipient");
+    });
+  });
+
   test("promotion status uses only the result endpoint with the persisted key", async () => {
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {
