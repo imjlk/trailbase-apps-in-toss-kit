@@ -121,12 +121,26 @@ async function forwardPlainHttp(target, init, payload, config) {
         upstreamRes.on("end", () => {
           ended = true;
           if (settled || truncated) return;
-          const raw = Buffer.concat(chunks).toString("utf8");
-          const status = upstreamRes.statusCode || 500;
-          settle(resolve, new Response(status === 204 || status === 304 ? null : raw, {
-            status,
-            headers: responseHeaders(upstreamRes.headers),
-          }));
+          // Build the fetch Response first and settle only on success: a
+          // construction failure (e.g. Node rejecting an out-of-range
+          // upstream status like 600) must surface as the transport's typed
+          // REQUEST_FAILED error, never as an unhandled throw that leaves
+          // the caller's promise unsettled. 204/205/304 carry a null body.
+          try {
+            const raw = Buffer.concat(chunks).toString("utf8");
+            const status = upstreamRes.statusCode || 500;
+            const body = status === 204 || status === 205 || status === 304 ? null : raw;
+            settle(resolve, new Response(body, {
+              status,
+              headers: responseHeaders(upstreamRes.headers),
+            }));
+          } catch (error) {
+            settle(reject, new NodeMtlsTransportError(
+              "REQUEST_FAILED",
+              "failed to convert the completed upstream response",
+              { cause: error },
+            ));
+          }
         });
       },
     );

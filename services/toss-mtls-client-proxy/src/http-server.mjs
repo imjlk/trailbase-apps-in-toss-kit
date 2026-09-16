@@ -60,7 +60,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.iapOrderStatus) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    // api-core 0.3 separates provider evidence (verified/skuCheck) from the
+    // api-core 0.4 separates provider evidence (verified/skuCheck) from the
     // request expectation; the proxy keeps its legacy wire shape on top.
     return response(200, legacyIapResponse(await core.iapOrderStatus(body), config.mode));
   }
@@ -106,7 +106,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
 }
 
 function createCore(config) {
-  // api-core 0.3 emits the official recipient headers (x-toss-user-key /
+  // api-core 0.4 emits the official recipient headers (x-toss-user-key /
   // x-anon-key) itself, so the transport passes through unmodified.
   return createTossMtlsCore({
     // This authenticated internal proxy intentionally exposes the generic relay.
@@ -124,7 +124,7 @@ function createCore(config) {
 }
 
 // Legacy grant wire shape. Non-anonymous grants pass through the unchanged
-// core API; anonymous grants orchestrate the 0.3 prepare -> execute ->
+// core API; anonymous grants orchestrate the prepare -> execute ->
 // status flow so every upstream call carries x-anon-key natively.
 async function promotionReward(core, config, body) {
   if (body?.anonKey === undefined) return core.promotionRewardGrant(body);
@@ -271,7 +271,7 @@ async function promotionRewardStatus(core, body) {
   return mappedRecipient !== undefined ? redactRecipient(mapped, mappedRecipient) : mapped;
 }
 
-// Legacy IAP wire shape: keep the 0.2 response fields, drop the 0.3
+// Legacy IAP wire shape: keep the 0.2 response fields, drop the api-core
 // verification internals, and enforce the proxy's paid-order policy
 // (a paid order without provider SKU evidence is never payable here).
 function legacyIapResponse(result, mode) {
