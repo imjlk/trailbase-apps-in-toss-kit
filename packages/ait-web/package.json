@@ -1,6 +1,6 @@
 {
   "name": "@trailbase-apps-in-toss-kit/ait-web",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "WebView SDK 3 adapters for TrailBase Apps in Toss consumers.",
