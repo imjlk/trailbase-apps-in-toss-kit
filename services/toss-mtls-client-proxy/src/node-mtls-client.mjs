@@ -43,11 +43,32 @@ async function forward(url, init, config, getTransport) {
 // needed. Mirrors the ait-kit transport's guarantees: one overall deadline
 // across headers and the full body, and a connection that breaks before the
 // body completes is an error — never a hang and never partial data.
+const HOP_BY_HOP_HEADERS = new Set([
+  "connection",
+  "keep-alive",
+  "proxy-authenticate",
+  "proxy-authorization",
+  "te",
+  "trailer",
+  "transfer-encoding",
+  "upgrade",
+  "host",
+  "content-length",
+]);
+
 async function forwardPlainHttp(target, init, payload, config) {
+  // Mirror the shared transport's header sanitization: caller-supplied
+  // hop-by-hop headers (transfer-encoding, connection, host, ...) must be
+  // dropped before the framed plain-HTTP request, or Node rejects the
+  // conflicting framing outright.
+  const rawHeaders = init.headers ? Object.fromEntries(new Headers(init.headers)) : {};
   const headers = {
     accept: "application/json",
-    ...(init.headers ? Object.fromEntries(new Headers(init.headers)) : {}),
   };
+  for (const [name, value] of Object.entries(rawHeaders)) {
+    if (HOP_BY_HOP_HEADERS.has(name.toLowerCase())) continue;
+    headers[name] = value;
+  }
   if (payload) {
     headers["content-type"] = headers["content-type"] || "application/json";
     headers["content-length"] = String(payload.length);

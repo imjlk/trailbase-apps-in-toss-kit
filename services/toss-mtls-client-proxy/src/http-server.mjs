@@ -62,7 +62,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
     const body = await readJson(req, requestBodyLimitBytes(config));
     // api-core 0.3 separates provider evidence (verified/skuCheck) from the
     // request expectation; the proxy keeps its legacy wire shape on top.
-    return response(200, legacyIapResponse(await core.iapOrderStatus(body)));
+    return response(200, legacyIapResponse(await core.iapOrderStatus(body), config.mode));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {
@@ -267,11 +267,20 @@ async function promotionRewardStatus(core, body) {
 // Legacy IAP wire shape: keep the 0.2 response fields, drop the 0.3
 // verification internals, and enforce the proxy's paid-order policy
 // (a paid order without provider SKU evidence is never payable here).
-function legacyIapResponse(result) {
+function legacyIapResponse(result, mode) {
   if (!result.ok) return result;
   const payable = PAYABLE_IAP_STATUSES.has(String(result.providerStatus).trim().toUpperCase());
   const skuMismatch = result.skuCheck?.status === "MISMATCHED";
-  if (payable && (!result.sku || skuMismatch || result.verificationCode === "ORDER_ID_MISMATCH")) {
+  // The provider-SKU evidence requirement guards real upstream responses.
+  // Stub mode fabricates payable results without provider evidence, and
+  // the documented stub request shape does not require a SKU, so local
+  // consumers keep the request-based stub behavior.
+  const enforceProviderEvidence = mode !== "stub" && !result.stub;
+  if (
+    enforceProviderEvidence &&
+    payable &&
+    (!result.sku || skuMismatch || result.verificationCode === "ORDER_ID_MISMATCH")
+  ) {
     return {
       ok: false,
       orderId: result.orderId,

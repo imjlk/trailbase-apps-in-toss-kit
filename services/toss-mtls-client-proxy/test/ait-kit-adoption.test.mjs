@@ -453,6 +453,50 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("plain-HTTP transport drops caller hop-by-hop headers", async () => {
+    // A caller-supplied transfer-encoding header must not survive into the
+    // framed plain-HTTP upstream request (Node rejects the conflicting
+    // framing); the proxy computes its own content-length.
+    let seenHeaders;
+    const upstreamServer = http.createServer(async (req, res) => {
+      seenHeaders = req.headers;
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          anonKey: "anon-plain-recipient",
+          promotionCode: "campaign",
+          providerTransactionKey: "plain-key",
+        }, {
+          authorization: "Bearer secret",
+          "transfer-encoding": "chunked",
+          connection: "keep-alive",
+        }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(true);
+      // Node's own server adds its connection handling to req.headers, so
+      // the forwarded-state proof is the framing pair: no transfer-encoding
+      // survives and the proxy computed a concrete content-length.
+      expect(seenHeaders["transfer-encoding"]).toBeUndefined();
+      expect(typeof seenHeaders["content-length"]).toBe("string");
+    });
+  });
+
+  test("stub IAP responses without a SKU keep the payable legacy shape", async () => {
+    const res = await handleRequest(
+      request("POST", PROXY_ENDPOINTS.iapOrderStatus, { orderId: "stub-order" }, { authorization: "Bearer secret" }),
+      { mode: "stub", internalToken: "secret" },
+    );
+    // The legacy wire shape keeps the stub payable result instead of
+    // rejecting it for missing provider SKU evidence (forward-only rule).
+    expect(res.body).toMatchObject({ ok: true, orderId: "stub-order", providerStatus: "PAYMENT_COMPLETED" });
+    expect(res.body.error).toBeUndefined();
+  });
+
   test("promotion status uses only the result endpoint with the persisted key", async () => {
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {
