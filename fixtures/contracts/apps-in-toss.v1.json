@@ -446,6 +446,23 @@
       "isSent": false
     },
     {
+      "id": "unknown-envelope",
+      "coreResponse": {
+        "ok": false,
+        "providerStatus": "UNKNOWN",
+        "error": "INVALID_RESPONSE",
+        "providerRequestId": "message-123"
+      },
+      "proxyResponse": {
+        "ok": false,
+        "providerStatus": "UNKNOWN",
+        "error": "INVALID_RESPONSE",
+        "providerRequestId": "message-123"
+      },
+      "providerStatus": "UNKNOWN",
+      "isSent": false
+    },
+    {
       "id": "legacy-success",
       "coreResponse": {
         "resultType": "SUCCESS"

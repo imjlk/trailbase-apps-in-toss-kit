@@ -114,6 +114,27 @@ claim한 뒤 반환된 row를 `template_code`, `purpose`, `provider` 기준으�
 사용할 때는 그룹을 나눠 proxy 요청 하나가 Toss 제한인 2,500명 이하가 되게 하고, 최종 outbox
 상태 전이는 기존 complete/fail/skip helper를 사용합니다.
 
+### 발송 결과 분류
+
+complete는 두 가지가 아니라 세 가지 결과를 구분합니다.
+
+- **확정 발송** — `ok:true`와 SENT 계열 provider 상태는 outbox를 `SENT`로 완료하고
+  provider가 알려준 `sent_at`을 기록합니다.
+- **확정 실패** — `ok:false`와 명시적 실패 상태(또는 `ok:false`인데 `SENT`가 섞인 상충
+  응답)는 `provider_status = 'FAILED'`, `failed_at`, 실패 사유와 함께 `FAILED`로
+  완료합니다.
+- **결과 미확정** — `providerStatus: "UNKNOWN"`은 `ok:false` 봉투(body 단절, timeout, 해석
+  불가 응답)에서도 유지되며, 빈 응답이나 파싱 불가 응답도 UNKNOWN으로 해석됩니다. outbox
+  row는 발송 큐에서 제외한다는 의미로만 `status = 'FAILED'`로 저장하고,
+  `provider_status = 'UNKNOWN'`(그리고 대응하는 attempt row의 `status = 'UNKNOWN'`)이
+  미확정 결과를 보존합니다. 여기에 맞춰 `sent_at`이나 `failed_at`을 만들지 않고,
+  `updated_at`으로 결과를 확인한 시각만 기록합니다.
+
+`ok`는 proxy 호출 봉투의 성공 여부이지 발송 결과가 아닙니다. `ok:false`만으로 UNKNOWN을
+덮어쓰지 않고, `ok:true`만으로 발송을 확정하지도 않습니다. UNKNOWN row는 자동 재발송하거나
+확정 실패 건수에 합산하지 않으며, 수동 재enqueue 결정 전에 provider request id 등으로 명시적으로
+재확인하세요.
+
 ## QA 체크리스트
 
 - 승인된 템플릿이 `message_templates`에 등록되어 있습니다.

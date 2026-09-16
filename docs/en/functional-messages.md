@@ -127,6 +127,29 @@ not open a separate transaction for every row. When using the bulk adapter, chun
 groups so each proxy request stays under the Toss 2,500-recipient limit, and use
 the existing complete/fail/skip helpers for final outbox state transitions.
 
+### Delivery outcome taxonomy
+
+Completion separates three outcomes instead of two:
+
+- **Confirmed send** — `ok:true` with a SENT-equivalent provider status
+  completes the outbox as `SENT` and records `sent_at` from the provider.
+- **Confirmed failure** — `ok:false` with an explicit failed status (or a
+  conflicting `SENT` under `ok:false`) completes as `FAILED` with
+  `provider_status = 'FAILED'`, `failed_at`, and the failure reason.
+- **Unknown outcome** — `providerStatus: "UNKNOWN"` survives an `ok:false`
+  envelope (broken body, timeout, uninterpretable response); an empty or
+  unparseable response parses as UNKNOWN too. The outbox row is stored as
+  `status = 'FAILED'` only to exclude it from the dispatch queue, while
+  `provider_status = 'UNKNOWN'` (and `status = 'UNKNOWN'` on the matching
+  attempt row) preserves the unconfirmed outcome. No `sent_at` or `failed_at`
+  is fabricated for it; `updated_at` records when the outcome was observed.
+
+`ok` describes the proxy call envelope, not the delivery result: `ok:false`
+alone never overwrites UNKNOWN, and `ok:true` alone never confirms a send.
+Unknown rows are never auto-requeued or counted as confirmed send failures;
+reconcile them explicitly (for example by provider request id) before any
+manual re-enqueue decision.
+
 ## QA Checklist
 
 - Approved template exists in `message_templates`.
