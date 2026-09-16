@@ -6,6 +6,11 @@
 TrailBase는 자신이 소유한 부분(공개 API 표면, TrailBase 서버 연동, 세션
 부트스트랩, 저장 키 호환성)을 계속 담당합니다.
 
+두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.3.0`).
+SDK의 peer 하한이 이 kit의 RN 최소 버전을 정의합니다:
+`@apps-in-toss/framework >=2.10.10`(SDK pin 채택 시 `>=2.5.0`에서 상향).
+WebView 소비자는 `@apps-in-toss/web-framework >=3.4.0 <4`를 유지합니다.
+
 ## 위임 대상
 
 | 기능 | RN (`@ait-kit/sdk/rn`) | Web (`@ait-kit/sdk/web`) |
@@ -55,7 +60,9 @@ seam(`appLogin`, `getAnonymousKey`, `loadFullScreenAd`, `IAP` 등)은 로컬
   `IAP_PRODUCT_GRANT_TIMEOUT`을 계속 구분). `IAP` 모듈을 주입한 결제는
   변경되지 않습니다.
 - Web 공유 결과는 공유 어댑터 계약을 따릅니다. 시트 호출이 resolve되면
-  "SDK 공유 호출이 끝났다"는 의미이지 보상 승인이 아닙니다.
+  "SDK 공유 호출이 끝났다"는 의미이지(SDK 0.3.0부터 `completed`, 0.2.x는
+  `closed`) 보상 승인이 아닙니다. 어댑터는 `failed`가 아닌 resolve를 호출
+  완료로만 취급합니다.
 
 ## 플랫폼 격리
 
@@ -64,3 +71,19 @@ RN 소스는 `@ait-kit/sdk/rn`(과 런타임 중립 루트의 `SdkError`)만, we
 `@ait-kit/sdk`의 **선택적 peer**로 남아 있어 RN 소비자는
 `@apps-in-toss/web-framework`를, web 소비자는 RN SDK를 요구하지 않습니다.
 두 패키지의 consumer-fixture 테스트가 이를 강제합니다.
+
+## 위임된 기본 경로 테스트
+
+주입 seam 테스트만으로는 위임이 동작한다고 증명되지 않습니다. 두 패키지의
+`default-loader` 테스트 파일은 공식 SDK 모듈(`@apps-in-toss/framework` /
+`@apps-in-toss/web-framework`)을 mock으로 교체하고 kit을 기본 로더로
+구동합니다. RN 로그인, 익명 키, 광고 load(실패 직후 재시도와 load 후 show
+포함), IAP 결제/대기 주문 조회(주문 ID 불일치와 중복 grant 콜백 포함),
+web identity/저장소/공유 연산을 다룹니다. bun이 mock 모듈 namespace를 첫
+import 때 스냅샷하므로, mock은 가변 provider 레코드 위의 안정적 래퍼 함수를
+노출합니다. 기능 게이트는 모듈 멤버를 제거하는 대신 호출 시점의
+`isSupported` 위임으로 검사합니다.
+
+이 테스트는 kit과 SDK 사이의 연결만 다룹니다. 실제 토스 앱, 네이티브
+모듈, 제공자 네트워크를 실행하지 않으므로, 소비자는 자체 지원 SDK 정책을
+올리기 전에 실기기 smoke test를 계속 수행해야 합니다.

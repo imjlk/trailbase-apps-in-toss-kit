@@ -7,6 +7,11 @@ deadline budgets, and cleanup locally. TrailBase keeps what it owns: the
 public API surface, TrailBase server integration, session bootstrap, and
 storage-key compatibility.
 
+Both packages pin `@ait-kit/sdk` exactly (currently `0.3.0`). The SDK's
+peer floor defines this kit's RN minimum: `@apps-in-toss/framework`
+`>=2.10.10` (raised from `>=2.5.0` when adopting the SDK pin). WebView
+consumers keep `@apps-in-toss/web-framework >=3.4.0 <4`.
+
 ## What is delegated
 
 | Domain | RN (`@ait-kit/sdk/rn`) | Web (`@ait-kit/sdk/web`) |
@@ -59,7 +64,9 @@ its own async loader.
   the restore flow keeps distinguishing `IAP_PRODUCT_GRANT_TIMEOUT`).
   Purchases with an injected `IAP` module are unchanged.
 - Web share results follow the shared adapter's contract: a resolved sheet
-  call means "the SDK share call finished", never a reward authorization.
+  call means "the SDK share call finished" (`completed` since SDK 0.3.0;
+  `closed` in 0.2.x), never a reward authorization. The adapter treats any
+  non-`failed` resolution as call completion only.
 
 ## Platform isolation
 
@@ -68,3 +75,21 @@ RN sources import only `@ait-kit/sdk/rn` (plus the runtime-neutral root for
 official SDKs remain **optional peers** of `@ait-kit/sdk`, so an RN consumer
 never needs `@apps-in-toss/web-framework` and vice versa — enforced by the
 consumer-fixture tests in both packages.
+
+## Testing the delegated default paths
+
+Injection-seam tests alone do not prove the delegation works. The
+`default-loader` test files in both packages replace the official SDK
+module (`@apps-in-toss/framework` / `@apps-in-toss/web-framework`) with a
+mock and drive the kit through its default loaders: RN login, anonymous
+key, ad load (including immediate retry after failure and load-then-show),
+IAP purchase/pending-order listing (including order-id mismatch and
+duplicate grant callbacks), and web identity/storage/share operations.
+Because bun snapshots a mocked module's namespace at first import, the
+mocks expose stable wrapper functions over a mutable provider record —
+capability gates are exercised through per-call `isSupported` delegation,
+not by removing module members.
+
+These tests cover the kit↔SDK connection only. They do not run the real
+Toss app, native modules, or provider networks; consumers still own
+real-device smoke tests before raising their supported SDK policy.

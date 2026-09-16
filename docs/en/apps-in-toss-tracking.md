@@ -113,6 +113,14 @@ The repository reference has been reviewed through `@apps-in-toss/framework`
 - `2.10.10`: Refreshes the RN reference and validates injected adapters against
   installed SDK types with `bun run packages:typecheck`. The installed SDK includes
   subscription purchase and status APIs; consuming them is a separate feature change.
+- `2.10.10` minimum adoption: `@ait-kit/sdk` 0.3.0 declares
+  `@apps-in-toss/framework@>=2.10.10` as its peer floor, so the kit's RN peer
+  bound and the exact minimum-fixture alias moved from `2.5.0` to `2.10.10`
+  together. Default-loader delegation paths (login, anonymous key, ad load,
+  IAP purchases and pending orders, web identity/storage/share) are covered by
+  `packages/ait-rn/test/default-loader.test.ts` and
+  `packages/ait-web/test/default-loader.test.ts` against the mocked official
+  module; real Toss app verification remains a consumer responsibility.
 
 The July 2026 API update allows anonymous recipients for promotion and Smart
 Message APIs. The kit now includes anonymous-key verification, private identity
@@ -165,7 +173,7 @@ for this repository so generated PRs trigger downstream `pull_request` checks.
 ## RN SDK Compatibility Matrix
 
 CI compiles the actual kit adapter/client sources and type contracts against both
-the reviewed SDK pin and the declared minimum `@apps-in-toss/framework@2.5.0`.
+the reviewed SDK pin and the declared minimum `@apps-in-toss/framework@2.10.10`.
 The minimum package is an exact development-only npm alias; `tsconfig.sdk-min.json`
 redirects SDK imports during that typecheck. `check-sdk-minimum.mjs` verifies the
 installed fixture, peer lower bound and mapping so the check cannot silently turn

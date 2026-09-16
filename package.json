@@ -37,7 +37,7 @@
     "@apps-in-toss/framework": "2.10.10",
     "@types/node": "24",
     "typescript": "7.0.2",
-    "@apps-in-toss/framework-min-supported": "npm:@apps-in-toss/framework@2.5.0",
+    "@apps-in-toss/framework-min-supported": "npm:@apps-in-toss/framework@2.10.10",
     "@apps-in-toss/web-framework": "3.4.0"
   }
 }

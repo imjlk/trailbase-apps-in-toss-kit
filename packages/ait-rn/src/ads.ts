@@ -465,7 +465,7 @@ async function loadFullScreenAdAsync({
       });
       cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
-        cleanup();
+        cleanupBestEffort(cleanup);
       }
     } catch (error) {
       settleReject(
@@ -483,8 +483,8 @@ async function loadFullScreenAdAsync({
       }
       settled = true;
       clearLoadTimeout();
-      cleanup();
       resolve();
+      cleanupBestEffort(cleanup);
     }
 
     function settleReject(error: unknown) {
@@ -493,8 +493,8 @@ async function loadFullScreenAdAsync({
       }
       settled = true;
       clearLoadTimeout();
-      cleanup();
       reject(error);
+      cleanupBestEffort(cleanup);
     }
   });
 }
@@ -646,7 +646,7 @@ async function showFullScreenAdAsync({
       });
       cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
-        cleanup();
+        cleanupBestEffort(cleanup);
       }
     } catch (error) {
       settleReject(
@@ -680,7 +680,6 @@ async function showFullScreenAdAsync({
       if (rewardFallbackTimeout != null) {
         clearTimeout(rewardFallbackTimeout);
       }
-      cleanup();
       resolve({
         adFormat,
         adGroupId,
@@ -693,6 +692,7 @@ async function showFullScreenAdAsync({
         unitAmount,
         unitType,
       });
+      cleanupBestEffort(cleanup);
     }
 
     function settleReject(error: unknown) {
@@ -707,8 +707,8 @@ async function showFullScreenAdAsync({
       if (rewardFallbackTimeout != null) {
         clearTimeout(rewardFallbackTimeout);
       }
-      cleanup();
       reject(error);
+      cleanupBestEffort(cleanup);
     }
 
     function scheduleInterstitialFallback() {
@@ -727,6 +727,19 @@ function normalizeAdGroupId(adGroupId: string) {
     adGroupId,
     "Apps in Toss adGroupId is required.",
   );
+}
+
+/**
+ * SDK listener cleanup is best-effort and must not leave an ad promise
+ * unsettled or replace its settled result (see iap.ts / share-reward.ts
+ * for the same pattern in the other settle flows).
+ */
+function cleanupBestEffort(cleanup: () => void) {
+  try {
+    cleanup();
+  } catch {
+    // Intentionally swallowed.
+  }
 }
 
 function normalizeRequiredString(value: string, message: string) {
