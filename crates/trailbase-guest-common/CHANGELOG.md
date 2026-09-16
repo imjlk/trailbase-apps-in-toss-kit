@@ -1,5 +1,71 @@
 # trailbase-guest-common
 
+## 0.11.0 — 2026-09-16
+
+### Minor changes
+
+- [a89e2b0](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/a89e2b08b350517d204767c125b95efc1ffd53f7) Persist promotion transaction keys before executing rewards.
+  
+  - New three-step proxy helpers: `promotion_reward_prepare` (issues a key and
+    nothing else — no recipient fields), `promotion_reward_execute` (rejects a
+    payload without a transaction key before any network call), joining the
+    existing `promotion_reward_status` lookup. The legacy grant helper stays.
+  - New ledger helpers complete the recommended flow on the existing schema
+    (no new tables, columns, or migrations): `store_promotion_transaction_key_tx`
+    persists the key and marks the row `PREPARED` (same-key re-store is
+    idempotent; a different key is rejected with
+    `PROMOTION_TRANSACTION_KEY_CONFLICT` and an existing key is never
+    overwritten), `begin_promotion_reward_execute_tx` atomically claims
+    `PREPARED` → `EXECUTING` so exactly one worker can execute (concurrent and
+    restart-after-claim callers get `None`; terminal rows are never re-entered),
+    and `promotion_reward_ledgers_awaiting_recovery_tx` lists rows whose execute
+    started but whose outcome is unknown — recovery is a status lookup with the
+    stored key first, never an immediate re-execute.
+  - Outcome application now only matches the ledger row's own
+    `provider_request_id` (another request's response returns
+    `PROMOTION_REWARD_REQUEST_MISMATCH` instead of being absorbed) and never
+    overwrites a stored key with a different one. A confirmed `success` row
+    still cannot be reverted by a late pending/unknown response.
+  - `SUBMITTED` (execute accepted, unconfirmed) now normalizes onto the pending
+    taxonomy, and `UNKNOWN` survives `ok:false` envelopes: both keep the ledger
+    row `pending` with no fabricated `granted_at`/`failed_at` — neither a
+    confirmed grant nor a confirmed failure. Execution progress is tracked in
+    `provider_status` (`PENDING` → `PREPARED` → `EXECUTING`), distinguishing
+    "key stored, execution not started" (safe to claim and execute with the
+    stored key after a restart) from "execution started, outcome unknown"
+    (status lookup first).
+  - Shared wire fixtures gain `execute-submitted` and `execute-unknown`
+    promotion cases; SQL-level tests execute the real statements against the
+    template schema (single-claim, key immutability, request-id fencing,
+    restart resume, recovery listing, late-response protection, outcome
+    taxonomy). Operation policy keeps result queries allowed while new grants
+    are paused. Ops docs describe the full flow in English and Korean. — Thanks @imjlk!
+- [4d4a970](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/4d4a97084e1315e7cf46348d4d2554eecd7d8c45) Preserve unknown Smart Message delivery outcomes through ledger completion.
+  
+  - `normalize_provider_status` no longer collapses `providerStatus: "UNKNOWN"`
+    into a confirmed failure when the proxy envelope reports `ok:false` (broken
+    body, timeout, uninterpretable response). `ok` describes the call envelope;
+    `ok:true` alone still never confirms a send. Explicit failures and the
+    conflicting `ok:false` + `SENT` shape still classify as FAILED, and empty or
+    unparseable responses keep parsing as UNKNOWN.
+  - Completion now records three distinct outcomes in the existing schema (no
+    new states or tables): confirmed send (`SENT` + `sent_at`), confirmed
+    failure (`FAILED` + `failed_at`), and unknown outcome — outbox
+    `status = 'FAILED'` only to exclude the row from the dispatch queue, with
+    `provider_status = 'UNKNOWN'` and `status = 'UNKNOWN'` on the matching
+    attempt row, matching the lease-expiry quarantine model. No `sent_at` or
+    `failed_at` is fabricated for an unknown outcome; `updated_at` records the
+    observation time and the internal envelope error stays in `failure_reason`,
+    distinct from `providerErrorCode`.
+  - Unknown rows are never auto-requeued: the ready claim skips them and
+    lease-expiry recovery leaves them untouched. Late responses stay fenced, so
+    a late UNKNOWN cannot revert a confirmed SENT. Operators reconcile unknown
+    outcomes explicitly (for example by provider request id) before any manual
+    re-enqueue.
+  - Shared wire fixtures gain an `unknown-envelope` message case
+    (`ok:false` + `providerStatus:"UNKNOWN"` + internal `error`), asserted by
+    the Rust, proxy, runtime, and RN contract tests. — Thanks @imjlk!
+
 ## 0.10.0 — 2026-09-12
 
 ### Minor changes

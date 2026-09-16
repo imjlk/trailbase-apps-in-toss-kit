@@ -1,6 +1,6 @@
 [package]
 name = "trailbase-toss-identity"
-version = "0.10.0"
+version = "0.11.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -10,7 +10,7 @@ publish.workspace = true
 aes-gcm.workspace = true
 base64.workspace = true
 serde.workspace = true
-trailbase-guest-common = { path = "../trailbase-guest-common", version = "0.10.0" }
+trailbase-guest-common = { path = "../trailbase-guest-common", version = "0.11.0" }
 trailbase-wasm.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
