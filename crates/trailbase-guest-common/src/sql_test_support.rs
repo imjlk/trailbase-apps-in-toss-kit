@@ -16,6 +16,14 @@ pub fn database() -> Connection {
         "../../../templates/trailbase/sql/iap_orders.sql"
     ))
     .unwrap();
+    db.execute_batch(include_str!(
+        "../../../templates/trailbase/sql/promotion_campaigns.sql"
+    ))
+    .unwrap();
+    db.execute_batch(include_str!(
+        "../../../templates/trailbase/sql/promotion_reward_ledger.sql"
+    ))
+    .unwrap();
     db
 }
 

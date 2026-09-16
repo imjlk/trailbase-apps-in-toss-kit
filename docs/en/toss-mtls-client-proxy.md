@@ -354,9 +354,9 @@ Use the AppsInToss adapter endpoints when their request and response shape fits 
 generic relay for other Toss mTLS APIs, or add a small adapter when an API needs repeated
 normalization or multi-step flow handling.
 
-## API Core 0.3 Contracts
+## API Core 0.4 Contracts
 
-The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.3.0` and
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.4.2` and
 explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
 behind the same internal bearer authentication; forward mode still requires a
 token. Bun is pinned to `1.4.2` across local tooling, CI, and the container.
@@ -368,15 +368,29 @@ The local Node mTLS client is replaced by `@ait-kit/api-client/node`'s
 transport: one overall deadline covers DNS, connect, TLS, headers, and the
 entire response body; a response that breaks mid-body, exceeds the size
 budget, or outlives the deadline fails closed with the proxy's existing
-`UPSTREAM_*` error envelope. Certificate files are still loaded by this
-repository; the transport receives PEM contents.
+`UPSTREAM_*` error envelope. A response that cannot be converted into a fetch
+`Response` (for example an out-of-range upstream status like 600) also fails
+closed with the typed transport error. The plain-HTTP path for local/test
+upstreams mirrors those guarantees and treats 204/205/304 as null-body
+responses. Certificate files are still loaded by this repository; the
+transport receives PEM contents.
 
 Single Smart Message requests accept one of `tossUserKey`, `userKey`, or
-`anonKey`. api-core 0.3 emits the official `x-toss-user-key`/`x-anon-key`
+`anonKey`. api-core emits the official `x-toss-user-key`/`x-anon-key`
 headers itself, so the proxy no longer rewrites recipient headers. See the
 [official message API](https://developers-apps-in-toss.toss.im/api/push).
 
-Promotion flows now use api-core 0.3's three-step contract. The legacy
+Message outcomes follow the three-way taxonomy: confirmed send (`SENT`),
+confirmed failure (`FAILED`, including 4xx and explicit provider rejections),
+and outcome unknown (`UNKNOWN` with the internal `error: "INVALID_RESPONSE"`
+marker — 5xx, empty/HTML bodies, conflicting status aliases, evidence-free
+successes). The proxy passes the internal `error` marker through next to
+`failureReason`/`providerErrorCode`, and 5xx responses preserve the caller's
+`requestedAt` as request-time context without claiming a delivery time. The
+kit's Rust parser quarantines UNKNOWN outcomes in the outbox ledger; see
+[Functional Messages](functional-messages.md).
+
+Promotion flows use api-core's three-step contract. The legacy
 `promotion/reward/grant` endpoint keeps its wire shape; anonymous grants
 internally run prepare → execute → status so every upstream call carries the
 official recipient headers. New endpoints `promotion/reward/prepare`,
@@ -392,8 +406,12 @@ A successful channel can coexist with failed channels; consumers must not retry
 an entire partially delivered message automatically. Functional notification
 agreement remains the consumer's responsibility before dispatch.
 
-In forward IAP lookups, api-core 0.3 separates provider evidence
-(`verified`, `skuCheck`) from request expectations. The proxy keeps its legacy
+In forward IAP lookups, api-core separates provider evidence
+(`verified`, `skuCheck`) from request expectations, and reads evidence
+strictly: an orderId/status/SKU that is not a real string (including a
+single-element array) is an `INVALID_RESPONSE`, and query-failure envelopes
+(`FAIL`, `ERROR`, `NETWORK_ERROR`, …) yield no evidence even when a
+contradictory success payload rides along. The proxy keeps its legacy
 wire shape on top: PAYMENT_COMPLETED/PURCHASED responses without a provider SKU
 (or naming a different order ID) return `ok: false` and `UNVERIFIED_IAP_ORDER`;
 retry verification before granting anything. Explicit stub mode keeps synthetic

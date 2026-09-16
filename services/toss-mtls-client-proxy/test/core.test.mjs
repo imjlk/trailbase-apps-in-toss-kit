@@ -1132,7 +1132,7 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
-  test("forward message treats non-2xx upstream responses as failed", async () => {
+  test("forward message treats 5xx upstream responses as outcome-unknown", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
       res.writeHead(500, { "content-type": "application/json" });
@@ -1157,15 +1157,57 @@ describe("toss-mtls-client-proxy", () => {
         upstreamBaseUrl,
       });
 
+      // 5xx cannot prove non-delivery: the provider may have sent before
+      // failing to answer. The contract keeps this outcome UNKNOWN so
+      // ledger consumers quarantine instead of counting a confirmed failure.
       expect(res.body.ok).toBe(false);
-      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.providerStatus).toBe("UNKNOWN");
+      expect(res.body.error).toBe("INVALID_RESPONSE");
       expect(res.body.failureReason).toBe("upstream unavailable");
       expect(res.body.providerErrorCode).toBe("UPSTREAM_500");
       expect(res.body.upstreamStatus).toBe(500);
+      // The core echoes the caller's requestedAt as diagnostic context; it
+      // is a request timestamp, not a delivery claim. The kit's Rust parser
+      // drops sentAt for UNKNOWN outcomes before the ledger is written.
+      expect(res.body.sentAt).toBe(1234);
     });
   });
 
-  test("forward bulk message treats raw non-2xx upstream responses as failed", async () => {
+  test("forward message treats 4xx upstream responses as confirmed failures", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(400, { "content-type": "application/json" });
+      res.end(JSON.stringify({ message: "template not approved", errorCode: "INVALID_TEMPLATE" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const req = request(
+        "POST",
+        PROXY_ENDPOINTS.smartMessageSend,
+        {
+          providerRequestId: "msg-http-400",
+          templateSetCode: "reward_result",
+          context: {},
+          tossUserKey: "toss-user-1",
+          requestedAt: 1234,
+        },
+        { authorization: "Bearer secret" },
+      );
+      const res = await handleRequest(req, {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      });
+
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.error).toBeUndefined();
+      expect(res.body.failureReason).toBe("template not approved");
+      expect(res.body.providerErrorCode).toBe("INVALID_TEMPLATE");
+      expect(res.body.upstreamStatus).toBe(400);
+    });
+  });
+
+  test("forward bulk message treats raw 5xx upstream responses as outcome-unknown", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
       res.writeHead(502, { "content-type": "text/plain" });
@@ -1190,7 +1232,8 @@ describe("toss-mtls-client-proxy", () => {
       });
 
       expect(res.body.ok).toBe(false);
-      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.providerStatus).toBe("UNKNOWN");
+      expect(res.body.error).toBe("INVALID_RESPONSE");
       expect(res.body.failureReason).toBe("bad gateway");
       expect(res.body.upstreamStatus).toBe(502);
     });

@@ -13,9 +13,10 @@ import {
   handleRequest,
 } from "../src/core.mjs";
 
-// Regression suite for adopting @ait-kit 0.3 contracts: broken mTLS
+// Regression suite for adopting @ait-kit 0.4 contracts: broken mTLS
 // responses, overall timeouts, anonymous recipients, incomplete IAP
-// responses, and lost promotion responses.
+// responses, lost promotion responses, UNKNOWN message outcomes, and
+// fail-closed plain-HTTP conversions.
 
 describe("toss-mtls-client-proxy ait-kit adoption", () => {
   test("a response that breaks mid-body fails closed with a 502 envelope", async () => {
@@ -574,6 +575,169 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
       expect(res.body.providerStatus).toBe("PENDING");
       expect(res.body.providerTransactionKey).toBe("saved-key");
       expect(typeof res.body.checkedAt).toBe("number");
+    });
+  });
+
+  test("plain-HTTP 204, 205, and 304 responses carry a null body without crashing", async () => {
+    for (const status of [204, 205, 304]) {
+      const upstreamServer = http.createServer((req, res) => {
+        req.resume();
+        res.writeHead(status, { "content-type": "application/json" });
+        res.end();
+      });
+      await withServer(upstreamServer, async (upstreamBaseUrl) => {
+        const res = await handleRequest(
+          request("POST", PROXY_ENDPOINTS.genericMtlRequest, {
+            method: "GET",
+            path: "/status-check",
+          }, { authorization: "Bearer secret" }),
+          { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+        );
+        expect(res.body.status).toBe(status);
+        // The relay parses the empty null-body payload as an empty object;
+        // the regression is that the null-body conversion completes at all.
+        expect(res.body.body).toEqual({});
+      });
+    }
+  });
+
+  test("plain-HTTP responses with out-of-range statuses fail closed as REQUEST_FAILED", async () => {
+    // Node's fetch Response constructor rejects status codes outside
+    // 200-599, so an upstream answering 600 must surface as the transport's
+    // typed error (502 envelope here), never an unhandled constructor throw.
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      // writeHead validates the 100-999 range the HTTP parser accepts;
+      // 600 is intentionally outside what Response can represent.
+      res.writeHead(600, "custom status", { "content-type": "application/json" });
+      res.end("{}");
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const server = createProxyServer({
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+        upstreamTimeoutMs: 5000,
+      });
+      await withServer(server, async (baseUrl) => {
+        const res = await fetch(`${baseUrl}${PROXY_ENDPOINTS.genericMtlRequest}`, {
+          method: "POST",
+          headers: { authorization: "Bearer secret", "content-type": "application/json" },
+          body: JSON.stringify({ method: "GET", path: "/weird" }),
+        });
+        const body = await res.json();
+        expect(res.status).toBe(502);
+        expect(body.error).toBe("UPSTREAM_REQUEST_FAILED");
+      });
+    });
+  });
+
+  test("empty and non-JSON message bodies surface UNKNOWN with the internal error marker", async () => {
+    for (const [id, payload] of [["empty-json", ""], ["html", "<html>maintenance</html>"]]) {
+      const upstreamServer = http.createServer((req, res) => {
+        req.resume();
+        res.writeHead(200, { "content-type": id === "html" ? "text/html" : "application/json" });
+        res.end(payload);
+      });
+      await withServer(upstreamServer, async (upstreamBaseUrl) => {
+        const res = await handleRequest(
+          request("POST", PROXY_ENDPOINTS.smartMessageSend, {
+            providerRequestId: `msg-${id}`,
+            templateSetCode: "reward_result",
+            context: {},
+            tossUserKey: "toss-user-1",
+            requestedAt: 1234,
+          }, { authorization: "Bearer secret" }),
+          { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+        );
+        expect(res.body.ok).toBe(false);
+        expect(res.body.providerStatus).toBe("UNKNOWN");
+        expect(res.body.error).toBe("INVALID_RESPONSE");
+        // The internal parse marker must stay distinct from a provider
+        // error code: nothing the provider actually returned is mirrored.
+        expect(res.body.providerErrorCode).toBeUndefined();
+      });
+    }
+  });
+
+  test("conflicting non-failure message status aliases surface UNKNOWN instead of optimistic sent", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      // Neither alias reports a failure, but they disagree about the
+      // outcome; the contract must not pick the optimistic one.
+      res.end(JSON.stringify({ providerStatus: "SENT", status: "PENDING" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.smartMessageSend, {
+          providerRequestId: "msg-conflicting",
+          templateSetCode: "reward_result",
+          context: {},
+          tossUserKey: "toss-user-1",
+          requestedAt: 1234,
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("UNKNOWN");
+      expect(res.body.error).toBe("INVALID_RESPONSE");
+    });
+  });
+
+  test("IAP evidence that is not a real string is an INVALID_RESPONSE, never a payable order", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      // A single-element array must not become a stringified SKU stand-in.
+      res.end(JSON.stringify({
+        orderId: "order-array-sku",
+        status: "PAYMENT_COMPLETED",
+        sku: ["fixture-coins"],
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.iapOrderStatus, {
+          orderId: "order-array-sku",
+          sku: "fixture-coins",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("ERROR");
+      expect(res.body.error).toBe("INVALID_RESPONSE");
+      // The request order id stays for reconciliation; no fabricated sku.
+      expect(res.body.orderId).toBe("order-array-sku");
+      expect(res.body.sku).toBeUndefined();
+    });
+  });
+
+  test("IAP query-failure envelopes never leak a contradictory success payload", async () => {
+    const upstreamServer = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        message: "order lookup failed",
+        success: { orderId: "order-fail-envelope", status: "PAYMENT_COMPLETED", sku: "fixture-coins" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.iapOrderStatus, {
+          orderId: "order-fail-envelope",
+          sku: "fixture-coins",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("ERROR");
+      expect(res.body.failureReason).toBe("order lookup failed");
+      expect(res.body.orderId).toBe("order-fail-envelope");
+      // The contradictory success payload must not survive as evidence.
+      expect(res.body.verified).toBeUndefined();
+      expect(res.body.skuCheck).toBeUndefined();
     });
   });
 });
