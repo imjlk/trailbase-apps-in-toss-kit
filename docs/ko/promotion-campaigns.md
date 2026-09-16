@@ -143,6 +143,51 @@ Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 �
 - `4104`, `4105`, `4108`, `4109`: 캠페인을 일시 중지합니다.
 - `4114`: 설정 오류로 보고, 재시도 전에 캠페인을 멈추거나 담당자에게 올립니다.
 
+## 실행 전에 거래 키를 저장하기
+
+권장 지급 흐름은 execute 호출 전에 제공자 거래 키를 원장에 저장해, 충돌이나 응답
+유실이 결과를 추적할 유일한 단서를 잃지 않게 합니다. 3단계 프록시 헬퍼
+(`apps_in_toss_proxy::promotion_reward_prepare`, `promotion_reward_execute`,
+`promotion_reward_status`)와 `trailbase_guest_common::promotion_rewards`의 원장
+헬퍼를 함께 사용하세요.
+
+1. **검증 후 pending 원장 행 삽입**(`insert_promotion_reward_ledger_tx`):
+   사용자, 캠페인, 금액, source, `provider_request_id`가 멱등 문맥입니다. 같은
+   request id라도 다른 사용자·금액·캠페인은 병합되지 않고 거절됩니다. 이
+   transaction을 네트워크 호출 동안 유지하지 마세요.
+2. **prepare**(`promotion_reward_prepare`): 키 발급만 합니다. 이 단계의
+   `ok: true`는 키 발급을 뜻할 뿐 지급이 아니며, 이 endpoint는 수신자를 받지
+   않으므로 user-key 필드를 임의로 붙이지 마세요.
+3. **키 저장 후 커밋**(`store_promotion_transaction_key_tx`): 행을 `PREPARED`로
+   표시합니다. 같은 키 재저장은 멱등이고, 다른 키 저장은
+   거절됩니다(`PROMOTION_TRANSACTION_KEY_CONFLICT`). 기존 키를 덮어쓰지
+   않습니다. 이 커밋이 실패하면 execute를 호출하지 마세요.
+4. **실행 클레임 후 커밋**(`begin_promotion_reward_execute_tx`):
+   `PREPARED` → `EXECUTING`으로 원자적으로 전환합니다. 정확히 한 worker만
+   클레임을 가질 수 있고, 동시 두 번째 클레임은 `None`을 받습니다. 저장된 키가
+   있는 `PREPARED` 행만 클레임할 수 있고 종결된 행은 다시 진입하지 않습니다.
+5. **execute**(`promotion_reward_execute`): 저장된 키와 원장 행 자체의
+   수신자·금액 문맥으로 호출합니다. 클라이언트가 제공한 금액·수신자·키로 실행하지
+   않습니다. 이 헬퍼는 거래 키 없는 페이로드를 네트워크 호출 전에 거절합니다.
+6. **응답 반영**(`apply_promotion_reward_outcome_tx`): 새 transaction에서
+   반영하거나, 응답을 잃었다면 `promotion_reward_status`와 저장된 키로 복구합니다.
+   이 문은 행 자신의 `provider_request_id`에만 매칭되고, 저장된 키를 다른 키로
+   덮어쓰지 않으며, 확정된 `success` 행은 늦은 pending/unknown 응답으로 되돌리지
+   않습니다.
+
+`SUBMITTED`(execute 접수, 미확정)와 `UNKNOWN`(결과 확인 불가 — `ok:false`
+UNKNOWN 봉투 포함)은 둘 다 원장 행을 `pending`으로 유지하며 `granted_at`/
+`failed_at`을 만들지 않습니다. 확정 지급도 확정 실패도 아닙니다. execute는
+시작했지만 결과를 모르는 행은
+`promotion_reward_ledgers_awaiting_recovery_tx`(`EXECUTING`)로 노출되며, 복구는
+저장된 키로 status 조회부터 합니다. 이 신호로 재실행하지 말고, 제공자 문서 없이
+동일 키 재실행의 안전성을 가정하지 마세요. 3단계 이후 4단계 이전의 재시작은 같은
+저장 키로 4단계에서 이어집니다(두 번째 prepare도 중복 지급도 없습니다).
+
+기존 단일 호출 grant endpoint와 헬퍼는 계속 지원되지만 실행 전 키 저장을 보장하지
+못합니다. 이 흐름의 응답 유실 사례는 그에 맞게 다루세요. 프록시의 status 매핑은
+레거시 원장 소비자를 위해 `UNKNOWN`을 `PENDING`으로 유지합니다.
+
 ## 기존 지급 결과 확인
 
 반환된 `providerTransactionKey`를 promotion ledger에 저장하세요.

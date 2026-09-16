@@ -155,6 +155,59 @@ error code. Consumers should map provider signals conservatively:
 - `4104`, `4105`, `4108`, `4109`: pause the campaign.
 - `4114`: treat as misconfiguration and pause or escalate before retrying.
 
+## Persist the Transaction Key Before Executing
+
+The recommended grant flow stores the provider transaction key in the ledger
+before any execute call, so a crash or lost response can never lose the only
+handle to the outcome. Use the three-step proxy helpers
+(`apps_in_toss_proxy::promotion_reward_prepare`,
+`promotion_reward_execute`, `promotion_reward_status`) with the ledger
+helpers in `trailbase_guest_common::promotion_rewards`:
+
+1. **Validate and insert** the pending ledger row
+   (`insert_promotion_reward_ledger_tx`): user, campaign, amount, source,
+   and `provider_request_id` are the idempotency context — the same request
+   id with a different user, amount, or campaign is rejected, not merged.
+   Never hold this transaction across a network call.
+2. **Prepare** (`promotion_reward_prepare`): issues a key and nothing else.
+   `ok: true` here only means a key was issued; it is never a grant, and the
+   endpoint takes no recipient, so do not attach user-key fields.
+3. **Store the key and commit**
+   (`store_promotion_transaction_key_tx`): marks the row `PREPARED`. Storing
+   the same key again is idempotent; storing a different key is rejected
+   (`PROMOTION_TRANSACTION_KEY_CONFLICT`) — an existing key is never
+   overwritten. If this commit fails, do not call execute.
+4. **Claim execution and commit** (`begin_promotion_reward_execute_tx`):
+   atomically moves `PREPARED` → `EXECUTING`. Exactly one worker can hold
+   the claim; a second concurrent claim gets `None`. Only a `PREPARED` row
+   with a stored key can be claimed, and terminal rows are never re-entered.
+5. **Execute** (`promotion_reward_execute`) with the stored key and the
+   ledger row's own recipient/amount context — never client-supplied
+   amounts, recipients, or keys. The helper rejects a payload without a
+   transaction key before any network call.
+6. **Apply the response** (`apply_promotion_reward_outcome_tx`) in a fresh
+   transaction, or recover a lost response with
+   `promotion_reward_status` and the stored key. The statement only matches
+   the row's own `provider_request_id`, never overwrites a stored key with
+   a different one, and a confirmed `success` row cannot be reverted by a
+   late pending/unknown response.
+
+`SUBMITTED` (execute accepted, unconfirmed) and `UNKNOWN` (outcome could not
+be determined — including `ok:false` UNKNOWN envelopes) both keep the ledger
+row `pending` with no fabricated `granted_at`/`failed_at`; they are
+neither a confirmed grant nor a confirmed failure. Rows whose execute
+started but whose outcome is unknown surface through
+`promotion_reward_ledgers_awaiting_recovery_tx` (`EXECUTING`); their
+recovery is a status lookup with the stored key first — do not re-execute
+on that signal, and do not assume same-key re-execution is safe without
+provider documentation. A restart after step 3 but before step 4 resumes at
+step 4 with the same stored key (no second prepare, no duplicate grant).
+
+The legacy single-call grant endpoint and helper remain supported, but they
+cannot guarantee the key was persisted before execution — treat that flow's
+lost-response cases accordingly. The proxy's status mapping keeps
+`UNKNOWN` as `PENDING` for legacy ledger consumers.
+
 ## Reconcile an Existing Grant
 
 Persist every returned `providerTransactionKey` in the promotion ledger. Use
