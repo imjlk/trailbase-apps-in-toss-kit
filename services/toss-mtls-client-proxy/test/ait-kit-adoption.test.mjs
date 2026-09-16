@@ -266,6 +266,120 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("anonymous execute failures keep the request ID and redact the recipient", async () => {
+    // Anonymous legacy grant whose execute step is explicitly rejected:
+    // the failure must carry the caller's providerRequestId and never echo
+    // the anonymous key.
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-2" } }));
+        return;
+      }
+      if (req.url === TOSS_ENDPOINTS.promotionExecute) {
+        res.end(JSON.stringify({
+          resultType: "FAIL",
+          error: { errorCode: "4112", reason: "anon-exec-recipient already granted" },
+        }));
+        return;
+      }
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+          anonKey: "anon-exec-recipient",
+          promotionCode: "campaign",
+          amount: 5,
+          providerRequestId: "ledger-request-9",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("PROMOTION_EXECUTE_FAILED");
+      expect(res.body.providerRequestId).toBe("ledger-request-9");
+      expect(res.body.providerErrorCode).toBe("4112");
+      expect(JSON.stringify(res.body)).not.toContain("anon-exec-recipient");
+    });
+  });
+
+  test("anonymous grant success keeps the legacy grantedAt timestamp", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-3" } }));
+        return;
+      }
+      if (req.url === TOSS_ENDPOINTS.promotionExecute) {
+        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-3" } }));
+        return;
+      }
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+          anonKey: "anon-granted-recipient",
+          promotionCode: "campaign",
+          amount: 5,
+          requestedAt: 123456,
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(true);
+      expect(res.body.providerStatus).toBe("GRANTED");
+      expect(res.body.grantedAt).toBe(123456);
+    });
+  });
+
+  test("direct anonymous execute responses redact the recipient key", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4113", reason: "anon-direct-recipient retracted" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+          amount: 5,
+          anonKey: "anon-direct-recipient",
+          promotionCode: "campaign",
+          providerTransactionKey: "some-key",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(JSON.stringify(res.body)).not.toContain("anon-direct-recipient");
+    });
+  });
+
+  test("terminal FAILED status outcomes report ok false for legacy consumers", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "FAILED" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          anonKey: "anon-failed-recipient",
+          promotionCode: "campaign",
+          providerTransactionKey: "failed-key",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
+      expect(res.body.status).toBe("FAILED");
+      expect(JSON.stringify(res.body)).not.toContain("anon-failed-recipient");
+    });
+  });
+
   test("promotion status uses only the result endpoint with the persisted key", async () => {
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {

@@ -77,7 +77,13 @@ export async function handleRequest(req, config = createConfig(), core = createC
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionExecuteReward) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    return response(200, await core.promotionExecuteReward(body));
+    const executed = await core.promotionExecuteReward(body);
+    // Ledger callers using the prepare/execute flow must never persist or
+    // log a provider-echoed anonymous key; every other anonymous path
+    // redacts, so the direct execute route does too.
+    const result =
+      body?.anonKey !== undefined ? redactRecipient(executed, requireAnonymousKey(body.anonKey)) : executed;
+    return response(200, result);
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardStatus) {
@@ -142,10 +148,15 @@ async function promotionReward(core, config, body) {
   });
   if (!executed.ok) {
     // Explicit provider rejection (e.g. 4112): no grant happened; surface
-    // the legacy execute-failure shape with the provider's codes.
+    // the legacy execute-failure shape with the provider's codes. The
+    // caller's request ID survives for ledger/audit/retry correlation,
+    // exactly as the previous grant implementation returned it.
+    const providerRequestId =
+      typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
     return redactRecipient(
       {
         ok: false,
+        ...(providerRequestId !== undefined ? { providerRequestId } : {}),
         providerStatus: "PROMOTION_EXECUTE_FAILED",
         providerTransactionKey: executed.providerTransactionKey,
         ...(executed.failureReason !== undefined ? { failureReason: executed.failureReason } : {}),
@@ -184,6 +195,11 @@ function legacyGrantFromStatus(status, request) {
     ...(providerRequestId !== undefined ? { providerRequestId } : {}),
     providerStatus,
     providerTransactionKey: status.providerTransactionKey,
+    // The old grant response surfaced the caller's requestedAt as the
+    // provider grant timestamp on success; keep it for ledger persistence.
+    ...(providerStatus === "GRANTED" && typeof request?.requestedAt === "number"
+      ? { grantedAt: request.requestedAt }
+      : {}),
     ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
   };
 }
@@ -207,7 +223,10 @@ async function promotionRewardStatus(core, body) {
   const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
   const providerRequestId = typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
   const mapped = {
-    ok: true,
+    // A technically successful lookup can still report a terminal FAILED
+    // outcome; the previous status path returned ok:false for it, and
+    // ledger consumers key their failure handling off this field.
+    ok: providerStatus !== "FAILED",
     ...(providerRequestId !== undefined ? { providerRequestId } : {}),
     providerStatus,
     status: status.status,
