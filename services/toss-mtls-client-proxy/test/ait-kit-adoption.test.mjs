@@ -380,6 +380,79 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("prepare and status failures keep request IDs and provider codes", async () => {
+    // get-key fails (prepare), then the result endpoint fails with a coded
+    // FAIL envelope: both responses must keep the caller's request ID and
+    // the status path must keep the provider's error code.
+    let phase = 0;
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      phase += 1;
+      if (phase === 1) {
+        res.end(JSON.stringify({ resultType: "FAIL", error: { errorCode: "4100", reason: "prepare-denied" } }));
+        return;
+      }
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4111", reason: "ledger-key-x not found" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const config = { mode: "forward", internalToken: "secret", upstreamBaseUrl };
+      const grant = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+          anonKey: "anon-prepare-recipient",
+          promotionCode: "campaign",
+          amount: 5,
+          providerRequestId: "ledger-request-p",
+        }, { authorization: "Bearer secret" }),
+        config,
+      );
+      expect(grant.body.ok).toBe(false);
+      expect(grant.body.providerRequestId).toBe("ledger-request-p");
+      expect(JSON.stringify(grant.body)).not.toContain("anon-prepare-recipient");
+
+      const status = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          anonKey: "anon-prepare-recipient",
+          promotionCode: "campaign",
+          providerTransactionKey: "ledger-key-x",
+          providerRequestId: "ledger-request-s",
+        }, { authorization: "Bearer secret" }),
+        config,
+      );
+      expect(status.body.ok).toBe(true);
+      expect(status.body.providerStatus).toBe("NOT_FOUND");
+      expect(status.body.providerRequestId).toBe("ledger-request-s");
+      expect(status.body.providerErrorCode).toBe("4111");
+    });
+  });
+
+  test("direct user-key execute responses redact the echoed recipient", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4113", reason: "user-direct-recipient retracted" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+          amount: 5,
+          promotionCode: "campaign",
+          providerTransactionKey: "some-key",
+          tossUserKey: "user-direct-recipient",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(JSON.stringify(res.body)).not.toContain("user-direct-recipient");
+    });
+  });
+
   test("promotion status uses only the result endpoint with the persisted key", async () => {
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {

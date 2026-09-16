@@ -79,10 +79,16 @@ export async function handleRequest(req, config = createConfig(), core = createC
     const body = await readJson(req, requestBodyLimitBytes(config));
     const executed = await core.promotionExecuteReward(body);
     // Ledger callers using the prepare/execute flow must never persist or
-    // log a provider-echoed anonymous key; every other anonymous path
-    // redacts, so the direct execute route does too.
-    const result =
-      body?.anonKey !== undefined ? redactRecipient(executed, requireAnonymousKey(body.anonKey)) : executed;
+    // log a provider-echoed recipient; every other path redacts, so the
+    // direct execute route does too — for anonymous keys and Toss user
+    // keys alike.
+    const recipient =
+      body?.anonKey !== undefined
+        ? requireAnonymousKey(body.anonKey)
+        : typeof body?.tossUserKey === "string" && body.tossUserKey.trim()
+          ? body.tossUserKey.trim()
+          : undefined;
+    const result = recipient !== undefined ? redactRecipient(executed, recipient) : executed;
     return response(200, result);
   }
 
@@ -139,7 +145,17 @@ async function promotionReward(core, config, body) {
   }
 
   const prepared = await core.promotionPrepareReward({});
-  if (!prepared.ok) return redactRecipient(prepared, anonKey);
+  if (!prepared.ok) {
+    const providerRequestId =
+      typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
+    return redactRecipient(
+      {
+        ...prepared,
+        ...(providerRequestId !== undefined ? { providerRequestId } : {}),
+      },
+      anonKey,
+    );
+  }
   const executed = await core.promotionExecuteReward({
     providerTransactionKey: prepared.providerTransactionKey,
     promotionCode: body.promotionCode,
@@ -187,6 +203,7 @@ function legacyGrantFromStatus(status, request) {
       providerStatus: "FAILED",
       providerTransactionKey: status.providerTransactionKey,
       failureReason: status.failureReason ?? "promotion status could not be determined",
+      ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
     };
   }
   const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
@@ -201,6 +218,7 @@ function legacyGrantFromStatus(status, request) {
       ? { grantedAt: request.requestedAt }
       : {}),
     ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
+    ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
   };
 }
 
@@ -213,9 +231,15 @@ async function promotionRewardStatus(core, body) {
   // Anonymous recipients must never leak back through provider-echoed
   // failure fields; the old grant-based path redacted, so this does too.
   if (!status.ok) {
+    const providerRequestId =
+      typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
+    const withRequestId = {
+      ...status,
+      ...(providerRequestId !== undefined ? { providerRequestId } : {}),
+    };
     return body?.anonKey !== undefined
-      ? redactRecipient(status, requireAnonymousKey(body.anonKey))
-      : status;
+      ? redactRecipient(withRequestId, requireAnonymousKey(body.anonKey))
+      : withRequestId;
   }
   // Legacy ledger consumers classify anything besides GRANTED/PENDING as
   // failed, so an indeterminate (UNKNOWN) outcome must stay PENDING here —
@@ -233,6 +257,7 @@ async function promotionRewardStatus(core, body) {
     providerTransactionKey: status.providerTransactionKey,
     checkedAt: status.checkedAt,
     ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
+    ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
   };
   return body?.anonKey !== undefined
     ? redactRecipient(mapped, requireAnonymousKey(body.anonKey))
