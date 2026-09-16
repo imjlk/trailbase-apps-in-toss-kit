@@ -332,14 +332,24 @@ pub fn promotion_provider_status_from_response(response: &JsonValue) -> String {
 }
 
 pub fn normalize_promotion_provider_status(ok: Option<bool>, status: Option<&str>) -> String {
+    let trimmed = status.map(str::trim).filter(|status| !status.is_empty());
+    // An UNKNOWN outcome must survive an ok:false envelope: the execute call
+    // may have reached the provider before the response was lost, so it is
+    // neither a confirmed grant nor a confirmed failure. Resolve it through
+    // the status lookup with the persisted transaction key.
+    if trimmed.is_some_and(|status| status.eq_ignore_ascii_case("UNKNOWN")) {
+        return "UNKNOWN".to_string();
+    }
     // A failure envelope cannot authorize a grant through a contradictory status.
     if ok == Some(false) {
         return "FAILED".to_string();
     }
-    if let Some(status) = status.map(str::trim).filter(|status| !status.is_empty()) {
+    if let Some(status) = trimmed {
         return match status.to_ascii_uppercase().as_str() {
             "SUCCESS" | "SUCCEEDED" | "GRANTED" | "DONE" | "COMPLETED" => "GRANTED".to_string(),
-            "PENDING" | "WAITING" | "PROCESSING" | "REQUESTED" => "PENDING".to_string(),
+            "PENDING" | "SUBMITTED" | "WAITING" | "PROCESSING" | "REQUESTED" => {
+                "PENDING".to_string()
+            }
             "FAILED" | "FAIL" | "ERROR" => "FAILED".to_string(),
             other => other.to_string(),
         };
@@ -355,7 +365,10 @@ pub fn normalize_promotion_provider_status(ok: Option<bool>, status: Option<&str
 pub fn promotion_ledger_status(provider_status: &str) -> &'static str {
     match normalize_promotion_provider_status(None, Some(provider_status)).as_str() {
         "GRANTED" => "success",
-        "PENDING" => "pending",
+        // SUBMITTED (execute accepted, not yet confirmed) and UNKNOWN
+        // (outcome undeterminable) are neither granted nor definitively
+        // failed; they stay pending for explicit status reconciliation.
+        "PENDING" | "SUBMITTED" | "UNKNOWN" => "pending",
         _ => "failed",
     }
 }
@@ -396,10 +409,109 @@ pub fn apply_promotion_reward_outcome_tx(
 ) -> ApiResult<PromotionRewardLedgerRecord> {
     let (sql, params) = promotion_reward_ledger_outcome_statement(table, ledger_id, outcome, now)?;
     let rows = db::tx_query(tx, &sql, &params)?;
+    if let Some(row) = rows.first() {
+        return promotion_reward_ledger_record_from_row(row);
+    }
+    // Classify the miss: a row that exists but carries a different provider
+    // request id must never absorb another request's outcome. Load failures
+    // propagate instead of masquerading as a missing row.
+    if let Some(record) = load_promotion_reward_ledger_by_id_tx(tx, table, ledger_id)?
+        && record.provider_request_id != outcome.provider_request_id
+    {
+        return Err(bad_request(
+            "PROMOTION_REWARD_REQUEST_MISMATCH",
+            "provider request does not match the reward ledger row",
+        ));
+    }
+    Err(internal("Promotion reward ledger row was not found"))
+}
+
+/// Persist the prepare-issued transaction key on a pending ledger row and
+/// mark it PREPARED, in its own committed transaction, BEFORE any execute
+/// call. An existing different key is never overwritten, and a restart
+/// reuses the stored key instead of issuing a new one for the same grant.
+pub fn store_promotion_transaction_key_tx(
+    tx: &mut Transaction,
+    table: PromotionRewardLedgerTable,
+    ledger_id: &str,
+    provider_transaction_key: &str,
+    now: i64,
+) -> ApiResult<PromotionRewardLedgerRecord> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::Promotion,
+        crate::operation_policy::OperationPhase::Dispatch,
+    )?;
+    let key = normalize_required_text(provider_transaction_key, "providerTransactionKey")?;
+    let (sql, params) = promotion_reward_ledger_store_key_statement(
+        table,
+        normalize_required_text(ledger_id, "ledgerId")?,
+        &key,
+        now,
+    )?;
+    let rows = db::tx_query(tx, &sql, &params)?;
+    if let Some(row) = rows.first() {
+        return promotion_reward_ledger_record_from_row(row);
+    }
+    // Load failures propagate; a row that exists gets a typed conflict for
+    // its actual state instead of a generic miss.
+    if let Some(record) = load_promotion_reward_ledger_by_id_tx(tx, table, ledger_id)? {
+        if record.provider_transaction_key.as_deref() != Some(key.as_str()) {
+            return Err(bad_request(
+                "PROMOTION_TRANSACTION_KEY_CONFLICT",
+                "ledger row already holds a different provider transaction key",
+            ));
+        }
+        // Same key, but the row is not in a key-storable phase: execution
+        // already started (EXECUTING) or the outcome is already terminal.
+        return Err(bad_request(
+            "PROMOTION_TRANSACTION_KEY_PHASE_CONFLICT",
+            "ledger row is not waiting to store a provider transaction key",
+        ));
+    }
+    Err(internal("Promotion reward ledger row was not found"))
+}
+
+/// Atomically claim the right to execute: PREPARED -> EXECUTING. The second
+/// concurrent caller gets None (another worker owns the execution), and a
+/// row whose outcome is already recorded is never re-entered. Returns the
+/// record whose stored key the caller must execute with.
+pub fn begin_promotion_reward_execute_tx(
+    tx: &mut Transaction,
+    table: PromotionRewardLedgerTable,
+    ledger_id: &str,
+    now: i64,
+) -> ApiResult<Option<PromotionRewardLedgerRecord>> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::Promotion,
+        crate::operation_policy::OperationPhase::Dispatch,
+    )?;
+    let (sql, params) = promotion_reward_ledger_begin_execute_statement(
+        table,
+        normalize_required_text(ledger_id, "ledgerId")?,
+        now,
+    )?;
+    let rows = db::tx_query(tx, &sql, &params)?;
     rows.first()
         .map(|row| promotion_reward_ledger_record_from_row(row))
-        .transpose()?
-        .ok_or_else(|| internal("Promotion reward ledger row was not found"))
+        .transpose()
+}
+
+/// Ledger rows whose execute started but whose outcome is still unknown
+/// (`EXECUTING`). Recovery for these rows is a status lookup with the
+/// stored key first — never an immediate re-execute.
+pub fn promotion_reward_ledgers_awaiting_recovery_tx(
+    tx: &mut Transaction,
+    table: PromotionRewardLedgerTable,
+    updated_before: i64,
+    limit: i64,
+) -> ApiResult<Vec<PromotionRewardLedgerRecord>> {
+    let (sql, params) = promotion_reward_ledger_recovery_statement(table, updated_before, limit)?;
+    let rows = db::tx_query(tx, &sql, &params)?;
+    rows.iter()
+        .map(|row| promotion_reward_ledger_record_from_row(row))
+        .collect()
 }
 
 pub fn promotion_reward_usage_for_campaign_tx(
@@ -540,31 +652,44 @@ fn promotion_reward_ledger_outcome_statement(
     validate_promotion_reward_ledger_table(table)?;
     let ledger_id = normalize_required_text(ledger_id, "ledgerId")?;
     let status = promotion_ledger_status(&outcome.provider_status);
+    // Sticky-terminal guards: a confirmed success is never downgraded, and a
+    // confirmed failure is never resurrected into pending limbo by a late
+    // non-terminal outcome (UNKNOWN/SUBMITTED/PENDING) for the same request —
+    // its failure diagnostics survive intact. A late GRANTED confirmation
+    // still upgrades a failed row.
     Ok((
         format!(
             "UPDATE {table}
              SET {status_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {status_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {status_column}
                    ELSE ?2
                  END,
                  {provider_request_id_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_request_id_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {provider_request_id_column}
                    ELSE ?3
                  END,
                  {provider_status_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_status_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {provider_status_column}
                    ELSE ?4
                  END,
                  {provider_error_code_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_error_code_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {provider_error_code_column}
                    ELSE ?5
                  END,
                  {provider_transaction_key_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_transaction_key_column}
+                   WHEN ?6 IS NOT NULL AND {provider_transaction_key_column} IS NOT NULL
+                        AND ?6 <> {provider_transaction_key_column}
+                     THEN {provider_transaction_key_column}
                    ELSE COALESCE(?6, {provider_transaction_key_column})
                  END,
                  {provider_response_json_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {provider_response_json_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {provider_response_json_column}
                    ELSE ?7
                  END,
                  {granted_at_column} = CASE
@@ -574,18 +699,22 @@ fn promotion_reward_ledger_outcome_statement(
                  END,
                  {failed_at_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {failed_at_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {failed_at_column}
                    WHEN ?2 = 'failed' THEN COALESCE({failed_at_column}, ?9)
                    ELSE ?9
                  END,
                  {failure_reason_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {failure_reason_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {failure_reason_column}
                    ELSE ?10
                  END,
                  {updated_at_column} = CASE
                    WHEN {status_column} = 'success' AND ?2 <> 'success' THEN {updated_at_column}
+                   WHEN {status_column} = 'failed' AND ?2 = 'pending' THEN {updated_at_column}
                    ELSE ?11
                  END
              WHERE {id_column} = ?1
+               AND {provider_request_id_column} = ?3
              RETURNING {returning_columns}",
             table = table.table,
             status_column = table.status_column,
@@ -615,6 +744,129 @@ fn promotion_reward_ledger_outcome_statement(
             Value::Integer(now),
         ],
     ))
+}
+
+/// Store the transaction key on a pending row that does not hold a
+/// different key yet. PREPARED (key stored, execution not started) is the
+/// only phase `begin_promotion_reward_execute_tx` claims from. The phase
+/// guard also keeps an EXECUTING row from being reset to PREPARED by a
+/// re-store of the same key, which would enable a second execution.
+fn promotion_reward_ledger_store_key_statement(
+    table: PromotionRewardLedgerTable,
+    ledger_id: String,
+    provider_transaction_key: &str,
+    now: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    validate_promotion_reward_ledger_table(table)?;
+    Ok((
+        format!(
+            "UPDATE {table}
+             SET {provider_transaction_key_column} = ?2,
+                 {provider_status_column} = 'PREPARED',
+                 {updated_at_column} = ?3
+             WHERE {id_column} = ?1
+               AND {status_column} = 'pending'
+               AND {provider_status_column} IN ('PENDING', 'PREPARED')
+               AND ({provider_transaction_key_column} IS NULL
+                    OR {provider_transaction_key_column} = ?2)
+             RETURNING {returning_columns}",
+            table = table.table,
+            provider_transaction_key_column = table.provider_transaction_key_column,
+            provider_status_column = table.provider_status_column,
+            updated_at_column = table.updated_at_column,
+            id_column = table.id_column,
+            status_column = table.status_column,
+            returning_columns = promotion_reward_ledger_returning_columns(table),
+        ),
+        vec![
+            Value::Text(ledger_id),
+            Value::Text(provider_transaction_key.to_string()),
+            Value::Integer(now),
+        ],
+    ))
+}
+
+/// Claim execution: only a PREPARED row with a stored key transitions to
+/// EXECUTING, so concurrent workers cannot double-execute and terminal
+/// rows are never re-entered.
+fn promotion_reward_ledger_begin_execute_statement(
+    table: PromotionRewardLedgerTable,
+    ledger_id: String,
+    now: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    validate_promotion_reward_ledger_table(table)?;
+    Ok((
+        format!(
+            "UPDATE {table}
+             SET {provider_status_column} = 'EXECUTING',
+                 {updated_at_column} = ?2
+             WHERE {id_column} = ?1
+               AND {status_column} = 'pending'
+               AND {provider_status_column} = 'PREPARED'
+               AND {provider_transaction_key_column} IS NOT NULL
+             RETURNING {returning_columns}",
+            table = table.table,
+            provider_status_column = table.provider_status_column,
+            updated_at_column = table.updated_at_column,
+            id_column = table.id_column,
+            status_column = table.status_column,
+            provider_transaction_key_column = table.provider_transaction_key_column,
+            returning_columns = promotion_reward_ledger_returning_columns(table),
+        ),
+        vec![Value::Text(ledger_id), Value::Integer(now)],
+    ))
+}
+
+fn promotion_reward_ledger_recovery_statement(
+    table: PromotionRewardLedgerTable,
+    updated_before: i64,
+    limit: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    validate_promotion_reward_ledger_table(table)?;
+    if limit <= 0 {
+        return Err(bad_request(
+            "INVALID_PROMOTION_RECOVERY_LIMIT",
+            "promotion recovery limit must be positive",
+        ));
+    }
+    Ok((
+        format!(
+            "SELECT {returning_columns}
+             FROM {table}
+             WHERE {status_column} = 'pending'
+               AND {provider_status_column} = 'EXECUTING'
+               AND {updated_at_column} < ?1
+             ORDER BY {updated_at_column} ASC
+             LIMIT ?2",
+            returning_columns = promotion_reward_ledger_returning_columns(table),
+            table = table.table,
+            status_column = table.status_column,
+            provider_status_column = table.provider_status_column,
+            updated_at_column = table.updated_at_column,
+        ),
+        vec![Value::Integer(updated_before), Value::Integer(limit)],
+    ))
+}
+
+fn load_promotion_reward_ledger_by_id_tx(
+    tx: &mut Transaction,
+    table: PromotionRewardLedgerTable,
+    ledger_id: &str,
+) -> ApiResult<Option<PromotionRewardLedgerRecord>> {
+    validate_promotion_reward_ledger_table(table)?;
+    let sql = format!(
+        "SELECT {returning_columns}
+         FROM {table}
+         WHERE {id_column} = ?1
+         LIMIT 1",
+        returning_columns = promotion_reward_ledger_returning_columns(table),
+        table = table.table,
+        id_column = table.id_column,
+    );
+    let rows = db::tx_query(tx, &sql, &[Value::Text(ledger_id.to_string())])?;
+    rows.first()
+        .map(|row| promotion_reward_ledger_record_from_row(row))
+        .transpose()
 }
 
 fn load_promotion_reward_ledger_by_idempotency_context_tx(
@@ -1242,5 +1494,412 @@ mod tests {
         assert!(matches!(&params[1], Value::Text(value) if value == "attendance"));
         assert!(matches!(&params[2], Value::Text(value) if value == "pending"));
         assert!(matches!(&params[3], Value::Text(value) if value == "success"));
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_tests {
+    use super::*;
+    use crate::sql_test_support::{database, execute, query};
+    use serde_json::json;
+
+    fn insert_ledger(db: &rusqlite::Connection, id: &str) {
+        execute(
+            db,
+            "INSERT INTO promotion_reward_ledger (
+               id, user_id, campaign_id, source_type, source_id, reward_amount,
+               status, provider, provider_request_id, provider_status,
+               requested_at, created_at, updated_at
+             )
+             VALUES (?1, X'01', NULL, 'attendance_daily', '2026-09-17', 100,
+               'pending', 'TOSS', ?2, 'PENDING', 100, 100, 100)",
+            &[
+                Value::Text(id.to_string()),
+                Value::Text(format!("{id}-request")),
+            ],
+        );
+    }
+
+    fn row_columns(
+        db: &rusqlite::Connection,
+        id: &str,
+    ) -> (
+        String,
+        Option<String>,
+        Option<String>,
+        Option<i64>,
+        Option<i64>,
+    ) {
+        let rows = query(
+            db,
+            "SELECT status, provider_status, provider_transaction_key, granted_at, failed_at
+             FROM promotion_reward_ledger WHERE id = ?1",
+            &[Value::Text(id.to_string())],
+        );
+        let text = |value: &rusqlite::types::Value| match value {
+            rusqlite::types::Value::Text(v) => Some(v.clone()),
+            _ => None,
+        };
+        let integer = |value: &rusqlite::types::Value| match value {
+            rusqlite::types::Value::Integer(v) => Some(*v),
+            _ => None,
+        };
+        (
+            text(&rows[0][0]).unwrap_or_default(),
+            text(&rows[0][1]),
+            text(&rows[0][2]),
+            integer(&rows[0][3]),
+            integer(&rows[0][4]),
+        )
+    }
+
+    fn store_key(db: &rusqlite::Connection, id: &str, key: &str, now: i64) -> usize {
+        let (sql, params) = promotion_reward_ledger_store_key_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            id.to_string(),
+            key,
+            now,
+        )
+        .unwrap();
+        query(db, &sql, &params).len()
+    }
+
+    fn begin_execute(db: &rusqlite::Connection, id: &str, now: i64) -> usize {
+        let (sql, params) = promotion_reward_ledger_begin_execute_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            id.to_string(),
+            now,
+        )
+        .unwrap();
+        query(db, &sql, &params).len()
+    }
+
+    fn apply_outcome(
+        db: &rusqlite::Connection,
+        id: &str,
+        outcome: &PromotionRewardOutcome,
+        now: i64,
+    ) -> usize {
+        let (sql, params) = promotion_reward_ledger_outcome_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            id,
+            outcome,
+            now,
+        )
+        .unwrap();
+        query(db, &sql, &params).len()
+    }
+
+    fn outcome(response: serde_json::Value, request_id: &str) -> PromotionRewardOutcome {
+        promotion_reward_outcome_from_response(&response, request_id, Some(1000))
+    }
+
+    #[test]
+    fn stores_the_key_once_and_never_overwrites_a_different_key() {
+        let db = database();
+        insert_ledger(&db, "row");
+
+        assert_eq!(store_key(&db, "row", "key-1", 200), 1);
+        assert_eq!(
+            row_columns(&db, "row"),
+            (
+                "pending".into(),
+                Some("PREPARED".into()),
+                Some("key-1".into()),
+                None,
+                None
+            )
+        );
+
+        // Storing the same key again is idempotent (restart resumes with it).
+        assert_eq!(store_key(&db, "row", "key-1", 210), 1);
+        // A different key is rejected by the statement itself.
+        assert_eq!(store_key(&db, "row", "key-2", 220), 0);
+        assert_eq!(row_columns(&db, "row").2, Some("key-1".into()));
+    }
+
+    #[test]
+    fn only_one_worker_claims_the_execution() {
+        let db = database();
+        insert_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+
+        assert_eq!(begin_execute(&db, "row", 300), 1);
+        assert_eq!(row_columns(&db, "row").1, Some("EXECUTING".into()));
+        // The concurrent worker (and a restart that saw EXECUTING) cannot
+        // claim again: recovery must go through the status lookup.
+        assert_eq!(begin_execute(&db, "row", 310), 0);
+    }
+
+    #[test]
+    fn unprepared_or_terminal_rows_cannot_start_execution() {
+        let db = database();
+        insert_ledger(&db, "no-key");
+        // PENDING without a stored key: prepare must run first.
+        assert_eq!(begin_execute(&db, "no-key", 300), 0);
+
+        insert_ledger(&db, "terminal");
+        store_key(&db, "terminal", "key-1", 200);
+        begin_execute(&db, "terminal", 300);
+        apply_outcome(
+            &db,
+            "terminal",
+            &outcome(
+                json!({"ok": true, "providerStatus": "GRANTED", "grantedAt": 400}),
+                "terminal-request",
+            ),
+            400,
+        );
+        // A granted row is never re-entered.
+        assert_eq!(begin_execute(&db, "terminal", 500), 0);
+    }
+
+    #[test]
+    fn recovery_list_contains_only_rows_whose_execute_outcome_is_unknown() {
+        let db = database();
+        insert_ledger(&db, "prepared");
+        insert_ledger(&db, "executing");
+        store_key(&db, "prepared", "key-p", 200);
+        store_key(&db, "executing", "key-e", 200);
+        begin_execute(&db, "executing", 300);
+
+        let (sql, params) = promotion_reward_ledger_recovery_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            400,
+            10,
+        )
+        .unwrap();
+        let rows = query(&db, &sql, &params);
+        assert_eq!(rows.len(), 1);
+        let id = match &rows[0][0] {
+            rusqlite::types::Value::Text(value) => value.clone(),
+            _ => String::new(),
+        };
+        assert_eq!(id, "executing");
+
+        // Before the execute started, nothing is awaiting recovery.
+        let (sql, params) = promotion_reward_ledger_recovery_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            250,
+            10,
+        )
+        .unwrap();
+        assert!(query(&db, &sql, &params).is_empty());
+    }
+
+    #[test]
+    fn execute_outcomes_apply_only_to_the_matching_request() {
+        let db = database();
+        insert_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+        begin_execute(&db, "row", 300);
+
+        // Another request's response never lands on this ledger row.
+        assert_eq!(
+            apply_outcome(
+                &db,
+                "row",
+                &outcome(
+                    json!({"ok": true, "providerStatus": "GRANTED"}),
+                    "other-request"
+                ),
+                400,
+            ),
+            0
+        );
+        assert_eq!(row_columns(&db, "row").0, "pending");
+
+        // A matching request carrying a different transaction key applies
+        // the outcome but never overwrites the stored key.
+        assert_eq!(
+            apply_outcome(
+                &db,
+                "row",
+                &outcome(
+                    json!({"ok": true, "providerStatus": "GRANTED", "grantedAt": 900, "providerTransactionKey": "key-other"}),
+                    "row-request",
+                ),
+                400,
+            ),
+            1
+        );
+        let columns = row_columns(&db, "row");
+        assert_eq!(columns.0, "success");
+        assert_eq!(columns.2, Some("key-1".into()));
+        assert_eq!(columns.3, Some(900));
+
+        // A late PENDING response cannot revert the confirmed grant.
+        assert_eq!(
+            apply_outcome(
+                &db,
+                "row",
+                &outcome(
+                    json!({"ok": true, "providerStatus": "SUBMITTED"}),
+                    "row-request"
+                ),
+                500,
+            ),
+            1
+        );
+        assert_eq!(row_columns(&db, "row").0, "success");
+    }
+
+    #[test]
+    fn submitted_and_unknown_execute_outcomes_stay_pending_without_timestamps() {
+        let db = database();
+        for (id, response, stored_provider_status) in [
+            (
+                "submitted",
+                json!({"ok": true, "providerStatus": "SUBMITTED"}),
+                // SUBMITTED normalizes onto the pending taxonomy.
+                "PENDING",
+            ),
+            (
+                "unknown",
+                json!({"ok": false, "providerStatus": "UNKNOWN", "error": "INVALID_RESPONSE"}),
+                "UNKNOWN",
+            ),
+        ] {
+            insert_ledger(&db, id);
+            store_key(&db, id, "key-1", 200);
+            begin_execute(&db, id, 300);
+            assert_eq!(
+                apply_outcome(&db, id, &outcome(response, &format!("{id}-request")), 400),
+                1
+            );
+            assert_eq!(
+                row_columns(&db, id),
+                (
+                    "pending".into(),
+                    Some(stored_provider_status.into()),
+                    Some("key-1".into()),
+                    None,
+                    None,
+                )
+            );
+        }
+    }
+
+    #[test]
+    fn confirmed_failure_keeps_failure_diagnostics() {
+        let db = database();
+        insert_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+        begin_execute(&db, "row", 300);
+        assert_eq!(
+            apply_outcome(
+                &db,
+                "row",
+                &outcome(
+                    json!({"ok": false, "providerStatus": "FAILED", "providerErrorCode": "4116", "failureReason": "budget exhausted"}),
+                    "row-request",
+                ),
+                400,
+            ),
+            1
+        );
+        assert_eq!(row_columns(&db, "row").0, "failed");
+        // The parser falls back to the request timestamp for the failure
+        // time when the provider did not report one.
+        assert_eq!(row_columns(&db, "row").4, Some(1000));
+    }
+
+    #[test]
+    fn same_key_cannot_reset_an_executing_row_to_prepared() {
+        let db = database();
+        insert_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+        assert_eq!(begin_execute(&db, "row", 300), 1);
+
+        // Re-storing the same key after execution started must not flip the
+        // row back to PREPARED (that would enable a second execution).
+        assert_eq!(store_key(&db, "row", "key-1", 400), 0);
+        assert_eq!(row_columns(&db, "row").1, Some("EXECUTING".into()));
+    }
+
+    #[test]
+    fn late_non_terminal_outcomes_cannot_resurrect_a_confirmed_failure() {
+        let db = database();
+        insert_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+        begin_execute(&db, "row", 300);
+        assert_eq!(
+            apply_outcome(
+                &db,
+                "row",
+                &outcome(
+                    json!({"ok": false, "providerStatus": "FAILED", "providerErrorCode": "4116", "failureReason": "budget exhausted"}),
+                    "row-request",
+                ),
+                400,
+            ),
+            1
+        );
+
+        // A late UNKNOWN/SUBMITTED response for the same request keeps the
+        // confirmed failure and its diagnostics; it cannot park the row in
+        // pending limbo.
+        for response in [
+            json!({"ok": false, "providerStatus": "UNKNOWN", "providerTransactionKey": "key-1"}),
+            json!({"ok": true, "providerStatus": "SUBMITTED"}),
+        ] {
+            assert_eq!(
+                apply_outcome(&db, "row", &outcome(response, "row-request"), 500),
+                1
+            );
+            assert_eq!(row_columns(&db, "row").0, "failed");
+            assert_eq!(row_columns(&db, "row").4, Some(1000));
+        }
+        let rows = query(
+            &db,
+            "SELECT provider_error_code, failure_reason FROM promotion_reward_ledger WHERE id = 'row'",
+            &[],
+        );
+        let text = |value: &rusqlite::types::Value| match value {
+            rusqlite::types::Value::Text(v) => Some(v.clone()),
+            _ => None,
+        };
+        assert_eq!(text(&rows[0][0]).as_deref(), Some("4116"));
+        assert_eq!(text(&rows[0][1]).as_deref(), Some("budget exhausted"));
+
+        // A late GRANTED confirmation still upgrades the failed row.
+        assert_eq!(
+            apply_outcome(
+                &db,
+                "row",
+                &outcome(
+                    json!({"ok": true, "providerStatus": "GRANTED", "grantedAt": 900}),
+                    "row-request",
+                ),
+                600,
+            ),
+            1
+        );
+        assert_eq!(row_columns(&db, "row").0, "success");
+        assert_eq!(row_columns(&db, "row").3, Some(900));
+    }
+
+    #[test]
+    fn unknown_survives_a_failure_envelope_in_the_parser() {
+        let normalized = promotion_provider_status_from_response(&json!({
+            "ok": false,
+            "providerStatus": "UNKNOWN",
+            "providerTransactionKey": "key-1"
+        }));
+        assert_eq!(normalized, "UNKNOWN");
+        assert_eq!(promotion_ledger_status(&normalized), "pending");
+
+        assert_eq!(promotion_ledger_status("SUBMITTED"), "pending");
+        assert_eq!(promotion_ledger_status("GRANTED"), "success");
+        assert_eq!(promotion_ledger_status("ERROR"), "failed");
+
+        let parsed = promotion_reward_outcome_from_response(
+            &json!({"ok": false, "providerStatus": "UNKNOWN"}),
+            "request-1",
+            Some(900),
+        );
+        assert_eq!(parsed.provider_status, "UNKNOWN");
+        assert_eq!(parsed.granted_at, None);
+        assert_eq!(parsed.failed_at, None);
     }
 }

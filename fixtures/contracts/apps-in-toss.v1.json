@@ -398,6 +398,29 @@
       },
       "providerStatus": "FAILED",
       "ledgerStatus": "failed"
+    },
+    {
+      "id": "execute-submitted",
+      "response": {
+        "ok": true,
+        "providerRequestId": "fixture-request",
+        "providerTransactionKey": "fixture-key",
+        "providerStatus": "SUBMITTED"
+      },
+      "providerStatus": "PENDING",
+      "ledgerStatus": "pending"
+    },
+    {
+      "id": "execute-unknown",
+      "response": {
+        "ok": false,
+        "providerRequestId": "fixture-request",
+        "providerTransactionKey": "fixture-key",
+        "providerStatus": "UNKNOWN",
+        "error": "INVALID_RESPONSE"
+      },
+      "providerStatus": "UNKNOWN",
+      "ledgerStatus": "pending"
     }
   ],
   "message": [
