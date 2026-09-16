@@ -465,7 +465,7 @@ async function loadFullScreenAdAsync({
       });
       cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
-        cleanup();
+        cleanupBestEffort();
       }
     } catch (error) {
       settleReject(
@@ -483,8 +483,8 @@ async function loadFullScreenAdAsync({
       }
       settled = true;
       clearLoadTimeout();
-      cleanup();
       resolve();
+      cleanupBestEffort();
     }
 
     function settleReject(error: unknown) {
@@ -493,8 +493,17 @@ async function loadFullScreenAdAsync({
       }
       settled = true;
       clearLoadTimeout();
-      cleanup();
       reject(error);
+      cleanupBestEffort();
+    }
+
+    function cleanupBestEffort() {
+      try {
+        cleanup();
+      } catch {
+        // SDK listener cleanup is best-effort and must not leave the load
+        // promise unsettled or replace its result.
+      }
     }
   });
 }
@@ -646,7 +655,7 @@ async function showFullScreenAdAsync({
       });
       cleanup = createCleanupOnce(nextCleanup);
       if (settled) {
-        cleanup();
+        cleanupBestEffort();
       }
     } catch (error) {
       settleReject(
@@ -680,7 +689,6 @@ async function showFullScreenAdAsync({
       if (rewardFallbackTimeout != null) {
         clearTimeout(rewardFallbackTimeout);
       }
-      cleanup();
       resolve({
         adFormat,
         adGroupId,
@@ -693,6 +701,7 @@ async function showFullScreenAdAsync({
         unitAmount,
         unitType,
       });
+      cleanupBestEffort();
     }
 
     function settleReject(error: unknown) {
@@ -707,8 +716,17 @@ async function showFullScreenAdAsync({
       if (rewardFallbackTimeout != null) {
         clearTimeout(rewardFallbackTimeout);
       }
-      cleanup();
       reject(error);
+      cleanupBestEffort();
+    }
+
+    function cleanupBestEffort() {
+      try {
+        cleanup();
+      } catch {
+        // SDK listener cleanup is best-effort and must not leave the show
+        // promise unsettled or replace its result.
+      }
     }
 
     function scheduleInterstitialFallback() {

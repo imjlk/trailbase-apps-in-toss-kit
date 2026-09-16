@@ -671,4 +671,132 @@ describe("AppsInToss full-screen ad bridge", () => {
     expect(requests[0].headers.get("authorization")).toBe("Bearer token");
     expect(requests[0].headers.get("content-type")).toBe("application/json");
   });
+
+  test("settles show results when SDK cleanup throws on success, failure, and timeout", async () => {
+    const throwingCleanup = () => {
+      throw new Error("listener removal failed");
+    };
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return throwingCleanup;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+
+    const successBridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd,
+    });
+    const success = successBridge.show({
+      adFormat: "rewarded",
+      adGroupId: "rewarded",
+    });
+    showCalls[0].onEvent({ type: "userEarnedReward", data: { unitAmount: 5 } });
+    showCalls[0].onEvent({ type: "dismissed" });
+    await expect(success).resolves.toMatchObject({
+      earned: true,
+      unitAmount: 5,
+    });
+
+    const failureBridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd,
+    });
+    const failure = failureBridge.show({
+      adFormat: "rewarded",
+      adGroupId: "rewarded",
+    });
+    showCalls[1].onEvent({ type: "failedToShow" });
+    await expect(failure).rejects.toMatchObject({ code: "AD_SHOW_FAILED" });
+
+    const timeoutBridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd,
+      showTimeoutMs: 1,
+    });
+    await expect(
+      timeoutBridge.show({ adFormat: "rewarded", adGroupId: "rewarded" }),
+    ).rejects.toMatchObject({ code: "AD_SHOW_TIMEOUT" });
+  });
+
+  test("settles injected preload results when SDK cleanup throws", async () => {
+    const throwingCleanup = () => {
+      throw new Error("listener removal failed");
+    };
+    const loadCalls: Array<{
+      onError: (error: unknown) => void;
+      onEvent: (event: AppsInTossLoadFullScreenAdEvent) => void;
+    }> = [];
+    const loadFullScreenAd = Object.assign(
+      ({ onError, onEvent }) => {
+        loadCalls.push({ onError, onEvent });
+        return throwingCleanup;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossLoadFullScreenAd;
+
+    const successBridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+    });
+    const success = successBridge.preload({ adGroupId: "rewarded" });
+    loadCalls[0].onEvent({ type: "loaded" });
+    await expect(success).resolves.toBeUndefined();
+
+    const failureBridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+    });
+    const failure = failureBridge.preload({ adGroupId: "rewarded" });
+    loadCalls[1].onError(new Error("ad load failed"));
+    await expect(failure).rejects.toMatchObject({ code: "AD_LOAD_FAILED" });
+
+    const timeoutBridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+      loadTimeoutMs: 1,
+    });
+    await expect(
+      timeoutBridge.preload({ adGroupId: "rewarded" }),
+    ).rejects.toMatchObject({ code: "AD_LOAD_TIMEOUT" });
+  });
+
+  test("runs throwing cleanup once and keeps settled results when callbacks fire synchronously", async () => {
+    let loadCleanupCalls = 0;
+    let showCleanupCalls = 0;
+    const loadFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        onEvent({ type: "loaded" });
+        return () => {
+          loadCleanupCalls += 1;
+          throw new Error("load listener removal failed");
+        };
+      },
+      { isSupported: () => true },
+    ) as AppsInTossLoadFullScreenAd;
+    const showCalls: Array<{
+      onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+    }> = [];
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        showCalls.push({ onEvent });
+        return () => {
+          showCleanupCalls += 1;
+          throw new Error("show listener removal failed");
+        };
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      loadFullScreenAd,
+      showFullScreenAd,
+    });
+
+    await expect(bridge.preload({ adGroupId: "rewarded" })).resolves.toBeUndefined();
+    const shown = bridge.show({ adFormat: "rewarded", adGroupId: "rewarded" });
+    showCalls[0].onEvent({ type: "userEarnedReward", data: { unitAmount: 2 } });
+    showCalls[0].onEvent({ type: "dismissed" });
+    showCalls[0].onEvent({ type: "failedToShow" });
+    await expect(shown).resolves.toMatchObject({ earned: true, unitAmount: 2 });
+    expect(loadCleanupCalls).toBe(1);
+    expect(showCleanupCalls).toBe(1);
+  });
 });

@@ -22,13 +22,13 @@
     "./package.json": "./package.json"
   },
   "peerDependencies": {
-    "@apps-in-toss/framework": ">=2.5.0",
+    "@apps-in-toss/framework": ">=2.10.10",
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
   },
   "scripts": {
     "test": "bun test"
   },
   "dependencies": {
-    "@ait-kit/sdk": "^0.2.0"
+    "@ait-kit/sdk": "0.3.0"
   }
 }

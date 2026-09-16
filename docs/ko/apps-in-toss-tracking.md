@@ -104,6 +104,13 @@ root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새
 - `2.10.10`: RN reference를 갱신하고 `bun run packages:typecheck`로 주입 adapter와
   실제 설치된 SDK 타입의 호환성을 검사합니다. SDK에 구독 구매·조회 API가 포함되어 있지만,
   이를 kit에서 사용하는 작업은 별도 기능 변경입니다.
+- `2.10.10` 최소 지원 채택: `@ait-kit/sdk` 0.3.0이 peer 하한으로
+  `@apps-in-toss/framework@>=2.10.10`을 선언함에 따라, kit의 RN peer 하한과
+  최소 버전 fixture alias를 `2.5.0`에서 `2.10.10`으로 함께 올렸습니다. 기본 로더 위임
+  경로(로그인, 익명 키, 광고 load, IAP 구매·대기 주문, web identity/저장소/공유)는
+  `packages/ait-rn/test/default-loader.test.ts`와
+  `packages/ait-web/test/default-loader.test.ts`가 공식 모듈을 mock해 검사합니다.
+  실제 토스 앱 검증은 컨슈머 앱의 책임으로 남아 있습니다.
 
 2026년 7월 API 변경으로 promotion·Smart Message는 익명 수신자를 지원합니다. Kit도
 이제 익명키 검증, 비공개 identity 저장소, 메시지 수신자 타입, 익명 promotion adapter를
@@ -151,7 +158,7 @@ branch push와 pull request 생성 권한이 있어야 합니다.
 ## RN SDK 호환성 매트릭스
 
 CI는 kit 어댑터·클라이언트의 실제 소스와 타입 계약을 검토 기준 SDK와 선언된 최소
-`@apps-in-toss/framework@2.5.0` 양쪽으로 컴파일합니다. 최소 버전은 개발 전용 npm
+`@apps-in-toss/framework@2.10.10` 양쪽으로 컴파일합니다. 최소 버전은 개발 전용 npm
 alias로 정확히 고정하고, `tsconfig.sdk-min.json`이 해당 타입 검사에서 SDK import를
 최소 버전으로 연결합니다. `check-sdk-minimum.mjs`는 설치 버전·peer 하한·경로 매핑을
 검증해 최소 버전 검사가 최신 버전 검사로 바뀌는 것을 막습니다. Renovate는 이 하한
