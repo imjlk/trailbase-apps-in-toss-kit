@@ -497,6 +497,30 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     expect(res.body.error).toBeUndefined();
   });
 
+  test("user-key status responses redact the echoed recipient", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4111", reason: "user-status-recipient not found" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          promotionCode: "campaign",
+          providerTransactionKey: "missing-key",
+          providerRequestId: "ledger-request-u",
+          tossUserKey: "user-status-recipient",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.providerRequestId).toBe("ledger-request-u");
+      expect(JSON.stringify(res.body)).not.toContain("user-status-recipient");
+    });
+  });
+
   test("promotion status uses only the result endpoint with the persisted key", async () => {
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {

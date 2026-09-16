@@ -82,12 +82,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
     // log a provider-echoed recipient; every other path redacts, so the
     // direct execute route does too — for anonymous keys and Toss user
     // keys alike.
-    const recipient =
-      body?.anonKey !== undefined
-        ? requireAnonymousKey(body.anonKey)
-        : typeof body?.tossUserKey === "string" && body.tossUserKey.trim()
-          ? body.tossUserKey.trim()
-          : undefined;
+    const recipient = resolveRecipient(body);
     const result = recipient !== undefined ? redactRecipient(executed, recipient) : executed;
     return response(200, result);
   }
@@ -237,9 +232,8 @@ async function promotionRewardStatus(core, body) {
       ...status,
       ...(providerRequestId !== undefined ? { providerRequestId } : {}),
     };
-    return body?.anonKey !== undefined
-      ? redactRecipient(withRequestId, requireAnonymousKey(body.anonKey))
-      : withRequestId;
+    const recipient = resolveRecipient(body);
+    return recipient !== undefined ? redactRecipient(withRequestId, recipient) : withRequestId;
   }
   // Legacy ledger consumers classify anything besides GRANTED/PENDING as
   // failed, so an indeterminate (UNKNOWN) outcome must stay PENDING here —
@@ -259,9 +253,8 @@ async function promotionRewardStatus(core, body) {
     ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
     ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
   };
-  return body?.anonKey !== undefined
-    ? redactRecipient(mapped, requireAnonymousKey(body.anonKey))
-    : mapped;
+  const mappedRecipient = resolveRecipient(body);
+  return mappedRecipient !== undefined ? redactRecipient(mapped, mappedRecipient) : mapped;
 }
 
 // Legacy IAP wire shape: keep the 0.2 response fields, drop the 0.3
@@ -304,6 +297,17 @@ function legacyIapResponse(result, mode) {
   if (result.reason !== undefined) legacy.reason = result.reason;
   if (result.attempts !== undefined) legacy.attempts = result.attempts;
   return legacy;
+}
+
+// The documented recipient contract accepts anonKey or tossUserKey;
+// provider-echoed identifiers of either kind must never reach downstream
+// persistence or logs.
+function resolveRecipient(body) {
+  if (body?.anonKey !== undefined) return requireAnonymousKey(body.anonKey);
+  if (typeof body?.tossUserKey === "string" && body.tossUserKey.trim()) {
+    return body.tossUserKey.trim();
+  }
+  return undefined;
 }
 
 function redactRecipient(value, recipient) {
