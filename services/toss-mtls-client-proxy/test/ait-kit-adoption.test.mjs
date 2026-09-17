@@ -567,6 +567,190 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
+  test("prepare failures echo-redact the submitted recipient", async () => {
+    // The get-key rejection embeds the submitted anonymous key in its
+    // failure reason; the prepare response must redact it like execute and
+    // status do.
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4100", reason: "recipient anon-prepare-recipient-key is not allowed" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {
+          anonKey: "anon-prepare-recipient-key",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerErrorCode).toBe("4100");
+      expect(JSON.stringify(res.body)).not.toContain("anon-prepare-recipient-key");
+      expect(JSON.stringify(res.body)).toContain("[redacted]");
+    });
+  });
+
+  test("numeric recipients never corrupt unrelated response fields", async () => {
+    // A short numeric id must not feed the substring redactor: keys like
+    // "key-1" and coded reasons stay intact when the recipient is 1.
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4113", reason: "already granted for order 1 of user 1" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+          userKey: 1,
+          promotionCode: "campaign",
+          amount: 5,
+          providerTransactionKey: "key-1",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerTransactionKey).toBe("key-1");
+      expect(res.body.providerErrorCode).toBe("4113");
+      // Free text with the short id passes through verbatim — the gate
+      // exists so the replacer never mangles fields like this.
+      expect(JSON.stringify(res.body)).toContain("already granted for order 1 of user 1");
+      expect(JSON.stringify(res.body)).not.toContain("[redacted]");
+    });
+  });
+
+  test("short string recipients skip substring redaction via the length gate", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4113", reason: "already granted for user 42" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+          tossUserKey: "42",
+          promotionCode: "campaign",
+          amount: 5,
+          providerTransactionKey: "key-42",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.providerErrorCode).toBe("4113");
+      expect(JSON.stringify(res.body)).toContain("user 42");
+      expect(JSON.stringify(res.body)).not.toContain("[redacted]");
+    });
+  });
+
+  test("long string userKey recipients still get provider-echo redaction", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4100", reason: "recipient user-hash-abcdef123 is not allowed" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {
+          userKey: "user-hash-abcdef123",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(JSON.stringify(res.body)).not.toContain("user-hash-abcdef123");
+      expect(JSON.stringify(res.body)).toContain("[redacted]");
+    });
+  });
+
+  for (const [label, recipientBody] of [
+    ["as JSON numbers", { userKey: 4437311042 }],
+    ["as string Toss user keys", { tossUserKey: "4437311042" }],
+    ["as JSON-number Toss user keys", { tossUserKey: 4437311042 }],
+  ]) {
+    test(`long numeric recipients (${label}) stay redacted`, async () => {
+      const upstreamServer = http.createServer(async (req, res) => {
+        await readRequestJson(req);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({
+          resultType: "FAIL",
+          error: { errorCode: "4100", reason: "recipient 4437311042 is not allowed" },
+        }));
+      });
+      await withServer(upstreamServer, async (upstreamBaseUrl) => {
+        const res = await handleRequest(
+          request("POST", PROXY_ENDPOINTS.promotionPrepareReward, recipientBody, { authorization: "Bearer secret" }),
+          { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+        );
+        expect(res.body.ok).toBe(false);
+        expect(JSON.stringify(res.body)).not.toContain("4437311042");
+        expect(JSON.stringify(res.body)).toContain("[redacted]");
+      });
+    });
+  }
+
+  test("a recipient spelling that fails validation still gets scrubbed after dispatch", async () => {
+    // requireAnonymousKey rejects over-length keys, but the core already
+    // dispatched: the completed response must come back scrubbed with the
+    // raw value, not as an INVALID_ANONYMOUS_KEY error and not unredacted.
+    const malformed = `anon-${"x".repeat(4100)}`;
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4100", reason: `recipient ${malformed} is not allowed` },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {
+          anonKey: malformed,
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerErrorCode).toBe("4100");
+      expect(JSON.stringify(res.body)).not.toContain(malformed);
+      expect(JSON.stringify(res.body)).toContain("[redacted]");
+    });
+  });
+
+  test("all-digit recipients of gate-passing length skip substring redaction", async () => {
+    // "12345678" would substring-match inside transaction keys and request
+    // ids; the gate excludes all-digit candidates from rewriting.
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4113", reason: "already granted for 12345678" },
+      }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+          tossUserKey: "12345678",
+          promotionCode: "campaign",
+          amount: 5,
+          providerTransactionKey: "tx-12345678-01",
+        }, { authorization: "Bearer secret" }),
+        { mode: "forward", internalToken: "secret", upstreamBaseUrl },
+      );
+      expect(res.body.providerTransactionKey).toBe("tx-12345678-01");
+      expect(JSON.stringify(res.body)).toContain("for 12345678");
+      expect(JSON.stringify(res.body)).not.toContain("[redacted]");
+    });
+  });
+
   test("plain-HTTP 204, 205, and 304 responses carry a null body without crashing", async () => {
     for (const status of [204, 205, 304]) {
       const upstreamServer = http.createServer((req, res) => {

@@ -439,14 +439,16 @@ pub fn apply_promotion_reward_outcome_tx(
 
 /// Persist the prepare-issued transaction key on a pending ledger row that
 /// has not started executing, in its own committed transaction, BEFORE any
-/// execute call. The row is marked `protocol = 'three-step'`; an existing
-/// different key is never overwritten, and a restart reuses the stored key
-/// instead of issuing a new one for the same grant. Adoption targets
-/// keyless rows only: a legacy row that already holds a key may have
-/// started executing under the old flow (its execution facts are unknown),
-/// so re-storing its key can never re-flag it for a fresh claim — settle
-/// such rows through the status lookup instead. Never touches the
-/// execution-start marker or the provider outcome.
+/// execute call. Only rows already stamped `protocol = 'three-step'`
+/// (created by the v2 insert, which stamps them at creation) can store a
+/// key: a keyless v2 row is genuinely never-executed because the v2 claim
+/// requires a stored key on a three-step row. Legacy rows — keyed or not —
+/// are never adopted: a legacy row that executed but crashed before the
+/// caller persisted its key is keyless and indistinguishable from a
+/// never-dispatched one, so adopting it could double-grant; settle legacy
+/// rows through explicit reconciliation instead. An existing different key
+/// is never overwritten, a restart reuses the stored key, and the store
+/// never touches the execution-start marker or the provider outcome.
 pub fn store_promotion_transaction_key_tx(
     tx: &mut Transaction,
     table: PromotionRewardLedgerTable,
@@ -793,10 +795,10 @@ fn promotion_reward_ledger_store_key_statement(
                  {updated_at_column} = ?3
              WHERE {id_column} = ?1
                AND {status_column} = 'pending'
+               AND {protocol_column} = 'three-step'
                AND {execution_started_at_column} IS NULL
                AND ({provider_transaction_key_column} IS NULL
-                    OR ({provider_transaction_key_column} = ?2
-                        AND {protocol_column} = 'three-step'))
+                    OR {provider_transaction_key_column} = ?2)
              RETURNING {returning_columns}",
             table = table.table,
             provider_transaction_key_column = table.provider_transaction_key_column,
@@ -1599,6 +1601,13 @@ mod sql_tests {
         assert_eq!(query(db, &sql, &params).len(), 1);
     }
 
+    fn sql_text(value: &rusqlite::types::Value) -> Option<&str> {
+        match value {
+            rusqlite::types::Value::Text(v) => Some(v.as_str()),
+            _ => None,
+        }
+    }
+
     #[derive(Debug, PartialEq, Eq)]
     struct RowColumns {
         status: String,
@@ -1617,19 +1626,15 @@ mod sql_tests {
              FROM promotion_reward_ledger WHERE id = ?1",
             &[Value::Text(id.to_string())],
         );
-        let text = |value: &rusqlite::types::Value| match value {
-            rusqlite::types::Value::Text(v) => Some(v.clone()),
-            _ => None,
-        };
         let integer = |value: &rusqlite::types::Value| match value {
             rusqlite::types::Value::Integer(v) => Some(*v),
             _ => None,
         };
         RowColumns {
-            status: text(&rows[0][0]).unwrap_or_default(),
-            provider_status: text(&rows[0][1]),
+            status: sql_text(&rows[0][0]).unwrap_or_default().to_string(),
+            provider_status: sql_text(&rows[0][1]).map(str::to_string),
             execution_started_at: integer(&rows[0][2]),
-            protocol: text(&rows[0][3]),
+            protocol: sql_text(&rows[0][3]).map(str::to_string),
             granted_at: integer(&rows[0][4]),
             failed_at: integer(&rows[0][5]),
         }
@@ -1746,11 +1751,13 @@ mod sql_tests {
         assert_eq!(row_columns(&db, "legacy-keyed").protocol, None);
         assert_eq!(begin_execute(&db, "legacy-keyed", 300), 0);
 
-        // Keyless legacy rows remain adoptable through an explicit
-        // prepare + store.
+        // Keyless legacy rows are equally unadoptable: a legacy grant that
+        // executed but crashed before the caller persisted its key leaves
+        // exactly this shape, and adopting it could double-grant.
         insert_legacy_ledger(&db, "legacy-bare");
-        assert_eq!(store_key(&db, "legacy-bare", "fresh-key", 200), 1);
-        assert_eq!(begin_execute(&db, "legacy-bare", 300), 1);
+        assert_eq!(store_key(&db, "legacy-bare", "fresh-key", 200), 0);
+        assert_eq!(begin_execute(&db, "legacy-bare", 300), 0);
+        assert_eq!(row_columns(&db, "legacy-bare").protocol, None);
     }
 
     #[test]
@@ -1793,17 +1800,15 @@ mod sql_tests {
         // A granted row is never re-entered.
         assert_eq!(begin_execute(&db, "terminal", 500), 0);
 
-        // A legacy row cannot execute as-is (no three-step marker), but an
-        // explicit prepare + key store adopts it into the new contract —
-        // recovery never does this automatically.
+        // Legacy rows are never adopted, keyed or not: a crashed legacy
+        // grant can leave a keyless executed row that is indistinguishable
+        // from a never-dispatched one. Only v2-created rows (stamped at
+        // insert) can store keys and claim.
         insert_legacy_ledger(&db, "legacy");
         assert_eq!(begin_execute(&db, "legacy", 300), 0);
-        assert_eq!(store_key(&db, "legacy", "key-l", 200), 1);
-        assert_eq!(
-            row_columns(&db, "legacy").protocol,
-            Some("three-step".into())
-        );
-        assert_eq!(begin_execute(&db, "legacy", 310), 1);
+        assert_eq!(store_key(&db, "legacy", "key-l", 200), 0);
+        assert_eq!(row_columns(&db, "legacy").protocol, None);
+        assert_eq!(begin_execute(&db, "legacy", 310), 0);
     }
 
     #[test]
@@ -2084,12 +2089,8 @@ mod sql_tests {
             "SELECT provider_error_code, failure_reason FROM promotion_reward_ledger WHERE id = 'row'",
             &[],
         );
-        let text = |value: &rusqlite::types::Value| match value {
-            rusqlite::types::Value::Text(v) => Some(v.clone()),
-            _ => None,
-        };
-        assert_eq!(text(&rows[0][0]).as_deref(), Some("4116"));
-        assert_eq!(text(&rows[0][1]).as_deref(), Some("budget exhausted"));
+        assert_eq!(sql_text(&rows[0][0]), Some("4116"));
+        assert_eq!(sql_text(&rows[0][1]), Some("budget exhausted"));
 
         // A late GRANTED confirmation still upgrades the failed row.
         assert_eq!(
@@ -2106,6 +2107,165 @@ mod sql_tests {
         );
         assert_eq!(row_columns(&db, "row").status, "success");
         assert_eq!(row_columns(&db, "row").granted_at, Some(900));
+    }
+
+    #[test]
+    fn interrupted_migration_rolls_back_and_is_retryable() {
+        // A failure mid-file (the second ALTER hits a pre-existing column)
+        // must leave NO partial state behind: no half-added columns, no
+        // backfilled rows — and a clean re-run must then succeed.
+        let dir =
+            std::env::temp_dir().join(format!("promotion-v2-atomicity-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let db_path = dir.join("ledger.db");
+        let _ = std::fs::remove_file(&db_path);
+
+        let v1_schema = "CREATE TABLE promotion_reward_ledger (
+            id TEXT PRIMARY KEY,
+            user_id BLOB NOT NULL,
+            campaign_id TEXT,
+            source_type TEXT NOT NULL,
+            source_id TEXT,
+            reward_amount INTEGER NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            provider TEXT NOT NULL DEFAULT 'TOSS',
+            provider_request_id TEXT NOT NULL UNIQUE,
+            provider_status TEXT,
+            provider_error_code TEXT,
+            provider_transaction_key TEXT,
+            provider_response_json TEXT,
+            requested_at INTEGER NOT NULL,
+            granted_at INTEGER,
+            failed_at INTEGER,
+            failure_reason TEXT,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          ) STRICT;";
+
+        // Seed the v1 table with the column that will collide mid-file:
+        // the first ALTER (protocol) succeeds inside the transaction, the
+        // second (execution_started_at) fails, and everything rolls back.
+        {
+            let db = rusqlite::Connection::open(&db_path).unwrap();
+            db.execute_batch(v1_schema).unwrap();
+            db.execute_batch(
+                "ALTER TABLE promotion_reward_ledger ADD COLUMN execution_started_at INTEGER;",
+            )
+            .unwrap();
+            db.execute(
+                "INSERT INTO promotion_reward_ledger (
+                   id, user_id, source_type, reward_amount, status, provider,
+                   provider_request_id, provider_status, provider_transaction_key,
+                   requested_at, created_at, updated_at
+                 ) VALUES ('prepared-1', X'01', 'attendance_daily', 5, 'pending', 'TOSS',
+                   'prepared-1-request', 'PREPARED', 'key-1', 50, 50, 60)",
+                [],
+            )
+            .unwrap();
+
+            let result = db.execute_batch(include_str!(
+                "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
+            ));
+            assert!(result.is_err(), "the colliding column must fail the batch");
+            // Dropping the connection rolls the open transaction back.
+        }
+
+        // A fresh handle sees no partial state: the protocol column never
+        // landed and the PREPARED row is untouched.
+        {
+            let db = rusqlite::Connection::open(&db_path).unwrap();
+            let protocol_columns = db
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('promotion_reward_ledger')
+                     WHERE name = 'protocol'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap();
+            assert_eq!(protocol_columns, 0);
+            let provider_status = db
+                .query_row(
+                    "SELECT provider_status FROM promotion_reward_ledger WHERE id = 'prepared-1'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .unwrap();
+            assert_eq!(provider_status, "PREPARED");
+
+            // Remove the seeded collision and retry: the migration now
+            // completes (schema only — no backfill exists to land).
+            db.execute_batch(
+                "ALTER TABLE promotion_reward_ledger DROP COLUMN execution_started_at;",
+            )
+            .unwrap();
+            db.execute_batch(include_str!(
+                "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
+            ))
+            .unwrap();
+            // The retry lands the schema; with no backfill, the legacy
+            // row stays unmarked and keeps its original provider_status.
+            let row = db
+                .query_row(
+                    "SELECT protocol, provider_status FROM promotion_reward_ledger
+                     WHERE id = 'prepared-1'",
+                    [],
+                    |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, String>(1)?)),
+                )
+                .unwrap();
+            assert_eq!(row, (None, "PREPARED".to_string()));
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn migration_nests_inside_a_runner_transaction() {
+        // A migration runner that wraps each file in its own transaction
+        // must be able to apply the savepoint-based migration without a
+        // "cannot start a transaction within a transaction" failure, with
+        // the runner's COMMIT persisting the result.
+        // Build the v1 table shape (pre-v2 columns) directly.
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch(
+            "CREATE TABLE promotion_reward_ledger (
+               id TEXT PRIMARY KEY,
+               user_id BLOB NOT NULL,
+               campaign_id TEXT,
+               source_type TEXT NOT NULL,
+               source_id TEXT,
+               reward_amount INTEGER NOT NULL,
+               status TEXT NOT NULL DEFAULT 'pending',
+               provider TEXT NOT NULL DEFAULT 'TOSS',
+               provider_request_id TEXT NOT NULL UNIQUE,
+               provider_status TEXT,
+               provider_error_code TEXT,
+               provider_transaction_key TEXT,
+               provider_response_json TEXT,
+               requested_at INTEGER NOT NULL,
+               granted_at INTEGER,
+               failed_at INTEGER,
+               failure_reason TEXT,
+               created_at INTEGER NOT NULL,
+               updated_at INTEGER NOT NULL
+             ) STRICT;",
+        )
+        .unwrap();
+
+        db.execute_batch("BEGIN").unwrap();
+        db.execute_batch(include_str!(
+            "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
+        ))
+        .unwrap();
+        db.execute_batch("COMMIT").unwrap();
+
+        let columns = db
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('promotion_reward_ledger')
+                 WHERE name IN ('protocol', 'execution_started_at')",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap();
+        assert_eq!(columns, 2);
     }
 
     #[test]
@@ -2162,37 +2322,87 @@ mod sql_tests {
              ) STRICT;",
         )
         .unwrap();
-        db.execute(
-            "INSERT INTO promotion_reward_ledger (
-               id, user_id, source_type, reward_amount, status, provider,
-               provider_request_id, provider_status, provider_transaction_key,
-               requested_at, created_at, updated_at
-             ) VALUES ('legacy-1', X'01', 'attendance_daily', 100, 'success', 'TOSS',
-               'legacy-request', 'GRANTED', 'legacy-key', 50, 50, 60)",
-            [],
-        )
-        .unwrap();
+        // Every legacy row class — settled, PREPARED (key stored, claim
+        // not provably never made: the 0.11 store fence admitted PENDING
+        // too, so a store replay could re-mark an executed-then-PENDING
+        // row), EXECUTING, unsettled outcome statuses, NULL, non-pending
+        // PREPARED, and keyless PREPARED — stays unmarked and unclaimable.
+        let mut expected: Vec<(String, &str, Option<String>, Option<&str>)> = vec![
+            (
+                "legacy-settled".to_string(),
+                "success",
+                Some("GRANTED".to_string()),
+                Some("legacy-key"),
+            ),
+            (
+                "legacy-prepared".to_string(),
+                "pending",
+                Some("PREPARED".to_string()),
+                Some("legacy-key"),
+            ),
+        ];
+        for provider_status in ["EXECUTING", "SUBMITTED", "UNKNOWN", "PENDING"] {
+            expected.push((
+                format!("legacy-inflight-{provider_status}"),
+                "pending",
+                Some(provider_status.to_string()),
+                Some("legacy-key"),
+            ));
+        }
+        expected.push((
+            "legacy-inflight-null".to_string(),
+            "pending",
+            None,
+            Some("legacy-key"),
+        ));
+        expected.push((
+            "legacy-prepared-failed".to_string(),
+            "failed",
+            Some("PREPARED".to_string()),
+            Some("legacy-key"),
+        ));
+        expected.push((
+            "legacy-prepared-keyless".to_string(),
+            "pending",
+            Some("PREPARED".to_string()),
+            None,
+        ));
+        let all_ids: Vec<String> = expected.iter().map(|(id, _, _, _)| id.clone()).collect();
+        for (id, status, provider_status, key) in expected {
+            db.execute(
+                "INSERT INTO promotion_reward_ledger (
+                   id, user_id, source_type, reward_amount, status, provider,
+                   provider_request_id, provider_status, provider_transaction_key,
+                   requested_at, created_at, updated_at
+                 ) VALUES (?1, X'01', 'attendance_daily', 100, ?2, 'TOSS',
+                   ?3, ?4, ?5, 50, 50, 60)",
+                rusqlite::params![id, status, format!("{id}-request"), provider_status, key],
+            )
+            .unwrap();
+        }
 
         db.execute_batch(include_str!(
             "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
         ))
         .unwrap();
 
-        // Existing rows survive with their data and stay unmarked.
-        let rows = query(
-            &db,
-            "SELECT status, provider_transaction_key, protocol, execution_started_at
-             FROM promotion_reward_ledger WHERE id = 'legacy-1'",
-            &[],
-        );
-        let text = |value: &rusqlite::types::Value| match value {
-            rusqlite::types::Value::Text(v) => Some(v.clone()),
-            _ => None,
-        };
-        assert_eq!(text(&rows[0][0]).as_deref(), Some("success"));
-        assert_eq!(text(&rows[0][1]).as_deref(), Some("legacy-key"));
-        assert!(matches!(rows[0][2], rusqlite::types::Value::Null));
-        assert!(matches!(rows[0][3], rusqlite::types::Value::Null));
+        for id in &all_ids {
+            let rows = query(
+                &db,
+                "SELECT protocol, execution_started_at, provider_transaction_key
+                 FROM promotion_reward_ledger WHERE id = ?1",
+                &[Value::Text(id.clone())],
+            );
+            assert!(matches!(rows[0][0], rusqlite::types::Value::Null), "{id}");
+            assert!(matches!(rows[0][1], rusqlite::types::Value::Null), "{id}");
+            let expected_key = if id.as_str() == "legacy-prepared-keyless" {
+                None
+            } else {
+                Some("legacy-key")
+            };
+            assert_eq!(sql_text(&rows[0][2]), expected_key, "{id}");
+            assert_eq!(begin_execute(&db, id, 300), 0, "{id}");
+        }
 
         // The migrated schema serves the new statements: fresh installs and
         // upgraded installs run the same code paths.
