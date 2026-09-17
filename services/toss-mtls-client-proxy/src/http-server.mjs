@@ -66,12 +66,22 @@ export async function handleRequest(req, config = createConfig(), core = createC
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardGrant) {
-    const body = await readJson(req, requestBodyLimitBytes(config));
-    return response(200, await promotionReward(core, config, body));
+    // The batch grant route is removed: rewards must run the persisted
+    // prepare -> execute -> status contract. This is an explicit
+    // unsupported response — no core call, no upstream grant, no redirect.
+    req.resume();
+    return response(410, {
+      ok: false,
+      error: "PROMOTION_GRANT_REMOVED",
+      message: "promotion/reward/grant was removed; use prepare, execute, and status",
+    });
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionPrepareReward) {
     const body = await readJson(req, requestBodyLimitBytes(config));
+    // api-core 0.5 binds the issued key to the caller's single recipient and
+    // sends the matching identity header itself; a recipient-less prepare is
+    // rejected before any dispatch. Prepare success means key issuance only.
     return response(200, await core.promotionPrepareReward(body));
   }
 
@@ -123,152 +133,26 @@ function createCore(config) {
   });
 }
 
-// Legacy grant wire shape. Non-anonymous grants pass through the unchanged
-// core API; anonymous grants orchestrate the prepare -> execute ->
-// status flow so every upstream call carries x-anon-key natively.
-async function promotionReward(core, config, body) {
-  if (body?.anonKey === undefined) return core.promotionRewardGrant(body);
-  const anonKey = requireAnonymousKey(body.anonKey);
-  if (body.tossUserKey !== undefined || body.userKey !== undefined) {
-    throw clientError("INVALID_PROMOTION_RECIPIENT", "provide exactly one promotion recipient");
-  }
-  if (config.mode !== "forward") {
-    // Stub mode keeps the deterministic legacy grant response; no transport
-    // is consulted, so header mapping is irrelevant here.
-    const stub = await core.promotionRewardGrant({ ...body, anonKey: undefined, tossUserKey: anonKey });
-    return redactRecipient(stub, anonKey);
-  }
-
-  // A caller-supplied transaction key means a previous grant already
-  // reached execute; retrying with prepare+execute would issue a second
-  // reward. Route saved keys straight through the status lookup, matching
-  // the previous grant implementation's existing-key path.
-  const savedKey = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
-  if (savedKey) {
-    const status = await core.promotionRewardStatus({
-      providerTransactionKey: savedKey,
-      promotionCode: body.promotionCode,
-      anonKey,
-    });
-    return redactRecipient(legacyGrantFromStatus(status, body), anonKey);
-  }
-
-  const prepared = await core.promotionPrepareReward({});
-  if (!prepared.ok) {
-    const providerRequestId =
-      typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
-    return redactRecipient(
-      {
-        ...prepared,
-        ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-      },
-      anonKey,
-    );
-  }
-  const executed = await core.promotionExecuteReward({
-    providerTransactionKey: prepared.providerTransactionKey,
-    promotionCode: body.promotionCode,
-    amount: body.amount ?? body.promotionAmount,
-    anonKey,
-  });
-  if (!executed.ok) {
-    // Explicit provider rejection (e.g. 4112): no grant happened; surface
-    // the legacy execute-failure shape with the provider's codes. The
-    // caller's request ID survives for ledger/audit/retry correlation,
-    // exactly as the previous grant implementation returned it.
-    const providerRequestId =
-      typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
-    return redactRecipient(
-      {
-        ok: false,
-        ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-        providerStatus: "PROMOTION_EXECUTE_FAILED",
-        providerTransactionKey: executed.providerTransactionKey,
-        ...(executed.failureReason !== undefined ? { failureReason: executed.failureReason } : {}),
-        ...(executed.providerErrorCode !== undefined
-          ? { providerErrorCode: executed.providerErrorCode }
-          : {}),
-      },
-      anonKey,
-    );
-  }
-  // SUBMITTED or UNKNOWN: the grant may or may not have been applied — the
-  // status lookup with the persisted transaction key decides the outcome,
-  // exactly the recovery path ledger callers use after a lost response.
-  const status = await core.promotionRewardStatus({
-    providerTransactionKey: prepared.providerTransactionKey,
-    promotionCode: body.promotionCode,
-    anonKey,
-  });
-  return redactRecipient(legacyGrantFromStatus(status, body), anonKey);
-}
-
-function legacyGrantFromStatus(status, request) {
-  const providerRequestId = typeof request?.providerRequestId === "string" ? request.providerRequestId : undefined;
-  if (!status.ok) {
-    return {
-      ok: false,
-      ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-      providerStatus: "FAILED",
-      providerTransactionKey: status.providerTransactionKey,
-      failureReason: status.failureReason ?? "promotion status could not be determined",
-      ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
-    };
-  }
-  const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
-  return {
-    ok: providerStatus !== "FAILED",
-    ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-    providerStatus,
-    providerTransactionKey: status.providerTransactionKey,
-    // The old grant response surfaced the caller's requestedAt as the
-    // provider grant timestamp on success; keep it for ledger persistence.
-    ...(providerStatus === "GRANTED" && typeof request?.requestedAt === "number"
-      ? { grantedAt: request.requestedAt }
-      : {}),
-    ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
-    ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
-  };
-}
-
 async function promotionRewardStatus(core, body) {
   const key = typeof body?.providerTransactionKey === "string" ? body.providerTransactionKey.trim() : "";
   if (!key) {
     throw clientError("MISSING_PROMOTION_TRANSACTION_KEY", "providerTransactionKey is required for result lookup");
   }
   const status = await core.promotionRewardStatus({ ...body, providerTransactionKey: key });
-  // Anonymous recipients must never leak back through provider-echoed
-  // failure fields; the old grant-based path redacted, so this does too.
-  if (!status.ok) {
-    const providerRequestId =
-      typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
-    const withRequestId = {
-      ...status,
-      ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-    };
-    const recipient = resolveRecipient(body);
-    return recipient !== undefined ? redactRecipient(withRequestId, recipient) : withRequestId;
-  }
-  // Legacy ledger consumers classify anything besides GRANTED/PENDING as
-  // failed, so an indeterminate (UNKNOWN) outcome must stay PENDING here —
-  // never finalized as failed while the grant may still land.
-  const providerStatus = status.status === "UNKNOWN" ? "PENDING" : status.status;
+  // Result lookup only: the provider-observed status passes through
+  // verbatim (UNKNOWN stays UNKNOWN; the Rust ledger owns the pending
+  // classification), the caller's request id survives for correlation, and
+  // provider-echoed recipients are redacted. This endpoint never allocates
+  // a key or executes a grant.
   const providerRequestId = typeof body?.providerRequestId === "string" ? body.providerRequestId : undefined;
   const mapped = {
-    // A technically successful lookup can still report a terminal FAILED
-    // outcome; the previous status path returned ok:false for it, and
-    // ledger consumers key their failure handling off this field.
-    ok: providerStatus !== "FAILED",
-    ...(providerRequestId !== undefined ? { providerRequestId } : {}),
-    providerStatus,
-    status: status.status,
-    providerTransactionKey: status.providerTransactionKey,
-    checkedAt: status.checkedAt,
-    ...(status.failureReason !== undefined ? { failureReason: status.failureReason } : {}),
-    ...(status.providerErrorCode !== undefined ? { providerErrorCode: status.providerErrorCode } : {}),
+    ...status,
+    ...(providerRequestId !== undefined && status.providerRequestId === undefined
+      ? { providerRequestId }
+      : {}),
   };
-  const mappedRecipient = resolveRecipient(body);
-  return mappedRecipient !== undefined ? redactRecipient(mapped, mappedRecipient) : mapped;
+  const recipient = resolveRecipient(body);
+  return recipient !== undefined ? redactRecipient(mapped, recipient) : mapped;
 }
 
 // Legacy IAP wire shape: keep the 0.2 response fields, drop the api-core
@@ -320,6 +204,14 @@ function resolveRecipient(body) {
   if (body?.anonKey !== undefined) return requireAnonymousKey(body.anonKey);
   if (typeof body?.tossUserKey === "string" && body.tossUserKey.trim()) {
     return body.tossUserKey.trim();
+  }
+  // userKey and integer tossUserKey are legal recipient spellings in the
+  // shared contract; normalize them so provider-echo redaction still runs.
+  if (body?.userKey !== undefined && body.userKey !== null) {
+    return String(body.userKey);
+  }
+  if (typeof body?.tossUserKey === "number" && Number.isInteger(body.tossUserKey)) {
+    return String(body.tossUserKey);
   }
   return undefined;
 }

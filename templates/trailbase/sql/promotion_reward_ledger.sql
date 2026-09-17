@@ -8,8 +8,18 @@ CREATE TABLE IF NOT EXISTS promotion_reward_ledger (
   status TEXT NOT NULL DEFAULT 'pending' CHECK (
     status IN ('recorded', 'pending', 'success', 'failed', 'cancelled')
   ),
+  -- Execution facts, kept separate from the provider outcome below:
+  -- 'three-step' marks rows created by the persisted prepare -> store ->
+  -- execute -> status contract; NULL marks rows written by the removed
+  -- legacy grant flow.
+  protocol TEXT CHECK (protocol IS NULL OR protocol IN ('three-step')),
+  -- NULL until execution is atomically claimed (committed before the
+  -- external execute call); once set it is never cleared or reset.
+  execution_started_at INTEGER,
   provider TEXT NOT NULL DEFAULT 'TOSS' CHECK (length(trim(provider)) > 0),
   provider_request_id TEXT NOT NULL UNIQUE CHECK (length(trim(provider_request_id)) > 0),
+  -- Provider-observed outcomes only (PREPARED/EXECUTING phases never live
+  -- here): GRANTED/PENDING/SUBMITTED/UNKNOWN/FAILED/NOT_FOUND or NULL.
   provider_status TEXT,
   provider_error_code TEXT,
   provider_transaction_key TEXT,
@@ -35,3 +45,9 @@ CREATE INDEX IF NOT EXISTS idx_promotion_reward_ledger_campaign_status
 CREATE INDEX IF NOT EXISTS idx_promotion_reward_ledger_source
   ON promotion_reward_ledger(source_type, source_id, created_at DESC)
   WHERE source_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_promotion_reward_ledger_recovery
+  ON promotion_reward_ledger(execution_started_at)
+  WHERE protocol = 'three-step'
+    AND status = 'pending'
+    AND provider_transaction_key IS NOT NULL;

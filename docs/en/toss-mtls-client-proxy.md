@@ -107,7 +107,9 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/toss-login/complete`: Toss Login adapter.
 - `POST /internal/apps-in-toss/toss-login/remove-by-user-key`: Toss Login unlink adapter.
 - `POST /internal/apps-in-toss/iap/order/status`: in-app purchase order status adapter.
-- `POST /internal/apps-in-toss/promotion/reward/grant`: promotion reward adapter.
+- `POST /internal/apps-in-toss/promotion/reward/prepare`: recipient-bound promotion key issuance.
+- `POST /internal/apps-in-toss/promotion/reward/execute`: promotion execution with a persisted key.
+- `POST /internal/apps-in-toss/promotion/reward/status`: promotion result lookup with the persisted key.
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `POST /internal/apps-in-toss/smart-message/send-bulk`: functional smart-message bulk adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
@@ -356,7 +358,7 @@ normalization or multi-step flow handling.
 
 ## API Core 0.4 Contracts
 
-The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.4.2` and
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.5.0` and
 explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
 behind the same internal bearer authentication; forward mode still requires a
 token. Bun is pinned to `1.4.2` across local tooling, CI, and the container.
@@ -392,15 +394,22 @@ successes). The proxy passes the internal `error` marker through next to
 kit's Rust parser quarantines UNKNOWN outcomes in the outbox ledger; see
 [Functional Messages](functional-messages.md).
 
-Promotion flows use api-core's three-step contract. The legacy
-`promotion/reward/grant` endpoint keeps its wire shape; anonymous grants
-internally run prepare → execute → status so every upstream call carries the
-official recipient headers. New endpoints `promotion/reward/prepare`,
-`promotion/reward/execute`, and `promotion/reward/status` let ledger callers
-persist the transaction key between prepare and execute and recover a lost
-execute response by re-querying status with the saved key. Grant ownership,
-idempotency, and concurrent-execution checks remain TrailBase's
-responsibility.
+Promotion rewards run the persisted three-step contract only. The batch
+`promotion/reward/grant` route is removed and answers `410
+PROMOTION_GRANT_REMOVED` without touching the upstream — there is no grant
+logic and no redirect left behind. `promotion/reward/prepare` takes exactly
+one recipient (`userKey`/`tossUserKey`/`anonKey`), binds the issued
+transaction key to it, and means key issuance only — never a grant.
+`promotion/reward/execute` requires the persisted key; `SUBMITTED` results
+are acceptance, not grants, and `UNKNOWN` results preserve the key for the
+status lookup. `promotion/reward/status` passes the provider-observed
+verdict through verbatim (`GRANTED`, `PENDING`, `FAILED`, `NOT_FOUND`,
+`UNKNOWN`, with `checkedAt` observation time and no fabricated `grantedAt`)
+and never allocates or executes. The `providerRequestId` field is
+correlation-only: it does not make an external grant idempotent. Grant
+ownership, idempotency, and concurrent-execution checks remain TrailBase's
+responsibility; see [Promotion Campaigns](promotion-campaigns.md) for the
+ledger flow and the v2 migration.
 
 Partial delivery still returns `failureReason` and `failures[].reachFailReason`.
 The upstream `reachedFailReason` field and per-channel details remain available.
@@ -424,8 +433,11 @@ request-based products for local tests.
 Authenticated health responses preserve `ok` and `mode` and add
 `kit: { contractVersion: 1, proxyVersion, capabilities }`. The version comes from
 the running package, and capabilities list implemented adapter contracts such as
-`anonymous-key.verify`, `iap.provider-sku-required`, `promotion.status`,
-`promotion.anonymous-recipient`, and `smart-message.channel-results`. The complete
+`anonymous-key.verify`, `iap.provider-sku-required`, `promotion.prepare.v2`,
+`promotion.execute.v2`, `promotion.status.v2`,
+`promotion.anonymous-recipient`, and `smart-message.channel-results`; the
+promotion capabilities are versioned (`.v2`) with the persisted three-step
+contract, and `promotion.grant` is no longer advertised. The complete
 list is maintained in `src/capabilities.mjs`. No upstream call or certificate/secret
 content is included. This describes implementation availability, not readiness of
 a specific campaign or user operation. See [Release Doctor](release-doctor.md#proxy-capability-preflight)

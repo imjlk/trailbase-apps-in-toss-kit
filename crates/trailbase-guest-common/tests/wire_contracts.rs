@@ -42,8 +42,7 @@ fn iap_wire_contracts_preserve_status_and_verification_failures() {
 #[test]
 fn promotion_wire_contracts_do_not_turn_failure_into_grant() {
     for case in fixtures()["promotion"].as_array().unwrap() {
-        let result =
-            promotion_reward_outcome_from_response(&case["response"], "fixture-request", Some(100));
+        let result = promotion_reward_outcome_from_response(&case["response"], "fixture-request");
         assert_eq!(
             result.provider_status,
             case["providerStatus"].as_str().unwrap(),

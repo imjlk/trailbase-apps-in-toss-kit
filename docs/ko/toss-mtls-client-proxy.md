@@ -108,7 +108,9 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 - `POST /internal/apps-in-toss/toss-login/complete`: Toss Login 어댑터.
 - `POST /internal/apps-in-toss/toss-login/remove-by-user-key`: Toss Login 연결 해제 어댑터.
 - `POST /internal/apps-in-toss/iap/order/status`: 인앱 결제 주문 상태 어댑터.
-- `POST /internal/apps-in-toss/promotion/reward/grant`: 프로모션 리워드 어댑터.
+- `POST /internal/apps-in-toss/promotion/reward/prepare`: 수신자에 바인딩된 프로모션 키 발급.
+- `POST /internal/apps-in-toss/promotion/reward/execute`: 저장된 키로 프로모션 실행.
+- `POST /internal/apps-in-toss/promotion/reward/status`: 저장된 키로 프로모션 결과 조회.
 - `POST /internal/apps-in-toss/smart-message/send`: 스마트 메시지 어댑터.
 - `POST /internal/apps-in-toss/smart-message/send-bulk`: 기능성 스마트 메시지 대량 발송 어댑터.
 - `GET /internal/apps-in-toss/health`: 로컬 health/mode 확인.
@@ -359,7 +361,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 
 ## API Core 0.4 계약
 
-프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.4.2`로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.5.0`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를
@@ -387,13 +389,19 @@ api-core가 공식 `x-toss-user-key`/`x-anon-key` 헤더를 직접 사용하므�
 주장 없이 요청 시각(`requestedAt`)만 맥락으로 보존합니다. kit의 Rust 파서는 UNKNOWN
 결과를 outbox 원장에 격리합니다. [기능성 메시지](functional-messages.md)를 참고하세요.
 
-프로모션은 api-core의 3단계 계약을 사용합니다. 기존 `promotion/reward/grant`
-엔드포인트의 응답 형태는 유지되며, 익명 grant는 내부적으로 prepare → execute →
-status를 실행해 모든 업스트림 호출이 공식 수신자 헤더를 담습니다. 새 엔드포인트
-`promotion/reward/prepare`, `promotion/reward/execute`, `promotion/reward/status`로
-원장 호출자가 prepare와 execute 사이에 거래 키를 저장하고, 응답이 유실된 execute를
-저장된 키로 status 재조회해 복구할 수 있습니다. 지급 소유권, 멱등성, 동시 실행 검증은
-TrailBase의 책임입니다.
+프로모션 지급은 영속 3단계 계약만 사용합니다. 일괄 `promotion/reward/grant`
+라우트는 제거되었고 업스트림을 건드리지 않고 `410 PROMOTION_GRANT_REMOVED`로
+응답합니다 — 지급 로직이나 redirect가 남아 있지 않습니다.
+`promotion/reward/prepare`는 수신자를 정확히 하나(`userKey`/`tossUserKey`/
+`anonKey`) 받아 발급된 거래 키를 그 수신자에 바인딩하며, 성공은 키 발급을 뜻할
+뿐 지급이 아닙니다. `promotion/reward/execute`는 저장된 키가 필수이며 `SUBMITTED`
+결과는 접수이지 지급이 아니고, `UNKNOWN` 결과는 status 조회를 위한 키를 보존합니다.
+`promotion/reward/status`는 제공자가 관찰한 판정(`GRANTED`, `PENDING`, `FAILED`,
+`NOT_FOUND`, `UNKNOWN`, 관찰 시각 `checkedAt`, 조작된 `grantedAt` 없음)을 그대로
+전달하고 키 발급이나 실행을 하지 않습니다. `providerRequestId` 필드는 상관관계
+전용이며 외부 지급을 멱등하게 만들지 않습니다. 지급 소유권, 멱등성, 동시 실행
+검증은 TrailBase의 책임입니다. 원장 흐름과 v2 마이그레이션은
+[프로모션 캠페인](promotion-campaigns.md)을 참고하세요.
 
 부분 발송 응답의 기존 `failureReason`, `failures[].reachFailReason`은 유지합니다.
 업스트림의 `reachedFailReason`과 채널별 상세 정보도 제공합니다. 일부 채널 성공과
@@ -413,9 +421,12 @@ ID가 다른 PAYMENT_COMPLETED/PURCHASED 응답은 `ok: false`와 `UNVERIFIED_IA
 
 인증된 health 응답은 기존 `ok`, `mode`를 유지하고
 `kit: { contractVersion: 1, proxyVersion, capabilities }`를 추가합니다. 버전은 실행 중인
-패키지에서 읽으며 `anonymous-key.verify`, `iap.provider-sku-required`, `promotion.status`,
+패키지에서 읽으며 `anonymous-key.verify`, `iap.provider-sku-required`,
+`promotion.prepare.v2`, `promotion.execute.v2`, `promotion.status.v2`,
 `promotion.anonymous-recipient`, `smart-message.channel-results` 같은 구현된 어댑터 계약을
-알립니다. 전체 목록은 `src/capabilities.mjs`에서 관리합니다. 업스트림 호출이나 인증서·
+알립니다. 프로모션 capability는 영속 3단계 계약과 함께 버전 표기(`.v2`)를 달며
+`promotion.grant`는 더 광고하지 않습니다. 전체 목록은 `src/capabilities.mjs`에서
+관리합니다. 업스트림 호출이나 인증서·
 비밀정보를 포함하지 않습니다. 특정 캠페인이나 사용자 작업의 준비 상태가 아닌 구현
 여부를 나타냅니다. 배포 전 검사는 [Release Doctor](release-doctor.md#프록시-지원-기능-사전-점검)를
 참고하세요. 기존 호출자는 계속 `ok`/`mode`를 읽을 수 있습니다.

@@ -134,11 +134,12 @@ promotion twice.
 
 ## Proxy Request
 
-DB-backed consumers should pass campaign values per request:
+Rewards run the persisted three-step contract only; the single-call grant
+request shape is gone. Execute requests carry the ledger row's own context:
 
 ```json
 {
-  "providerRequestId": "app-feature:user-or-eligibility-id",
+  "providerTransactionKey": "key-persisted-before-executing",
   "promotionCode": "toss-console-promotion-code",
   "amount": 50,
   "tossUserKey": "sealed-user-key-after-unseal"
@@ -146,7 +147,8 @@ DB-backed consumers should pass campaign values per request:
 ```
 
 `promotionAmount` is accepted as a compatibility alias for `amount`, but new
-callers should prefer `amount`.
+callers should prefer `amount`. `providerRequestId` stays correlation-only —
+it does not make an external grant idempotent.
 
 The proxy returns a normalized `providerErrorCode` when Toss returns an upstream
 error code. Consumers should map provider signals conservatively:
@@ -157,9 +159,9 @@ error code. Consumers should map provider signals conservatively:
 
 ## Persist the Transaction Key Before Executing
 
-The recommended grant flow stores the provider transaction key in the ledger
-before any execute call, so a crash or lost response can never lose the only
-handle to the outcome. Use the three-step proxy helpers
+This is the only new-grant flow. The ledger stores the provider transaction
+key before any execute call, so a crash or lost response can never lose the
+only handle to the outcome. Use the three-step proxy helpers
 (`apps_in_toss_proxy::promotion_reward_prepare`,
 `promotion_reward_execute`, `promotion_reward_status`) with the ledger
 helpers in `trailbase_guest_common::promotion_rewards`:
@@ -168,19 +170,26 @@ helpers in `trailbase_guest_common::promotion_rewards`:
    (`insert_promotion_reward_ledger_tx`): user, campaign, amount, source,
    and `provider_request_id` are the idempotency context — the same request
    id with a different user, amount, or campaign is rejected, not merged.
-   Never hold this transaction across a network call.
-2. **Prepare** (`promotion_reward_prepare`): issues a key and nothing else.
-   `ok: true` here only means a key was issued; it is never a grant, and the
-   endpoint takes no recipient, so do not attach user-key fields.
+   The row is stamped `protocol = 'three-step'` at insert. Never hold this
+   transaction across a network call.
+2. **Prepare** (`promotion_reward_prepare`) with exactly one recipient
+   (`userKey`/`tossUserKey`/`anonKey`): issues a key bound to that recipient
+   and nothing else. `ok: true` here only means a key was issued; it is
+   never a grant.
 3. **Store the key and commit**
-   (`store_promotion_transaction_key_tx`): marks the row `PREPARED`. Storing
-   the same key again is idempotent; storing a different key is rejected
-   (`PROMOTION_TRANSACTION_KEY_CONFLICT`) — an existing key is never
-   overwritten. If this commit fails, do not call execute.
+   (`store_promotion_transaction_key_tx`): stores the key on a pending row
+   that has not started executing and marks it `three-step`. Storing the
+   same key again is idempotent while execution has not started; storing a
+   different key is rejected (`PROMOTION_TRANSACTION_KEY_CONFLICT`) — an
+   existing key is never overwritten. The store never touches the execution
+   marker or the provider outcome. If this commit fails, do not call execute.
 4. **Claim execution and commit** (`begin_promotion_reward_execute_tx`):
-   atomically moves `PREPARED` → `EXECUTING`. Exactly one worker can hold
-   the claim; a second concurrent claim gets `None`. Only a `PREPARED` row
-   with a stored key can be claimed, and terminal rows are never re-entered.
+   atomically records `execution_started_at` — its own committed
+   transaction BEFORE the external execute call. The marker is write-once:
+   exactly one worker can claim; a second concurrent claim, a restart after
+   the claim, and a late retry all get `None`; terminal rows are never
+   re-entered; nothing ever moves a claimed row back to a pre-execution
+   state (a `PENDING` provider status is NOT evidence of pre-execution).
 5. **Execute** (`promotion_reward_execute`) with the stored key and the
    ledger row's own recipient/amount context — never client-supplied
    amounts, recipients, or keys. The helper rejects a payload without a
@@ -189,24 +198,32 @@ helpers in `trailbase_guest_common::promotion_rewards`:
    transaction, or recover a lost response with
    `promotion_reward_status` and the stored key. The statement only matches
    the row's own `provider_request_id`, never overwrites a stored key with
-   a different one, and a confirmed `success` row cannot be reverted by a
-   late pending/unknown response.
+   a different one, never touches `protocol`/`execution_started_at`, and a
+   confirmed `success` row cannot be reverted by a late pending/unknown
+   response.
 
-`SUBMITTED` (execute accepted, unconfirmed) and `UNKNOWN` (outcome could not
-be determined — including `ok:false` UNKNOWN envelopes) both keep the ledger
-row `pending` with no fabricated `granted_at`/`failed_at`; they are
-neither a confirmed grant nor a confirmed failure. Rows whose execute
-started but whose outcome is unknown surface through
-`promotion_reward_ledgers_awaiting_recovery_tx` (`EXECUTING`); their
-recovery is a status lookup with the stored key first — do not re-execute
-on that signal, and do not assume same-key re-execution is safe without
-provider documentation. A restart after step 3 but before step 4 resumes at
-step 4 with the same stored key (no second prepare, no duplicate grant).
+Execution facts and provider outcomes live in separate columns: `protocol`
+marks new-contract rows (legacy grant-flow rows stay `NULL`), the write-once
+`execution_started_at` records the committed execution start, and
+`provider_status` stores provider-observed results only. `SUBMITTED`
+(execute accepted, unconfirmed) and `UNKNOWN` (outcome could not be
+determined — including `ok:false` UNKNOWN envelopes) both keep the ledger
+row `pending` with no fabricated `granted_at`/`failed_at`; they are neither
+a confirmed grant nor a confirmed failure, and a `NOT_FOUND` status (no
+grant record for the key) classifies as failed. Recovery targets come from
+`promotion_reward_ledgers_awaiting_recovery_tx`: three-step rows whose
+execution started, that hold their stored key, and whose outcome is still
+unsettled — PENDING, SUBMITTED, and UNKNOWN rows all qualify, pre-execution
+rows and legacy rows never do. Recovery calls status only; it never issues
+a new key, never re-executes, and a failed lookup or NOT_FOUND verdict is
+never permission for a new grant. A restart after step 3 but before step 4
+resumes at step 4 with the same stored key (no second prepare, no duplicate
+grant). A crash after step 4 leaves the row in the recovery set — resolve
+it with the status lookup before any operator decision.
 
-The legacy single-call grant endpoint and helper remain supported, but they
-cannot guarantee the key was persisted before execution — treat that flow's
-lost-response cases accordingly. The proxy's status mapping keeps
-`UNKNOWN` as `PENDING` for legacy ledger consumers.
+The legacy single-call grant endpoint and Rust helper are removed. The
+proxy answers `410 PROMOTION_GRANT_REMOVED` on the old route without
+touching the upstream; switch claim handlers to the sequence above.
 
 ## Reconcile an Existing Grant
 
@@ -215,11 +232,27 @@ Persist every returned `providerTransactionKey` in the promotion ledger. Use
 request id, and transaction key to call
 `POST /internal/apps-in-toss/promotion/reward/status`. The endpoint requires an
 existing key and only queries Toss execution-result; it cannot allocate a key or
-execute another grant. Apply the result to the original ledger row.
+execute another grant. Apply the result to the original ledger row. The proxy
+passes the observed verdict through verbatim (`GRANTED`, `PENDING`, `FAILED`,
+`NOT_FOUND`, `UNKNOWN`) — the ledger decides the classification.
 
-A transport failure during the original grant can lose the key before the caller
-persists it. That case requires operator/provider reconciliation; do not retry
-with a new key. The status endpoint does not make the combined original grant
-flow atomic across a network interruption.
+A transport failure during the removed grant flow could lose the key before the
+caller persisted it. Such legacy rows (`protocol IS NULL`, no key) are not
+recovery targets and are never converted automatically: resolve them through
+operator/provider reconciliation and never retry with a new key on the same
+ledger row. The status endpoint does not make any flow atomic across a network
+interruption.
+
+## Upgrading the Ledger Schema (v2)
+
+The persisted three-step contract stores execution facts in two new columns,
+`protocol` and `execution_started_at`. Fresh installs get them from
+`templates/trailbase/sql/promotion_reward_ledger.sql`. Existing installs apply
+`templates/trailbase/sql/promotion_reward_ledger.v2.sql` once as an explicit
+migration: it is additive only — existing grant rows, transaction keys,
+user/source/campaign links, and provider outcomes are preserved, and legacy
+rows stay unmarked (`protocol IS NULL`) rather than guessed. There is no
+long-running compatibility branch: after this breaking release, the helpers
+expect the v2 columns.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).

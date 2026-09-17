@@ -5,7 +5,13 @@ the rollout order consumer apps should follow, and the verification evidence
 behind the baseline. Versions are distinct release trains: equal-looking
 numbers do not imply the same release.
 
-## Version Matrix (0.5.0 baseline, 2026-09-17)
+## Version Matrix
+
+The 0.5.0 baseline (2026-09-17) established the message-UNKNOWN and
+three-step-promotion groundwork; the current cycle is the **promotion v2
+breaking release** described below. Pin consumer images to the exact tag of
+the release you deploy — never assume two equal-looking version numbers are
+the same release train.
 
 | Component | Version | Notes |
 |---|---|---|
@@ -27,42 +33,52 @@ apps:
    Old Rust guests convert the new proxy's `UNKNOWN` responses into
    confirmed failures, so the proxy rollout must not overlap live queue
    traffic.
-2. **Proxy next**: update the consumer-owned Compose image pin to
-   `toss-mtls-client-proxy:0.5.0` (template updated accordingly) and roll the
-   proxy. Wire shapes for login, promotion grant, and stub responses are
-   unchanged, so a paused worker survives an accidental proxy-first order.
+2. **Proxy next** (breaking promotion v2): update the consumer-owned
+   Compose image pin to the released proxy (template updated accordingly;
+   final tag comes from the release — this cycle removes the promotion
+   grant route) and roll the proxy behind the light-on/off switch. Wire
+   shapes for login, messages, IAP, and stub responses are unchanged, but
+   `promotion/reward/grant` now answers `410 PROMOTION_GRANT_REMOVED`
+   without touching the upstream, prepare requires exactly one recipient,
+   and status passes the observed verdict through verbatim (UNKNOWN stays
+   UNKNOWN; no PENDING remap). A paused worker survives an accidental
+   proxy-first order.
 3. **Preflight the proxy before deploying guests**: confirm the health
-   metadata check with `minimumVersion: "0.5.0"` and the required
-   capabilities `promotion.prepare`, `promotion.execute`,
-   `promotion.status`, `contractVersion: 1` (see
+   metadata check with the released `minimumVersion` and the required
+   capabilities `promotion.prepare.v2`, `promotion.execute.v2`,
+   `promotion.status.v2`, `contractVersion: 1` (see
    [Release Doctor](release-doctor.md#proxy-capability-preflight)). The
-   version floor matters: proxy 0.4.0 already advertises the same
-   capabilities but predates the api-core 0.4.2 UNKNOWN-message and
-   strict-IAP behavior this rollout activates. Consumers on proxies without
-   the prepare/execute capabilities must not silently fall back to the
-   legacy grant for new ledger flows.
-4. **Rust/WASM guests, with handler adoption**: rebuild guests against
-   crates 0.11.0 **and** switch the app's reward handlers to the three-step
-   helper sequence — insert the pending ledger row
-   (`insert_promotion_reward_ledger_tx`, its own committed transaction) →
-   prepare → persist the transaction key (own commit) → claim execution
-   (own commit) → execute → apply/status recovery. A rebuild alone changes
-   nothing: the legacy grant helper still compiles, and handlers that keep
-   using it retain the old lost-response behavior. Deploying the new guests
-   is what makes message UNKNOWN outcomes quarantine in the outbox ledger.
-   Deploy guests soon after the proxy, and keep dispatch paused until they
-   are live.
+   versioned names matter: pre-v2 proxies advertise the unversioned
+   promotion capabilities (and proxy 0.4.0 even those without the
+   api-core 0.4.2 UNKNOWN-message and strict-IAP behavior), so a stale
+   deployment must fail the preflight instead of passing as this contract.
+4. **Migrate the ledger schema, then deploy Rust/WASM guests with handler
+   adoption**: apply
+   `templates/trailbase/sql/promotion_reward_ledger.v2.sql` as an explicit
+   migration (additive `protocol`/`execution_started_at` columns; legacy
+   rows stay unmarked), then rebuild guests against this cycle's crates
+   **and** switch the app's reward handlers to the three-step helper
+   sequence — insert the pending ledger row (own committed transaction) →
+   prepare with one recipient → persist the transaction key (own commit) →
+   claim execution by recording `execution_started_at` (own commit) →
+   execute → apply/status recovery. A rebuild alone changes nothing, and
+   the legacy grant helper no longer compiles: handlers that still call it
+   must be rewritten for this cycle. Deploying the new guests is also what
+   makes message UNKNOWN outcomes quarantine in the outbox ledger. Deploy
+   guests soon after the proxy, and keep dispatch paused until they are
+   live.
 5. **Client apps last**: rebuild with `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0). RN consumers must already be on
    `@apps-in-toss/framework >=2.10.10`.
 6. **Resume and watch**: re-enable dispatch features and monitor ledger
    outcomes. In-flight promotion attempts and message outbox rows survive
-   as-is. Quarantined rows reconcile differently per feature: promotion rows
-   (`pending` with `provider_status = 'UNKNOWN'`, or `EXECUTING` after a
-   lost execute response) settle through the status lookup **when they hold
-   a stored transaction key** — a legacy single-call grant that lost its
-   response before persisting the key has no key to look up, and such rows
-   need provider/operator reconciliation without retrying on a new key (see
+   as-is. Quarantined rows reconcile differently per feature: three-step
+   promotion rows whose `execution_started_at` is set and whose outcome is
+   unsettled (pending, including PENDING/SUBMITTED/UNKNOWN provider
+   statuses) come from `promotion_reward_ledgers_awaiting_recovery_tx` and
+   settle through the status lookup with their stored key — status only,
+   never prepare/execute. Legacy rows without a key need provider/operator
+   reconciliation without retrying on a new key (see
    [Promotion Campaigns](promotion-campaigns.md)). Message UNKNOWN rows have
    no kit status endpoint either — reconcile them explicitly with the
    provider by `provider_request_id` before any deliberate re-enqueue
@@ -77,17 +93,16 @@ apps:
   that old Rust parsers read `provider_status = 'UNKNOWN'` rows as plain
   failures — preserve and re-apply the new guests before any further
   reconciliation.
-- Before rolling back, drain and settle promotion work while the 0.11 guest
-  is still live, because pre-0.11 guests cannot resume a persisted
-  transaction key:
-  - `PREPARED` rows (key stored, execution not started — e.g. dispatch
-    paused right after the key commit) must be claimed, executed, and
-    settled now.
-  - `EXECUTING` or UNKNOWN rows with a stored transaction key settle
-    through the status lookup with that key.
-  - UNKNOWN rows without a key (a legacy single-call grant that lost its
-    response before persisting it) cannot use the status endpoint — they
-    need provider/operator reconciliation.
+- Before rolling back, drain and settle promotion work while the new guest
+  is still live, because older guests cannot resume a persisted transaction
+  key:
+  - Rows with a stored key and `execution_started_at IS NULL` (key stored,
+    execution not started — e.g. dispatch paused right after the key
+    commit) must be claimed, executed, and settled now.
+  - Rows with `execution_started_at` set and an unsettled outcome settle
+    through the status lookup with their stored key.
+  - Legacy rows without a key cannot use the status endpoint — they need
+    provider/operator reconciliation.
   Promotion executions never expire on their own — only message leases do —
   so waiting leaves a lost execute response in-flight indefinitely, and
   rolling back exposes unsettled rows to the old parser as failures.
@@ -104,8 +119,14 @@ apps:
   bodies, conflicting statuses). Exhaustive status validators must accept
   the new value, and every consumer must treat it as outcome-unknown, not
   failed.
-- Promotion grant/status wire responses keep the legacy shape; the proxy
-  maps UNKNOWN to PENDING there for legacy ledger consumers.
+- Promotion rewards are a breaking change: the grant route answers `410`
+  with no upstream call, prepare is recipient-bound, execute requires the
+  persisted key, and status passes the observed verdict through verbatim
+  (`GRANTED`/`PENDING`/`FAILED`/`NOT_FOUND`/`UNKNOWN`, `checkedAt`
+  observation time, no fabricated `grantedAt`). Raw-JSON promotion
+  consumers must handle `NOT_FOUND` and unremapped `UNKNOWN` statuses, and
+  the ledger needs the explicit v2 migration (additive columns, legacy rows
+  preserved unmarked).
 - No auto-resend and no auto-regrant exist anywhere in this baseline: unknown
   message outcomes stay out of the dispatch queue, unknown/submitted
   promotions stay pending, and every recovery is an explicit decision — a
@@ -141,7 +162,7 @@ calls, no real Toss app, no published-image install test beyond the CI build.
 ## Remaining Real-Device Checks (consumer-owned)
 
 - Toss app login (production and sandbox referrers) against a deployed
-  proxy 0.5.0 + guests 0.11.0.
+  released proxy + matching guest crates.
 - Real IAP purchase and pending-order restore; confirm server grant gating
   on provider SKU evidence.
 - A real promotion reward through prepare → key persistence → execute, plus

@@ -122,11 +122,12 @@ key, proxy token은 알지 않습니다. `campaignId`를 RN과 백엔드 사이�
 
 ## 프록시 요청
 
-DB 기반 캠페인을 쓰는 앱은 요청마다 캠페인 값을 전달해야 합니다.
+지급은 영속 3단계 계약만 사용하며, 단일 호출 grant 요청 형태는 제거되었습니다.
+execute 요청은 원장 행 자체의 문맥을 전달합니다.
 
 ```json
 {
-  "providerRequestId": "app-feature:user-or-eligibility-id",
+  "providerTransactionKey": "실행-전에-저장한-키",
   "promotionCode": "toss-console-promotion-code",
   "amount": 50,
   "tossUserKey": "sealed-user-key-after-unseal"
@@ -134,7 +135,8 @@ DB 기반 캠페인을 쓰는 앱은 요청마다 캠페인 값을 전달해야 
 ```
 
 `promotionAmount`는 `amount`의 호환 alias로 허용되지만, 새 호출자는 `amount`를 우선
-사용하세요.
+사용하세요. `providerRequestId`는 상관관계 전용이며 외부 지급을 멱등하게 만들지
+않습니다.
 
 Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 정리된 `providerErrorCode`를 반환합니다.
 앱은 제공자 신호(provider signal)를 보수적으로 해석해야 합니다.
@@ -145,48 +147,61 @@ Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 �
 
 ## 실행 전에 거래 키를 저장하기
 
-권장 지급 흐름은 execute 호출 전에 제공자 거래 키를 원장에 저장해, 충돌이나 응답
-유실이 결과를 추적할 유일한 단서를 잃지 않게 합니다. 3단계 프록시 헬퍼
-(`apps_in_toss_proxy::promotion_reward_prepare`, `promotion_reward_execute`,
-`promotion_reward_status`)와 `trailbase_guest_common::promotion_rewards`의 원장
-헬퍼를 함께 사용하세요.
+이것이 유일한 신규 지급 흐름입니다. 원장은 execute 호출 전에 제공자 거래 키를
+저장해, 충돌이나 응답 유실이 결과를 추적할 유일한 단서를 잃지 않게 합니다. 3단계
+프록시 헬퍼(`apps_in_toss_proxy::promotion_reward_prepare`,
+`promotion_reward_execute`, `promotion_reward_status`)와
+`trailbase_guest_common::promotion_rewards`의 원장 헬퍼를 함께 사용하세요.
 
 1. **검증 후 pending 원장 행 삽입**(`insert_promotion_reward_ledger_tx`):
    사용자, 캠페인, 금액, source, `provider_request_id`가 멱등 문맥입니다. 같은
-   request id라도 다른 사용자·금액·캠페인은 병합되지 않고 거절됩니다. 이
-   transaction을 네트워크 호출 동안 유지하지 마세요.
-2. **prepare**(`promotion_reward_prepare`): 키 발급만 합니다. 이 단계의
-   `ok: true`는 키 발급을 뜻할 뿐 지급이 아니며, 이 endpoint는 수신자를 받지
-   않으므로 user-key 필드를 임의로 붙이지 마세요.
-3. **키 저장 후 커밋**(`store_promotion_transaction_key_tx`): 행을 `PREPARED`로
-   표시합니다. 같은 키 재저장은 멱등이고, 다른 키 저장은
-   거절됩니다(`PROMOTION_TRANSACTION_KEY_CONFLICT`). 기존 키를 덮어쓰지
-   않습니다. 이 커밋이 실패하면 execute를 호출하지 마세요.
+   request id라도 다른 사용자·금액·캠페인은 병합되지 않고 거절됩니다. 행은 삽입
+   시점에 `protocol = 'three-step'`로 표시됩니다. 이 transaction을 네트워크 호출
+   동안 유지하지 마세요.
+2. **prepare**(`promotion_reward_prepare`): 수신자를 정확히 하나
+   (`userKey`/`tossUserKey`/`anonKey`) 전달하면 그 수신자에 바인딩된 키를 발급하고
+   다른 것은 하지 않습니다. 이 단계의 `ok: true`는 키 발급을 뜻할 뿐 지급이
+   아닙니다.
+3. **키 저장 후 커밋**(`store_promotion_transaction_key_tx`): 실행을 시작하지 않은
+   pending 행에 키를 저장하고 `three-step`으로 표시합니다. 실행 시작 전이라면 같은
+   키 재저장은 멱등이고, 다른 키 저장은 거절됩니다
+   (`PROMOTION_TRANSACTION_KEY_CONFLICT`). 기존 키를 덮어쓰지 않습니다. 저장은
+   실행 표식이나 제공자 결과를 건드리지 않습니다. 이 커밋이 실패하면 execute를
+   호출하지 마세요.
 4. **실행 클레임 후 커밋**(`begin_promotion_reward_execute_tx`):
-   `PREPARED` → `EXECUTING`으로 원자적으로 전환합니다. 정확히 한 worker만
-   클레임을 가질 수 있고, 동시 두 번째 클레임은 `None`을 받습니다. 저장된 키가
-   있는 `PREPARED` 행만 클레임할 수 있고 종결된 행은 다시 진입하지 않습니다.
+   `execution_started_at`을 원자적으로 기록합니다 — 외부 execute 호출 전에 자체
+   transaction으로 커밋됩니다. 표식은 한 번만 기록됩니다. 정확히 한 worker만
+   클레임할 수 있고, 동시 두 번째 클레임·클레임 후 재시작·늦은 재시도는 모두
+   `None`을 받으며, 종결된 행은 다시 진입하지 않고, 클레임된 행을 실행 전 상태로
+   되돌리는 것은 불가능합니다(`PENDING` 제공자 상태는 실행 전의 근거가 아닙니다).
 5. **execute**(`promotion_reward_execute`): 저장된 키와 원장 행 자체의
    수신자·금액 문맥으로 호출합니다. 클라이언트가 제공한 금액·수신자·키로 실행하지
    않습니다. 이 헬퍼는 거래 키 없는 페이로드를 네트워크 호출 전에 거절합니다.
 6. **응답 반영**(`apply_promotion_reward_outcome_tx`): 새 transaction에서
    반영하거나, 응답을 잃었다면 `promotion_reward_status`와 저장된 키로 복구합니다.
    이 문은 행 자신의 `provider_request_id`에만 매칭되고, 저장된 키를 다른 키로
-   덮어쓰지 않으며, 확정된 `success` 행은 늦은 pending/unknown 응답으로 되돌리지
-   않습니다.
+   덮어쓰지 않으며, `protocol`/`execution_started_at`을 건드리지 않고, 확정된
+   `success` 행은 늦은 pending/unknown 응답으로 되돌리지 않습니다.
 
-`SUBMITTED`(execute 접수, 미확정)와 `UNKNOWN`(결과 확인 불가 — `ok:false`
-UNKNOWN 봉투 포함)은 둘 다 원장 행을 `pending`으로 유지하며 `granted_at`/
-`failed_at`을 만들지 않습니다. 확정 지급도 확정 실패도 아닙니다. execute는
-시작했지만 결과를 모르는 행은
-`promotion_reward_ledgers_awaiting_recovery_tx`(`EXECUTING`)로 노출되며, 복구는
-저장된 키로 status 조회부터 합니다. 이 신호로 재실행하지 말고, 제공자 문서 없이
-동일 키 재실행의 안전성을 가정하지 마세요. 3단계 이후 4단계 이전의 재시작은 같은
-저장 키로 4단계에서 이어집니다(두 번째 prepare도 중복 지급도 없습니다).
+실행 사실과 제공자 결과는 별도 컬럼에 저장됩니다. `protocol`은 신규 계약 행을
+표시하고(레거시 grant 흐름의 행은 `NULL`로 남습니다), 한 번만 기록되는
+`execution_started_at`은 커밋된 실행 시작을 기록하며, `provider_status`는
+제공자가 관찰한 결과만 담습니다. `SUBMITTED`(execute 접수, 미확정)와
+`UNKNOWN`(결과 확인 불가 — `ok:false` UNKNOWN 봉투 포함)은 둘 다 원장 행을
+`pending`으로 유지하며 `granted_at`/`failed_at`을 만들지 않습니다. 확정 지급도
+확정 실패도 아니며, `NOT_FOUND` status(해당 키의 지급 기록 없음)는 실패으로
+분류됩니다. 재조회 대상은 `promotion_reward_ledgers_awaiting_recovery_tx`가
+제공합니다 — 실행을 시작했고, 저장 키와 원래 문맥이 있으며, 결과가 아직 확정되지
+않은 three-step 행. PENDING·SUBMITTED·UNKNOWN 행 모두 해당되고, 실행 전 행과
+레거시 행은 절대 해당되지 않습니다. 재조회는 status만 호출하며 새 키 발급도
+재실행도 하지 않고, 조회 실패나 NOT_FOUND 판정은 새 지급의 허가로 사용하지
+않습니다. 3단계 이후 4단계 이전의 재시작은 같은 저장 키로 4단계에서 이어지고(두
+번째 prepare도 중복 지급도 없습니다), 4단계 이후 충돌한 행은 재조회 대상에
+남으므로 운영 판단 전에 status 조회로 마무리하세요.
 
-기존 단일 호출 grant endpoint와 헬퍼는 계속 지원되지만 실행 전 키 저장을 보장하지
-못합니다. 이 흐름의 응답 유실 사례는 그에 맞게 다루세요. 프록시의 status 매핑은
-레거시 원장 소비자를 위해 `UNKNOWN`을 `PENDING`으로 유지합니다.
+기존 단일 호출 grant endpoint와 Rust 헬퍼는 제거되었습니다. 프록시는 옛 라우트에
+업스트림을 건드리지 않고 `410 PROMOTION_GRANT_REMOVED`로 응답합니다. claim
+핸들러를 위 순서로 전환하세요.
 
 ## 기존 지급 결과 확인
 
@@ -195,9 +210,23 @@ UNKNOWN 봉투 포함)은 둘 다 원장 행을 `pending`으로 유지하며 `gr
 transaction key를 전달하면 `POST /internal/apps-in-toss/promotion/reward/status`를
 호출합니다. 이 endpoint는 기존 키가 필수이며 Toss execution-result만 조회합니다.
 새 키를 만들거나 지급을 다시 실행하지 않습니다. 결과는 기존 원장 행에 반영하세요.
+프록시는 관찰된 판정(`GRANTED`, `PENDING`, `FAILED`, `NOT_FOUND`, `UNKNOWN`)을
+그대로 전달하고 분류는 원장이 결정합니다.
 
-최초 지급 중 통신이 끊기면 호출자가 저장하기 전에 키를 잃을 수 있습니다. 이 경우는
-운영자·제공자 확인이 필요하며 새 키로 재시도하면 안 됩니다. 결과 조회 endpoint가
-기존의 통합 지급 흐름 전체를 네트워크 중단에 대해 원자적으로 만드는 것은 아닙니다.
+제거된 grant 흐름에서는 통신이 끊기면 호출자가 저장하기 전에 키를 잃을 수
+있었습니다. 그런 레거시 행(`protocol IS NULL`, 키 없음)은 재조회 대상이 아니며
+자동으로 전환되지도 않습니다 — 운영자·제공자 정산으로 해결하고, 같은 원장 행에
+새 키로 재시도하지 마세요. 결과 조회 endpoint가 어떤 흐름도 네트워크 중단에 대해
+원자적으로 만들지는 않습니다.
+
+## 원장 스키마 v2 업그레이드
+
+영속 3단계 계약은 실행 사실을 `protocol`과 `execution_started_at` 두 새 컬럼에
+저장합니다. 신규 설치는 `templates/trailbase/sql/promotion_reward_ledger.sql`에서
+컬럼을 받습니다. 기존 설치는 `templates/trailbase/sql/promotion_reward_ledger.v2.sql`을
+명시적 마이그레이션으로 한 번 적용합니다. 추가 전용입니다 — 기존 지급 행, 거래
+키, 사용자·source·캠페인 연결, 제공자 결과가 보존되고, 레거시 행은 추측으로
+표시하지 않고 `protocol IS NULL`로 남습니다. 장기 호환 분기는 없습니다. 이
+breaking 릴리스 이후 헬퍼는 v2 컬럼을 기대합니다.
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.

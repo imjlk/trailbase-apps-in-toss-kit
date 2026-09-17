@@ -68,7 +68,7 @@ another canonical user is an app-owned transaction that must recheck consent.
 
 ## Anonymous Promotion and Recovery
 
-The proxy's promotion grant and status endpoints accept `anonKey` as an alternative
+The proxy's promotion prepare, execute, and status endpoints accept `anonKey` as an alternative
 to `tossUserKey`. Supplying both is rejected. api-core 0.3.0's three-step
 promotion contract accepts anonymous recipients directly, so the proxy runs
 prepare → execute → status and forwards the official recipient headers as-is.
@@ -76,7 +76,7 @@ Existing transaction key, outcome, and retry semantics remain in api-core. No
 shared mutable recipient state or certificate access is added to the app
 container.
 
-Create the normal `_user`-keyed promotion ledger row and call
+Create the normal `_user`-keyed promotion ledger row (prepare issues the key with `anonKey` as the bound recipient) and call
 `bind_anonymous_promotion_recipient_tx` in the same transaction. Persist every
 returned provider transaction key. For later recovery, load
 `anonymous_promotion_recipient_tx`, construct the anonymous payload with the saved

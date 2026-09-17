@@ -421,6 +421,47 @@
       },
       "providerStatus": "UNKNOWN",
       "ledgerStatus": "pending"
+    },
+    {
+      "id": "execute-result-submitted",
+      "response": {
+        "ok": true,
+        "result": "SUBMITTED",
+        "providerTransactionKey": "fixture-key"
+      },
+      "providerStatus": "PENDING",
+      "ledgerStatus": "pending"
+    },
+    {
+      "id": "execute-result-unknown",
+      "response": {
+        "ok": true,
+        "result": "UNKNOWN",
+        "providerTransactionKey": "fixture-key",
+        "failureReason": "transport failure"
+      },
+      "providerStatus": "UNKNOWN",
+      "ledgerStatus": "pending"
+    },
+    {
+      "id": "ok-without-status",
+      "response": {
+        "ok": true,
+        "providerTransactionKey": "fixture-key"
+      },
+      "providerStatus": "PENDING",
+      "ledgerStatus": "pending"
+    },
+    {
+      "id": "status-not-found",
+      "response": {
+        "ok": true,
+        "status": "NOT_FOUND",
+        "providerTransactionKey": "fixture-key",
+        "checkedAt": 1700000000
+      },
+      "providerStatus": "NOT_FOUND",
+      "ledgerStatus": "failed"
     }
   ],
   "message": [

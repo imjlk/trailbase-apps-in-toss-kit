@@ -6,7 +6,6 @@ pub const TOSS_LOGIN_COMPLETE_PATH: &str = "/internal/apps-in-toss/toss-login/co
 pub const TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH: &str =
     "/internal/apps-in-toss/toss-login/remove-by-user-key";
 pub const IAP_ORDER_STATUS_PATH: &str = "/internal/apps-in-toss/iap/order/status";
-pub const PROMOTION_REWARD_GRANT_PATH: &str = "/internal/apps-in-toss/promotion/reward/grant";
 pub const PROMOTION_REWARD_PREPARE_PATH: &str = "/internal/apps-in-toss/promotion/reward/prepare";
 pub const PROMOTION_REWARD_EXECUTE_PATH: &str = "/internal/apps-in-toss/promotion/reward/execute";
 pub const PROMOTION_REWARD_STATUS_PATH: &str = "/internal/apps-in-toss/promotion/reward/status";
@@ -66,30 +65,22 @@ pub async fn iap_order_status(
     .await
 }
 
-pub async fn promotion_reward_grant(
-    proxy_url: &str,
-    bearer_token: Option<&str>,
-    payload: JsonValue,
-) -> CommonResult<JsonValue> {
-    post_json_with_optional_bearer(
-        &join_url(proxy_url, PROMOTION_REWARD_GRANT_PATH),
-        payload,
-        bearer_token,
-    )
-    .await
-}
-
 /// Prepare step of the three-step reward contract: issues a provider
-/// transaction key and nothing else. The prepare endpoint takes no
-/// recipient, so this helper deliberately sends an empty body — do not
-/// attach user-key headers the API does not ask for.
+/// transaction key and nothing else — no execute, no result lookup.
+///
+/// `recipient` must carry exactly one of `userKey`, `tossUserKey`, or
+/// `anonKey`; the proxy binds the issued key to that recipient and sends
+/// the single matching identity header on the get-key request. Prepare
+/// success means KEY ISSUANCE succeeded — it is never a grant.
 pub async fn promotion_reward_prepare(
     proxy_url: &str,
     bearer_token: Option<&str>,
+    recipient: JsonValue,
 ) -> CommonResult<JsonValue> {
+    require_promotion_recipient(&recipient)?;
     post_json_with_optional_bearer(
         &join_url(proxy_url, PROMOTION_REWARD_PREPARE_PATH),
-        json!({}),
+        recipient,
         bearer_token,
     )
     .await
@@ -98,8 +89,7 @@ pub async fn promotion_reward_prepare(
 /// Execute step of the three-step reward contract. `payload` must carry the
 /// transaction key persisted for this ledger row (and the same recipient
 /// context that row was created with); a keyless execute is rejected before
-/// any network call. `prepare`'s `ok: true` only means a key was issued —
-/// it is never a grant.
+/// any network call.
 pub async fn promotion_reward_execute(
     proxy_url: &str,
     bearer_token: Option<&str>,
@@ -128,6 +118,33 @@ fn require_provider_transaction_key(payload: &JsonValue, message: &str) -> Commo
         return Err(message.into());
     }
     Ok(())
+}
+
+/// Prepare binds the issued key to one recipient; a payload without exactly
+/// one of userKey/tossUserKey/anonKey is rejected before any network call.
+/// userKey/tossUserKey accept the shared recipient contract's string or
+/// integer id forms; anonKey is string-only. Any present-but-invalid
+/// spelling (blank, null, or wrong type such as a numeric anonKey or a
+/// non-integer user id) also rejects, so a malformed payload cannot slip
+/// past this gate and fail only on the remote side.
+fn require_promotion_recipient(recipient: &JsonValue) -> CommonResult<()> {
+    let fields = ["userKey", "tossUserKey", "anonKey"];
+    let is_present = |field: &str| -> bool {
+        match (field, recipient.get(field)) {
+            (_, Some(JsonValue::String(value))) => !value.trim().is_empty(),
+            ("userKey" | "tossUserKey", Some(value)) => value.as_u64().is_some(),
+            _ => false,
+        }
+    };
+    let present = fields.iter().filter(|field| is_present(field)).count();
+    let has_invalid_field = fields
+        .iter()
+        .any(|field| recipient.get(field).is_some_and(|_| !is_present(field)));
+    if present == 1 && !has_invalid_field {
+        Ok(())
+    } else {
+        Err("promotion prepare requires exactly one of userKey, tossUserKey, or anonKey".into())
+    }
 }
 
 /// Query the persisted transaction key. This endpoint cannot allocate or execute
@@ -317,10 +334,6 @@ mod tests {
             "/internal/apps-in-toss/iap/order/status"
         );
         assert_eq!(
-            PROMOTION_REWARD_GRANT_PATH,
-            "/internal/apps-in-toss/promotion/reward/grant"
-        );
-        assert_eq!(
             PROMOTION_REWARD_PREPARE_PATH,
             "/internal/apps-in-toss/promotion/reward/prepare"
         );
@@ -364,5 +377,37 @@ mod tests {
             )
             .is_ok()
         );
+    }
+
+    #[test]
+    fn prepare_requires_exactly_one_recipient() {
+        for payload in [
+            json!({}),
+            json!({ "tossUserKey": "  " }),
+            json!({ "tossUserKey": "user", "anonKey": "anon" }),
+            json!({ "userKey": "user", "tossUserKey": "login", "anonKey": "anon" }),
+            // anonKey is string-only; user-key ids must be non-negative
+            // integers; blank/null extra spellings also reject locally.
+            json!({ "anonKey": 42 }),
+            json!({ "userKey": 1.5 }),
+            json!({ "userKey": -1 }),
+            json!({ "userKey": "u", "anonKey": "" }),
+            json!({ "tossUserKey": "user", "anonKey": null }),
+        ] {
+            let error = require_promotion_recipient(&payload).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("exactly one of userKey, tossUserKey, or anonKey"),
+                "{payload}"
+            );
+        }
+        for payload in [
+            json!({ "tossUserKey": "user" }),
+            json!({ "userKey": 42 }),
+            json!({ "anonKey": "anon" }),
+        ] {
+            assert!(require_promotion_recipient(&payload).is_ok(), "{payload}");
+        }
     }
 }

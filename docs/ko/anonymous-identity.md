@@ -63,7 +63,7 @@ canonical user로 옮기는 transaction은 앱이 소유하며 동의를 다시 
 
 ## 익명 프로모션과 결과 조회
 
-Proxy의 promotion grant·status endpoint는 `tossUserKey` 대신 `anonKey`를 받습니다.
+Proxy의 promotion prepare·execute·status endpoint는 `tossUserKey` 대신 `anonKey`를 받습니다.
 둘을 함께 전달하면 거부합니다. api-core 0.3.0의 3단계 프로모션 계약이 익명 수신자를
 직접 지원하므로 프록시는 prepare → execute → status를 통해 공식 수신자 헤더를
 그대로 전달합니다. 기존 거래키·결과·재시도 의미는 api-core에 유지합니다. 공유 수신자
