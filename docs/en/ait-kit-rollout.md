@@ -22,11 +22,16 @@ numbers do not imply the same release.
 No schema migration is required for this baseline. Sequence for consumer
 apps:
 
-1. **Proxy first**: update the consumer-owned Compose image pin to
+1. **Pause dispatch first**: stop claiming new promotion and message work,
+   and let in-flight attempts finish (message leases expire on their own).
+   Old Rust guests convert the new proxy's `UNKNOWN` responses into
+   confirmed failures, so the proxy rollout must not overlap live queue
+   traffic.
+2. **Proxy next**: update the consumer-owned Compose image pin to
    `toss-mtls-client-proxy:0.5.0` (template updated accordingly) and roll the
-   proxy. Existing workers keep functioning against it; wire shapes for
-   login, promotion grant, and stub responses are unchanged.
-2. **Preflight the proxy before deploying guests**: confirm the health
+   proxy. Wire shapes for login, promotion grant, and stub responses are
+   unchanged, so a paused worker survives an accidental proxy-first order.
+3. **Preflight the proxy before deploying guests**: confirm the health
    metadata check with `minimumVersion: "0.5.0"` and the required
    capabilities `promotion.prepare`, `promotion.execute`,
    `promotion.status`, `contractVersion: 1` (see
@@ -36,22 +41,25 @@ apps:
    strict-IAP behavior this rollout activates. Consumers on proxies without
    the prepare/execute capabilities must not silently fall back to the
    legacy grant for new ledger flows.
-3. **Rust/WASM guests next**: rebuild guests against crates 0.11.0 and deploy.
-   This is what makes message UNKNOWN outcomes quarantine in the outbox
-   ledger and enables the three-step promotion flow. Until guests are
-   rebuilt, old Rust parsers collapse the new proxy's
-   `providerStatus: "UNKNOWN"` into confirmed failures — deploy guests soon
-   after the proxy, and do not process promotion/message backlogs in between.
-4. **Client apps last**: rebuild with `ait-rn` 0.6.0 / `ait-web` 0.3.0
+4. **Rust/WASM guests, with handler adoption**: rebuild guests against
+   crates 0.11.0 **and** switch the app's reward handlers to the three-step
+   helper sequence — prepare → persist the transaction key → claim → execute
+   → apply/status recovery. A rebuild alone changes nothing: the legacy
+   grant helper still compiles, and handlers that keep using it retain the
+   old lost-response behavior. Deploying the new guests is what makes
+   message UNKNOWN outcomes quarantine in the outbox ledger. Deploy guests
+   soon after the proxy, and keep dispatch paused until they are live.
+5. **Client apps last**: rebuild with `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0). RN consumers must already be on
    `@apps-in-toss/framework >=2.10.10`.
-5. **Resume and watch**: re-enable dispatch features and monitor ledger
+6. **Resume and watch**: re-enable dispatch features and monitor ledger
    outcomes. In-flight promotion attempts and message outbox rows survive
    as-is. Quarantined rows reconcile differently per feature: promotion rows
-   (`FAILED` with `provider_status = 'UNKNOWN'`) settle through the status
-   lookup with the stored transaction key, while message UNKNOWN rows have
-   no kit status endpoint — reconcile them explicitly with the provider by
-   `provider_request_id` before any deliberate re-enqueue decision (see
+   (`pending` with `provider_status = 'UNKNOWN'`, or `EXECUTING` after a
+   lost execute response) settle through the status lookup with the stored
+   transaction key, while message UNKNOWN rows have no kit status endpoint —
+   reconcile them explicitly with the provider by `provider_request_id`
+   before any deliberate re-enqueue decision (see
    [Functional Messages](functional-messages.md)). Never clear UNKNOWN
    isolation data to "reset" — query and settle it.
 
@@ -63,8 +71,14 @@ apps:
   that old Rust parsers read `provider_status = 'UNKNOWN'` rows as plain
   failures — preserve and re-apply the new guests before any further
   reconciliation.
-- When rolling back, stop new dispatch first, let in-flight attempts finish
-  or expire, then roll proxy and guests back together.
+- Before rolling back, settle every `EXECUTING` or UNKNOWN promotion row
+  through the status lookup with its stored transaction key. Promotion
+  executions never expire on their own — only message leases do — so
+  waiting leaves a lost execute response in-flight indefinitely, and
+  rolling back exposes that row to the old parser as a failure.
+- When rolling back, pause new dispatch first, complete the promotion
+  reconciliation above (message attempts may instead be left to their lease
+  expiry), then roll proxy and guests back together.
 
 ## Consumer Impact Summary
 

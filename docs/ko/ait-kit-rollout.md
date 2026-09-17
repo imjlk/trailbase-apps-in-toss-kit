@@ -20,33 +20,39 @@
 
 이 기준선에는 스키마 마이그레이션이 없습니다. 컨슈머 앱 순서:
 
-1. **프록시 먼저**: 컨슈머 소유 Compose 이미지 핀을
+1. **먼저 발송 중지**: 새 프로모션·메시지 작업 claim을 멈추고 진행 중
+   attempt가 끝나게 합니다(메시지 lease는 스스로 만료됩니다). 구 Rust
+   guest는 새 프록시의 `UNKNOWN` 응답을 확정 실패로 바꾸므로, 프록시
+   롤아웃이 살아 있는 큐 트래픽과 겹쳐서는 안 됩니다.
+2. **프록시 다음**: 컨슈머 소유 Compose 이미지 핀을
    `toss-mtls-client-proxy:0.5.0`으로 올리고 프록시를 배포합니다(템플릿도
-   같이 갱신). 기존 워커는 그대로 동작하며 로그인, 프로모션 grant, stub
-   응답의 wire 형태는 변경되지 않았습니다.
-2. **guest 배포 전에 프록시 preflight**: health 메타데이터 검사에
+   같이 갱신). 로그인, 프로모션 grant, stub 응답의 wire 형태는 변경되지
+   않았으므로 발송이 멈춘 워커는 프록시가 먼저 교체돼도 안전합니다.
+3. **guest 배포 전에 프록시 preflight**: health 메타데이터 검사에
    `minimumVersion: "0.5.0"`과 필수 capability `promotion.prepare`,
    `promotion.execute`, `promotion.status`, `contractVersion: 1`을
-   지정합니다([Release Doctor](release-doctor.md#proxy-capability-preflight)).
+   지정합니다([Release Doctor](release-doctor.md#프록시-지원-기능-사전-점검)).
    버전 하한이 중요합니다. 프록시 0.4.0도 같은 capability를 광고하지만 이
    롤아웃이 활성화하려는 api-core 0.4.2의 UNKNOWN 메시지·IAP 엄격 근거
    동작이 없습니다. prepare/execute capability가 없는 프록시에서 새 원장
    흐름을 legacy grant로 조용히 우회해서는 안 됩니다.
-3. **Rust/WASM guest 다음**: 크레이트 0.11.0으로 guest를 다시 빌드해
-   배포합니다. 메시지 UNKNOWN이 outbox 원장에 격리되고 3단계 프로모션
-   흐름이 활성화되는 단계입니다. guest를 다시 빌드하기 전의 구 Rust
-   파서는 새 프록시의 `providerStatus: "UNKNOWN"`을 확정 실패로 바꾸므로,
-   프록시 배포 후 빠르게 이어서 배포하고 그 사이에 프로모션/메시지
-   백로그를 처리하지 마세요.
-4. **클라이언트 앱 마지막**: `ait-rn` 0.6.0 / `ait-web` 0.3.0
+4. **Rust/WASM guest, 핸들러 전환과 함께**: 크레이트 0.11.0으로 guest를 다시
+   빌드하고 **동시에** 앱의 지급 핸들러를 3단계 헬퍼 순서 — prepare → 거래
+   키 저장 → 실행 클레임 → execute → 반영/status 복구 — 로 전환합니다. 재빌드만으로는
+   아무것도 바뀌지 않습니다. legacy grant 헬퍼는 그대로 컴파일되므로 이를
+   계속 쓰는 핸들러는 기존의 응답 유실 동작을 유지합니다. guest 배포가
+   메시지 UNKNOWN의 outbox 원장 격리를 활성화하는 단계입니다. 프록시 배포
+   후 빠르게 이어서 배포하고, guest가 살아날 때까지 발송 중지를 유지하세요.
+5. **클라이언트 앱 마지막**: `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0)로 다시 빌드합니다. RN 컨슈머는 이미
    `@apps-in-toss/framework >=2.10.10`이어야 합니다.
-5. **재개 및 관찰**: 발송 기능을 다시 켜고 원장 결과를 관찰합니다. 진행
+6. **재개 및 관찰**: 발송 기능을 다시 켜고 원장 결과를 관찰합니다. 진행
    중이던 프로모션 attempt와 메시지 outbox 행은 그대로 유지됩니다. 격리된
-   행의 정산은 기능마다 다릅니다. 프로모션 행(`FAILED` +
-   `provider_status = 'UNKNOWN'`)은 저장된 거래 키로 status 조회해 마무리하고,
-   메시지 UNKNOWN 행은 kit에 status 엔드포인트가 없으므로 의도적인 재enqueue
-   결정 전에 `provider_request_id`로 제공자·운영자가 명시적으로 재확인합니다
+   행의 정산은 기능마다 다릅니다. 프로모션 행(`pending` +
+   `provider_status = 'UNKNOWN'`, 또는 execute 응답 유실 후의 `EXECUTING`)은
+   저장된 거래 키로 status 조회해 마무리하고, 메시지 UNKNOWN 행은 kit에
+   status 엔드포인트가 없으므로 의도적인 재enqueue 결정 전에
+   `provider_request_id`로 제공자·운영자가 명시적으로 재확인합니다
    ([기능성 메시지](functional-messages.md) 참고). UNKNOWN 격리 데이터를 지워서
    "초기화"하지 말고 조회해 마무리하세요.
 
@@ -57,8 +63,13 @@
   원장/outbox 데이터는 이전 코드에서도 읽히지만, 구 Rust 파서는
   `provider_status = 'UNKNOWN'` 행을 단순 실패로 읽습니다. 추가 정산 전에
   새 guest를 다시 적용하세요.
-- 롤백 시에는 먼저 신규 발송을 멈추고, 진행 중 attempt가 끝나거나 만료된
-  뒤 프록시와 guest를 함께 되돌립니다.
+- 되돌리기 전에 `EXECUTING` 또는 UNKNOWN 프로모션 행을 저장된 거래 키로
+  status 조회해 전부 마무리하세요. 프로모션 실행은 스스로 만료되지
+  않습니다(만료되는 것은 메시지 lease뿐입니다). 기다리면 응답을 잃은
+  execute가 무기한 진행 상태로 남고, 되돌린 뒤에는 그 행이 구 파서에게
+  실패로 노출됩니다.
+- 롤백 시에는 먼저 신규 발송을 멈추고, 위의 프로모션 정산을 마친 뒤(메시지
+  attempt는 lease 만료에 맡길 수 있습니다) 프록시와 guest를 함께 되돌립니다.
 
 ## 컨슈머 영향 요약
 

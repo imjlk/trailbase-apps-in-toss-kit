@@ -14,7 +14,8 @@ Align deployment baselines with the released 0.5.0 image.
 - New bilingual rollout and verification record
   (`docs/en/ait-kit-rollout.md`, `docs/ko/ait-kit-rollout.md`): version
   matrix (proxy 0.5.0 image digest, api 0.4.2 pins, SDK 0.3.0, RN minimum
-  2.10.10, crates 0.11.0), rollout order (proxy → WASM guests → capability
-  check → client apps), rollback cautions, the 2026-09-17 verification
-  record, and the consumer-owned real-device checks that remain. No schema
-  migrations ship in this cycle.
+  2.10.10, crates 0.11.0), rollout order (pause dispatch → proxy →
+  capability preflight with minimumVersion 0.5.0 → WASM guests with
+  three-step handler adoption → client apps), rollback cautions, the
+  2026-09-17 verification record, and the consumer-owned real-device checks
+  that remain. No schema migrations ship in this cycle.
