@@ -249,10 +249,19 @@ The persisted three-step contract stores execution facts in two new columns,
 `protocol` and `execution_started_at`. Fresh installs get them from
 `templates/trailbase/sql/promotion_reward_ledger.sql`. Existing installs apply
 `templates/trailbase/sql/promotion_reward_ledger.v2.sql` once as an explicit
-migration: it is additive only — existing grant rows, transaction keys,
+migration (wrapped in a SAVEPOINT, so it also nests inside migration runners): it is additive only — existing grant rows, transaction keys,
 user/source/campaign links, and provider outcomes are preserved, and legacy
-rows stay unmarked (`protocol IS NULL`) rather than guessed. There is no
-long-running compatibility branch: after this breaking release, the helpers
-expect the v2 columns.
+rows stay unmarked (`protocol IS NULL`) rather than guessed. No protocol
+backfill runs: a `PREPARED` legacy row is not provably pre-execution (the
+0.11 store fence admitted `PENDING` too, so an executed-then-PENDING row
+could read `PREPARED` after a store replay), so **drain before upgrading**
+while the 0.11 helpers still run — and drain every legacy row, keyed or keyless,
+PREPARED included, **through the status lookup or explicit reconciliation
+only**: PREPARED cannot distinguish a never-executed key from the
+executed-then-PENDING replay state, and a keyless legacy row may be a
+grant that executed before the caller persisted its key — so resuming or
+re-adopting either shape can double-grant. The v2 key store only accepts
+rows the v2 flow itself created. There is no long-running compatibility branch: after this
+breaking release, the helpers expect the v2 columns.
 
 See [Verified anonymous identity, dispatch, and recovery](anonymous-identity.md).

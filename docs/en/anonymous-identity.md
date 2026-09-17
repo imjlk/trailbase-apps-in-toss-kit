@@ -69,12 +69,19 @@ another canonical user is an app-owned transaction that must recheck consent.
 ## Anonymous Promotion and Recovery
 
 The proxy's promotion prepare, execute, and status endpoints accept `anonKey` as an alternative
-to `tossUserKey`. Supplying both is rejected. api-core 0.3.0's three-step
-promotion contract accepts anonymous recipients directly, so the proxy runs
-prepare → execute → status and forwards the official recipient headers as-is.
-Existing transaction key, outcome, and retry semantics remain in api-core. No
-shared mutable recipient state or certificate access is added to the app
-container.
+to `tossUserKey`. Supplying both is rejected. Since the promotion v2
+contract (api-core 0.5.0), prepare is recipient-bound: it issues a key for
+exactly one recipient and forwards the official recipient header itself.
+The proxy does NOT orchestrate the steps — the caller runs
+prepare → persist the key → atomically claim execution (the committed
+`execution_started_at` marker) → execute → status, one request per
+endpoint, persisting the transaction key between prepare and execute and
+committing the claim before the external execute call so a crash afterwards
+leaves the row in the recovery set instead of being silently re-executed. Prepare success
+means key issuance only; execute `SUBMITTED` is not a grant; the status
+lookup reports the observed verdict (`checkedAt`, no fabricated
+`grantedAt`). No shared mutable recipient state or certificate access is
+added to the app container.
 
 Create the normal `_user`-keyed promotion ledger row (prepare issues the key with `anonKey` as the bound recipient) and call
 `bind_anonymous_promotion_recipient_tx` in the same transaction. Persist every
@@ -85,8 +92,10 @@ The identity binding prevents a subsequent Toss login from changing the recovery
 recipient. Missing keys or revoked identities require explicit reconciliation;
 never allocate another key merely because the first outcome is unknown.
 
-Select the published proxy `0.4.0` or later (the first image carrying the api-core 0.3 contracts), or a reviewed compatible release, before
-using these endpoints. Local
+Select a proxy advertising the versioned promotion capabilities
+(`promotion.prepare.v2`, `promotion.execute.v2`, `promotion.status.v2`) —
+the batch grant route is gone and pre-v2 proxies do not expose this
+contract — before using these endpoints. Local
 contract/SQL tests are provided; consuming apps still need sandbox/real-app
 bootstrap, notification-agreement, and promotion tests before rollout.
 

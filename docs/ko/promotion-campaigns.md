@@ -224,9 +224,16 @@ transaction key를 전달하면 `POST /internal/apps-in-toss/promotion/reward/st
 영속 3단계 계약은 실행 사실을 `protocol`과 `execution_started_at` 두 새 컬럼에
 저장합니다. 신규 설치는 `templates/trailbase/sql/promotion_reward_ledger.sql`에서
 컬럼을 받습니다. 기존 설치는 `templates/trailbase/sql/promotion_reward_ledger.v2.sql`을
-명시적 마이그레이션으로 한 번 적용합니다. 추가 전용입니다 — 기존 지급 행, 거래
+명시적 마이그레이션으로 한 번 적용합니다 (SAVEPOINT로 감싸져 실행돼 마이그레이션 러너 안에서도 동작). 추가 전용입니다 — 기존 지급 행, 거래
 키, 사용자·source·캠페인 연결, 제공자 결과가 보존되고, 레거시 행은 추측으로
-표시하지 않고 `protocol IS NULL`로 남습니다. 장기 호환 분기는 없습니다. 이
-breaking 릴리스 이후 헬퍼는 v2 컬럼을 기대합니다.
+표시하지 않고 `protocol IS NULL`로 남습니다. 프로토콜 백필은 실행하지 않습니다.
+`PREPARED` 레거시 행은 실행 전이라 증명되지 않습니다(0.11 저장 펜스가 `PENDING`도
+허용해, 실행 후 PENDING 행이 저장 재생 뒤 `PREPARED`로 읽힐 수 있습니다). 따라서
+**업그레이드 전에 드레인하세요** — 0.11 헬퍼가 살아 있는 동안, 모든 레거시 행(키
+유무와 PREPARED 포함)을 **status 조회 또는 명시적 정산으로만** 마무리합니다.
+PREPARED는 미실행 키와 재생된 실행 후 상태를 구분할 수 없고, 키 없는 레거시 행도
+호출자가 키를 저장하기 전에 실행된 지급일 수 있어 resume이나 재채택은 이중 지급이
+될 수 있습니다. v2 키 저장은 v2 흐름이 만든 행만 받습니다. 장기
+호환 분기는 없습니다. 이 breaking 릴리스 이후 헬퍼는 v2 컬럼을 기대합니다.
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.

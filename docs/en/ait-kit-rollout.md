@@ -52,8 +52,13 @@ apps:
    promotion capabilities (and proxy 0.4.0 even those without the
    api-core 0.4.2 UNKNOWN-message and strict-IAP behavior), so a stale
    deployment must fail the preflight instead of passing as this contract.
-4. **Migrate the ledger schema, then deploy Rust/WASM guests with handler
-   adoption**: apply
+4. **Drain legacy promotion rows, migrate the ledger schema, then deploy
+   Rust/WASM guests with handler adoption**: FIRST drain the legacy
+   promotion ledger while the 0.11 helpers still run — every legacy row,
+   keyed or keyless and PREPARED included, settles through the status
+   lookup or explicit reconciliation only (the migration leaves them
+   unmarked and v2 never adopts them, so undrained rewards would strand).
+   THEN apply
    `templates/trailbase/sql/promotion_reward_ledger.v2.sql` as an explicit
    migration (additive `protocol`/`execution_started_at` columns; legacy
    rows stay unmarked), then rebuild guests against this cycle's crates

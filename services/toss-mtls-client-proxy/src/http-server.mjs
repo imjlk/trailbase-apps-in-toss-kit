@@ -82,19 +82,17 @@ export async function handleRequest(req, config = createConfig(), core = createC
     // api-core 0.5 binds the issued key to the caller's single recipient and
     // sends the matching identity header itself; a recipient-less prepare is
     // rejected before any dispatch. Prepare success means key issuance only.
-    return response(200, await core.promotionPrepareReward(body));
+    // Rejections can echo the submitted recipient, so this path redacts like
+    // execute and status do.
+    const prepared = await core.promotionPrepareReward(body);
+    return response(200, redactRecipientEchoes(prepared, body));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionExecuteReward) {
     const body = await readJson(req, requestBodyLimitBytes(config));
-    const executed = await core.promotionExecuteReward(body);
     // Ledger callers using the prepare/execute flow must never persist or
-    // log a provider-echoed recipient; every other path redacts, so the
-    // direct execute route does too — for anonymous keys and Toss user
-    // keys alike.
-    const recipient = resolveRecipient(body);
-    const result = recipient !== undefined ? redactRecipient(executed, recipient) : executed;
-    return response(200, result);
+    // log a provider-echoed recipient; every promotion path redacts.
+    return response(200, redactRecipientEchoes(await core.promotionExecuteReward(body), body));
   }
 
   if (req.method === "POST" && url.pathname === PROXY_ENDPOINTS.promotionRewardStatus) {
@@ -151,8 +149,7 @@ async function promotionRewardStatus(core, body) {
       ? { providerRequestId }
       : {}),
   };
-  const recipient = resolveRecipient(body);
-  return recipient !== undefined ? redactRecipient(mapped, recipient) : mapped;
+  return redactRecipientEchoes(mapped, body);
 }
 
 // Legacy IAP wire shape: keep the 0.2 response fields, drop the api-core
@@ -200,26 +197,134 @@ function legacyIapResponse(result, mode) {
 // The documented recipient contract accepts anonKey or tossUserKey;
 // provider-echoed identifiers of either kind must never reach downstream
 // persistence or logs.
-function resolveRecipient(body) {
-  if (body?.anonKey !== undefined) return requireAnonymousKey(body.anonKey);
-  if (typeof body?.tossUserKey === "string" && body.tossUserKey.trim()) {
-    return body.tossUserKey.trim();
-  }
-  // userKey and integer tossUserKey are legal recipient spellings in the
-  // shared contract; normalize them so provider-echo redaction still runs.
-  if (body?.userKey !== undefined && body.userKey !== null) {
-    return String(body.userKey);
-  }
-  if (typeof body?.tossUserKey === "number" && Number.isInteger(body.tossUserKey)) {
-    return String(body.tossUserKey);
-  }
-  return undefined;
+// Substring redaction is only meaningful for unambiguous identifier
+// strings: feeding a short id such as "1" or "42" into the recursive
+// replacer would corrupt unrelated response fields instead of protecting
+// anything, and a short digit run substring-matches inside transaction keys
+// and request ids ("tx-12345678-01"). Genuine numeric Toss user keys are
+// long, so all-digit candidates become unambiguous once they pass a higher
+// floor (10+ digits; a 9-digit id stays below it and skips rewriting).
+// Candidates below their floor get no rewriting; the proxy never echoes
+// recipient fields (anonKey / tossUserKey / userKey) from the request body
+// back — correlated request fields such as providerRequestId do pass
+// through — so the remaining exposure is a provider-echoed short digit run
+// or sub-floor identifier (requireAnonymousKey enforces no minimum length,
+// so sub-floor anonymous keys intentionally skip redaction too) inside
+// free text.
+const MIN_REDACTABLE_RECIPIENT_LENGTH = 8;
+const MIN_ALL_DIGIT_REDACTABLE_LENGTH = 10;
+
+function isSubstringRedactable(candidate) {
+  if (candidate.length < MIN_REDACTABLE_RECIPIENT_LENGTH) return false;
+  return /^\d+$/.test(candidate)
+    ? candidate.length >= MIN_ALL_DIGIT_REDACTABLE_LENGTH
+    : true;
 }
 
-function redactRecipient(value, recipient) {
+function resolveRecipient(body) {
+  const candidate = (() => {
+    // requireAnonymousKey validates the shape but not a minimum length, so
+    // short anonymous keys dispatch and skip redaction by the gate above.
+    if (body?.anonKey !== undefined) return requireAnonymousKey(body.anonKey);
+    if (typeof body?.tossUserKey === "string" && body.tossUserKey.trim()) {
+      return body.tossUserKey.trim();
+    }
+    if (typeof body?.userKey === "string" && body.userKey.trim()) {
+      return body.userKey.trim();
+    }
+    // The shared contract accepts integer id spellings; normalize them so
+    // long numeric keys still reach the length gate (short ones are
+    // filtered out by isRedactableRecipient).
+    if (typeof body?.userKey === "number" && Number.isInteger(body.userKey)) {
+      return String(body.userKey);
+    }
+    if (typeof body?.tossUserKey === "number" && Number.isInteger(body.tossUserKey)) {
+      return String(body.tossUserKey);
+    }
+    return undefined;
+  })();
+  // Sub-floor candidates still redact by exact equality (whole-value
+  // matches only) — a short id echoed as a complete field value is
+  // scrubbed, while fragments inside free text or other identifiers are
+  // left alone because rewriting them corrupts data. The mode is carried
+  // alongside the value, never encoded inside it (identifiers may begin
+  // with any character).
+  if (candidate === undefined) return undefined;
+  return {
+    value: candidate,
+    substring: isSubstringRedactable(candidate),
+  };
+}
+
+// All three promotion endpoints share identical echo-redaction semantics:
+// resolve the caller's recipient and scrub it from the provider response
+// when (and only when) substring replacement is unambiguous. The scrub is
+// best-effort — an unparsable recipient spelling must never turn a
+// completed prepare/execute/status into an error response after dispatch.
+function redactRecipientEchoes(result, body) {
+  let recipient;
+  try {
+    recipient = resolveRecipient(body);
+  } catch {
+    // The spelling failed validation (for example a malformed anonKey the
+    // core still dispatched). Do not silently bypass the scrub: fall back
+    // to the raw string value of whichever recipient field was submitted,
+    // when it is unambiguous, so the echo it triggered cannot leak through
+    // the error path either.
+    for (const field of ["anonKey", "tossUserKey", "userKey"]) {
+      const raw = body?.[field];
+      if (typeof raw === "string" && raw.trim() && isSubstringRedactable(raw.trim())) {
+        return redactRecipient(result, { value: raw.trim(), substring: true });
+      }
+    }
+    return result;
+  }
+  return recipient !== undefined ? redactRecipient(result, recipient) : result;
+}
+
+// Correlation fields survive verbatim: providerTransactionKey is the one
+// value prepare exists to deliver and the ledger persists it as the
+// execute/status identity — rewriting it would corrupt every later lookup.
+const UNREDACTED_FIELD_NAMES = new Set([
+  "providerTransactionKey",
+  "providerRequestId",
+  "checkedAt",
+]);
+
+function redactRecipient(value, { value: recipient, substring }) {
+  if (!substring) {
+    // Sub-floor recipient: redact by exact equality only — whole
+    // string/number values, never substrings.
+    if (typeof value === "string" && value === recipient) return "[redacted]";
+    if (typeof value === "number" && String(value) === recipient) return "[redacted]";
+    if (Array.isArray(value)) return value.map((entry) => redactRecipient(entry, { value: recipient, substring }));
+    if (value && typeof value === "object") {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [
+          key,
+          UNREDACTED_FIELD_NAMES.has(key) ? entry : redactRecipient(entry, { value: recipient, substring }),
+        ]),
+      );
+    }
+    return value;
+  }
   if (typeof value === "string") return value.split(recipient).join("[redacted]");
-  if (Array.isArray(value)) return value.map((entry) => redactRecipient(entry, recipient));
-  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactRecipient(entry, recipient)]));
+  // Exact-equality only for numeric echoes: a JSON number identical to the
+  // recipient is redacted, while every other numeric field (counts,
+  // checkedAt) passes through — no substring risk at all. Ids beyond
+  // Number.MAX_SAFE_INTEGER lose exactness in JSON parsing and fall back
+  // to the string branch when echoed as strings; known Toss user keys are
+  // well within the safe range.
+  if (typeof value === "number" && String(value) === recipient) return "[redacted]";
+  if (Array.isArray(value)) return value.map((entry) => redactRecipient(entry, { value: recipient, substring }));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => [
+        key,
+        UNREDACTED_FIELD_NAMES.has(key) ? entry : redactRecipient(entry, { value: recipient, substring }),
+      ]),
+    );
+  }
   return value;
 }
 

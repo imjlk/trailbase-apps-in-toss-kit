@@ -64,9 +64,16 @@ canonical user로 옮기는 transaction은 앱이 소유하며 동의를 다시 
 ## 익명 프로모션과 결과 조회
 
 Proxy의 promotion prepare·execute·status endpoint는 `tossUserKey` 대신 `anonKey`를 받습니다.
-둘을 함께 전달하면 거부합니다. api-core 0.3.0의 3단계 프로모션 계약이 익명 수신자를
-직접 지원하므로 프록시는 prepare → execute → status를 통해 공식 수신자 헤더를
-그대로 전달합니다. 기존 거래키·결과·재시도 의미는 api-core에 유지합니다. 공유 수신자
+둘을 함께 전달하면 거부합니다. 프로모션 v2 계약(api-core 0.5.0)부터 prepare는
+수신자에 바인딩됩니다. 수신자를 정확히 하나 받아 키를 발급하고 공식 수신자
+헤더를 직접 전송합니다. 프록시는 단계를 오케스트레이션하지 않습니다 —
+호출자가 prepare → 키 저장 → 실행 클레임(커밋된 `execution_started_at`
+표식) → execute → status를 엔드포인트마다 한 요청씩 수행하며, prepare와
+execute 사이에 거래 키를 저장하고 외부 execute 호출 전에 클레임을
+커밋해, 이후 충돌하면 행이 조용히 재실행되는 대신 재조회 대상에 남게
+합니다. prepare 성공은 키
+발급을 뜻할 뿐이고, execute의 `SUBMITTED`는 지급이 아니며, status 조회는
+관찰된 판정을 보고합니다(`checkedAt`, 조작된 `grantedAt` 없음). 공유 수신자
 상태나 앱 컨테이너의 인증서 접근은 추가하지 않습니다.
 
 기존 `_user` 기준 promotion ledger 행을 만들고 같은 transaction에서
@@ -77,8 +84,9 @@ Proxy의 promotion prepare·execute·status endpoint는 `tossUserKey` 대신 `an
 유지합니다. 키 누락·식별자 폐기 시에는 명시적으로 결과를 확인해야 하며 첫 지급 결과가
 불명확하다는 이유로 새 키를 만들면 안 됩니다.
 
-Endpoint를 사용하기 전에 게시된 proxy `0.4.0` 이상(api-core 0.3 계약을 포함한 첫 이미지) 또는 호환성을 검토한 이후 버전을
-선택하세요. 로컬 계약·SQL
+Endpoint를 사용하기 전에 버전 표기된 프로모션 capability(`promotion.prepare.v2`,
+`promotion.execute.v2`, `promotion.status.v2`)를 광고하는 프록시를 선택하세요 — 일괄
+grant 라우트는 제거되었고 v2 이전 프록시는 이 계약을 노출하지 않습니다. 로컬 계약·SQL
 테스트를 제공하지만 rollout 전 컨슈머 앱의 sandbox·실제 앱 bootstrap, 알림 동의,
 프로모션 검증은 별도로 필요합니다.
 
