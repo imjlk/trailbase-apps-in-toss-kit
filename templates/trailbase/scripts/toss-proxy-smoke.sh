@@ -95,18 +95,40 @@ curl_proxy \
   "${BASE_URL%/}/internal/apps-in-toss/toss-login/complete"
 printf '\n'
 
+# Promotion rewards run the persisted three-step contract: prepare issues a
+# recipient-bound transaction key, execute requests the grant with exactly
+# the key prepare issued, and status looks the result up with the same key.
+PREPARE_RESPONSE="$(curl_proxy \
+  -H 'content-type: application/json' \
+  -d '{"tossUserKey": "smoke-toss-user-key"}' \
+  "${BASE_URL%/}/internal/apps-in-toss/promotion/reward/prepare")"
+printf '%s\n' "$PREPARE_RESPONSE"
+
+TRANSACTION_KEY="$(printf '%s' "$PREPARE_RESPONSE" | sed -nE 's/.*"providerTransactionKey"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p')"
+if [ -z "$TRANSACTION_KEY" ]; then
+  echo "Prepare did not issue a provider transaction key." >&2
+  exit 1
+fi
+
 curl_proxy \
   -H 'content-type: application/json' \
   -d '{
-    "providerRequestId": "smoke:reward:001",
-    "eligibilityId": "smoke-eligibility",
-    "userId": "smoke-user",
-    "sourceType": "SMOKE",
-    "sourceId": "smoke-source",
-    "requestedAt": 1,
+    "providerTransactionKey": "'"${TRANSACTION_KEY}"'",
+    "promotionCode": "smoke-promotion",
+    "amount": 1,
     "tossUserKey": "smoke-toss-user-key"
   }' \
-  "${BASE_URL%/}/internal/apps-in-toss/promotion/reward/grant"
+  "${BASE_URL%/}/internal/apps-in-toss/promotion/reward/execute"
+printf '\n'
+
+curl_proxy \
+  -H 'content-type: application/json' \
+  -d '{
+    "providerTransactionKey": "'"${TRANSACTION_KEY}"'",
+    "promotionCode": "smoke-promotion",
+    "tossUserKey": "smoke-toss-user-key"
+  }' \
+  "${BASE_URL%/}/internal/apps-in-toss/promotion/reward/status"
 printf '\n'
 
 curl_proxy \

@@ -10,7 +10,10 @@ test("doctor accepts the actual proxy metadata while health stays local", async 
     healthCalls++; return { ok: true, mode: "forward", token: secret };
   } });
   expect(healthCalls).toBe(1);
-  expect(evaluateProxyCapabilities(response.body, { requiredCapabilities: ["promotion.status", "iap.provider-sku-required"] }).ok).toBe(true);
+  expect(evaluateProxyCapabilities(response.body, { requiredCapabilities: ["promotion.prepare.v2", "promotion.execute.v2", "promotion.status.v2", "iap.provider-sku-required"] }).ok).toBe(true);
+  // The removed batch-grant contract is no longer advertised; requiring it
+  // fails the preflight so stale consumers cannot deploy against it.
+  expect(evaluateProxyCapabilities(response.body, { requiredCapabilities: ["promotion.grant"] }).ok).toBe(false);
   expect(JSON.stringify(response.body)).not.toContain(secret);
   const denied = await handleRequest({ ...req, headers: {} }, { mode: "forward", internalToken: secret }, {});
   expect(denied.status).toBe(401);

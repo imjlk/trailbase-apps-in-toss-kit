@@ -114,6 +114,8 @@ pub struct PromotionRewardLedgerTable {
     pub source_id_column: &'static str,
     pub amount_column: &'static str,
     pub status_column: &'static str,
+    pub protocol_column: &'static str,
+    pub execution_started_at_column: &'static str,
     pub provider_column: &'static str,
     pub provider_request_id_column: &'static str,
     pub provider_status_column: &'static str,
@@ -138,6 +140,8 @@ pub const DEFAULT_PROMOTION_REWARD_LEDGER_TABLE: PromotionRewardLedgerTable =
         source_id_column: "source_id",
         amount_column: "reward_amount",
         status_column: "status",
+        protocol_column: "protocol",
+        execution_started_at_column: "execution_started_at",
         provider_column: "provider",
         provider_request_id_column: "provider_request_id",
         provider_status_column: "provider_status",
@@ -186,6 +190,8 @@ pub struct PromotionRewardLedgerRecord {
     pub source_id: Option<String>,
     pub reward_amount: i64,
     pub status: String,
+    pub protocol: Option<String>,
+    pub execution_started_at: Option<i64>,
     pub provider: String,
     pub provider_request_id: String,
     pub provider_status: Option<String>,
@@ -259,19 +265,19 @@ pub fn promotion_reward_payload(input: PromotionRewardPayloadInput<'_>) -> JsonV
 pub fn promotion_reward_outcome_from_response(
     response: &JsonValue,
     fallback_provider_request_id: &str,
-    requested_at: Option<i64>,
 ) -> PromotionRewardOutcome {
     let provider_status = promotion_provider_status_from_response(response);
     let ledger_status = promotion_ledger_status(&provider_status);
+    // Provider-supplied timestamps only: the request time is not a grant or
+    // failure time, and the status contract reports observation time as
+    // checkedAt, which the caller records through updated_at.
     let granted_at = if provider_status == "GRANTED" {
         read_integer_path(response, &["grantedAt", "data.grantedAt", "body.grantedAt"])
-            .or(requested_at)
     } else {
         None
     };
     let failed_at = if ledger_status == "failed" {
         read_integer_path(response, &["failedAt", "data.failedAt", "body.failedAt"])
-            .or(requested_at)
     } else {
         None
     };
@@ -317,6 +323,7 @@ pub fn promotion_provider_status_from_response(response: &JsonValue) -> String {
         &[
             "providerStatus",
             "status",
+            "result",
             "success.status",
             "data.status",
             "body.status",
@@ -355,10 +362,12 @@ pub fn normalize_promotion_provider_status(ok: Option<bool>, status: Option<&str
         };
     }
 
+    // ok alone never fabricates a grant: an envelope without an observable
+    // status is an unconfirmed outcome (execute SUBMITTED-style responses
+    // carry their verdict in `result`, which the status paths above read).
     match ok {
         Some(false) => "FAILED".to_string(),
-        Some(true) => "GRANTED".to_string(),
-        None => "PENDING".to_string(),
+        Some(true) | None => "PENDING".to_string(),
     }
 }
 
@@ -368,6 +377,8 @@ pub fn promotion_ledger_status(provider_status: &str) -> &'static str {
         // SUBMITTED (execute accepted, not yet confirmed) and UNKNOWN
         // (outcome undeterminable) are neither granted nor definitively
         // failed; they stay pending for explicit status reconciliation.
+        // NOT_FOUND (provider error 4111: no grant record for the key) and
+        // every other verdict classify as failed — no grant exists.
         "PENDING" | "SUBMITTED" | "UNKNOWN" => "pending",
         _ => "failed",
     }
@@ -426,10 +437,16 @@ pub fn apply_promotion_reward_outcome_tx(
     Err(internal("Promotion reward ledger row was not found"))
 }
 
-/// Persist the prepare-issued transaction key on a pending ledger row and
-/// mark it PREPARED, in its own committed transaction, BEFORE any execute
-/// call. An existing different key is never overwritten, and a restart
-/// reuses the stored key instead of issuing a new one for the same grant.
+/// Persist the prepare-issued transaction key on a pending ledger row that
+/// has not started executing, in its own committed transaction, BEFORE any
+/// execute call. The row is marked `protocol = 'three-step'`; an existing
+/// different key is never overwritten, and a restart reuses the stored key
+/// instead of issuing a new one for the same grant. Adoption targets
+/// keyless rows only: a legacy row that already holds a key may have
+/// started executing under the old flow (its execution facts are unknown),
+/// so re-storing its key can never re-flag it for a fresh claim — settle
+/// such rows through the status lookup instead. Never touches the
+/// execution-start marker or the provider outcome.
 pub fn store_promotion_transaction_key_tx(
     tx: &mut Transaction,
     table: PromotionRewardLedgerTable,
@@ -462,8 +479,8 @@ pub fn store_promotion_transaction_key_tx(
                 "ledger row already holds a different provider transaction key",
             ));
         }
-        // Same key, but the row is not in a key-storable phase: execution
-        // already started (EXECUTING) or the outcome is already terminal.
+        // Same key, but the row is not in a key-storable state: execution
+        // already started (the marker is set) or the outcome is terminal.
         return Err(bad_request(
             "PROMOTION_TRANSACTION_KEY_PHASE_CONFLICT",
             "ledger row is not waiting to store a provider transaction key",
@@ -472,10 +489,14 @@ pub fn store_promotion_transaction_key_tx(
     Err(internal("Promotion reward ledger row was not found"))
 }
 
-/// Atomically claim the right to execute: PREPARED -> EXECUTING. The second
-/// concurrent caller gets None (another worker owns the execution), and a
-/// row whose outcome is already recorded is never re-entered. Returns the
-/// record whose stored key the caller must execute with.
+/// Atomically claim the right to execute by recording the execution-start
+/// marker, in its own committed transaction BEFORE the external execute
+/// call. The marker is write-once: the second concurrent caller gets None
+/// (another worker owns the execution), a restart after the claim gets
+/// None (recovery goes through the status lookup), and a row whose outcome
+/// is already recorded is never re-entered. Only a three-step row with a
+/// stored key and no marker can be claimed. Returns the record whose
+/// stored key the caller must execute with.
 pub fn begin_promotion_reward_execute_tx(
     tx: &mut Transaction,
     table: PromotionRewardLedgerTable,
@@ -498,16 +519,21 @@ pub fn begin_promotion_reward_execute_tx(
         .transpose()
 }
 
-/// Ledger rows whose execute started but whose outcome is still unknown
-/// (`EXECUTING`). Recovery for these rows is a status lookup with the
-/// stored key first — never an immediate re-execute.
+/// Ledger rows of the three-step contract whose execution started before
+/// `started_before` and whose outcome is still unsettled (pending,
+/// including PENDING/SUBMITTED/UNKNOWN provider statuses). Recovery for
+/// these rows is a status lookup with the stored key — never prepare,
+/// never execute, never a new grant intent. Ordering rides on `updated_at`
+/// (advanced by every applied status outcome) so each unsettled row is
+/// re-checked in turn instead of the oldest permanently-UNKNOWN rows
+/// starving everything behind them; the row id breaks timestamp ties.
 pub fn promotion_reward_ledgers_awaiting_recovery_tx(
     tx: &mut Transaction,
     table: PromotionRewardLedgerTable,
-    updated_before: i64,
+    started_before: i64,
     limit: i64,
 ) -> ApiResult<Vec<PromotionRewardLedgerRecord>> {
-    let (sql, params) = promotion_reward_ledger_recovery_statement(table, updated_before, limit)?;
+    let (sql, params) = promotion_reward_ledger_recovery_statement(table, started_before, limit)?;
     let rows = db::tx_query(tx, &sql, &params)?;
     rows.iter()
         .map(|row| promotion_reward_ledger_record_from_row(row))
@@ -602,13 +628,13 @@ fn promotion_reward_ledger_insert_statement(
         format!(
             "INSERT INTO {table} (
                {id_column}, {user_id_column}, {campaign_id_column}, {source_type_column},
-               {source_id_column}, {amount_column}, {status_column}, {provider_column},
-               {provider_request_id_column}, {provider_status_column}, {requested_at_column},
-               {created_at_column}, {updated_at_column}
+               {source_id_column}, {amount_column}, {status_column}, {protocol_column},
+               {provider_column}, {provider_request_id_column}, {provider_status_column},
+               {requested_at_column}, {created_at_column}, {updated_at_column}
              )
              VALUES (
                COALESCE(?1, lower(hex(randomblob(16)))), ?2, ?3, ?4, ?5, ?6, 'pending',
-               ?7, ?8, 'PENDING', ?9, ?10, ?10
+               'three-step', ?7, ?8, 'PENDING', ?9, ?10, ?10
              )
              ON CONFLICT({provider_request_id_column}) DO NOTHING
              RETURNING {returning_columns}",
@@ -620,6 +646,7 @@ fn promotion_reward_ledger_insert_statement(
             source_id_column = table.source_id_column,
             amount_column = table.amount_column,
             status_column = table.status_column,
+            protocol_column = table.protocol_column,
             provider_column = table.provider_column,
             provider_request_id_column = table.provider_request_id_column,
             provider_status_column = table.provider_status_column,
@@ -746,11 +773,11 @@ fn promotion_reward_ledger_outcome_statement(
     ))
 }
 
-/// Store the transaction key on a pending row that does not hold a
-/// different key yet. PREPARED (key stored, execution not started) is the
-/// only phase `begin_promotion_reward_execute_tx` claims from. The phase
-/// guard also keeps an EXECUTING row from being reset to PREPARED by a
-/// re-store of the same key, which would enable a second execution.
+/// Store the transaction key on a pending row that has not started
+/// executing and does not hold a different key, and mark the row as a
+/// three-step record. Execution facts (`execution_started_at`) and the
+/// provider outcome (`provider_status`) are NOT written here — a re-store
+/// of the same key can never reset a row to a pre-execution state.
 fn promotion_reward_ledger_store_key_statement(
     table: PromotionRewardLedgerTable,
     ledger_id: String,
@@ -762,20 +789,22 @@ fn promotion_reward_ledger_store_key_statement(
         format!(
             "UPDATE {table}
              SET {provider_transaction_key_column} = ?2,
-                 {provider_status_column} = 'PREPARED',
+                 {protocol_column} = 'three-step',
                  {updated_at_column} = ?3
              WHERE {id_column} = ?1
                AND {status_column} = 'pending'
-               AND {provider_status_column} IN ('PENDING', 'PREPARED')
+               AND {execution_started_at_column} IS NULL
                AND ({provider_transaction_key_column} IS NULL
-                    OR {provider_transaction_key_column} = ?2)
+                    OR ({provider_transaction_key_column} = ?2
+                        AND {protocol_column} = 'three-step'))
              RETURNING {returning_columns}",
             table = table.table,
             provider_transaction_key_column = table.provider_transaction_key_column,
-            provider_status_column = table.provider_status_column,
+            protocol_column = table.protocol_column,
             updated_at_column = table.updated_at_column,
             id_column = table.id_column,
             status_column = table.status_column,
+            execution_started_at_column = table.execution_started_at_column,
             returning_columns = promotion_reward_ledger_returning_columns(table),
         ),
         vec![
@@ -786,9 +815,13 @@ fn promotion_reward_ledger_store_key_statement(
     ))
 }
 
-/// Claim execution: only a PREPARED row with a stored key transitions to
-/// EXECUTING, so concurrent workers cannot double-execute and terminal
-/// rows are never re-entered.
+/// Atomically record the execution start: a three-step row with a stored
+/// key that has not started executing gets `execution_started_at`, in its
+/// own committed transaction BEFORE the external execute call. The marker
+/// is write-once — the WHERE clause makes a second claim (concurrent
+/// worker, restart, or late retry) match zero rows — and nothing ever
+/// clears it back to a pre-execution state. `provider_status` is not
+/// touched: it stores provider outcomes only.
 fn promotion_reward_ledger_begin_execute_statement(
     table: PromotionRewardLedgerTable,
     ledger_id: String,
@@ -798,18 +831,20 @@ fn promotion_reward_ledger_begin_execute_statement(
     Ok((
         format!(
             "UPDATE {table}
-             SET {provider_status_column} = 'EXECUTING',
+             SET {execution_started_at_column} = ?2,
                  {updated_at_column} = ?2
              WHERE {id_column} = ?1
                AND {status_column} = 'pending'
-               AND {provider_status_column} = 'PREPARED'
+               AND {protocol_column} = 'three-step'
                AND {provider_transaction_key_column} IS NOT NULL
+               AND {execution_started_at_column} IS NULL
              RETURNING {returning_columns}",
             table = table.table,
-            provider_status_column = table.provider_status_column,
+            execution_started_at_column = table.execution_started_at_column,
             updated_at_column = table.updated_at_column,
             id_column = table.id_column,
             status_column = table.status_column,
+            protocol_column = table.protocol_column,
             provider_transaction_key_column = table.provider_transaction_key_column,
             returning_columns = promotion_reward_ledger_returning_columns(table),
         ),
@@ -817,9 +852,17 @@ fn promotion_reward_ledger_begin_execute_statement(
     ))
 }
 
+/// The single recovery target set for the three-step contract: rows whose
+/// execution started (persisted marker), that hold their stored key and
+/// original context, and whose outcome is still unsettled (PENDING,
+/// SUBMITTED, and UNKNOWN provider statuses all remain pending). Pre-
+/// execution rows (`execution_started_at IS NULL`) and legacy rows
+/// (`protocol IS NULL`) are never listed: recovery never issues a new
+/// grant intent and never re-executes — callers drive it with the status
+/// lookup only.
 fn promotion_reward_ledger_recovery_statement(
     table: PromotionRewardLedgerTable,
-    updated_before: i64,
+    started_before: i64,
     limit: i64,
 ) -> ApiResult<(String, Vec<Value>)> {
     validate_promotion_reward_ledger_table(table)?;
@@ -833,18 +876,23 @@ fn promotion_reward_ledger_recovery_statement(
         format!(
             "SELECT {returning_columns}
              FROM {table}
-             WHERE {status_column} = 'pending'
-               AND {provider_status_column} = 'EXECUTING'
-               AND {updated_at_column} < ?1
-             ORDER BY {updated_at_column} ASC
+             WHERE {protocol_column} = 'three-step'
+               AND {status_column} = 'pending'
+               AND {provider_transaction_key_column} IS NOT NULL
+               AND {execution_started_at_column} IS NOT NULL
+               AND {execution_started_at_column} < ?1
+             ORDER BY {updated_at_column} ASC, {id_column} ASC
              LIMIT ?2",
             returning_columns = promotion_reward_ledger_returning_columns(table),
             table = table.table,
+            protocol_column = table.protocol_column,
             status_column = table.status_column,
-            provider_status_column = table.provider_status_column,
+            provider_transaction_key_column = table.provider_transaction_key_column,
+            execution_started_at_column = table.execution_started_at_column,
             updated_at_column = table.updated_at_column,
+            id_column = table.id_column,
         ),
-        vec![Value::Integer(updated_before), Value::Integer(limit)],
+        vec![Value::Integer(started_before), Value::Integer(limit)],
     ))
 }
 
@@ -1015,6 +1063,8 @@ fn promotion_reward_ledger_returning_columns(table: PromotionRewardLedgerTable) 
         table.source_id_column,
         table.amount_column,
         table.status_column,
+        table.protocol_column,
+        table.execution_started_at_column,
         table.provider_column,
         table.provider_request_id_column,
         table.provider_status_column,
@@ -1042,18 +1092,20 @@ fn promotion_reward_ledger_record_from_row(
         source_id: db::nullable_text(&row[4])?,
         reward_amount: db::integer(&row[5], "promotion_reward_ledger_reward_amount")?,
         status: db::text(&row[6], "promotion_reward_ledger_status")?,
-        provider: db::text(&row[7], "promotion_reward_ledger_provider")?,
-        provider_request_id: db::text(&row[8], "promotion_reward_ledger_provider_request_id")?,
-        provider_status: db::nullable_text(&row[9])?,
-        provider_error_code: db::nullable_text(&row[10])?,
-        provider_transaction_key: db::nullable_text(&row[11])?,
-        provider_response_json: db::nullable_text(&row[12])?,
-        requested_at: db::integer(&row[13], "promotion_reward_ledger_requested_at")?,
-        granted_at: db::nullable_integer(&row[14])?,
-        failed_at: db::nullable_integer(&row[15])?,
-        failure_reason: db::nullable_text(&row[16])?,
-        created_at: db::integer(&row[17], "promotion_reward_ledger_created_at")?,
-        updated_at: db::integer(&row[18], "promotion_reward_ledger_updated_at")?,
+        protocol: db::nullable_text(&row[7])?,
+        execution_started_at: db::nullable_integer(&row[8])?,
+        provider: db::text(&row[9], "promotion_reward_ledger_provider")?,
+        provider_request_id: db::text(&row[10], "promotion_reward_ledger_provider_request_id")?,
+        provider_status: db::nullable_text(&row[11])?,
+        provider_error_code: db::nullable_text(&row[12])?,
+        provider_transaction_key: db::nullable_text(&row[13])?,
+        provider_response_json: db::nullable_text(&row[14])?,
+        requested_at: db::integer(&row[15], "promotion_reward_ledger_requested_at")?,
+        granted_at: db::nullable_integer(&row[16])?,
+        failed_at: db::nullable_integer(&row[17])?,
+        failure_reason: db::nullable_text(&row[18])?,
+        created_at: db::integer(&row[19], "promotion_reward_ledger_created_at")?,
+        updated_at: db::integer(&row[20], "promotion_reward_ledger_updated_at")?,
     })
 }
 
@@ -1082,6 +1134,8 @@ fn validate_promotion_reward_ledger_table(table: PromotionRewardLedgerTable) -> 
     validate_sql_identifier(table.source_id_column)?;
     validate_sql_identifier(table.amount_column)?;
     validate_sql_identifier(table.status_column)?;
+    validate_sql_identifier(table.protocol_column)?;
+    validate_sql_identifier(table.execution_started_at_column)?;
     validate_sql_identifier(table.provider_column)?;
     validate_sql_identifier(table.provider_request_id_column)?;
     validate_sql_identifier(table.provider_status_column)?;
@@ -1255,7 +1309,7 @@ mod tests {
           "grantedAt": 123,
           "message": "done",
         });
-        let outcome = promotion_reward_outcome_from_response(&response, "request-1", Some(100));
+        let outcome = promotion_reward_outcome_from_response(&response, "request-1");
 
         assert_eq!(outcome.provider_request_id, "request-2");
         assert_eq!(
@@ -1278,7 +1332,6 @@ mod tests {
                 "data": { "failedAt": 321 },
             }),
             "request-1",
-            Some(100),
         );
         assert_eq!(
             explicit_failed_at.provider_status,
@@ -1287,16 +1340,17 @@ mod tests {
         assert_eq!(explicit_failed_at.granted_at, None);
         assert_eq!(explicit_failed_at.failed_at, Some(321));
 
+        // Without a provider-supplied failedAt the outcome carries no
+        // failure timestamp: the request time is not a failure time.
         for status in ["MISSING_TOSS_USER_KEY", "UPSTREAM_REJECTED"] {
             let outcome = promotion_reward_outcome_from_response(
                 &json!({ "providerStatus": status }),
                 "request-1",
-                Some(100),
             );
 
             assert_eq!(outcome.provider_status, status);
             assert_eq!(outcome.granted_at, None);
-            assert_eq!(outcome.failed_at, Some(100));
+            assert_eq!(outcome.failed_at, None);
         }
     }
 
@@ -1418,7 +1472,6 @@ mod tests {
               "grantedAt": 1234
             }),
             "fallback",
-            Some(1000),
         );
 
         let (sql, params) = promotion_reward_ledger_outcome_statement(
@@ -1503,7 +1556,9 @@ mod sql_tests {
     use crate::sql_test_support::{database, execute, query};
     use serde_json::json;
 
-    fn insert_ledger(db: &rusqlite::Connection, id: &str) {
+    /// A legacy row as written by the removed grant flow: no protocol, no
+    /// execution marker, provider fields only.
+    fn insert_legacy_ledger(db: &rusqlite::Connection, id: &str) {
         execute(
             db,
             "INSERT INTO promotion_reward_ledger (
@@ -1520,19 +1575,45 @@ mod sql_tests {
         );
     }
 
-    fn row_columns(
-        db: &rusqlite::Connection,
-        id: &str,
-    ) -> (
-        String,
-        Option<String>,
-        Option<String>,
-        Option<i64>,
-        Option<i64>,
-    ) {
+    /// A new-contract intent row, created through the insert statement that
+    /// stamps `protocol = 'three-step'`.
+    fn insert_three_step_ledger(db: &rusqlite::Connection, id: &str) {
+        let record = normalize_promotion_reward_ledger_insert(PromotionRewardLedgerInsert {
+            id: Some(id),
+            user: &[1],
+            campaign_id: None,
+            source_type: "attendance_daily",
+            source_id: Some("2026-09-17"),
+            reward_amount: 100,
+            provider: None,
+            provider_request_id: &format!("{id}-request"),
+            requested_at: 100,
+            now: 100,
+        })
+        .unwrap();
+        let (sql, params) = promotion_reward_ledger_insert_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            &record,
+        )
+        .unwrap();
+        assert_eq!(query(db, &sql, &params).len(), 1);
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct RowColumns {
+        status: String,
+        provider_status: Option<String>,
+        execution_started_at: Option<i64>,
+        protocol: Option<String>,
+        granted_at: Option<i64>,
+        failed_at: Option<i64>,
+    }
+
+    fn row_columns(db: &rusqlite::Connection, id: &str) -> RowColumns {
         let rows = query(
             db,
-            "SELECT status, provider_status, provider_transaction_key, granted_at, failed_at
+            "SELECT status, provider_status, execution_started_at, protocol,
+                    granted_at, failed_at
              FROM promotion_reward_ledger WHERE id = ?1",
             &[Value::Text(id.to_string())],
         );
@@ -1544,13 +1625,14 @@ mod sql_tests {
             rusqlite::types::Value::Integer(v) => Some(*v),
             _ => None,
         };
-        (
-            text(&rows[0][0]).unwrap_or_default(),
-            text(&rows[0][1]),
-            text(&rows[0][2]),
-            integer(&rows[0][3]),
-            integer(&rows[0][4]),
-        )
+        RowColumns {
+            status: text(&rows[0][0]).unwrap_or_default(),
+            provider_status: text(&rows[0][1]),
+            execution_started_at: integer(&rows[0][2]),
+            protocol: text(&rows[0][3]),
+            granted_at: integer(&rows[0][4]),
+            failed_at: integer(&rows[0][5]),
+        }
     }
 
     fn store_key(db: &rusqlite::Connection, id: &str, key: &str, now: i64) -> usize {
@@ -1591,54 +1673,112 @@ mod sql_tests {
     }
 
     fn outcome(response: serde_json::Value, request_id: &str) -> PromotionRewardOutcome {
-        promotion_reward_outcome_from_response(&response, request_id, Some(1000))
+        promotion_reward_outcome_from_response(&response, request_id)
+    }
+
+    #[test]
+    fn new_intents_are_stamped_three_step() {
+        let db = database();
+        insert_three_step_ledger(&db, "row");
+        let columns = row_columns(&db, "row");
+        assert_eq!(columns.protocol, Some("three-step".into()));
+        assert_eq!(columns.execution_started_at, None);
+        // A legacy row keeps its NULL protocol marker.
+        insert_legacy_ledger(&db, "legacy");
+        assert_eq!(row_columns(&db, "legacy").protocol, None);
     }
 
     #[test]
     fn stores_the_key_once_and_never_overwrites_a_different_key() {
         let db = database();
-        insert_ledger(&db, "row");
+        insert_three_step_ledger(&db, "row");
 
         assert_eq!(store_key(&db, "row", "key-1", 200), 1);
-        assert_eq!(
-            row_columns(&db, "row"),
-            (
-                "pending".into(),
-                Some("PREPARED".into()),
-                Some("key-1".into()),
-                None,
-                None
-            )
-        );
+        let columns = row_columns(&db, "row");
+        assert_eq!(columns.protocol, Some("three-step".into()));
+        assert_eq!(columns.execution_started_at, None);
+        // Provider status is untouched by the key store.
+        assert_eq!(columns.provider_status, Some("PENDING".into()));
 
         // Storing the same key again is idempotent (restart resumes with it).
         assert_eq!(store_key(&db, "row", "key-1", 210), 1);
         // A different key is rejected by the statement itself.
         assert_eq!(store_key(&db, "row", "key-2", 220), 0);
-        assert_eq!(row_columns(&db, "row").2, Some("key-1".into()));
+        let columns = row_columns(&db, "row");
+        assert_eq!(columns.protocol, Some("three-step".into()));
+    }
+
+    #[test]
+    fn key_store_failure_leaves_the_row_unexecutable() {
+        // "store failed -> execute 0 times": the claim requires a stored key
+        // under the three-step protocol, so a failed store never leads to an
+        // executable row.
+        let db = database();
+        insert_three_step_ledger(&db, "row");
+        // A conflicting second key cannot be stored...
+        assert_eq!(store_key(&db, "row", "key-1", 200), 1);
+        assert_eq!(store_key(&db, "row", "key-2", 210), 0);
+        // ...and without the protocol marker a claim is impossible anyway.
+        insert_three_step_ledger(&db, "bare");
+        execute(
+            &db,
+            "UPDATE promotion_reward_ledger SET protocol = NULL WHERE id = 'bare'",
+            &[],
+        );
+        assert_eq!(begin_execute(&db, "bare", 300), 0);
+    }
+
+    #[test]
+    fn legacy_rows_with_a_stored_key_cannot_be_adopted_for_re_execution() {
+        // A legacy row that already holds a key may have started executing
+        // under the old flow (its execution facts are unknown), so a
+        // same-key re-store must never re-flag it for a fresh claim.
+        let db = database();
+        insert_legacy_ledger(&db, "legacy-keyed");
+        execute(
+            &db,
+            "UPDATE promotion_reward_ledger
+             SET provider_transaction_key = 'legacy-key', provider_status = 'UNKNOWN'
+             WHERE id = 'legacy-keyed'",
+            &[],
+        );
+        assert_eq!(store_key(&db, "legacy-keyed", "legacy-key", 200), 0);
+        assert_eq!(row_columns(&db, "legacy-keyed").protocol, None);
+        assert_eq!(begin_execute(&db, "legacy-keyed", 300), 0);
+
+        // Keyless legacy rows remain adoptable through an explicit
+        // prepare + store.
+        insert_legacy_ledger(&db, "legacy-bare");
+        assert_eq!(store_key(&db, "legacy-bare", "fresh-key", 200), 1);
+        assert_eq!(begin_execute(&db, "legacy-bare", 300), 1);
     }
 
     #[test]
     fn only_one_worker_claims_the_execution() {
         let db = database();
-        insert_ledger(&db, "row");
+        insert_three_step_ledger(&db, "row");
         store_key(&db, "row", "key-1", 200);
 
         assert_eq!(begin_execute(&db, "row", 300), 1);
-        assert_eq!(row_columns(&db, "row").1, Some("EXECUTING".into()));
-        // The concurrent worker (and a restart that saw EXECUTING) cannot
-        // claim again: recovery must go through the status lookup.
+        let columns = row_columns(&db, "row");
+        assert_eq!(columns.execution_started_at, Some(300));
+        // The provider outcome column stays untouched by the claim.
+        assert_eq!(columns.provider_status, Some("PENDING".into()));
+        // The concurrent worker, a restart, and a late retry all fail.
         assert_eq!(begin_execute(&db, "row", 310), 0);
+        assert_eq!(begin_execute(&db, "row", 320), 0);
+        // The marker never regresses.
+        assert_eq!(row_columns(&db, "row").execution_started_at, Some(300));
     }
 
     #[test]
-    fn unprepared_or_terminal_rows_cannot_start_execution() {
+    fn unkeyed_or_terminal_rows_cannot_start_execution() {
         let db = database();
-        insert_ledger(&db, "no-key");
-        // PENDING without a stored key: prepare must run first.
+        insert_three_step_ledger(&db, "no-key");
+        // Key not stored yet: prepare must run first.
         assert_eq!(begin_execute(&db, "no-key", 300), 0);
 
-        insert_ledger(&db, "terminal");
+        insert_three_step_ledger(&db, "terminal");
         store_key(&db, "terminal", "key-1", 200);
         begin_execute(&db, "terminal", 300);
         apply_outcome(
@@ -1652,32 +1792,95 @@ mod sql_tests {
         );
         // A granted row is never re-entered.
         assert_eq!(begin_execute(&db, "terminal", 500), 0);
+
+        // A legacy row cannot execute as-is (no three-step marker), but an
+        // explicit prepare + key store adopts it into the new contract —
+        // recovery never does this automatically.
+        insert_legacy_ledger(&db, "legacy");
+        assert_eq!(begin_execute(&db, "legacy", 300), 0);
+        assert_eq!(store_key(&db, "legacy", "key-l", 200), 1);
+        assert_eq!(
+            row_columns(&db, "legacy").protocol,
+            Some("three-step".into())
+        );
+        assert_eq!(begin_execute(&db, "legacy", 310), 1);
     }
 
     #[test]
-    fn recovery_list_contains_only_rows_whose_execute_outcome_is_unknown() {
+    fn started_rows_survive_pending_outcomes_and_same_key_restores() {
+        // EXECUTING -> SUBMITTED/PENDING -> same-key re-store -> execute
+        // re-request: all blocked from restarting the execution.
         let db = database();
-        insert_ledger(&db, "prepared");
-        insert_ledger(&db, "executing");
+        insert_three_step_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+        assert_eq!(begin_execute(&db, "row", 300), 1);
+
+        // A non-terminal execute outcome keeps the row pending and the
+        // execution marker intact.
+        for response in [
+            json!({"ok": true, "result": "SUBMITTED", "providerTransactionKey": "key-1"}),
+            json!({"ok": true, "status": "PENDING"}),
+            json!({"ok": false, "providerStatus": "UNKNOWN", "providerTransactionKey": "key-1"}),
+        ] {
+            assert_eq!(
+                apply_outcome(&db, "row", &outcome(response, "row-request"), 400),
+                1
+            );
+            let columns = row_columns(&db, "row");
+            assert_eq!(columns.status, "pending");
+            assert_eq!(columns.execution_started_at, Some(300));
+
+            // Re-storing the same key cannot reset the marker, and a new
+            // claim is impossible.
+            assert_eq!(store_key(&db, "row", "key-1", 410), 0);
+            assert_eq!(begin_execute(&db, "row", 420), 0);
+        }
+    }
+
+    #[test]
+    fn recovery_list_targets_started_three_step_rows_only() {
+        let db = database();
+        insert_three_step_ledger(&db, "prepared");
+        insert_three_step_ledger(&db, "started");
+        insert_three_step_ledger(&db, "settled");
+        insert_legacy_ledger(&db, "legacy-unknown");
         store_key(&db, "prepared", "key-p", 200);
-        store_key(&db, "executing", "key-e", 200);
-        begin_execute(&db, "executing", 300);
+        store_key(&db, "started", "key-s", 200);
+        store_key(&db, "settled", "key-d", 200);
+        begin_execute(&db, "started", 300);
+        begin_execute(&db, "settled", 300);
+        apply_outcome(
+            &db,
+            "settled",
+            &outcome(json!({"ok": true, "status": "GRANTED"}), "settled-request"),
+            400,
+        );
+        // A legacy row with an UNKNOWN provider outcome is NOT recovery
+        // material: its execution facts are unknown and it is never
+        // converted into a new-contract intent.
+        execute(
+            &db,
+            "UPDATE promotion_reward_ledger SET provider_status = 'UNKNOWN' WHERE id = 'legacy-unknown'",
+            &[],
+        );
 
         let (sql, params) = promotion_reward_ledger_recovery_statement(
             DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
-            400,
+            350,
             10,
         )
         .unwrap();
         let rows = query(&db, &sql, &params);
-        assert_eq!(rows.len(), 1);
-        let id = match &rows[0][0] {
-            rusqlite::types::Value::Text(value) => value.clone(),
-            _ => String::new(),
-        };
-        assert_eq!(id, "executing");
+        let ids: Vec<String> = rows
+            .iter()
+            .filter_map(|row| match &row[0] {
+                rusqlite::types::Value::Text(value) => Some(value.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ids, ["started".to_string()]);
 
-        // Before the execute started, nothing is awaiting recovery.
+        // Staleness and ordering ride on the execution-start marker.
         let (sql, params) = promotion_reward_ledger_recovery_statement(
             DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
             250,
@@ -1690,7 +1893,7 @@ mod sql_tests {
     #[test]
     fn execute_outcomes_apply_only_to_the_matching_request() {
         let db = database();
-        insert_ledger(&db, "row");
+        insert_three_step_ledger(&db, "row");
         store_key(&db, "row", "key-1", 200);
         begin_execute(&db, "row", 300);
 
@@ -1707,7 +1910,7 @@ mod sql_tests {
             ),
             0
         );
-        assert_eq!(row_columns(&db, "row").0, "pending");
+        assert_eq!(row_columns(&db, "row").status, "pending");
 
         // A matching request carrying a different transaction key applies
         // the outcome but never overwrites the stored key.
@@ -1723,25 +1926,32 @@ mod sql_tests {
             ),
             1
         );
+        let rows = query(
+            &db,
+            "SELECT provider_transaction_key FROM promotion_reward_ledger WHERE id = 'row'",
+            &[],
+        );
+        let key = match &rows[0][0] {
+            rusqlite::types::Value::Text(value) => value.clone(),
+            _ => String::new(),
+        };
+        assert_eq!(key, "key-1");
         let columns = row_columns(&db, "row");
-        assert_eq!(columns.0, "success");
-        assert_eq!(columns.2, Some("key-1".into()));
-        assert_eq!(columns.3, Some(900));
+        assert_eq!(columns.status, "success");
+        assert_eq!(columns.granted_at, Some(900));
+        assert_eq!(columns.execution_started_at, Some(300));
 
         // A late PENDING response cannot revert the confirmed grant.
         assert_eq!(
             apply_outcome(
                 &db,
                 "row",
-                &outcome(
-                    json!({"ok": true, "providerStatus": "SUBMITTED"}),
-                    "row-request"
-                ),
+                &outcome(json!({"ok": true, "result": "SUBMITTED"}), "row-request"),
                 500,
             ),
             1
         );
-        assert_eq!(row_columns(&db, "row").0, "success");
+        assert_eq!(row_columns(&db, "row").status, "success");
     }
 
     #[test]
@@ -1750,7 +1960,7 @@ mod sql_tests {
         for (id, response, stored_provider_status) in [
             (
                 "submitted",
-                json!({"ok": true, "providerStatus": "SUBMITTED"}),
+                json!({"ok": true, "result": "SUBMITTED"}),
                 // SUBMITTED normalizes onto the pending taxonomy.
                 "PENDING",
             ),
@@ -1760,7 +1970,7 @@ mod sql_tests {
                 "UNKNOWN",
             ),
         ] {
-            insert_ledger(&db, id);
+            insert_three_step_ledger(&db, id);
             store_key(&db, id, "key-1", 200);
             begin_execute(&db, id, 300);
             assert_eq!(
@@ -1769,21 +1979,55 @@ mod sql_tests {
             );
             assert_eq!(
                 row_columns(&db, id),
-                (
-                    "pending".into(),
-                    Some(stored_provider_status.into()),
-                    Some("key-1".into()),
-                    None,
-                    None,
-                )
+                RowColumns {
+                    status: "pending".into(),
+                    provider_status: Some(stored_provider_status.into()),
+                    execution_started_at: Some(300),
+                    protocol: Some("three-step".into()),
+                    granted_at: None,
+                    failed_at: None,
+                }
             );
         }
     }
 
     #[test]
+    fn ok_true_alone_never_fabricates_a_grant() {
+        let parsed = promotion_reward_outcome_from_response(
+            &json!({"ok": true, "providerTransactionKey": "key-1"}),
+            "request-1",
+        );
+        assert_eq!(parsed.provider_status, "PENDING");
+        assert_eq!(parsed.granted_at, None);
+        assert_eq!(promotion_ledger_status(&parsed.provider_status), "pending");
+
+        // Execute verdicts arrive in `result`.
+        let submitted = promotion_reward_outcome_from_response(
+            &json!({"ok": true, "result": "SUBMITTED"}),
+            "r",
+        );
+        assert_eq!(submitted.provider_status, "PENDING");
+        let unknown = promotion_reward_outcome_from_response(
+            &json!({"ok": true, "result": "UNKNOWN", "failureReason": "transport"}),
+            "r",
+        );
+        assert_eq!(unknown.provider_status, "UNKNOWN");
+        assert_eq!(promotion_ledger_status(&unknown.provider_status), "pending");
+
+        // Status lookups report NOT_FOUND when the provider has no record.
+        let not_found = promotion_reward_outcome_from_response(
+            &json!({"ok": true, "status": "NOT_FOUND"}),
+            "r",
+        );
+        assert_eq!(not_found.provider_status, "NOT_FOUND");
+        assert_eq!(promotion_ledger_status("NOT_FOUND"), "failed");
+        assert_eq!(not_found.granted_at, None);
+    }
+
+    #[test]
     fn confirmed_failure_keeps_failure_diagnostics() {
         let db = database();
-        insert_ledger(&db, "row");
+        insert_three_step_ledger(&db, "row");
         store_key(&db, "row", "key-1", 200);
         begin_execute(&db, "row", 300);
         assert_eq!(
@@ -1791,36 +2035,24 @@ mod sql_tests {
                 &db,
                 "row",
                 &outcome(
-                    json!({"ok": false, "providerStatus": "FAILED", "providerErrorCode": "4116", "failureReason": "budget exhausted"}),
+                    json!({"ok": false, "providerStatus": "FAILED", "providerErrorCode": "4116", "failureReason": "budget exhausted", "failedAt": 350}),
                     "row-request",
                 ),
                 400,
             ),
             1
         );
-        assert_eq!(row_columns(&db, "row").0, "failed");
-        // The parser falls back to the request timestamp for the failure
-        // time when the provider did not report one.
-        assert_eq!(row_columns(&db, "row").4, Some(1000));
-    }
-
-    #[test]
-    fn same_key_cannot_reset_an_executing_row_to_prepared() {
-        let db = database();
-        insert_ledger(&db, "row");
-        store_key(&db, "row", "key-1", 200);
-        assert_eq!(begin_execute(&db, "row", 300), 1);
-
-        // Re-storing the same key after execution started must not flip the
-        // row back to PREPARED (that would enable a second execution).
-        assert_eq!(store_key(&db, "row", "key-1", 400), 0);
-        assert_eq!(row_columns(&db, "row").1, Some("EXECUTING".into()));
+        let columns = row_columns(&db, "row");
+        assert_eq!(columns.status, "failed");
+        // Only provider-supplied timestamps land; the request time never
+        // masquerades as a failure time.
+        assert_eq!(columns.failed_at, Some(350));
     }
 
     #[test]
     fn late_non_terminal_outcomes_cannot_resurrect_a_confirmed_failure() {
         let db = database();
-        insert_ledger(&db, "row");
+        insert_three_step_ledger(&db, "row");
         store_key(&db, "row", "key-1", 200);
         begin_execute(&db, "row", 300);
         assert_eq!(
@@ -1828,7 +2060,7 @@ mod sql_tests {
                 &db,
                 "row",
                 &outcome(
-                    json!({"ok": false, "providerStatus": "FAILED", "providerErrorCode": "4116", "failureReason": "budget exhausted"}),
+                    json!({"ok": false, "providerStatus": "FAILED", "providerErrorCode": "4116", "failureReason": "budget exhausted", "failedAt": 350}),
                     "row-request",
                 ),
                 400,
@@ -1836,19 +2068,16 @@ mod sql_tests {
             1
         );
 
-        // A late UNKNOWN/SUBMITTED response for the same request keeps the
-        // confirmed failure and its diagnostics; it cannot park the row in
-        // pending limbo.
         for response in [
             json!({"ok": false, "providerStatus": "UNKNOWN", "providerTransactionKey": "key-1"}),
-            json!({"ok": true, "providerStatus": "SUBMITTED"}),
+            json!({"ok": true, "result": "SUBMITTED"}),
         ] {
             assert_eq!(
                 apply_outcome(&db, "row", &outcome(response, "row-request"), 500),
                 1
             );
-            assert_eq!(row_columns(&db, "row").0, "failed");
-            assert_eq!(row_columns(&db, "row").4, Some(1000));
+            assert_eq!(row_columns(&db, "row").status, "failed");
+            assert_eq!(row_columns(&db, "row").failed_at, Some(350));
         }
         let rows = query(
             &db,
@@ -1875,8 +2104,8 @@ mod sql_tests {
             ),
             1
         );
-        assert_eq!(row_columns(&db, "row").0, "success");
-        assert_eq!(row_columns(&db, "row").3, Some(900));
+        assert_eq!(row_columns(&db, "row").status, "success");
+        assert_eq!(row_columns(&db, "row").granted_at, Some(900));
     }
 
     #[test]
@@ -1892,14 +2121,83 @@ mod sql_tests {
         assert_eq!(promotion_ledger_status("SUBMITTED"), "pending");
         assert_eq!(promotion_ledger_status("GRANTED"), "success");
         assert_eq!(promotion_ledger_status("ERROR"), "failed");
+        assert_eq!(promotion_ledger_status("NOT_FOUND"), "failed");
 
         let parsed = promotion_reward_outcome_from_response(
             &json!({"ok": false, "providerStatus": "UNKNOWN"}),
             "request-1",
-            Some(900),
         );
         assert_eq!(parsed.provider_status, "UNKNOWN");
         assert_eq!(parsed.granted_at, None);
         assert_eq!(parsed.failed_at, None);
+    }
+
+    #[test]
+    fn migration_adds_execution_fact_columns_without_touching_legacy_rows() {
+        // Simulate a v1 install: build the pre-v2 table shape, then apply the
+        // explicit v2 migration file on top.
+        let db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT; INSERT INTO _user VALUES (X'01');").unwrap();
+        db.execute_batch(
+            "CREATE TABLE promotion_reward_ledger (
+               id TEXT PRIMARY KEY,
+               user_id BLOB NOT NULL REFERENCES _user(id) ON DELETE CASCADE,
+               campaign_id TEXT,
+               source_type TEXT NOT NULL,
+               source_id TEXT,
+               reward_amount INTEGER NOT NULL CHECK (reward_amount > 0),
+               status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('recorded', 'pending', 'success', 'failed', 'cancelled')),
+               provider TEXT NOT NULL DEFAULT 'TOSS' CHECK (length(trim(provider)) > 0),
+               provider_request_id TEXT NOT NULL UNIQUE CHECK (length(trim(provider_request_id)) > 0),
+               provider_status TEXT,
+               provider_error_code TEXT,
+               provider_transaction_key TEXT,
+               provider_response_json TEXT CHECK (provider_response_json IS NULL OR json_valid(provider_response_json)),
+               requested_at INTEGER NOT NULL,
+               granted_at INTEGER,
+               failed_at INTEGER,
+               failure_reason TEXT,
+               created_at INTEGER NOT NULL,
+               updated_at INTEGER NOT NULL
+             ) STRICT;",
+        )
+        .unwrap();
+        db.execute(
+            "INSERT INTO promotion_reward_ledger (
+               id, user_id, source_type, reward_amount, status, provider,
+               provider_request_id, provider_status, provider_transaction_key,
+               requested_at, created_at, updated_at
+             ) VALUES ('legacy-1', X'01', 'attendance_daily', 100, 'success', 'TOSS',
+               'legacy-request', 'GRANTED', 'legacy-key', 50, 50, 60)",
+            [],
+        )
+        .unwrap();
+
+        db.execute_batch(include_str!(
+            "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
+        ))
+        .unwrap();
+
+        // Existing rows survive with their data and stay unmarked.
+        let rows = query(
+            &db,
+            "SELECT status, provider_transaction_key, protocol, execution_started_at
+             FROM promotion_reward_ledger WHERE id = 'legacy-1'",
+            &[],
+        );
+        let text = |value: &rusqlite::types::Value| match value {
+            rusqlite::types::Value::Text(v) => Some(v.clone()),
+            _ => None,
+        };
+        assert_eq!(text(&rows[0][0]).as_deref(), Some("success"));
+        assert_eq!(text(&rows[0][1]).as_deref(), Some("legacy-key"));
+        assert!(matches!(rows[0][2], rusqlite::types::Value::Null));
+        assert!(matches!(rows[0][3], rusqlite::types::Value::Null));
+
+        // The migrated schema serves the new statements: fresh installs and
+        // upgraded installs run the same code paths.
+        insert_three_step_ledger(&db, "fresh");
+        assert_eq!(store_key(&db, "fresh", "key-2", 200), 1);
+        assert_eq!(begin_execute(&db, "fresh", 300), 1);
     }
 }

@@ -79,7 +79,13 @@ describe("toss-mtls-client-proxy", () => {
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: true, mode: "stub", kit: { contractVersion: 1 } });
     expect(res.body.kit.proxyVersion).toBe((await import("../package.json")).default.version);
-    expect(res.body.kit.capabilities).toContain("promotion.status");
+    // The promotion capabilities carry the three-step contract version and
+    // the removed batch grant is no longer advertised.
+    expect(res.body.kit.capabilities).toContain("promotion.status.v2");
+    expect(res.body.kit.capabilities).toContain("promotion.prepare.v2");
+    expect(res.body.kit.capabilities).toContain("promotion.execute.v2");
+    expect(res.body.kit.capabilities).not.toContain("promotion.grant");
+    expect(res.body.kit.capabilities).not.toContain("promotion.status");
   });
 
   test("requires an internal token in forward mode", () => {
@@ -644,17 +650,73 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
-  test("stub promotion rewards do not require Toss upstream env", async () => {
-    const req = request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
-      providerRequestId: "smoke",
-      requestedAt: 1,
+  test("stub promotion prepare issues a key without any upstream env", async () => {
+    const req = request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {
+      tossUserKey: "smoke-user",
     });
     const res = await handleRequest(req, { mode: "stub", internalToken: "" });
-    expect(res.body.providerStatus).toBe("GRANTED");
-    expect(res.body.providerRequestId).toBe("smoke");
+    expect(res.body.ok).toBe(true);
+    expect(res.body.providerTransactionKey).toBe("stub-promotion-transaction-key");
+    expect(res.body.stub).toBe(true);
   });
 
-  test("forward promotion rewards can use request-level campaign values", async () => {
+  test("the removed grant route answers 410 without touching the upstream", async () => {
+    let upstreamCalls = 0;
+    const upstreamServer = http.createServer(() => {
+      upstreamCalls += 1;
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+        amount: 50,
+        promotionCode: "campaign",
+        tossUserKey: "toss-user-1",
+      }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(res.status).toBe(410);
+      expect(res.body).toEqual({
+        ok: false,
+        error: "PROMOTION_GRANT_REMOVED",
+        message: "promotion/reward/grant was removed; use prepare, execute, and status",
+      });
+      expect(upstreamCalls).toBe(0);
+    });
+  });
+
+  test("prepare sends the single recipient as the identity header on get-key", async () => {
+    const seen = [];
+    const upstreamServer = http.createServer(async (req, res) => {
+      seen.push({
+        path: req.url,
+        tossUserKey: req.headers["x-toss-user-key"],
+        anonKey: req.headers["x-anon-key"],
+        body: await readRequestJson(req),
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const config = { mode: "forward", internalToken: "secret", upstreamBaseUrl };
+      const prepared = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {
+        tossUserKey: "toss-user-1",
+      }, { authorization: "Bearer secret" }), config);
+      expect(prepared.body).toEqual({ ok: true, providerTransactionKey: "promotion-key" });
+      expect(seen).toEqual([{
+        path: TOSS_ENDPOINTS.promotionGetKey,
+        tossUserKey: "toss-user-1",
+        anonKey: undefined,
+        // The official get-key endpoint takes no request body.
+        body: {},
+      }]);
+
+      // A recipient-less prepare never reaches the upstream: the shared
+      // contract rejects it before dispatch with a typed 400.
+      seen.length = 0;
+      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {}, { authorization: "Bearer secret" }), config))
+        .rejects.toThrow("exactly one of userKey, tossUserKey, or anonKey");
+      expect(seen).toEqual([]);
+    });
+  });
+
+  test("execute forwards the stored key, campaign values, and recipient", async () => {
     const calls = [];
     const upstreamServer = http.createServer((req, res) => {
       readRequestJson(req).then((body) => {
@@ -664,57 +726,57 @@ describe("toss-mtls-client-proxy", () => {
           tossUserKey: req.headers["x-toss-user-key"],
         });
         res.writeHead(200, { "content-type": "application/json" });
-        if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
-          res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
-          return;
-        }
-        if (req.url === TOSS_ENDPOINTS.promotionExecute) {
-          res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
-          return;
-        }
         res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
       });
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
-      const req = request(
-        "POST",
-        PROXY_ENDPOINTS.promotionRewardGrant,
-        {
-          amount: 50,
-          promotionCode: "campaign-from-db",
-          providerRequestId: "attendance-1",
-          tossUserKey: "toss-user-1",
-        },
-        { authorization: "Bearer secret" },
-      );
-      const res = await handleRequest(req, {
+      const res = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+        amount: 50,
+        promotionCode: "campaign-from-db",
+        providerTransactionKey: "promotion-key",
+        tossUserKey: "toss-user-1",
+      }, { authorization: "Bearer secret" }), {
         mode: "forward",
         internalToken: "secret",
         upstreamBaseUrl,
       });
-      expect(res.body.providerStatus).toBe("GRANTED");
-      expect(calls.map((call) => call.path)).toEqual([
-        TOSS_ENDPOINTS.promotionGetKey,
-        TOSS_ENDPOINTS.promotionExecute,
-        TOSS_ENDPOINTS.promotionResult,
-      ]);
-      expect(calls[1].body).toEqual({
+      expect(res.body.ok).toBe(true);
+      expect(calls.map((call) => call.path)).toEqual([TOSS_ENDPOINTS.promotionExecute]);
+      expect(calls[0].body).toEqual({
         amount: 50,
         key: "promotion-key",
         promotionCode: "campaign-from-db",
       });
-      expect(calls.every((call) => call.tossUserKey === "toss-user-1")).toBe(true);
+      expect(calls[0].tossUserKey).toBe("toss-user-1");
     });
   });
 
-  test("forward promotion execute failures include provider error codes", async () => {
+  test("key-less execute is rejected before any upstream dispatch", async () => {
+    const paths = [];
+    const upstreamServer = http.createServer((req, res) => {
+      paths.push(req.url);
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+        amount: 5,
+        promotionCode: "campaign",
+        tossUserKey: "toss-user-1",
+      }, { authorization: "Bearer secret" }), {
+        mode: "forward",
+        internalToken: "secret",
+        upstreamBaseUrl,
+      })).rejects.toThrow("providerTransactionKey");
+      expect(paths).toEqual([]);
+    });
+  });
+
+  test("forward execute failures include provider error codes", async () => {
     const upstreamServer = http.createServer((req, res) => {
       req.resume();
       res.writeHead(200, { "content-type": "application/json" });
-      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "promotion-key" } }));
-        return;
-      }
       res.end(
         JSON.stringify({
           error: {
@@ -726,25 +788,19 @@ describe("toss-mtls-client-proxy", () => {
       );
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
-      const req = request(
-        "POST",
-        PROXY_ENDPOINTS.promotionRewardGrant,
-        {
-          amount: 50,
-          promotionCode: "campaign-from-db",
-          providerRequestId: "attendance-1",
-          tossUserKey: "toss-user-1",
-        },
-        { authorization: "Bearer secret" },
-      );
-      const res = await handleRequest(req, {
+      const res = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+        amount: 50,
+        promotionCode: "campaign-from-db",
+        providerTransactionKey: "promotion-key",
+        tossUserKey: "toss-user-1",
+      }, { authorization: "Bearer secret" }), {
         mode: "forward",
         internalToken: "secret",
         upstreamBaseUrl,
       });
-      expect(res.body.providerStatus).toBe("PROMOTION_EXECUTE_FAILED");
+      expect(res.body.ok).toBe(false);
+      expect(res.body.providerStatus).toBe("FAILED");
       expect(res.body.providerErrorCode).toBe("4112");
-      expect(res.body.failureReason).toBe("4112");
     });
   });
 
@@ -762,7 +818,8 @@ describe("toss-mtls-client-proxy", () => {
       }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
       expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
       expect(response.body.providerTransactionKey).toBe("existing-key");
-      expect(response.body.providerStatus).toBe("GRANTED");
+      expect(response.body.status).toBe("GRANTED");
+      expect(typeof response.body.checkedAt).toBe("number");
     });
   });
 
@@ -816,33 +873,39 @@ describe("toss-mtls-client-proxy", () => {
     await expect(handleRequest(request("POST", ANONYMOUS_KEY_VERIFY_PATH, { anonKey: "" }), { mode: "stub", internalToken: "" })).rejects.toThrow("non-empty");
   });
 
-  test("anonymous promotion uses only x-anon-key for grant and existing-key recovery", async () => {
+  test("anonymous promotions use only x-anon-key across prepare, execute, and status", async () => {
     const paths = [];
     const upstream = http.createServer(async (req, res) => {
       paths.push(req.url);
-      // get-key takes no recipient header (official contract); execute and
-      // result carry the anonymous recipient natively via api-core 0.3.
-      if (req.url !== TOSS_ENDPOINTS.promotionGetKey) {
-        expect(req.headers["x-anon-key"]).toBe("anonymous-recipient");
-      } else {
-        expect(req.headers["x-anon-key"]).toBeUndefined();
-      }
+      // Every step of the recipient-bound contract carries the anonymous
+      // recipient as its single identity header — including get-key.
+      expect(req.headers["x-anon-key"]).toBe("anonymous-recipient");
       expect(req.headers["x-toss-user-key"]).toBeUndefined();
       expect(req.headers["x-user-key"]).toBeUndefined();
       await readRequestJson(req);
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ resultType: "SUCCESS", success: req.url === TOSS_ENDPOINTS.promotionResult ? "SUCCESS" : { key: "transaction-key" } }));
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: req.url === TOSS_ENDPOINTS.promotionGetKey ? { key: "transaction-key" } : "SUCCESS" }));
     });
     await withServer(upstream, async (upstreamBaseUrl) => {
-      const body = { anonKey: "anonymous-recipient", promotionCode: "campaign", amount: 10 };
+      const body = { anonKey: "anonymous-recipient", promotionCode: "campaign" };
       const config = { mode: "forward", internalToken: "secret", upstreamBaseUrl };
-      const grant = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, body, { authorization: "Bearer secret" }), config);
-      expect(grant.body.providerStatus).toBe("GRANTED");
-      expect(paths).toEqual([TOSS_ENDPOINTS.promotionGetKey, TOSS_ENDPOINTS.promotionExecute, TOSS_ENDPOINTS.promotionResult]);
+      const prepared = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionPrepareReward, body, { authorization: "Bearer secret" }), config);
+      expect(prepared.body.ok).toBe(true);
+      expect(prepared.body.providerTransactionKey).toBe("transaction-key");
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionGetKey]);
+      paths.length = 0;
+      const executed = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+        ...body,
+        amount: 10,
+        providerTransactionKey: prepared.body.providerTransactionKey,
+      }, { authorization: "Bearer secret" }), config);
+      expect(executed.body.ok).toBe(true);
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionExecute]);
       paths.length = 0;
       await handleRequest(request("POST", PROMOTION_REWARD_STATUS_PATH, { ...body, providerTransactionKey: "transaction-key" }, { authorization: "Bearer secret" }), config);
       expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
-      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionRewardGrant, { ...body, tossUserKey: "login-key" }, { authorization: "Bearer secret" }), config)).rejects.toThrow("provide exactly one promotion recipient");
+      // Two recipients on one call stay rejected by the shared contract.
+      await expect(handleRequest(request("POST", PROXY_ENDPOINTS.promotionPrepareReward, { ...body, tossUserKey: "login-key" }, { authorization: "Bearer secret" }), config)).rejects.toThrow("at most one");
     });
   });
 

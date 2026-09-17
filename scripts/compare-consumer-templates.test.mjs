@@ -616,12 +616,28 @@ describe("toss-proxy-smoke template script", () => {
 
       expect(result.status).toBe(0);
       expect(result.stdout).toContain('"path":"/internal/apps-in-toss/toss-login/complete"');
-      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/promotion/reward/grant"');
+      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/promotion/reward/prepare"');
+      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/promotion/reward/execute"');
+      expect(result.stdout).toContain('"path":"/internal/apps-in-toss/promotion/reward/status"');
       expect(result.stdout).toContain('"path":"/internal/apps-in-toss/smart-message/send"');
     });
   });
 
-  function runSmokeScript(binDir, args = []) {
+  test("full smoke fails when prepare does not issue a transaction key", () => {
+    withFakeCurl("stub", (binDir) => {
+      const result = runSmokeScript(binDir, ["--full"], {
+        FAKE_OMIT_TRANSACTION_KEY: "1",
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain("Prepare did not issue a provider transaction key.");
+      // Without a key, execute and status are never called.
+      expect(result.stdout).not.toContain('"path":"/internal/apps-in-toss/promotion/reward/execute"');
+      expect(result.stdout).not.toContain('"path":"/internal/apps-in-toss/promotion/reward/status"');
+    });
+  });
+
+  function runSmokeScript(binDir, args = [], extraEnv = {}) {
     return spawnSync("bash", [smokeScript, ...args], {
       cwd: repoRoot,
       encoding: "utf8",
@@ -629,6 +645,7 @@ describe("toss-proxy-smoke template script", () => {
         ...process.env,
         PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
         TOSS_PROXY_SMOKE_URL: "http://toss-proxy.test",
+        ...extraEnv,
       },
     });
   }
@@ -701,6 +718,8 @@ function withFakeCurl(mode, fn) {
         'url="${@: -1}"',
         'if [[ "$url" == */internal/apps-in-toss/health ]]; then',
         `  printf '%s\\n' '{"ok":true,"mode":"${mode}"}'`,
+        'elif [[ "$url" == */promotion/reward/prepare && -z "${FAKE_OMIT_TRANSACTION_KEY:-}" ]]; then',
+        `  printf '%s\\n' '{"ok":true,"path":"/internal/apps-in-toss/promotion/reward/prepare","providerTransactionKey":"fake-transaction-key"}'`,
         "else",
         '  printf \'{"ok":true,"path":"%s"}\\n\' "${url#http://toss-proxy.test}"',
         "fi",

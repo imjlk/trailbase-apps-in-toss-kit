@@ -138,10 +138,10 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
   });
 
   test("lost promotion execute responses recover through status with the saved key", async () => {
-    // First execute attempt: respond after the connection is destroyed so
-    // the proxy sees a failed/UNKNOWN execute; the saved transaction key
-    // then resolves the outcome through the status lookup.
-    let executeAttempts = 0;
+    // Ledger-driven three-step flow: prepare issues the key, the first
+    // execute attempt loses its response (connection destroyed mid-body),
+    // and the saved transaction key resolves the outcome through the status
+    // lookup — never through a second execute.
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {
       paths.push(req.url);
@@ -152,41 +152,50 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         return;
       }
       if (req.url === TOSS_ENDPOINTS.promotionExecute) {
-        executeAttempts += 1;
-        if (executeAttempts === 1) {
-          // Response lost: destroy before the body completes.
-          res.write('{"resultType":"SUC');
-          setTimeout(() => res.destroy(), 10);
-          return;
-        }
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-1" } }));
+        // Response lost: destroy before the body completes.
+        res.write('{"resultType":"SUC');
+        setTimeout(() => res.destroy(), 10);
         return;
       }
       res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
-      const body = { anonKey: "anon-grant-recipient", promotionCode: "campaign", amount: 10 };
+      const recipient = { anonKey: "anon-grant-recipient" };
       const config = { mode: "forward", internalToken: "secret", upstreamBaseUrl, upstreamTimeoutMs: 2000 };
-      const grant = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, body, { authorization: "Bearer secret" }),
+      const prepared = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionPrepareReward, recipient, { authorization: "Bearer secret" }),
         config,
       );
-      // The lost execute never reports success; recovery (status with the
-      // saved key) decides the terminal outcome.
-      expect(["GRANTED", "PENDING", "FAILED"]).toContain(grant.body.providerStatus);
-      expect(paths[0]).toBe(TOSS_ENDPOINTS.promotionGetKey);
-      expect(paths).toContain(TOSS_ENDPOINTS.promotionResult);
-      // The ledger-saved key is what the recovery queried.
-      const statusCalls = paths.filter((p) => p === TOSS_ENDPOINTS.promotionResult);
-      expect(statusCalls.length).toBeGreaterThanOrEqual(1);
+      expect(prepared.body.ok).toBe(true);
+      expect(prepared.body.providerTransactionKey).toBe("ledger-key-1");
 
-      // The three-step endpoints are exposed for ledger-driven callers.
-      const prepare = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {}, { authorization: "Bearer secret" }),
+      const executed = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+          ...recipient,
+          promotionCode: "campaign",
+          amount: 10,
+          providerTransactionKey: prepared.body.providerTransactionKey,
+        }, { authorization: "Bearer secret" }),
         config,
       );
-      expect(prepare.body.ok).toBe(true);
-      expect(typeof prepare.body.providerTransactionKey).toBe("string");
+      // The lost execute never reports success: the outcome is UNKNOWN with
+      // the transaction key preserved for the status lookup.
+      expect(executed.body.ok).toBe(true);
+      expect(executed.body.result).toBe("UNKNOWN");
+      expect(executed.body.providerTransactionKey).toBe("ledger-key-1");
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionGetKey, TOSS_ENDPOINTS.promotionExecute]);
+
+      const status = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
+          ...recipient,
+          promotionCode: "campaign",
+          providerTransactionKey: prepared.body.providerTransactionKey,
+        }, { authorization: "Bearer secret" }),
+        config,
+      );
+      expect(status.body.ok).toBe(true);
+      expect(status.body.status).toBe("GRANTED");
+      expect(paths).toEqual([TOSS_ENDPOINTS.promotionGetKey, TOSS_ENDPOINTS.promotionExecute, TOSS_ENDPOINTS.promotionResult]);
     });
   });
 
@@ -209,43 +218,37 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(res.body.ok).toBe(true);
-      expect(res.body.providerStatus).toBe("NOT_FOUND");
+      expect(res.body.status).toBe("NOT_FOUND");
       expect(JSON.stringify(res.body)).not.toContain("anon-status-key");
     });
   });
 
-  test("anonymous grants honor the promotionAmount compatibility alias", async () => {
+  test("execute honors the promotionAmount compatibility alias", async () => {
     const bodies = [];
     const upstreamServer = http.createServer(async (req, res) => {
-      const body = await readRequestJson(req);
-      bodies.push({ url: req.url, body });
+      bodies.push({ url: req.url, body: await readRequestJson(req) });
       res.writeHead(200, { "content-type": "application/json" });
-      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "alias-key" } }));
-        return;
-      }
-      if (req.url === TOSS_ENDPOINTS.promotionExecute) {
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "alias-key" } }));
-        return;
-      }
       res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const res = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
           anonKey: "alias-recipient",
           promotionCode: "campaign",
+          providerTransactionKey: "alias-key",
           promotionAmount: 77,
         }, { authorization: "Bearer secret" }),
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
-      expect(res.body.providerStatus).toBe("GRANTED");
-      const execute = bodies.find((call) => call.url === TOSS_ENDPOINTS.promotionExecute);
-      expect(execute.body).toEqual({ promotionCode: "campaign", key: "alias-key", amount: 77 });
+      expect(res.body.ok).toBe(true);
+      expect(bodies).toEqual([{
+        url: TOSS_ENDPOINTS.promotionExecute,
+        body: { promotionCode: "campaign", key: "alias-key", amount: 77 },
+      }]);
     });
   });
 
-  test("UNKNOWN status outcomes stay PENDING for legacy ledger consumers", async () => {
+  test("UNKNOWN status outcomes pass through verbatim", async () => {
     const upstreamServer = http.createServer(async (req, res) => {
       await readRequestJson(req);
       res.writeHead(200, { "content-type": "application/json" });
@@ -261,77 +264,64 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         }, { authorization: "Bearer secret" }),
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
+      // No legacy remap: the Rust ledger owns the pending classification.
       expect(res.body.ok).toBe(true);
-      expect(res.body.providerStatus).toBe("PENDING");
       expect(res.body.status).toBe("UNKNOWN");
     });
   });
 
-  test("anonymous execute failures keep the request ID and redact the recipient", async () => {
-    // Anonymous legacy grant whose execute step is explicitly rejected:
-    // the failure must carry the caller's providerRequestId and never echo
-    // the anonymous key.
+  test("direct execute failures carry the provider codes and redact the recipient", async () => {
+    // The provider explicitly rejects the execute call (budget exhausted).
+    // The failure keeps the provider's codes and the transaction key; the
+    // caller correlates with its own ledger request id.
     const upstreamServer = http.createServer(async (req, res) => {
       await readRequestJson(req);
       res.writeHead(200, { "content-type": "application/json" });
-      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-2" } }));
-        return;
-      }
-      if (req.url === TOSS_ENDPOINTS.promotionExecute) {
-        res.end(JSON.stringify({
-          resultType: "FAIL",
-          error: { errorCode: "4112", reason: "anon-exec-recipient already granted" },
-        }));
-        return;
-      }
-      res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
+      res.end(JSON.stringify({
+        resultType: "FAIL",
+        error: { errorCode: "4112", reason: "anon-exec-recipient budget exhausted" },
+      }));
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const res = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+        request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
           anonKey: "anon-exec-recipient",
           promotionCode: "campaign",
           amount: 5,
-          providerRequestId: "ledger-request-9",
+          providerTransactionKey: "ledger-key-2",
         }, { authorization: "Bearer secret" }),
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(res.body.ok).toBe(false);
-      expect(res.body.providerStatus).toBe("PROMOTION_EXECUTE_FAILED");
-      expect(res.body.providerRequestId).toBe("ledger-request-9");
+      expect(res.body.providerStatus).toBe("FAILED");
       expect(res.body.providerErrorCode).toBe("4112");
+      expect(res.body.providerTransactionKey).toBe("ledger-key-2");
       expect(JSON.stringify(res.body)).not.toContain("anon-exec-recipient");
     });
   });
 
-  test("anonymous grant success keeps the legacy grantedAt timestamp", async () => {
+  test("granted status reports observation time, never a fabricated grantedAt", async () => {
+    // The official result API supplies no grant timestamp: the contract
+    // carries checkedAt (observation time) only.
     const upstreamServer = http.createServer(async (req, res) => {
       await readRequestJson(req);
       res.writeHead(200, { "content-type": "application/json" });
-      if (req.url === TOSS_ENDPOINTS.promotionGetKey) {
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-3" } }));
-        return;
-      }
-      if (req.url === TOSS_ENDPOINTS.promotionExecute) {
-        res.end(JSON.stringify({ resultType: "SUCCESS", success: { key: "ledger-key-3" } }));
-        return;
-      }
       res.end(JSON.stringify({ resultType: "SUCCESS", success: "SUCCESS" }));
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const res = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
           anonKey: "anon-granted-recipient",
           promotionCode: "campaign",
-          amount: 5,
-          requestedAt: 123456,
+          providerTransactionKey: "ledger-key-3",
         }, { authorization: "Bearer secret" }),
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(res.body.ok).toBe(true);
-      expect(res.body.providerStatus).toBe("GRANTED");
-      expect(res.body.grantedAt).toBe(123456);
+      expect(res.body.status).toBe("GRANTED");
+      expect(typeof res.body.checkedAt).toBe("number");
+      expect(res.body.grantedAt).toBeUndefined();
+      expect(res.body.requestedAt).toBeUndefined();
     });
   });
 
@@ -359,7 +349,7 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
-  test("terminal FAILED status outcomes report ok false for legacy consumers", async () => {
+  test("terminal FAILED status outcomes report the observed verdict verbatim", async () => {
     const upstreamServer = http.createServer(async (req, res) => {
       await readRequestJson(req);
       res.writeHead(200, { "content-type": "application/json" });
@@ -374,17 +364,18 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         }, { authorization: "Bearer secret" }),
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
-      expect(res.body.ok).toBe(false);
-      expect(res.body.providerStatus).toBe("FAILED");
+      // A successful lookup can still observe a terminal FAILED verdict;
+      // ok describes the lookup, status carries the outcome.
+      expect(res.body.ok).toBe(true);
       expect(res.body.status).toBe("FAILED");
       expect(JSON.stringify(res.body)).not.toContain("anon-failed-recipient");
     });
   });
 
-  test("prepare and status failures keep request IDs and provider codes", async () => {
-    // get-key fails (prepare), then the result endpoint fails with a coded
-    // FAIL envelope: both responses must keep the caller's request ID and
-    // the status path must keep the provider's error code.
+  test("prepare and status failures keep provider codes and the caller request id", async () => {
+    // get-key fails (prepare), then the result endpoint answers 4111: the
+    // status path keeps the caller's request id for correlation and the
+    // provider's error code, and neither response echoes the recipient.
     let phase = 0;
     const upstreamServer = http.createServer(async (req, res) => {
       await readRequestJson(req);
@@ -401,18 +392,15 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const config = { mode: "forward", internalToken: "secret", upstreamBaseUrl };
-      const grant = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+      const prepared = await handleRequest(
+        request("POST", PROXY_ENDPOINTS.promotionPrepareReward, {
           anonKey: "anon-prepare-recipient",
-          promotionCode: "campaign",
-          amount: 5,
-          providerRequestId: "ledger-request-p",
         }, { authorization: "Bearer secret" }),
         config,
       );
-      expect(grant.body.ok).toBe(false);
-      expect(grant.body.providerRequestId).toBe("ledger-request-p");
-      expect(JSON.stringify(grant.body)).not.toContain("anon-prepare-recipient");
+      expect(prepared.body.ok).toBe(false);
+      expect(prepared.body.providerErrorCode).toBe("4100");
+      expect(JSON.stringify(prepared.body)).not.toContain("anon-prepare-recipient");
 
       const status = await handleRequest(
         request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
@@ -424,9 +412,10 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         config,
       );
       expect(status.body.ok).toBe(true);
-      expect(status.body.providerStatus).toBe("NOT_FOUND");
+      expect(status.body.status).toBe("NOT_FOUND");
       expect(status.body.providerRequestId).toBe("ledger-request-s");
       expect(status.body.providerErrorCode).toBe("4111");
+      expect(JSON.stringify(status.body)).not.toContain("anon-prepare-recipient");
     });
   });
 
@@ -522,9 +511,10 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   });
 
-  test("anonymous grants with a saved key reconcile without re-executing", async () => {
-    // A retry carrying the ledger-saved transaction key must only look the
-    // result up — prepare/execute would issue a duplicate reward.
+  test("saved-key recovery through the status endpoint never re-executes", async () => {
+    // A ledger retry carrying the saved transaction key must only look the
+    // result up — prepare/execute would issue a duplicate reward. This is
+    // the only recovery path now that the batch grant route is gone.
     const paths = [];
     const upstreamServer = http.createServer(async (req, res) => {
       paths.push(req.url);
@@ -534,16 +524,15 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
     await withServer(upstreamServer, async (upstreamBaseUrl) => {
       const res = await handleRequest(
-        request("POST", PROXY_ENDPOINTS.promotionRewardGrant, {
+        request("POST", PROXY_ENDPOINTS.promotionRewardStatus, {
           anonKey: "anon-saved-key-recipient",
-          amount: 5,
           promotionCode: "campaign",
           providerTransactionKey: "ledger-saved-key",
         }, { authorization: "Bearer secret" }),
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(res.body.ok).toBe(true);
-      expect(res.body.providerStatus).toBe("GRANTED");
+      expect(res.body.status).toBe("GRANTED");
       expect(res.body.providerTransactionKey).toBe("ledger-saved-key");
       expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
       expect(JSON.stringify(res.body)).not.toContain("anon-saved-key-recipient");
@@ -572,7 +561,7 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(paths).toEqual([TOSS_ENDPOINTS.promotionResult]);
-      expect(res.body.providerStatus).toBe("PENDING");
+      expect(res.body.status).toBe("PENDING");
       expect(res.body.providerTransactionKey).toBe("saved-key");
       expect(typeof res.body.checkedAt).toBe("number");
     });
