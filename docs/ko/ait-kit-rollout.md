@@ -24,25 +24,31 @@
    `toss-mtls-client-proxy:0.5.0`으로 올리고 프록시를 배포합니다(템플릿도
    같이 갱신). 기존 워커는 그대로 동작하며 로그인, 프로모션 grant, stub
    응답의 wire 형태는 변경되지 않았습니다.
-2. **Rust/WASM guest 다음**: 크레이트 0.11.0으로 guest를 다시 빌드해
+2. **guest 배포 전에 프록시 preflight**: health 메타데이터 검사에
+   `minimumVersion: "0.5.0"`과 필수 capability `promotion.prepare`,
+   `promotion.execute`, `promotion.status`, `contractVersion: 1`을
+   지정합니다([Release Doctor](release-doctor.md#proxy-capability-preflight)).
+   버전 하한이 중요합니다. 프록시 0.4.0도 같은 capability를 광고하지만 이
+   롤아웃이 활성화하려는 api-core 0.4.2의 UNKNOWN 메시지·IAP 엄격 근거
+   동작이 없습니다. prepare/execute capability가 없는 프록시에서 새 원장
+   흐름을 legacy grant로 조용히 우회해서는 안 됩니다.
+3. **Rust/WASM guest 다음**: 크레이트 0.11.0으로 guest를 다시 빌드해
    배포합니다. 메시지 UNKNOWN이 outbox 원장에 격리되고 3단계 프로모션
    흐름이 활성화되는 단계입니다. guest를 다시 빌드하기 전의 구 Rust
    파서는 새 프록시의 `providerStatus: "UNKNOWN"`을 확정 실패로 바꾸므로,
    프록시 배포 후 빠르게 이어서 배포하고 그 사이에 프로모션/메시지
    백로그를 처리하지 마세요.
-3. **capability 확인**: 프록시 health 메타데이터가 `promotion.prepare`,
-   `promotion.execute`, `promotion.status`, `contractVersion: 1`을
-   노출하는지 확인합니다([Release Doctor](release-doctor.md#proxy-capability-preflight)).
-   prepare/execute capability가 없는 프록시에서 새 원장 흐름을 legacy
-   grant로 조용히 우회해서는 안 됩니다.
 4. **클라이언트 앱 마지막**: `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0)로 다시 빌드합니다. RN 컨슈머는 이미
    `@apps-in-toss/framework >=2.10.10`이어야 합니다.
 5. **재개 및 관찰**: 발송 기능을 다시 켜고 원장 결과를 관찰합니다. 진행
-   중이던 프로모션 attempt와 메시지 outbox 행은 그대로 유지되며,
-   `provider_status = 'UNKNOWN'`으로 격리된 `FAILED` 행은 저장된 거래
-   키/provider request id로 status 조회해 정산합니다. UNKNOWN 격리
-   데이터를 지워서 "초기화"하지 말고 조회해 마무리하세요.
+   중이던 프로모션 attempt와 메시지 outbox 행은 그대로 유지됩니다. 격리된
+   행의 정산은 기능마다 다릅니다. 프로모션 행(`FAILED` +
+   `provider_status = 'UNKNOWN'`)은 저장된 거래 키로 status 조회해 마무리하고,
+   메시지 UNKNOWN 행은 kit에 status 엔드포인트가 없으므로 의도적인 재enqueue
+   결정 전에 `provider_request_id`로 제공자·운영자가 명시적으로 재확인합니다
+   ([기능성 메시지](functional-messages.md) 참고). UNKNOWN 격리 데이터를 지워서
+   "초기화"하지 말고 조회해 마무리하세요.
 
 ### 롤백
 
@@ -65,13 +71,16 @@
   원장 소비자를 위해 UNKNOWN을 PENDING으로 매핑합니다.
 - 이 기준선 어디에도 자동 재발송과 자동 재지급이 없습니다. 결과 미확정
   메시지는 발송 큐에서 제외된 채 유지되고, 미확정/접수된 프로모션은
-  pending을 유지하며, 복구는 항상 명시적인 status 조회입니다.
+  pending을 유지하며, 모든 복구는 명시적 결정입니다 — 프로모션은 저장된
+  키로 status 조회, 메시지는 request id 기반 제공자·운영자 정산(이 kit는
+  Smart Message status 엔드포인트를 제공하지 않습니다).
 
 ## 검증 기록 (2026-09-17)
 
-아래는 릴리즈된 기준선 커밋 범위(`ced5f86..08ae12f`, 릴리즈 머지 포함)에서
-실행했습니다. 로컬 실행은 저장소의 bun/cargo 툴체인을 사용했고, CI 행은
-PR #133, #134, #138, 릴리즈 PR #135와 머지 후 main 워크플로우 결과입니다.
+로컬 검사는 기능 범위 `ced5f86..08ae12f`(PR #133, #134, #138 — 이 기준선의
+모든 소스 변경)에서 실행했습니다. 릴리즈 머지 `729dac6`는 버전 bump,
+changelog, lockfile 동기화만 추가하며, 머지 후 main 워크플로우 전체가
+성공했습니다. CI 행은 해당 PR, 릴리즈 PR #135, 릴리즈 후 main 실행 결과입니다.
 
 | 검사 | 실행 위치 | 결과 |
 |---|---|---|

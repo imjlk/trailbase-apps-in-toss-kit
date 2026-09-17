@@ -26,26 +26,34 @@ apps:
    `toss-mtls-client-proxy:0.5.0` (template updated accordingly) and roll the
    proxy. Existing workers keep functioning against it; wire shapes for
    login, promotion grant, and stub responses are unchanged.
-2. **Rust/WASM guests next**: rebuild guests against crates 0.11.0 and deploy.
+2. **Preflight the proxy before deploying guests**: confirm the health
+   metadata check with `minimumVersion: "0.5.0"` and the required
+   capabilities `promotion.prepare`, `promotion.execute`,
+   `promotion.status`, `contractVersion: 1` (see
+   [Release Doctor](release-doctor.md#proxy-capability-preflight)). The
+   version floor matters: proxy 0.4.0 already advertises the same
+   capabilities but predates the api-core 0.4.2 UNKNOWN-message and
+   strict-IAP behavior this rollout activates. Consumers on proxies without
+   the prepare/execute capabilities must not silently fall back to the
+   legacy grant for new ledger flows.
+3. **Rust/WASM guests next**: rebuild guests against crates 0.11.0 and deploy.
    This is what makes message UNKNOWN outcomes quarantine in the outbox
    ledger and enables the three-step promotion flow. Until guests are
    rebuilt, old Rust parsers collapse the new proxy's
    `providerStatus: "UNKNOWN"` into confirmed failures — deploy guests soon
    after the proxy, and do not process promotion/message backlogs in between.
-3. **Capability check**: confirm the proxy health metadata exposes
-   `promotion.prepare`, `promotion.execute`, `promotion.status`, and
-   `contractVersion: 1` (see [Release Doctor](release-doctor.md#proxy-capability-preflight)).
-   Consumers on proxies without the prepare/execute capabilities must not
-   silently fall back to the legacy grant for new ledger flows.
 4. **Client apps last**: rebuild with `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0). RN consumers must already be on
    `@apps-in-toss/framework >=2.10.10`.
 5. **Resume and watch**: re-enable dispatch features and monitor ledger
    outcomes. In-flight promotion attempts and message outbox rows survive
-   as-is; rows quarantined `FAILED` with `provider_status = 'UNKNOWN'`
-   reconcile through the status lookup with the stored transaction key /
-   provider request id. Never clear UNKNOWN isolation data to "reset" —
-   query and settle it.
+   as-is. Quarantined rows reconcile differently per feature: promotion rows
+   (`FAILED` with `provider_status = 'UNKNOWN'`) settle through the status
+   lookup with the stored transaction key, while message UNKNOWN rows have
+   no kit status endpoint — reconcile them explicitly with the provider by
+   `provider_request_id` before any deliberate re-enqueue decision (see
+   [Functional Messages](functional-messages.md)). Never clear UNKNOWN
+   isolation data to "reset" — query and settle it.
 
 ### Rollback
 
@@ -68,14 +76,19 @@ apps:
   maps UNKNOWN to PENDING there for legacy ledger consumers.
 - No auto-resend and no auto-regrant exist anywhere in this baseline: unknown
   message outcomes stay out of the dispatch queue, unknown/submitted
-  promotions stay pending, and recovery is always an explicit status lookup.
+  promotions stay pending, and every recovery is an explicit decision — a
+  status-lookup with the persisted key for promotions, or provider/operator
+  reconciliation by request id for messages (this kit exposes no Smart
+  Message status endpoint).
 
 ## Verification Record (2026-09-17)
 
-All of the following were executed on the released baseline commit range
-(`ced5f86..08ae12f`, release merge included). Local runs used the repo's
-bun/cargo toolchain; CI rows refer to the GitHub checks on PRs #133, #134,
-#138, and release PR #135 plus the post-merge main workflows.
+Local checks ran on the feature range `ced5f86..08ae12f` (PRs #133, #134,
+#138 — every source change in this baseline). The release merge `729dac6`
+added only version bumps, changelogs, and lockfile synchronization; it is
+covered by the post-merge main workflows, all of which succeeded. CI rows
+refer to the GitHub checks on those PRs, release PR #135, and the
+post-release main runs.
 
 | Check | Where | Result |
 |---|---|---|
