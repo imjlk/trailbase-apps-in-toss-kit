@@ -37,12 +37,14 @@
    동작이 없습니다. prepare/execute capability가 없는 프록시에서 새 원장
    흐름을 legacy grant로 조용히 우회해서는 안 됩니다.
 4. **Rust/WASM guest, 핸들러 전환과 함께**: 크레이트 0.11.0으로 guest를 다시
-   빌드하고 **동시에** 앱의 지급 핸들러를 3단계 헬퍼 순서 — prepare → 거래
-   키 저장 → 실행 클레임 → execute → 반영/status 복구 — 로 전환합니다. 재빌드만으로는
-   아무것도 바뀌지 않습니다. legacy grant 헬퍼는 그대로 컴파일되므로 이를
-   계속 쓰는 핸들러는 기존의 응답 유실 동작을 유지합니다. guest 배포가
-   메시지 UNKNOWN의 outbox 원장 격리를 활성화하는 단계입니다. 프록시 배포
-   후 빠르게 이어서 배포하고, guest가 살아날 때까지 발송 중지를 유지하세요.
+   빌드하고 **동시에** 앱의 지급 핸들러를 3단계 헬퍼 순서 — pending 원장 행
+   삽입(`insert_promotion_reward_ledger_tx`, 자체 커밋) → prepare → 거래 키
+   저장(자체 커밋) → 실행 클레임(자체 커밋) → execute → 반영/status 복구 — 로
+   전환합니다. 재빌드만으로는 아무것도 바뀌지 않습니다. legacy grant 헬퍼는
+   그대로 컴파일되므로 이를 계속 쓰는 핸들러는 기존의 응답 유실 동작을
+   유지합니다. guest 배포가 메시지 UNKNOWN의 outbox 원장 격리를 활성화하는
+   단계입니다. 프록시 배포 후 빠르게 이어서 배포하고, guest가 살아날 때까지
+   발송 중지를 유지하세요.
 5. **클라이언트 앱 마지막**: `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0)로 다시 빌드합니다. RN 컨슈머는 이미
    `@apps-in-toss/framework >=2.10.10`이어야 합니다.
@@ -50,7 +52,10 @@
    중이던 프로모션 attempt와 메시지 outbox 행은 그대로 유지됩니다. 격리된
    행의 정산은 기능마다 다릅니다. 프로모션 행(`pending` +
    `provider_status = 'UNKNOWN'`, 또는 execute 응답 유실 후의 `EXECUTING`)은
-   저장된 거래 키로 status 조회해 마무리하고, 메시지 UNKNOWN 행은 kit에
+   **저장된 거래 키가 있을 때만** status 조회로 마무리할 수 있습니다. 키를
+   저장하기 전에 응답을 잃은 레거시 단일 호출 grant는 조회할 키가 없으므로,
+   그런 행은 새 키로 재시도하지 않고 제공자·운영자 정산으로 다룹니다
+   ([프로모션 캠페인](promotion-campaigns.md) 참고). 메시지 UNKNOWN 행도 kit에
    status 엔드포인트가 없으므로 의도적인 재enqueue 결정 전에
    `provider_request_id`로 제공자·운영자가 명시적으로 재확인합니다
    ([기능성 메시지](functional-messages.md) 참고). UNKNOWN 격리 데이터를 지워서
@@ -73,18 +78,20 @@
 
 ## 컨슈머 영향 요약
 
-- kit의 import, 옵션, 응답 형태는 변경되지 않았습니다. 프록시 응답을 원본
-  JSON으로 소비하는 곳은 이제 메시지 응답에서(5xx, 빈/HTML body, 상충하는
-  상태)`providerStatus: "UNKNOWN"`과 `error: "INVALID_RESPONSE"` 마커를
-  받을 수 있음을 알아야 하며, 이를 실패가 아니라 결과 미확정으로 다뤄야
-  합니다.
+- kit의 import, 옵션, JSON 구조는 변경되지 않았지만 Smart Message 응답
+  계약은 추가로 확장됩니다. 프록시 응답을 원본 JSON으로 소비하는 곳은 이제
+  메시지 응답에서(5xx, 빈/HTML body, 상충하는 상태)`providerStatus:
+  "UNKNOWN"`과 `error: "INVALID_RESPONSE"` 마커를 받을 수 있습니다. 열거형
+  status를 전수 검사하는 검증기는 새 값을 허용해야 하고, 모든 소비자는 이를
+  실패가 아니라 결과 미확정으로 다뤄야 합니다.
 - 프로모션 grant/status wire 응답은 기존 형태를 유지하며, 프록시가 레거시
   원장 소비자를 위해 UNKNOWN을 PENDING으로 매핑합니다.
 - 이 기준선 어디에도 자동 재발송과 자동 재지급이 없습니다. 결과 미확정
   메시지는 발송 큐에서 제외된 채 유지되고, 미확정/접수된 프로모션은
-  pending을 유지하며, 모든 복구는 명시적 결정입니다 — 프로모션은 저장된
-  키로 status 조회, 메시지는 request id 기반 제공자·운영자 정산(이 kit는
-  Smart Message status 엔드포인트를 제공하지 않습니다).
+  pending을 유지하며, 모든 복구는 명시적 결정입니다 — 거래 키를 저장한
+  프로모션은 status 조회, 키가 없는 프로모션과 메시지는 request id 기반
+  제공자·운영자 정산입니다(이 kit는 Smart Message status 엔드포인트를
+  제공하지 않습니다).
 
 ## 검증 기록 (2026-09-17)
 

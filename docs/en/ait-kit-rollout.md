@@ -43,12 +43,15 @@ apps:
    legacy grant for new ledger flows.
 4. **Rust/WASM guests, with handler adoption**: rebuild guests against
    crates 0.11.0 **and** switch the app's reward handlers to the three-step
-   helper sequence — prepare → persist the transaction key → claim → execute
-   → apply/status recovery. A rebuild alone changes nothing: the legacy
-   grant helper still compiles, and handlers that keep using it retain the
-   old lost-response behavior. Deploying the new guests is what makes
-   message UNKNOWN outcomes quarantine in the outbox ledger. Deploy guests
-   soon after the proxy, and keep dispatch paused until they are live.
+   helper sequence — insert the pending ledger row
+   (`insert_promotion_reward_ledger_tx`, its own committed transaction) →
+   prepare → persist the transaction key (own commit) → claim execution
+   (own commit) → execute → apply/status recovery. A rebuild alone changes
+   nothing: the legacy grant helper still compiles, and handlers that keep
+   using it retain the old lost-response behavior. Deploying the new guests
+   is what makes message UNKNOWN outcomes quarantine in the outbox ledger.
+   Deploy guests soon after the proxy, and keep dispatch paused until they
+   are live.
 5. **Client apps last**: rebuild with `ait-rn` 0.6.0 / `ait-web` 0.3.0
    (`@ait-kit/sdk` 0.3.0). RN consumers must already be on
    `@apps-in-toss/framework >=2.10.10`.
@@ -56,12 +59,15 @@ apps:
    outcomes. In-flight promotion attempts and message outbox rows survive
    as-is. Quarantined rows reconcile differently per feature: promotion rows
    (`pending` with `provider_status = 'UNKNOWN'`, or `EXECUTING` after a
-   lost execute response) settle through the status lookup with the stored
-   transaction key, while message UNKNOWN rows have no kit status endpoint —
-   reconcile them explicitly with the provider by `provider_request_id`
-   before any deliberate re-enqueue decision (see
-   [Functional Messages](functional-messages.md)). Never clear UNKNOWN
-   isolation data to "reset" — query and settle it.
+   lost execute response) settle through the status lookup **when they hold
+   a stored transaction key** — a legacy single-call grant that lost its
+   response before persisting the key has no key to look up, and such rows
+   need provider/operator reconciliation without retrying on a new key (see
+   [Promotion Campaigns](promotion-campaigns.md)). Message UNKNOWN rows have
+   no kit status endpoint either — reconcile them explicitly with the
+   provider by `provider_request_id` before any deliberate re-enqueue
+   decision (see [Functional Messages](functional-messages.md)). Never clear
+   UNKNOWN isolation data to "reset" — query and settle it.
 
 ### Rollback
 
@@ -82,18 +88,21 @@ apps:
 
 ## Consumer Impact Summary
 
-- Kit imports, options, and response shapes are unchanged. Raw-JSON
-  consumers of the proxy must now expect `providerStatus: "UNKNOWN"` with an
+- Kit imports, options, and JSON structure are unchanged, but the Smart
+  Message response contract is additively extended: raw-JSON consumers of
+  the proxy can now receive `providerStatus: "UNKNOWN"` plus an
   `error: "INVALID_RESPONSE"` marker on message responses (5xx, empty/HTML
-  bodies, conflicting statuses) and treat it as outcome-unknown, not failed.
+  bodies, conflicting statuses). Exhaustive status validators must accept
+  the new value, and every consumer must treat it as outcome-unknown, not
+  failed.
 - Promotion grant/status wire responses keep the legacy shape; the proxy
   maps UNKNOWN to PENDING there for legacy ledger consumers.
 - No auto-resend and no auto-regrant exist anywhere in this baseline: unknown
   message outcomes stay out of the dispatch queue, unknown/submitted
   promotions stay pending, and every recovery is an explicit decision — a
-  status-lookup with the persisted key for promotions, or provider/operator
-  reconciliation by request id for messages (this kit exposes no Smart
-  Message status endpoint).
+  status-lookup for promotions that hold a persisted transaction key, or
+  provider/operator reconciliation by request id for keyless promotions and
+  messages (this kit exposes no Smart Message status endpoint).
 
 ## Verification Record (2026-09-17)
 
