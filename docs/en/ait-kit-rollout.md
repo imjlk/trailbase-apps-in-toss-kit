@@ -77,11 +77,20 @@ apps:
   that old Rust parsers read `provider_status = 'UNKNOWN'` rows as plain
   failures — preserve and re-apply the new guests before any further
   reconciliation.
-- Before rolling back, settle every `EXECUTING` or UNKNOWN promotion row
-  through the status lookup with its stored transaction key. Promotion
-  executions never expire on their own — only message leases do — so
-  waiting leaves a lost execute response in-flight indefinitely, and
-  rolling back exposes that row to the old parser as a failure.
+- Before rolling back, drain and settle promotion work while the 0.11 guest
+  is still live, because pre-0.11 guests cannot resume a persisted
+  transaction key:
+  - `PREPARED` rows (key stored, execution not started — e.g. dispatch
+    paused right after the key commit) must be claimed, executed, and
+    settled now.
+  - `EXECUTING` or UNKNOWN rows with a stored transaction key settle
+    through the status lookup with that key.
+  - UNKNOWN rows without a key (a legacy single-call grant that lost its
+    response before persisting it) cannot use the status endpoint — they
+    need provider/operator reconciliation.
+  Promotion executions never expire on their own — only message leases do —
+  so waiting leaves a lost execute response in-flight indefinitely, and
+  rolling back exposes unsettled rows to the old parser as failures.
 - When rolling back, pause new dispatch first, complete the promotion
   reconciliation above (message attempts may instead be left to their lease
   expiry), then roll proxy and guests back together.
