@@ -72,7 +72,7 @@
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@ait-kit/api-client": "0.5.0",
         "@ait-kit/api-core": "0.5.0",

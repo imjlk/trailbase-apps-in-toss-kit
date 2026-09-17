@@ -1,5 +1,46 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.6.0 — 2026-09-17
+
+### Minor changes
+
+- [860e6e1](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/860e6e1104655a2368c03819e73ea704eef997b5) BREAKING (0.x): standardize new promotion rewards on the persisted three-step contract. Roll out together with a light-on/off switch — merging or publishing alone does not replace a running proxy.
+  
+  Proxy (pins `@ait-kit/api-core`/`api-client` at 0.5.0):
+  
+  - The batch `POST /internal/apps-in-toss/promotion/reward/grant` route is removed and answers `410 PROMOTION_GRANT_REMOVED` with zero upstream calls — no grant logic, no redirect, no mixed key-lookup-or-issue behavior. IAP and Smart Message compatibility code is untouched.
+  - `prepare` now takes exactly one recipient (`userKey`/`tossUserKey`/`anonKey`) and issues a key bound to it (recipient-less prepares are rejected before dispatch); `execute` requires the persisted key; `status` passes the provider-observed verdict through verbatim — `GRANTED`/`PENDING`/`FAILED`/`NOT_FOUND`/`UNKNOWN` with `checkedAt` observation time and no fabricated `grantedAt` (the UNKNOWN→PENDING remap for legacy ledger consumers is gone; the Rust ledger owns classification).
+  - Health capabilities are versioned with the new contract: `promotion.prepare.v2`, `promotion.execute.v2`, `promotion.status.v2`; `promotion.grant` is no longer advertised, so release-doctor preflights requiring the old names fail against this proxy.
+  
+  Rust (`trailbase-guest-common`):
+  
+  - `promotion_reward_grant` and its path constant are removed; `promotion_reward_prepare` now takes the recipient payload and rejects anything without exactly one recipient before a network call. `promotion_reward_outcome_from_response` drops the `requested_at` parameter (request time never masquerades as a grant/failure time) and no longer fabricates `GRANTED` from `ok: true` alone — execute verdicts are read from `result` (`SUBMITTED`→pending, `UNKNOWN` stays unknown), and `NOT_FOUND` classifies as failed.
+  - Execution facts are persisted separately from provider outcomes: the ledger gains `protocol` (`'three-step'` for new-contract rows, NULL for legacy rows) and a write-once `execution_started_at` recorded atomically in its own committed transaction before the external execute call. Key storage never touches them; PENDING/UNKNOWN outcomes and same-key re-stores can never move a claimed row back to a pre-execution state; `provider_status` stores provider results only.
+  - Recovery is one contract: `promotion_reward_ledgers_awaiting_recovery_tx` lists three-step rows whose execution started and whose outcome is unsettled (PENDING/SUBMITTED/UNKNOWN all included), ordered and limited by the execution-start marker — status-only, never prepare/execute, never auto-converting legacy rows. Outcome application keeps its fences (own `provider_request_id`, stored key never swapped, confirmed success/failure sticky).
+  - **Migration required for existing installs**: apply `templates/trailbase/sql/promotion_reward_ledger.v2.sql` once (additive `protocol`/`execution_started_at` columns; rows, keys, links, and outcomes preserved; legacy rows stay unmarked). Fresh installs get the columns from the core template. Consumers must rewrite claim handlers that call the removed grant helper; there is no per-request legacy/v2 flag and no dual grant path.
+  
+  Wire fixtures add execute-`result` (SUBMITTED/UNKNOWN), ok-without-status (pending, never granted), and status-NOT_FOUND cases; the copy-in smoke script runs prepare → execute → status. — Thanks @imjlk!
+
+### Patch changes
+
+- [cc67d97](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/cc67d9727ec5a444295bee76ac6bf6d4af2e54af) Align deployment baselines with the released 0.5.0 image.
+  
+  - The copy-in Compose template now pins
+    `toss-mtls-client-proxy:0.5.0` (was 0.2.0) and its comment describes the
+    actual baseline — @ait-kit api-core/api-client 0.4.2 contracts, message
+    UNKNOWN outcomes, three-step promotion rewards — instead of the stale
+    "API Core 0.2" note. Consumers reconcile their copied Compose file with
+    this pin; consumers on older images keep working, but the UNKNOWN outcome
+    quarantine in the Rust ledger requires the 0.11.0 guest crates.
+  - New bilingual rollout and verification record
+    (`docs/en/ait-kit-rollout.md`, `docs/ko/ait-kit-rollout.md`): version
+    matrix (proxy 0.5.0 image digest, api 0.4.2 pins, SDK 0.3.0, RN minimum
+    2.10.10, crates 0.11.0), rollout order (pause dispatch → proxy →
+    capability preflight with minimumVersion 0.5.0 → WASM guests with
+    three-step handler adoption → client apps), rollback cautions, the
+    2026-09-17 verification record, and the consumer-owned real-device checks
+    that remain. No schema migrations ship in this cycle. — Thanks @imjlk!
+
 ## 0.5.0 — 2026-09-16
 
 ### Minor changes
