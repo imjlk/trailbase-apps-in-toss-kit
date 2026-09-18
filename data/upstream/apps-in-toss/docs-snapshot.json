@@ -1,19 +1,19 @@
 {
-  "fetchedAt": "2026-09-12T05:05:31.228Z",
+  "fetchedAt": "2026-09-18T05:53:34.918Z",
   "documents": [
     {
       "key": "release-notes",
       "title": "Apps in Toss release notes",
       "url": "https://developers-apps-in-toss.toss.im/release-note/release-note.md",
-      "sha256": "2e550a7d9294b0ddbf277c01b00ecc0e9c8332dfa46773698d21644d0326dcc0",
-      "bytes": 21200
+      "sha256": "415ab6e8391bebcd7ed2ee9c9e93b850cb3608b98f634ba91ecc76c7eabc4fe6",
+      "bytes": 21634
     },
     {
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "350854caf3c98a6b2424e53b512038af3452d3550adb4fcd9305fd284b6bcd03",
-      "bytes": 33293
+      "sha256": "b6800bd82649895487964860a22b90888f4094e41de26cbe6fb8bb459ddc2856",
+      "bytes": 32846
     },
     {
       "key": "react-native-tutorial",
