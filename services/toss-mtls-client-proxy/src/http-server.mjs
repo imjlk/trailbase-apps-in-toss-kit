@@ -204,13 +204,14 @@ function legacyIapResponse(result, mode) {
 // and request ids ("tx-12345678-01"). Genuine numeric Toss user keys are
 // long, so all-digit candidates become unambiguous once they pass a higher
 // floor (10+ digits; a 9-digit id stays below it and skips rewriting).
-// Candidates below their floor get no rewriting; the proxy never echoes
+// Candidates below their floor use exact-value matching; failureReason text
+// containing such a candidate is suppressed separately. The proxy never echoes
 // recipient fields (anonKey / tossUserKey / userKey) from the request body
 // back — correlated request fields such as providerRequestId do pass
 // through — so the remaining exposure is a provider-echoed short digit run
 // or sub-floor identifier (requireAnonymousKey enforces no minimum length,
 // so sub-floor anonymous keys intentionally skip redaction too) inside
-// free text.
+// free text, handled by redactRecipientEchoes before returning downstream.
 const MIN_REDACTABLE_RECIPIENT_LENGTH = 8;
 const MIN_ALL_DIGIT_REDACTABLE_LENGTH = 10;
 
@@ -279,7 +280,16 @@ function redactRecipientEchoes(result, body) {
     }
     return result;
   }
-  return recipient !== undefined ? redactRecipient(result, recipient) : result;
+  if (recipient === undefined) return result;
+  const redacted = redactRecipient(result, recipient);
+  // api-core normalizes provider free text into failureReason. Short IDs
+  // cannot safely replace substrings in codes or correlation fields, but
+  // suppress the whole free-text value when it contains the recipient.
+  if (!recipient.substring && typeof result?.failureReason === "string" &&
+      result.failureReason.includes(recipient.value)) {
+    return { ...redacted, failureReason: "[redacted]" };
+  }
+  return redacted;
 }
 
 // Correlation fields survive verbatim: providerTransactionKey is the one

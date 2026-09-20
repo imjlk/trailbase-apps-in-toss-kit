@@ -97,3 +97,11 @@ No public endpoint, server callback, schema migration or proxy rollout is added.
 See [Release Doctor](release-doctor.md) for deployment checks and
 [functional messages](functional-messages.md), [IAP orders](iap-orders.md) and
 [promotion campaigns](promotion-campaigns.md) for the actual transition contracts.
+
+Promotion v2 diagnostics report `execution.schemaAvailable`, `protocol`, `started`,
+and `startedAt` without exposing the transaction key. `SUBMITTED` remains a stored
+acceptance result, never proof of a grant. Pending three-step rows without an
+execution marker require review of the unstarted attempt; started rows require
+status lookup only. Legacy rows are never adopted, and missing keys require manual
+reconciliation without issuing a new key. Pre-v2 snapshots remain readable with
+`schemaAvailable: false`. These fields never authorize execution or automatic retry.

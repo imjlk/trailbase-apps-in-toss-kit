@@ -617,10 +617,7 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
       expect(res.body.ok).toBe(false);
       expect(res.body.providerTransactionKey).toBe("key-1");
       expect(res.body.providerErrorCode).toBe("4113");
-      // Free text with the short id passes through verbatim — the gate
-      // exists so the replacer never mangles fields like this.
-      expect(JSON.stringify(res.body)).toContain("already granted for order 1 of user 1");
-      expect(JSON.stringify(res.body)).not.toContain("[redacted]");
+      expect(res.body.failureReason).toBe("[redacted]");
     });
   });
 
@@ -644,8 +641,7 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(res.body.providerErrorCode).toBe("4113");
-      expect(JSON.stringify(res.body)).toContain("user 42");
-      expect(JSON.stringify(res.body)).not.toContain("[redacted]");
+      expect(res.body.failureReason).toBe("[redacted]");
     });
   });
 
@@ -746,10 +742,28 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
         { mode: "forward", internalToken: "secret", upstreamBaseUrl },
       );
       expect(res.body.providerTransactionKey).toBe("tx-12345678-01");
-      expect(JSON.stringify(res.body)).toContain("for 12345678");
-      expect(JSON.stringify(res.body)).not.toContain("[redacted]");
+      expect(res.body.failureReason).toBe("[redacted]");
     });
   });
+
+  for (const endpoint of [PROXY_ENDPOINTS.promotionPrepareReward, PROXY_ENDPOINTS.promotionExecuteReward, PROXY_ENDPOINTS.promotionRewardStatus]) {
+    test(`short recipient free text is suppressed without corrupting codes: ${endpoint}`, async () => {
+      const upstreamServer = http.createServer(async (req, res) => {
+        await readRequestJson(req);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ resultType: "FAIL", error: { errorCode: "4113", reason: "recipient 1 not eligible" } }));
+      });
+      await withServer(upstreamServer, async (upstreamBaseUrl) => {
+        const res = await handleRequest(request("POST", endpoint, {
+          userKey: 1, promotionCode: "campaign", amount: 5,
+          providerTransactionKey: "key-1", providerRequestId: "request-1",
+        }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+        expect(res.body.failureReason).toBe("[redacted]");
+        expect(res.body.providerErrorCode).toBe("4113");
+        if (endpoint !== PROXY_ENDPOINTS.promotionPrepareReward) expect(res.body.providerTransactionKey).toBe("key-1");
+      });
+    });
+  }
 
   test("plain-HTTP 204, 205, and 304 responses carry a null body without crashing", async () => {
     for (const status of [204, 205, 304]) {

@@ -88,3 +88,11 @@ fingerprint만 남깁니다. 예상 밖의 provider 상태는 `UNRECOGNIZED`로 
 배포 검증은 [Release Doctor](release-doctor.md), 실제 상태 전이 계약은
 [기능성 메시지](functional-messages.md), [IAP 주문](iap-orders.md),
 [프로모션 캠페인](promotion-campaigns.md)을 참고하세요.
+
+프로모션 v2 진단은 거래 키를 노출하지 않고 `execution.schemaAvailable`,
+`protocol`, `started`, `startedAt`을 표시합니다. `SUBMITTED`는 저장된 접수
+결과이며 지급 증거가 아닙니다. 실행 표식이 없는 pending three-step 행은
+미실행 시도를 검토하고, 실행된 행은 status 조회로만 확인합니다. 레거시 행을
+재채택하지 않으며 키가 없으면 새 키 발급 없이 수동 정산합니다. v2 이전
+스냅샷도 `schemaAvailable: false`로 읽습니다. 이 필드는 실행이나 자동 재시도를
+허가하지 않습니다.

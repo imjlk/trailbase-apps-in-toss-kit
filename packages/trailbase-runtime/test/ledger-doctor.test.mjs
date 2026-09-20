@@ -238,3 +238,31 @@ test('CLI opens a snapshot read-only, rejects mutation flags, and sanitizes corr
     expect(broken.stderr).not.toContain(secret);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('promotion v2 diagnostics separate unstarted attempts from status-only recovery without exposing keys', () => {
+  const db = database();
+  try {
+    promotion(db);
+    db.exec("UPDATE promotion_reward_ledger SET protocol='three-step', provider_status='SUBMITTED', execution_started_at=15");
+    let report = inspect(db, 'promotion', 'promotion-1');
+    expect(report.record.providerStatus).toBe('SUBMITTED');
+    expect(report.record.execution).toEqual({ schemaAvailable: true, protocol: 'three-step', started: true, startedAt: 15 });
+    expect(report.recoveryPlan.actions).toEqual(['query-original-promotion-transaction']);
+    expect(report.recoveryPlan.allowsAutomaticRetry).toBe(false);
+    expect(JSON.stringify(report)).not.toContain(secret);
+    db.exec('UPDATE promotion_reward_ledger SET execution_started_at=NULL');
+    expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['review-unstarted-three-step-attempt']);
+    db.exec('UPDATE promotion_reward_ledger SET protocol=NULL');
+    expect(inspect(db, 'promotion', 'promotion-1').record.execution.started).toBeNull();
+    expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['query-original-promotion-transaction']);
+    db.exec('UPDATE promotion_reward_ledger SET provider_transaction_key=NULL');
+    expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
+    db.exec('DROP INDEX idx_promotion_reward_ledger_recovery; ALTER TABLE promotion_reward_ledger DROP COLUMN protocol; ALTER TABLE promotion_reward_ledger DROP COLUMN execution_started_at;');
+    report = inspect(db, 'promotion', 'promotion-1');
+    expect(report.record.execution.schemaAvailable).toBe(false);
+    expect(report.record.execution.started).toBeNull();
+    expect(report.recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
+    db.exec('ALTER TABLE promotion_reward_ledger ADD COLUMN protocol TEXT');
+    expect(() => inspect(db, 'promotion', 'promotion-1')).toThrow('LEDGER_SCHEMA_UNAVAILABLE');
+  } finally { db.close(); }
+});
