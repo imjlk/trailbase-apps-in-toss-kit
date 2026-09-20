@@ -1,9 +1,9 @@
 {
-  "fetchedAt": "2026-09-12T05:03:20.136Z",
+  "fetchedAt": "2026-09-18T05:53:25.831Z",
   "packages": [
     {
       "packageName": "@apps-in-toss/web-framework",
-      "version": "3.4.0",
+      "version": "3.4.1",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fweb-framework/latest"
@@ -24,14 +24,14 @@
     },
     {
       "packageName": "create-granite-app",
-      "version": "1.0.43",
+      "version": "1.0.45",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/create-granite-app/latest"
     },
     {
       "packageName": "@granite-js/react-native",
-      "version": "1.0.43",
+      "version": "1.0.45",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@granite-js%2Freact-native/latest"
