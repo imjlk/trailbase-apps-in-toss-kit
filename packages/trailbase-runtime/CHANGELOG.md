@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.4.1 — 2026-09-20
+
+### Patch changes
+
+- [1107144](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1107144b94f64ccef1d2a4078dfc4ba359794275) Report promotion v2 execution markers and SUBMITTED outcomes in private ledger diagnostics while retaining read-only, no-retry guidance and compatibility with legacy snapshots. Correct the deployment baseline to proxy 0.6.1 and require the additive v2 ledger migration after legacy reconciliation. End failed migration savepoints before same-connection retries; regression coverage verifies successful retries are committed.
+  
+  Suppress provider failure text containing short recipient identifiers before returning prepare/execute/status responses, while preserving error codes and correlation keys. Deploy the resulting proxy patch release to obtain this privacy fix. — Thanks @imjlk!
+
 ## 0.4.0 — 2026-09-12
 
 ### Minor changes
