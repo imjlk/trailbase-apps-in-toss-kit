@@ -6,7 +6,7 @@ services:
     # message UNKNOWN outcomes, recipient-bound promotion v2 rewards, and
     # anonymous-recipient/recovery adapters.
     # Reconcile consumer-owned migrations and rebuild WASM guests before rollout.
-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.6.1
+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.6.2
     init: true
     stop_grace_period: 100s
     profiles:

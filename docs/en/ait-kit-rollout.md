@@ -15,12 +15,12 @@ the same release train.
 
 | Component | Version | Notes |
 |---|---|---|
-| Proxy image | `toss-mtls-client-proxy:0.6.1` | Published promotion v2 baseline; require the three versioned promotion capabilities below |
+| Proxy image | `toss-mtls-client-proxy:0.6.2` | Published promotion v2 baseline; require the three versioned promotion capabilities below |
 | Proxy internal `@ait-kit/api-core` / `api-client` | `0.5.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
 | RN/Web `@ait-kit/sdk` | `0.3.0` (exact pins) | `ait-rn` 0.6.0 / `ait-web` 0.3.0 (private, Sampo-versioned) |
 | RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.3.0 peer floor; minimum fixture compiles against the same reviewed pin |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Unchanged |
-| Rust guest crates | `trailbase-guest-common` / `trailbase-toss-identity` 0.12.1 | Fixed pair; moves together |
+| Rust guest crates | `trailbase-guest-common` / `trailbase-toss-identity` 0.12.2 | Fixed pair; moves together |
 | SQL templates | Additive v2 migration required | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers; preserve legacy rows |
 
 ## Rollout Order
@@ -146,7 +146,7 @@ Keep dispatch paused throughout reconciliation, migration and deployment:
 ## Historical Verification Record: proxy 0.5.0 (2026-09-17)
 
 This record covers the previous baseline, not promotion v2. The current baseline
-is proxy 0.6.1 and Rust crates 0.12.1 (release PR #143). Verify the v2 migration
+is proxy 0.6.2 and Rust crates 0.12.2 (release PR #145). Verify the v2 migration
 and versioned capabilities separately; this historical record is not v2 evidence.
 
 Local checks ran on the feature range `ced5f86..08ae12f` (PRs #133, #134,
