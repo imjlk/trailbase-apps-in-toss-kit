@@ -2167,6 +2167,36 @@ mod sql_tests {
                 "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
             ));
             assert!(result.is_err(), "the colliding column must fail the batch");
+            // Retry on the SAME handle: ROLLBACK TO alone leaves the outer
+            // savepoint alive, so the retry would appear successful without
+            // committing. End the failed savepoint before correcting/retrying.
+            db.execute_batch(
+                "ROLLBACK TO promotion_reward_ledger_v2; RELEASE promotion_reward_ledger_v2;",
+            )
+            .unwrap();
+            assert!(db.is_autocommit());
+            db.execute_batch(
+                "ALTER TABLE promotion_reward_ledger DROP COLUMN execution_started_at;",
+            )
+            .unwrap();
+            db.execute_batch(include_str!(
+                "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
+            ))
+            .unwrap();
+            assert!(db.is_autocommit(), "successful retry must commit");
+            // Reset the synthetic schema to exercise the existing fresh-handle
+            // rollback/retry assertions below as well.
+            db.execute_batch(
+                "DROP INDEX idx_promotion_reward_ledger_recovery;
+                 ALTER TABLE promotion_reward_ledger DROP COLUMN protocol;",
+            )
+            .unwrap();
+            assert!(
+                db.execute_batch(include_str!(
+                    "../../../templates/trailbase/sql/promotion_reward_ledger.v2.sql"
+                ))
+                .is_err()
+            );
             // Dropping the connection rolls the open transaction back.
         }
 

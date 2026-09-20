@@ -15,24 +15,27 @@ the same release train.
 
 | Component | Version | Notes |
 |---|---|---|
-| Proxy image | `toss-mtls-client-proxy:0.5.0` | GHCR tags `0.5.0`, `0.5`, `0`, `latest`, `edge`, `sha-729dac6`; digest `sha256:64d31ef5f2671f5e788c45b6ef49cd6d6569a1e4f8ceee149d4b6257b3733148` |
-| Proxy internal `@ait-kit/api-core` / `api-client` | `0.4.2` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
+| Proxy image | `toss-mtls-client-proxy:0.6.1` | Published promotion v2 baseline; require the three versioned promotion capabilities below |
+| Proxy internal `@ait-kit/api-core` / `api-client` | `0.5.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
 | RN/Web `@ait-kit/sdk` | `0.3.0` (exact pins) | `ait-rn` 0.6.0 / `ait-web` 0.3.0 (private, Sampo-versioned) |
 | RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.3.0 peer floor; minimum fixture compiles against the same reviewed pin |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Unchanged |
-| Rust guest crates | `trailbase-guest-common` / `trailbase-toss-identity` 0.11.0 | Fixed pair; moves together |
-| SQL templates | unchanged this cycle | No migrations required; UNKNOWN/execution phases reuse existing columns |
+| Rust guest crates | `trailbase-guest-common` / `trailbase-toss-identity` 0.12.1 | Fixed pair; moves together |
+| SQL templates | Additive v2 migration required | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers; preserve legacy rows |
 
 ## Rollout Order
 
-No schema migration is required for this baseline. Sequence for consumer
-apps:
+Existing v1 ledgers require the additive v2 migration before new guests run.
+Keep dispatch paused throughout reconciliation, migration and deployment:
 
 1. **Pause dispatch first**: stop claiming new promotion and message work,
    and let in-flight attempts finish (message leases expire on their own).
    Old Rust guests convert the new proxy's `UNKNOWN` responses into
    confirmed failures, so the proxy rollout must not overlap live queue
-   traffic.
+   traffic. Before replacing either proxy or guests, reconcile every legacy
+   promotion row while the old stack remains available: query stored keys,
+   and use explicit provider/operator reconciliation for keyless rows. Never
+   resume PREPARED rows or allocate replacement keys to drain uncertain work.
 2. **Proxy next** (breaking promotion v2): update the consumer-owned
    Compose image pin to the released proxy (template updated accordingly;
    final tag comes from the release — this cycle removes the promotion
@@ -52,9 +55,9 @@ apps:
    promotion capabilities (and proxy 0.4.0 even those without the
    api-core 0.4.2 UNKNOWN-message and strict-IAP behavior), so a stale
    deployment must fail the preflight instead of passing as this contract.
-4. **Drain legacy promotion rows, migrate the ledger schema, then deploy
-   Rust/WASM guests with handler adoption**: FIRST drain the legacy
-   promotion ledger while the 0.11 helpers still run — every legacy row,
+4. **Verify the legacy drain, migrate the ledger schema, then deploy
+   Rust/WASM guests with handler adoption**: confirm the legacy
+   promotion ledger was reconciled in step 1 — every legacy row,
    keyed or keyless and PREPARED included, settles through the status
    lookup or explicit reconciliation only (the migration leaves them
    unmarked and v2 never adopts them, so undrained rewards would strand).
@@ -93,7 +96,8 @@ apps:
 ### Rollback
 
 - A code rollback cannot cancel rewards the provider already executed.
-- No automatic down migrations exist (none were added); ledger/outbox data
+- The v2 migration adds columns; no automatic down migration exists. Keep
+  those columns and their execution facts on rollback. Ledger/outbox data
   written by the new baseline remains readable by the previous code, except
   that old Rust parsers read `provider_status = 'UNKNOWN'` rows as plain
   failures — preserve and re-apply the new guests before any further
@@ -101,7 +105,7 @@ apps:
 - Before rolling back, drain and settle promotion work while the new guest
   is still live, because older guests cannot resume a persisted transaction
   key:
-  - Rows with a stored key and `execution_started_at IS NULL` (key stored,
+  - Only v2 rows (`protocol = 'three-step'`) with a stored key and `execution_started_at IS NULL` (key stored,
     execution not started — e.g. dispatch paused right after the key
     commit) must be claimed, executed, and settled now.
   - Rows with `execution_started_at` set and an unsettled outcome settle
@@ -117,7 +121,7 @@ apps:
 
 ## Consumer Impact Summary
 
-- Kit imports, options, and JSON structure are unchanged, but the Smart
+- Login/IAP client integration remains unchanged, but the Smart
   Message response contract is additively extended: raw-JSON consumers of
   the proxy can now receive `providerStatus: "UNKNOWN"` plus an
   `error: "INVALID_RESPONSE"` marker on message responses (5xx, empty/HTML
@@ -139,7 +143,11 @@ apps:
   provider/operator reconciliation by request id for keyless promotions and
   messages (this kit exposes no Smart Message status endpoint).
 
-## Verification Record (2026-09-17)
+## Historical Verification Record: proxy 0.5.0 (2026-09-17)
+
+This record covers the previous baseline, not promotion v2. The current baseline
+is proxy 0.6.1 and Rust crates 0.12.1 (release PR #143). Verify the v2 migration
+and versioned capabilities separately; this historical record is not v2 evidence.
 
 Local checks ran on the feature range `ced5f86..08ae12f` (PRs #133, #134,
 #138 — every source change in this baseline). The release merge `729dac6`

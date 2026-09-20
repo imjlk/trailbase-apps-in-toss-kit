@@ -13,22 +13,26 @@
 
 | 구성 요소 | 버전 | 비고 |
 |---|---|---|
-| 프록시 이미지 | `toss-mtls-client-proxy:0.5.0` | GHCR 태그 `0.5.0`, `0.5`, `0`, `latest`, `edge`, `sha-729dac6`; digest `sha256:64d31ef5f2671f5e788c45b6ef49cd6d6569a1e4f8ceee149d4b6257b3733148` |
-| 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.4.2` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패 |
+| 프록시 이미지 | `toss-mtls-client-proxy:0.6.1` | 게시된 프로모션 v2 기준선. 아래의 버전 표기된 프로모션 capability 세 가지 필수 |
+| 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.5.0` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패 |
 | RN/Web `@ait-kit/sdk` | `0.3.0` (정확한 고정) | `ait-rn` 0.6.0 / `ait-web` 0.3.0 (비공개, Sampo 버전 관리) |
 | RN 최소 `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.3.0 peer 하한. 최소 fixture도 같은 검토 pin으로 컴파일 |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | 변경 없음 |
-| Rust guest 크레이트 | `trailbase-guest-common` / `trailbase-toss-identity` 0.11.0 | 고정 묶음. 함께 이동 |
-| SQL 템플릿 | 이번 주기 변경 없음 | 마이그레이션 불필요. UNKNOWN/실행 단계는 기존 컬럼 재사용 |
+| Rust guest 크레이트 | `trailbase-guest-common` / `trailbase-toss-identity` 0.12.1 | 고정 묶음. 함께 이동 |
+| SQL 템플릿 | 추가 전용 v2 마이그레이션 필수 | 기존 v1 원장에 `promotion_reward_ledger.v2.sql` 적용. 레거시 행 보존 |
 
 ## 롤아웃 순서
 
-이 기준선에는 스키마 마이그레이션이 없습니다. 컨슈머 앱 순서:
+기존 v1 원장은 새 guest 실행 전에 추가 전용 v2 마이그레이션이 필요합니다.
+정산·마이그레이션·배포가 끝날 때까지 발송 중지를 유지합니다:
 
 1. **먼저 발송 중지**: 새 프로모션·메시지 작업 claim을 멈추고 진행 중
    attempt가 끝나게 합니다(메시지 lease는 스스로 만료됩니다). 구 Rust
    guest는 새 프록시의 `UNKNOWN` 응답을 확정 실패로 바꾸므로, 프록시
-   롤아웃이 살아 있는 큐 트래픽과 겹쳐서는 안 됩니다.
+   롤아웃이 살아 있는 큐 트래픽과 겹쳐서는 안 됩니다. 프록시나 guest를
+   교체하기 전에 기존 스택에서 모든 레거시 프로모션 행을 정산합니다.
+   저장된 키는 status로 조회하고, 키가 없으면 제공자·운영자가 명시적으로
+   정산합니다. PREPARED 재실행이나 대체 키 발급으로 소진하지 마세요.
 2. **프록시 다음**(프로모션 v2 breaking): 컨슈머 소유 Compose 이미지 핀을
    릴리즈된 프록시로 올리고(템플릿도 같이 갱신, 최종 태그는 릴리즈에서
    확정 — 이번 주기는 프로모션 grant 라우트를 제거합니다) light-on-off와
@@ -45,9 +49,9 @@
    광고하고(프록시 0.4.0은 api-core 0.4.2의 UNKNOWN 메시지·IAP 엄격 근거
    동작조차 없는 채로), 오래된 배포는 이 계약으로 통과하는 대신 preflight에
    실패해야 합니다.
-4. **레거시 프로모션 드레인 → 원장 스키마 마이그레이션 → 핸들러 전환과 함께
-   Rust/WASM guest 배포**: 먼저 0.11 헬퍼가 살아 있는 동안 레거시 프로모션
-   원장을 드레인합니다 — 모든 레거시 행(키 유무와 PREPARED 포함)을 status
+4. **레거시 프로모션 드레인 확인 → 원장 스키마 마이그레이션 → 핸들러 전환과 함께
+   Rust/WASM guest 배포**: 1단계에서 레거시 프로모션 원장을 정산했는지
+   확인합니다 — 모든 레거시 행(키 유무와 PREPARED 포함)을 status
    조회 또는 명시적 정산으로만 마무리합니다(마이그레이션은 이들을 표시 없이
    남기고 v2는 채택하지 않으므로, 드레인하지 않은 지급은 방치됩니다). 그다음
    `templates/trailbase/sql/promotion_reward_ledger.v2.sql`을 명시적
@@ -81,13 +85,14 @@
 ### 롤백
 
 - 코드 롤백으로 제공자가 이미 실행한 지급을 취소할 수 없습니다.
-- 자동 down 마이그레이션이 없습니다(추가된 것도 없음). 새 기준선이 기록한
+- v2 마이그레이션은 컬럼을 추가하며 자동 down 마이그레이션은 없습니다.
+  롤백해도 컬럼과 실행 사실을 보존하세요. 새 기준선이 기록한
   원장/outbox 데이터는 이전 코드에서도 읽히지만, 구 Rust 파서는
   `provider_status = 'UNKNOWN'` 행을 단순 실패로 읽습니다. 추가 정산 전에
   새 guest를 다시 적용하세요.
 - 되돌리기 전에 새 guest가 살아 있는 동안 프로모션 작업을 모두 소진·정산
   하세요. 이전 guest는 저장된 거래 키를 이어서 처리할 수 없습니다.
-  - 저장된 키가 있고 `execution_started_at IS NULL`인 행(키 저장 후 실행
+  - v2 행(`protocol = 'three-step'`) 중 저장된 키가 있고 `execution_started_at IS NULL`인 행(키 저장 후 실행
     시작 전 — 예: 키 커밋 직후 발송 중지)은 지금 클레임하고 실행해
     마무리해야 합니다.
   - `execution_started_at`이 기록되고 결과가 확정되지 않은 행은 저장된 키로
@@ -102,7 +107,7 @@
 
 ## 컨슈머 영향 요약
 
-- kit의 import, 옵션, JSON 구조는 변경되지 않았지만 Smart Message 응답
+- 프로모션 Rust API·원장·프록시 계약은 breaking 변경입니다. Smart Message 응답
   계약은 추가로 확장됩니다. 프록시 응답을 원본 JSON으로 소비하는 곳은 이제
   메시지 응답에서(5xx, 빈/HTML body, 상충하는 상태)`providerStatus:
   "UNKNOWN"`과 `error: "INVALID_RESPONSE"` 마커를 받을 수 있습니다. 열거형
@@ -122,7 +127,11 @@
   제공자·운영자 정산입니다(이 kit는 Smart Message status 엔드포인트를
   제공하지 않습니다).
 
-## 검증 기록 (2026-09-17)
+## 이전 검증 기록: proxy 0.5.0 (2026-09-17)
+
+아래 기록은 이전 기준선이며 프로모션 v2 검증 결과가 아닙니다. 현재 기준선은
+proxy 0.6.1과 Rust 크레이트 0.12.1(릴리즈 PR #143)입니다. v2 마이그레이션과
+버전 표기된 capability는 별도로 검증해야 합니다.
 
 로컬 검사는 기능 범위 `ced5f86..08ae12f`(PR #133, #134, #138 — 이 기준선의
 모든 소스 변경)에서 실행했습니다. 릴리즈 머지 `729dac6`는 버전 bump,

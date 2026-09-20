@@ -35,17 +35,13 @@
     same provider-echo redaction as execute and status — a get-key rejection
     embedding the submitted `anonKey`/`tossUserKey` in its failure reason no
     longer leaks the raw identifier into logs or persisted error JSON.
-  - **Numeric/short recipient redaction (P2)**: short and all-digit ids no
-    longer feed the recursive substring redactor — a recipient like `1`
-    previously rewrote unrelated fields such as
-    `providerTransactionKey: "key-1"` into `key-[redacted]`, and an
-    all-digit id of any length can substring-match inside transaction keys.
-    Substring redaction now applies only to identifier strings of meaningful
-    length that contain non-digits (anonymous keys, raw Toss user keys, long
-    userKey hashes — the string `userKey` spelling stays redacted); the proxy
-    never echoes the caller's request body back, so numeric app-side user ids
-    get no rewriting instead of corrupting responses. All three promotion
-    endpoints share one redaction helper.
+  - **Numeric/short recipient redaction (P2)**: whole string/number
+    recipient echoes are redacted by equality. Substring redaction applies
+    to identifiers of at least 8 characters, or all-digit identifiers of
+    at least 10 digits; shorter fragments in free text remain unchanged
+    to avoid corrupting unrelated values. Correlation fields
+    (`providerTransactionKey`, `providerRequestId`, `checkedAt`) survive
+    verbatim. All three promotion endpoints share the same helper.
   - **Docs (P2)**: the anonymous-identity guidance (EN/KO) no longer describes
     the removed proxy-side prepare → execute → status orchestration or
     recommends pre-v2 proxy versions; it now requires the versioned

@@ -30,7 +30,7 @@ function integer(value) { return Number.isSafeInteger(value) && value >= 0 ? val
 function normalizedProvider(value) {
   return known(typeof value === 'string' ? value.trim().toUpperCase() : '', [
     'PAYMENT_COMPLETED', 'PURCHASED', 'REFUNDED', 'PENDING', 'NOT_FOUND', 'FAILED', 'ERROR', 'UNKNOWN',
-    'SUCCESS', 'GRANTED', 'SENT', 'CANCELLED', 'SKIPPED', 'READY', 'PROCESSING',
+    'PREPARED', 'EXECUTING', 'SUBMITTED', 'SUCCESS', 'GRANTED', 'SENT', 'CANCELLED', 'SKIPPED', 'READY', 'PROCESSING',
     'ORDER_IN_PROGRESS', 'PAYMENT_PENDING', 'PENDING_GRANT', 'ALREADY_GRANTED', 'COMPLETED', 'MINIAPP_MISMATCH',
   ]);
 }
@@ -99,16 +99,30 @@ function inspectIap(db, id, now, unit) {
 }
 
 function inspectPromotion(db, id, now, unit) {
-  requireColumns(db, 'promotion_reward_ledger', ['id', 'status', 'provider_status', 'provider_transaction_key', 'failure_reason', 'created_at', 'updated_at', 'granted_at']);
+  const present = requireColumns(db, 'promotion_reward_ledger', ['id', 'status', 'provider_status', 'provider_transaction_key', 'failure_reason', 'created_at', 'updated_at', 'granted_at']);
+  if (present.has('protocol') !== present.has('execution_started_at')) fail('LEDGER_SCHEMA_UNAVAILABLE');
+  const hasV2 = present.has('protocol');
   const row = db.query(`SELECT status, provider_status, created_at, updated_at, granted_at,
+    ${hasV2 ? 'protocol, execution_started_at' : 'NULL AS protocol, NULL AS execution_started_at'},
     failure_reason IS NOT NULL AS has_failure_reason,
     length(trim(COALESCE(provider_transaction_key,''))) > 0 AS has_transaction_key
     FROM promotion_reward_ledger WHERE id=?`).get(id);
   if (!row) return null;
   row.status = known(row.status, ['recorded', 'pending', 'success', 'failed', 'cancelled']);
   const record = { ...common(row, now, unit), hasTransactionKey: Boolean(row.has_transaction_key), granted: row.granted_at !== null };
-  const actions = row.status === 'success' || row.status === 'cancelled' ? ['none'] :
-    record.hasTransactionKey ? ['query-original-promotion-transaction'] : ['manual-reconciliation-without-new-key'];
+  record.execution = {
+    schemaAvailable: hasV2,
+    protocol: row.protocol === null ? 'legacy' : known(row.protocol, ['three-step']),
+    started: row.protocol === 'three-step' ? row.execution_started_at !== null : null,
+    startedAt: integer(row.execution_started_at),
+  };
+  let actions;
+  if (row.status === 'success' || row.status === 'cancelled') actions = ['none'];
+  else if (row.status === 'pending' && record.execution.protocol === 'three-step' && !record.execution.started) {
+    actions = ['review-unstarted-three-step-attempt'];
+  } else {
+    actions = record.hasTransactionKey ? ['query-original-promotion-transaction'] : ['manual-reconciliation-without-new-key'];
+  }
   return { record, actions };
 }
 

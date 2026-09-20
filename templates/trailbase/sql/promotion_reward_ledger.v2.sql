@@ -31,9 +31,11 @@
 -- the outermost savepoint starts an implicit transaction that the RELEASE
 -- commits — while a migration runner that already wraps each file in its
 -- own transaction nests cleanly instead of failing with "cannot start a
--- transaction within a transaction". On failure, issue ROLLBACK TO (or
--- close the connection) before retrying, because a failed batch leaves
--- the savepoint open on that handle. When using the sqlite3 CLI, run with
+-- transaction within a transaction". A failed batch leaves the savepoint open.
+-- Before retrying on the same handle, run ROLLBACK TO promotion_reward_ledger_v2;
+-- followed by RELEASE promotion_reward_ledger_v2; (or close the connection).
+-- ROLLBACK TO alone retains the savepoint and prevents the retry from committing.
+-- When using the sqlite3 CLI, run with
 -- bail-on-errors so a mid-file failure stops before the trailing RELEASE:
 -- `sqlite3 --bail ledger.db ".read promotion_reward_ledger.v2.sql"` — a
 -- plain ".read" without bail keeps going after an error and would release
