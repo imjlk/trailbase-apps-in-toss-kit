@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "trailbase-guest-common"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "base64 0.22.1",
  "hex",
@@ -948,7 +948,7 @@ dependencies = [
 
 [[package]]
 name = "trailbase-toss-identity"
-version = "0.12.1"
+version = "0.12.2"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
