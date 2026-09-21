@@ -22,6 +22,7 @@ pub struct StoredProxyRecipient {
     pub hmac: String,
     pub sealed: String,
 }
+#[derive(Clone, Copy)]
 pub enum ProxyRecipient<'a> {
     TossUserKey(&'a str),
     AnonymousKey(&'a str),

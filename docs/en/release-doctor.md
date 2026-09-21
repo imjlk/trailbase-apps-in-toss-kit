@@ -145,7 +145,7 @@ a new adapter flow. JSON configuration supports the same check:
   "urlEnv": "MTLS_PROXY_URL",
   "tokenEnv": "MTLS_PROXY_TOKEN",
   "expectedMode": "forward",
-  "requiredCapabilities": ["anonymous-key.verify", "promotion.status"],
+  "requiredCapabilities": ["anonymous-key.verify", "promotion.prepare.v2", "promotion.execute.v2", "promotion.status.v2", "promotion.anonymous-recipient"],
   "timeout": 5000
 }
 ```
@@ -173,3 +173,28 @@ the existing application and integration flows. This preflight never grants, sen
 or invokes an upstream API.
 
 The Node CLI remains self-contained when run from a git submodule; no npm install is required. Minimum versions use strict SemVer precedence (including prereleases and ignoring build metadata), limited to 128 characters and safe integer core components.
+
+
+## Promotion Rollout Preflight
+
+For anonymous reward flows, copy
+`templates/trailbase/release/promotion-release-doctor.config.example.json` into
+your deployment configuration and run it from a host on the private proxy network:
+
+```sh
+node vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/release-doctor.mjs --config path/to/promotion-release-doctor.config.json
+```
+
+Provide `MTLS_PROXY_URL` and `MTLS_PROXY_TOKEN` through the process environment.
+The required health-only check verifies forward mode, anonymous-key verification,
+anonymous promotion recipients, and **all three** `promotion.*.v2` capabilities.
+A healthy proxy or a high version number alone does not pass. Missing metadata,
+a legacy protocol, or any missing step fails the check without invoking a payment.
+For a login-only flow, omit the two anonymous capabilities but keep all three v2 steps.
+
+Run this before enabling the new caller, and fail the deployment gate on failure.
+It is an opt-in recipe, not a new default requirement for unrelated apps. Migrate
+legacy single-call grant consumers to the persisted prepare/execute/status flow
+before upgrading their proxy: the current proxy returns `410 PROMOTION_GRANT_REMOVED`
+on the old grant route. Copying a Compose template or updating a submodule pointer
+does not update an independently deployed proxy instance.

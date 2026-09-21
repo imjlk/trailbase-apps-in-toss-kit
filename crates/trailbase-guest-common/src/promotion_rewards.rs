@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value as JsonValue};
 use trailbase_wasm::db::{Transaction, Value};
 
+pub use crate::message_recipients::ProxyRecipient as PromotionRecipient;
+use crate::message_recipients::payload_with_recipient;
 use crate::promotion_campaigns::PromotionCampaignUsage;
 use crate::responses::{ApiResult, bad_request, internal};
 use crate::{db, read_string_path};
@@ -60,6 +62,7 @@ pub struct PromotionGrantContext {
     pub source: String,
 }
 
+/// Legacy Toss Login-only input. Use `PromotionRewardRequest` for explicit recipient selection.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PromotionRewardPayloadInput<'a> {
     pub provider_request_id: &'a str,
@@ -71,6 +74,53 @@ pub struct PromotionRewardPayloadInput<'a> {
     pub user_id: Option<&'a str>,
     pub source_type: Option<&'a str>,
     pub source_id: Option<JsonValue>,
+}
+
+/// Execute/status context from a persisted ledger row, with an explicit recipient.
+/// Deliberately not Debug/Serialize: the recipient contains a private identity key.
+pub struct PromotionRewardRequest<'a> {
+    pub provider_request_id: &'a str,
+    pub provider_transaction_key: &'a str,
+    pub promotion: &'a PromotionGrantContext,
+    pub requested_at: i64,
+    pub recipient: PromotionRecipient<'a>,
+    pub eligibility_id: Option<&'a str>,
+    pub user_id: Option<&'a str>,
+    pub source_type: Option<&'a str>,
+    pub source_id: Option<JsonValue>,
+}
+
+/// Build the recipient-only prepare request; success issues a key, not a reward.
+pub fn promotion_reward_prepare_payload(recipient: PromotionRecipient<'_>) -> ApiResult<JsonValue> {
+    payload_with_recipient(JsonValue::Object(Map::new()), recipient)
+}
+
+/// Build an execute/status payload with exactly one identity field and a stored key.
+/// Reuse the prepare recipient; the caller owns durable recipient/key binding and
+/// must commit the execution claim before execute. Recovery invokes status only.
+pub fn promotion_reward_payload_for_recipient(
+    input: PromotionRewardRequest<'_>,
+) -> ApiResult<JsonValue> {
+    if input.provider_transaction_key.trim().is_empty() {
+        return Err(bad_request(
+            "MISSING_PROMOTION_TRANSACTION_KEY",
+            "persisted provider transaction key is required",
+        ));
+    }
+    // Keep the legacy metadata mapping in one place, then replace its login-only
+    // recipient before returning anything to a caller or proxy.
+    let payload = promotion_reward_payload(PromotionRewardPayloadInput {
+        provider_request_id: input.provider_request_id,
+        provider_transaction_key: Some(input.provider_transaction_key),
+        promotion: input.promotion,
+        requested_at: input.requested_at,
+        toss_user_key: "",
+        eligibility_id: input.eligibility_id,
+        user_id: input.user_id,
+        source_type: input.source_type,
+        source_id: input.source_id,
+    });
+    payload_with_recipient(payload, input.recipient)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,6 +262,8 @@ pub struct PromotionRewardLedgerInsertResult {
     pub record: PromotionRewardLedgerRecord,
 }
 
+/// Legacy Toss Login-only builder. Prefer `promotion_reward_payload_for_recipient`;
+/// never pass an anonymous key as `toss_user_key`. Wire behavior is preserved for existing callers.
 pub fn promotion_reward_payload(input: PromotionRewardPayloadInput<'_>) -> JsonValue {
     let mut payload = Map::new();
     payload.insert(
@@ -1357,6 +1409,86 @@ mod tests {
     }
 
     #[test]
+    fn explicit_recipient_payload_preserves_context_and_rejects_blank_keys() {
+        let context = PromotionGrantContext {
+            campaign_id: Some("campaign".into()),
+            provider_promotion_code: Some("code".into()),
+            reward_amount: 5,
+            source: "daily-reward".into(),
+        };
+        for (field, other, recipient) in [
+            (
+                "anonKey",
+                "tossUserKey",
+                PromotionRecipient::AnonymousKey("private-anonymous"),
+            ),
+            (
+                "tossUserKey",
+                "anonKey",
+                PromotionRecipient::TossUserKey("private-login"),
+            ),
+        ] {
+            let prepare = promotion_reward_prepare_payload(recipient).unwrap();
+            let payload = promotion_reward_payload_for_recipient(PromotionRewardRequest {
+                provider_request_id: "request",
+                provider_transaction_key: "stored-key",
+                promotion: &context,
+                requested_at: 100,
+                recipient,
+                eligibility_id: Some("eligible"),
+                user_id: Some("internal-user"),
+                source_type: Some("daily-reward"),
+                source_id: Some(json!("day")),
+            })
+            .unwrap();
+            assert_eq!(prepare.as_object().unwrap().len(), 1);
+            assert_eq!(payload[field], prepare[field]);
+            assert!(payload.get(other).is_none());
+            assert!(payload.get("userKey").is_none());
+            assert_eq!(payload["providerTransactionKey"], "stored-key");
+            assert_eq!(payload["amount"], 5);
+            assert_eq!(payload["promotionCode"], "code");
+            assert_eq!(payload["providerRequestId"], "request");
+            assert_eq!(payload["eligibilityId"], "eligible");
+            assert_eq!(payload["sourceId"], "day");
+        }
+        for recipient in [
+            PromotionRecipient::AnonymousKey(" "),
+            PromotionRecipient::TossUserKey(""),
+        ] {
+            assert!(promotion_reward_prepare_payload(recipient).is_err());
+            assert!(
+                promotion_reward_payload_for_recipient(PromotionRewardRequest {
+                    provider_request_id: "request",
+                    provider_transaction_key: "stored-key",
+                    promotion: &context,
+                    requested_at: 100,
+                    recipient,
+                    eligibility_id: None,
+                    user_id: None,
+                    source_type: None,
+                    source_id: None,
+                })
+                .is_err()
+            );
+        }
+        assert!(
+            promotion_reward_payload_for_recipient(PromotionRewardRequest {
+                provider_request_id: "request",
+                provider_transaction_key: " ",
+                promotion: &context,
+                requested_at: 100,
+                recipient: PromotionRecipient::AnonymousKey("private-anonymous"),
+                eligibility_id: None,
+                user_id: None,
+                source_type: None,
+                source_id: None,
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
     fn provider_payload_omits_absent_optional_fields() {
         let context = PromotionGrantContext {
             campaign_id: Some("campaign-1".to_string()),
@@ -1376,6 +1508,8 @@ mod tests {
             source_id: Some(json!("source-1")),
         });
 
+        assert_eq!(payload["tossUserKey"], "toss-user");
+        assert!(payload.get("anonKey").is_none());
         assert_eq!(payload["amount"], 5);
         assert_eq!(payload["promotionCode"], "promo");
         assert_eq!(payload["promotionCampaignId"], "campaign-1");

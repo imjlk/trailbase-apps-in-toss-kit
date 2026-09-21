@@ -90,12 +90,20 @@ It also has AppsInToss adapter endpoints:
 - `GET /internal/apps-in-toss/health`
 - `POST /internal/apps-in-toss/toss-login/complete`
 - `POST /internal/apps-in-toss/iap/order/status`
-- `POST /internal/apps-in-toss/promotion/reward/grant`
+- `POST /internal/apps-in-toss/promotion/reward/prepare`
+- `POST /internal/apps-in-toss/promotion/reward/execute`
+- `POST /internal/apps-in-toss/promotion/reward/status`
 - `POST /internal/apps-in-toss/smart-message/send`
 
 Current implemented areas are Toss Login, in-app purchase order status,
-promotion reward grant, and smart message send. Toss Pay can be added as another
+persisted promotion prepare/execute/status, and smart message send. Toss Pay can be added as another
 adapter on top of the generic mTLS relay when the app needs it.
+
+The old single-call grant route returns `410 PROMOTION_GRANT_REMOVED`. Use the
+explicit `PromotionRecipient` payload builders for new Rust promotion callers;
+never pass an anonymous identity into the legacy login-only `toss_user_key` input.
+Before enabling a three-step caller, run the promotion Release Doctor recipe
+against the running proxy and require its versioned promotion capabilities.
 
 The proxy container is reusable outside TrailBase as long as the caller can send
 authenticated HTTP requests on the internal network. Keep app containers away

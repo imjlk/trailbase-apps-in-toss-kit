@@ -4,6 +4,12 @@ on:
   pull_request:
     paths:
       - "fixtures/contracts/**"
+      - "scripts/promotion-recipient-contract.test.mjs"
+      - "services/toss-mtls-client-proxy/**"
+      - "packages/trailbase-runtime/**"
+      - "templates/trailbase/release/promotion-release-doctor.config.example.json"
+      - "bun.lock"
+      - "package.json"
       - ".github/workflows/rust.yml"
       - ".mise.toml"
       - "Cargo.toml"
@@ -15,6 +21,12 @@ on:
       - main
     paths:
       - "fixtures/contracts/**"
+      - "scripts/promotion-recipient-contract.test.mjs"
+      - "services/toss-mtls-client-proxy/**"
+      - "packages/trailbase-runtime/**"
+      - "templates/trailbase/release/promotion-release-doctor.config.example.json"
+      - "bun.lock"
+      - "package.json"
       - ".github/workflows/rust.yml"
       - ".mise.toml"
       - "Cargo.toml"
@@ -34,6 +46,7 @@ jobs:
   test:
     name: Test Rust helpers
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -60,3 +73,8 @@ jobs:
 
       - name: Check WASI build
         run: cargo check --workspace --target wasm32-wasip2
+
+      - name: Verify Rust promotion payloads through the proxy
+        run: |
+          bun install --frozen-lockfile
+          bun test scripts/promotion-recipient-contract.test.mjs --timeout 120000
