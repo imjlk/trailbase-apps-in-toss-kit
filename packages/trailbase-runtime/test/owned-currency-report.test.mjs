@@ -73,6 +73,16 @@ describe("owned currency report", () => {
         { currencyCode: "stars", unitCode: "count", balanceQuantity: 4, eventCount: 1 },
       ]);
 
+      insertEvent(db, ["future-duplicate-a", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "future-source", "event:future-a", "v1", null, null, null, null, 6000]);
+      insertEvent(db, ["future-duplicate-b", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "future-source", "event:future-b", "v1", null, null, null, null, 6001]);
+      expect(buildOwnedCurrencyReport({
+        db,
+        periodStart: 1000,
+        periodEnd: 5000,
+        timestampUnit: "milliseconds",
+        now: 5000,
+      }).quality.duplicateSourceCount).toBe(1);
+
       const csv = formatOwnedCurrencyCsv(report);
       expect(csv).toContain("rowType,currencyCode,unitCode");
       expect(csv).toContain("period,gold_dust,mg");
@@ -82,6 +92,8 @@ describe("owned currency report", () => {
       expect(qualityRow.split(",").slice(18, 22)).toEqual(["1", "1", "1", "0"]);
       const metadataRow = csv.split("\n").find(row => row.startsWith("metadata,"));
       expect(metadataRow.split(",").slice(22, 26)).toEqual(["1000", "5000", "milliseconds", "5000"]);
+      const balanceRow = csv.split("\n").find(row => row.startsWith("balance,gold_dust,mg"));
+      expect(balanceRow.split(",").slice(14, 17)).toEqual(["", "7", "68"]);
       expect(csv).not.toContain("same-source");
     } finally {
       db.close();

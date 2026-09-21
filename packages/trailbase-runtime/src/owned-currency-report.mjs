@@ -93,6 +93,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
       SELECT COUNT(*) AS count FROM (
         SELECT source_type, source_id
         FROM owned_currency_events
+        WHERE occurred_at < ?
         GROUP BY source_type, source_id
         HAVING COUNT(*) > 1
            AND (
@@ -103,7 +104,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
              OR SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) <> 1
            )
       )
-    `).get().count);
+    `).get(periodEnd).count);
 
     const missingPolicyEventCount = integer(db.query(`
       SELECT COUNT(*) AS count
@@ -180,10 +181,13 @@ export function formatOwnedCurrencyCsv(report) {
     ]));
   }
   for (const balance of report.balances) {
-    rows.push(pad([
-      "balance", balance.currencyCode, balance.unitCode, "", "", "", "", "", "", "", "", "", "", "",
-      balance.eventCount, balance.balanceQuantity, "",
-    ]));
+    const row = Array(header.length).fill("");
+    row[0] = "balance";
+    row[1] = balance.currencyCode;
+    row[2] = balance.unitCode;
+    row[15] = balance.eventCount;
+    row[16] = balance.balanceQuantity;
+    rows.push(row);
   }
   const quality = Array(header.length).fill("");
   quality[0] = "quality";
