@@ -16,6 +16,19 @@ try {
   db.exec("CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT");
   db.exec("INSERT INTO _user VALUES (X'01')");
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_events.sql"), "utf8"));
+  db.exec(readFileSync(path.join(sqlDir, "owned_currency_policies.sql"), "utf8"));
+  db.query(`INSERT INTO owned_currency_policies
+    (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
+     conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "gold_dust", "mg", "v1", "FIXED_RATE", "TOSS_POINT", 1, 100, 0, null, 0,
+  );
+  db.query(`INSERT INTO owned_currency_policies
+    (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
+     conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "gold_dust", "mg", "v2", "MARKET_SNAPSHOT", "KRW", null, null, 6000, null, 6000,
+  );
   const indexes = db.query("PRAGMA index_list('owned_currency_events')").all().map(row => row.name);
   assert.ok(indexes.includes("idx_owned_currency_events_time"));
 
