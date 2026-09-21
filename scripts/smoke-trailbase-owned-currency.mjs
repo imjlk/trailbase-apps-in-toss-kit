@@ -89,8 +89,13 @@ try {
   assert.equal(policy.find(row => row.currency_code === "gold_dust" && row.policy_version === "v2").issued_quantity, 0);
 
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), []);
+  add(["duplicate-conversion", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-1", "event:duplicate-conversion", "v1", "conversion-1", null, null, null, 6400, 6400, "{}"]);
+  assert.deepEqual(db.query(queries.duplicate_source_check).all(), [
+    { source_type: "refine", source_id: "r-1", event_count: 3 },
+  ]);
   add(["duplicate-source", X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "a-1", "event:duplicate-source", "v2", null, null, null, null, 6500, 6500, "{}"]);
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), [
+    { source_type: "refine", source_id: "r-1", event_count: 3 },
     { source_type: "operator", source_id: "a-1", event_count: 2 },
   ]);
   assert.throws(() => add(["duplicate-idempotency", X01, "stars", "count", "ISSUE", 1, "vote", "v-2", "event:star-issue", "v1", null, null, null, null, 7000, 7000, "{}"]));
