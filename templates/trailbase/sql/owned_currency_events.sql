@@ -35,8 +35,14 @@ CREATE TABLE IF NOT EXISTS owned_currency_events (
     length(trim(idempotency_key)) BETWEEN 1 AND 256
   ),
   policy_version TEXT NOT NULL CHECK (length(trim(policy_version)) BETWEEN 1 AND 64),
-  conversion_group_id TEXT,
-  exchange_id TEXT,
+  conversion_group_id TEXT CHECK (
+    conversion_group_id IS NULL
+    OR length(trim(conversion_group_id)) BETWEEN 1 AND 256
+  ),
+  exchange_id TEXT CHECK (
+    exchange_id IS NULL
+    OR length(trim(exchange_id)) BETWEEN 1 AND 256
+  ),
   valuation_amount INTEGER CHECK (valuation_amount IS NULL OR valuation_amount >= 0),
   valuation_currency_code TEXT CHECK (
     valuation_currency_code IS NULL
@@ -66,6 +72,9 @@ CREATE TABLE IF NOT EXISTS owned_currency_events (
 
 CREATE INDEX IF NOT EXISTS idx_owned_currency_events_currency_time
   ON owned_currency_events(currency_code, unit_code, occurred_at);
+
+CREATE INDEX IF NOT EXISTS idx_owned_currency_events_time
+  ON owned_currency_events(occurred_at, currency_code, unit_code);
 
 CREATE INDEX IF NOT EXISTS idx_owned_currency_events_user_time
   ON owned_currency_events(user_id, occurred_at DESC)

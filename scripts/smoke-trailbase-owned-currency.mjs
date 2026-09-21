@@ -16,6 +16,8 @@ try {
   db.exec("CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT");
   db.exec("INSERT INTO _user VALUES (X'01')");
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_events.sql"), "utf8"));
+  const indexes = db.query("PRAGMA index_list('owned_currency_events')").all().map(row => row.name);
+  assert.ok(indexes.includes("idx_owned_currency_events_time"));
 
   const insert = db.query(`INSERT INTO owned_currency_events
     (id, user_id, currency_code, unit_code, event_type, quantity, source_type,
@@ -84,21 +86,41 @@ try {
     { currency_code: "stars", unit_code: "count", balance_quantity: 5, event_count: 1 },
   ]);
 
+  add(["gold-exchange-krw", X01, "gold_dust", "mg", "EXCHANGE", -5, "promotion", "p-2", "event:gold-exchange-krw", "v1", null, "exchange-2", 100, "KRW", 4500, 4500, "{}"]);
   const policy = db.query(withTestWindow(queries.policy_breakdown, 1000, 7000)).all();
-  assert.equal(policy.find(row => row.currency_code === "gold_dust" && row.policy_version === "v1").recorded_valuation_amount, 50);
+  const valuedGoldPolicyRows = policy
+    .filter(row => row.currency_code === "gold_dust" && row.policy_version === "v1" && row.valuation_currency_code)
+    .map(row => ({ valuation_currency_code: row.valuation_currency_code, exchanged_quantity: row.exchanged_quantity, recorded_valuation_amount: row.recorded_valuation_amount }))
+    .sort((left, right) => left.valuation_currency_code.localeCompare(right.valuation_currency_code));
+  assert.deepEqual(valuedGoldPolicyRows, [
+    { valuation_currency_code: "KRW", exchanged_quantity: 5, recorded_valuation_amount: 100 },
+    { valuation_currency_code: "TOSS_POINT", exchanged_quantity: 10, recorded_valuation_amount: 50 },
+  ]);
   assert.equal(policy.find(row => row.currency_code === "gold_dust" && row.policy_version === "v2").issued_quantity, 0);
 
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), []);
+  add(["duplicate-direction-1", X01, "gold_dust", "mg", "CONVERT_OUT", -2, "refine", "r-duplicate", "event:duplicate-direction-1", "v1", "conversion-duplicate", null, null, null, 6400, 6400, "{}"]);
+  add(["duplicate-direction-2", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-duplicate", "event:duplicate-direction-2", "v1", "conversion-duplicate", null, null, null, 6401, 6401, "{}"]);
+  assert.deepEqual(db.query(queries.duplicate_source_check).all().find(row => row.source_id === "r-duplicate"), {
+    source_type: "refine",
+    source_id: "r-duplicate",
+    event_count: 2,
+  });
   add(["duplicate-conversion", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-1", "event:duplicate-conversion", "v1", "conversion-1", null, null, null, 6400, 6400, "{}"]);
-  assert.deepEqual(db.query(queries.duplicate_source_check).all(), [
-    { source_type: "refine", source_id: "r-1", event_count: 3 },
-  ]);
+  assert.deepEqual(db.query(queries.duplicate_source_check).all().find(row => row.source_id === "r-1"), {
+    source_type: "refine",
+    source_id: "r-1",
+    event_count: 3,
+  });
   add(["duplicate-source", X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "a-1", "event:duplicate-source", "v2", null, null, null, null, 6500, 6500, "{}"]);
-  assert.deepEqual(db.query(queries.duplicate_source_check).all(), [
-    { source_type: "refine", source_id: "r-1", event_count: 3 },
-    { source_type: "operator", source_id: "a-1", event_count: 2 },
-  ]);
+  assert.deepEqual(db.query(queries.duplicate_source_check).all().find(row => row.source_id === "a-1"), {
+    source_type: "operator",
+    source_id: "a-1",
+    event_count: 2,
+  });
   assert.throws(() => add(["duplicate-idempotency", X01, "stars", "count", "ISSUE", 1, "vote", "v-2", "event:star-issue", "v1", null, null, null, null, 7000, 7000, "{}"]));
+  assert.throws(() => add(["invalid-conversion-id", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-invalid", "event:invalid-conversion-id", "v1", " ", null, null, null, 7100, 7100, "{}"]));
+  assert.throws(() => add(["invalid-exchange-id", X01, "gold_dust", "mg", "EXCHANGE", -1, "promotion", "p-invalid", "event:invalid-exchange-id", "v1", null, " ", 1, "TOSS_POINT", 7100, 7100, "{}"]));
 
   db.query("DELETE FROM _user WHERE id = X'01'").run();
   assert.equal(db.query("SELECT user_id FROM owned_currency_events WHERE id = 'gold-issue'").get().user_id, null);

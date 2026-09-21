@@ -53,8 +53,8 @@ The read-only examples in
 - a half-open monthly summary (the `period_start` literal is inclusive and the
   `period_end` literal is exclusive);
 - balance as of a timestamp;
-- policy-version breakdown with recorded valuation; and
-- duplicate source detection that ignores the two sides of one conversion group.
+- policy-version breakdown with recorded valuation denominations; and
+- duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair.
 
 Replace the two timestamp literals at the top of each query with values in the
 unit used by the consumer database. The examples are for an authenticated
@@ -81,7 +81,8 @@ balance. A month with 10,000 units issued and 6,000 units exchanged still has
 5. Record corrections as new adjustment events or a new report revision; do not
    rewrite old event rows.
 
-The first version is deliberately read-only. It does not infer missing history
+Valuation totals stay grouped by `valuation_currency_code`; never add integer
+amounts from different denominations into one total. The first version is deliberately read-only. It does not infer missing history
 from a balance, call the Toss provider, or enforce a fixed monthly budget. The
 consumer app must confirm the applicable reporting period, valuation rule, and
 retention policy with Toss before submitting an official report.

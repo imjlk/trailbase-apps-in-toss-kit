@@ -56,6 +56,7 @@ SELECT
   currency_code,
   unit_code,
   policy_version,
+  valuation_currency_code,
   SUM(CASE WHEN event_type = 'ISSUE' THEN quantity ELSE 0 END) AS issued_quantity,
   SUM(CASE WHEN event_type = 'EXCHANGE' THEN -quantity ELSE 0 END) AS exchanged_quantity,
   SUM(CASE WHEN event_type = 'EXCHANGE' THEN COALESCE(valuation_amount, 0) ELSE 0 END) AS recorded_valuation_amount,
@@ -63,8 +64,8 @@ SELECT
 FROM owned_currency_events, period
 WHERE occurred_at >= period_start
   AND occurred_at < period_end
-GROUP BY currency_code, unit_code, policy_version
-ORDER BY currency_code, unit_code, policy_version;
+GROUP BY currency_code, unit_code, policy_version, valuation_currency_code
+ORDER BY currency_code, unit_code, policy_version, valuation_currency_code;
 
 -- Query: duplicate_source_check
 SELECT
@@ -81,5 +82,7 @@ HAVING COUNT(*) > 1
      COUNT(DISTINCT COALESCE(conversion_group_id, '__no_conversion__')) > 1
      OR MAX(conversion_group_id) IS NULL
      OR COUNT(*) <> 2
+     OR SUM(CASE WHEN event_type = 'CONVERT_IN' THEN 1 ELSE 0 END) <> 1
+     OR SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) <> 1
    )
 ORDER BY event_count DESC, source_type, source_id;
