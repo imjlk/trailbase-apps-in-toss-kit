@@ -361,7 +361,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 
 ## API Core 0.4 계약
 
-프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.5.0`으로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.5.1`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를
@@ -438,3 +438,9 @@ ID가 다른 PAYMENT_COMPLETED/PURCHASED 응답은 `ok: false`와 `UNVERIFIED_IA
 프로모션 응답에 성공 상태가 섞여 있어도 지급으로 인정하지 않습니다. 명시적 결과 플래그와
 상태값이 모두 없는 메시지 응답은 UNKNOWN으로 유지하고, 재발송 전에
 원래 요청 결과를 확인하세요. 실제 제공사 연동 테스트는 별도로 필요합니다.
+
+프로모션 실패 문구 보호와 안전한 숫자 수신자 검증은 api-core 0.5.1이 담당합니다.
+프록시는 정규화된 결과를 재귀적으로 다시 변경하지 않고 전달하므로 거래 키,
+오류 코드, 관찰 시각이 그대로 유지됩니다. 소수·안전 범위 밖의 숫자 ID는 전송
+전에 거부하며 큰 ID는 정확한 문자열로 전달합니다. 이 의존성 갱신에는 기존
+프로모션 v2 스키마 외에 새로운 원장 마이그레이션이 필요하지 않습니다.

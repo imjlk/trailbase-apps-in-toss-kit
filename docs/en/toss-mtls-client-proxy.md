@@ -358,7 +358,7 @@ normalization or multi-step flow handling.
 
 ## API Core 0.4 Contracts
 
-The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.5.0` and
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.5.1` and
 explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
 behind the same internal bearer authentication; forward mode still requires a
 token. Bun is pinned to `1.4.2` across local tooling, CI, and the container.
@@ -451,3 +451,10 @@ SKU, explicit failures and partial message delivery. An explicit failed promotio
 response cannot become a grant through a contradictory status. A message response
 with neither an explicit result flag nor a status field remains UNKNOWN; reconcile its
 original request before any resend. These checks complement real provider tests.
+
+Promotion failure-text privacy and safe numeric recipient validation are owned by
+api-core 0.5.1. The proxy forwards those normalized results without recursively
+rewriting them: transaction keys, error codes and observation timestamps remain
+intact. Fractional/unsafe numeric recipient IDs are rejected before dispatch;
+use exact strings for large IDs. This dependency update requires no new ledger
+migration beyond the existing promotion v2 schema.
