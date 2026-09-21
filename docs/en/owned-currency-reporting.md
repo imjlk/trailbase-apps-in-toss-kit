@@ -8,10 +8,15 @@ the Toss console.
 
 ## What the kit provides
 
-Copy `templates/trailbase/sql/owned_currency_events.sql` into a consumer
-migration. The `owned_currency_events` table is a private journal of signed
-integer minor units. It records the event type, source, idempotency key, policy
-version, and optional valuation captured at the time of the event.
+Copy both `templates/trailbase/sql/owned_currency_events.sql` and
+`templates/trailbase/sql/owned_currency_policies.sql` into forward-only
+consumer migrations. The `owned_currency_events` table is a private journal
+of signed integer minor units. The `owned_currency_policies` table keeps the
+valuation mode, denomination, rational rate, and effective window for each
+policy version. Populate a policy row before writing events that reference its
+version; existing consumers must add this migration and backfill the policy
+history they can support before running the report CLI. Updating the kit
+submodule does not update migrations copied into a consumer app.
 
 Keep the table out of the public Record API. The optional `_user` reference is
 set to `NULL` when a user is deleted, so a later closed-period aggregate does
@@ -97,7 +102,8 @@ issuance, consumption, conversion, exchange, valuation denominations, and
 as-of balances separate; it does not include source IDs or user identifiers.
 The quality section also counts events whose policy version is missing or whose
 event time falls outside that policy version's effective window. CSV output
-includes those quality counts as a final `quality` row.
+includes those quality counts as a final `quality` row and records the period,
+timestamp unit, generation time, and CLI provenance in a `metadata` row.
 `trailbase-ledger-doctor` remains the diagnostic tool for the existing payment
 ledgers. Neither command submits data to Toss or changes the live database.
 

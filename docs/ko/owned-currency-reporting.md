@@ -7,10 +7,15 @@
 
 ## 킷이 제공하는 것
 
-`templates/trailbase/sql/owned_currency_events.sql`을 소비 앱의 migration으로
-복사해 사용하세요. `owned_currency_events` 테이블은 부호가 있는 정수 최소
-단위의 회계 원장입니다. 이벤트 종류, 원본, 멱등 키, 정책 버전, 이벤트 시점에
-확정한 선택적 평가액을 저장합니다.
+`templates/trailbase/sql/owned_currency_events.sql`과
+`templates/trailbase/sql/owned_currency_policies.sql`을 모두 소비 앱의
+forward-only migration으로 복사해 사용하세요. `owned_currency_events` 테이블은
+부호가 있는 정수 최소 단위의 회계 원장이고, `owned_currency_policies` 테이블은
+정책 버전별 평가 방식, 평가액 단위, 유리수 전환율, 적용 구간을 저장합니다.
+이벤트가 해당 버전을 참조하기 전에 정책 행을 먼저 채워야 합니다. 기존 소비 앱은
+이 migration을 추가하고 복원할 수 있는 정책 이력을 backfill한 뒤 보고 CLI를
+실행하세요. 킷 submodule을 업데이트해도 소비 앱에 복사한 migration은 자동으로
+바뀌지 않습니다.
 
 이 테이블은 public Record API에 노출하지 마세요. 선택적인 `_user` 참조는 사용자가
 삭제되면 `NULL`이 되므로, 이후 마감 집계에 TrailBase 사용자가 남지 않습니다.
@@ -84,6 +89,7 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-curre
 소진, 변환, 교환, 평가액 단위, 기준 시각 잔액을 분리하며 source ID나 사용자 식별자를
 포함하지 않습니다. quality에는 정책 버전이 없거나 이벤트 시각이 해당 정책 버전의
 적용 구간 밖인 이벤트 수도 포함되며, CSV의 마지막 `quality` 행에도 이 값이 들어갑니다.
+CSV에는 기간, timestamp 단위, 생성 시각, CLI provenance를 담은 `metadata` 행도 포함됩니다.
 기존 결제 원장 진단은 계속
 `trailbase-ledger-doctor`를 사용합니다.
 두 명령 모두 토스에 제출하지 않고 실시간 데이터베이스도 변경하지 않습니다.

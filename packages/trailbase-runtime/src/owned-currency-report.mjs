@@ -16,8 +16,9 @@ export class OwnedCurrencyReportError extends Error {
   }
 }
 
-export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestampUnit, now = Date.now() } = {}) {
-  validateReportInput({ db, periodStart, periodEnd, timestampUnit, now });
+export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestampUnit, now } = {}) {
+  const generatedAt = now === undefined ? currentTimestamp(timestampUnit) : now;
+  validateReportInput({ db, periodStart, periodEnd, timestampUnit, now: generatedAt });
   return db.transaction(() => {
     requireTableColumns(db, "owned_currency_events", [
       "currency_code", "unit_code", "event_type", "quantity", "source_type",
@@ -47,6 +48,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
         SUM(CASE WHEN e.event_type = 'EXCHANGE' THEN COALESCE(e.valuation_amount, 0) ELSE 0 END) AS recorded_valuation_amount,
         COUNT(*) AS event_count,
         p.valuation_mode,
+        p.valuation_currency_code AS policy_valuation_currency_code,
         p.effective_from,
         p.effective_to,
         p.conversion_numerator,
@@ -65,6 +67,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
         e.policy_version,
         e.valuation_currency_code,
         p.valuation_mode,
+        p.valuation_currency_code,
         p.effective_from,
         p.effective_to,
         p.conversion_numerator,
@@ -141,7 +144,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
       schemaVersion: 1,
       timestampUnit,
       period: { start: periodStart, end: periodEnd },
-      generatedAt: now,
+      generatedAt,
       lines,
       balances,
       quality: {
@@ -157,34 +160,51 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
 export function formatOwnedCurrencyCsv(report) {
   const header = [
     "rowType", "currencyCode", "unitCode", "policyVersion", "valuationCurrencyCode",
+    "policyValuationCurrencyCode",
     "issuedQuantity", "spentQuantity", "convertedOutQuantity", "convertedInQuantity",
     "exchangedQuantity", "expiredQuantity", "adjustmentCreditQuantity", "adjustmentDebitQuantity",
     "recordedValuationAmount", "eventCount", "balanceQuantity", "policyPresent",
     "duplicateSourceCount", "missingPolicyEventCount", "policyWindowMismatchEventCount", "unknownEventCount",
+    "periodStart", "periodEnd", "timestampUnit", "generatedAt",
+    "toolName", "toolVersion", "sourceCommit", "reportedServerVersion",
   ];
   const rows = [header];
+  const pad = row => [...row, ...Array(header.length - row.length).fill("")];
   for (const line of report.lines) {
-    rows.push([
+    rows.push(pad([
       "period", line.currencyCode, line.unitCode, line.policyVersion, line.valuationCurrencyCode,
+      line.policy.valuationCurrencyCode,
       line.issuedQuantity, line.spentQuantity, line.convertedOutQuantity, line.convertedInQuantity,
       line.exchangedQuantity, line.expiredQuantity, line.adjustmentCreditQuantity,
       line.adjustmentDebitQuantity, line.recordedValuationAmount, line.eventCount, "", line.policy.present,
-      "", "", "", "",
-    ]);
+    ]));
   }
   for (const balance of report.balances) {
-    rows.push([
+    rows.push(pad([
       "balance", balance.currencyCode, balance.unitCode, "", "", "", "", "", "", "", "", "", "", "",
-      balance.eventCount, balance.balanceQuantity, "", "", "", "", "",
-    ]);
+      balance.eventCount, balance.balanceQuantity, "",
+    ]));
   }
   const quality = Array(header.length).fill("");
   quality[0] = "quality";
-  quality[17] = report.quality.duplicateSourceCount;
-  quality[18] = report.quality.missingPolicyEventCount;
-  quality[19] = report.quality.policyWindowMismatchEventCount;
-  quality[20] = report.quality.unknownEventCount;
+  const qualityOffset = 18;
+  quality[qualityOffset] = report.quality.duplicateSourceCount;
+  quality[qualityOffset + 1] = report.quality.missingPolicyEventCount;
+  quality[qualityOffset + 2] = report.quality.policyWindowMismatchEventCount;
+  quality[qualityOffset + 3] = report.quality.unknownEventCount;
   rows.push(quality);
+  const metadata = Array(header.length).fill("");
+  metadata[0] = "metadata";
+  const metadataOffset = 22;
+  metadata[metadataOffset] = report.period.start;
+  metadata[metadataOffset + 1] = report.period.end;
+  metadata[metadataOffset + 2] = report.timestampUnit;
+  metadata[metadataOffset + 3] = report.generatedAt;
+  metadata[metadataOffset + 4] = report.tool?.name;
+  metadata[metadataOffset + 5] = report.tool?.version;
+  metadata[metadataOffset + 6] = report.tool?.sourceCommit;
+  metadata[metadataOffset + 7] = report.tool?.reportedServerVersion;
+  rows.push(metadata);
   return `${rows.map(row => row.map(csvCell).join(",")).join("\n")}\n`;
 }
 
@@ -202,6 +222,11 @@ function requireTableColumns(db, table, required) {
   if (!present) fail("REPORT_SCHEMA_UNAVAILABLE");
   const columns = new Set(db.query(`PRAGMA table_info("${table}")`).all().map(row => row.name));
   if (required.some(column => !columns.has(column))) fail("REPORT_SCHEMA_UNAVAILABLE");
+}
+
+function currentTimestamp(timestampUnit) {
+  const milliseconds = Date.now();
+  return timestampUnit === "seconds" ? Math.floor(milliseconds / 1000) : milliseconds;
 }
 
 function normalizeLine(row) {
@@ -223,6 +248,7 @@ function normalizeLine(row) {
     policy: {
       present: row.policy_present === 1,
       valuationMode: nullableText(row.valuation_mode),
+      valuationCurrencyCode: nullableText(row.policy_valuation_currency_code),
       effectiveFrom: nullableInteger(row.effective_from),
       effectiveTo: nullableInteger(row.effective_to),
       conversionNumerator: nullableInteger(row.conversion_numerator),

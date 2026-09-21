@@ -49,12 +49,19 @@ describe("owned currency report", () => {
         currencyCode: "gold_dust",
         exchangedQuantity: 10,
         recordedValuationAmount: 50,
-        policy: { present: true, valuationMode: "FIXED_RATE", conversionNumerator: 1, conversionDenominator: 100 },
+        policy: {
+          present: true,
+          valuationMode: "FIXED_RATE",
+          valuationCurrencyCode: "TOSS_POINT",
+          conversionNumerator: 1,
+          conversionDenominator: 100,
+        },
       });
       expect(report.lines.find(line => line.valuationCurrencyCode === "KRW")).toMatchObject({
         currencyCode: "gold_dust",
         exchangedQuantity: 5,
         recordedValuationAmount: 100,
+        policy: { valuationCurrencyCode: "TOSS_POINT" },
       });
       expect(report.lines.find(line => line.policyVersion === "missing")).toMatchObject({
         currencyCode: "stars",
@@ -71,8 +78,29 @@ describe("owned currency report", () => {
       expect(csv).toContain("period,gold_dust,mg");
       expect(csv).toContain("balance,gold_dust,mg");
       expect(csv).toContain("duplicateSourceCount,missingPolicyEventCount,policyWindowMismatchEventCount,unknownEventCount");
-      expect(csv).toContain("quality,,,,,,,,,,,,,,,,,1,1,1,0");
+      const qualityRow = csv.split("\n").find(row => row.startsWith("quality,"));
+      expect(qualityRow.split(",").slice(18, 22)).toEqual(["1", "1", "1", "0"]);
+      const metadataRow = csv.split("\n").find(row => row.startsWith("metadata,"));
+      expect(metadataRow.split(",").slice(22, 26)).toEqual(["1000", "5000", "milliseconds", "5000"]);
       expect(csv).not.toContain("same-source");
+    } finally {
+      db.close();
+    }
+  });
+
+  test("uses the selected timestamp unit for the default generation time", () => {
+    const db = createDatabase();
+    try {
+      const before = Math.floor(Date.now() / 1000);
+      const report = buildOwnedCurrencyReport({
+        db,
+        periodStart: 0,
+        periodEnd: 1,
+        timestampUnit: "seconds",
+      });
+      const after = Math.floor(Date.now() / 1000);
+      expect(report.generatedAt).toBeGreaterThanOrEqual(before);
+      expect(report.generatedAt).toBeLessThanOrEqual(after);
     } finally {
       db.close();
     }
@@ -83,6 +111,8 @@ describe("owned currency report", () => {
     try {
       expect(() => buildOwnedCurrencyReport({ db, periodStart: 10, periodEnd: 10, timestampUnit: "milliseconds" }))
         .toThrow(new OwnedCurrencyReportError("INVALID_REPORT_PERIOD"));
+      expect(() => buildOwnedCurrencyReport({ db, periodStart: 0, periodEnd: 1, timestampUnit: "milliseconds", now: null }))
+        .toThrow(new OwnedCurrencyReportError("INVALID_REPORT_TIME"));
     } finally {
       db.close();
     }
