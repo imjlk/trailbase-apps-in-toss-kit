@@ -137,6 +137,18 @@ try {
       /CHECK constraint failed/,
     );
   }
+  for (const [index, sourceId] of ["source-1\t", "\nsource-2", "source-3\r"].entries()) {
+    assert.throws(
+      () => add([`invalid-source-id-${index}`, X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", sourceId, `event:invalid-source-id-${index}`, "v1", null, null, null, null, 7200, 7200, "{}"]),
+      /CHECK constraint failed/,
+    );
+  }
+  for (const [index, idempotencyKey] of ["event:invalid-idempotency-1\t", "\nevent:invalid-idempotency-2"].entries()) {
+    assert.throws(
+      () => add([`invalid-idempotency-${index}`, X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", `source-idempotency-${index}`, idempotencyKey, "v1", null, null, null, null, 7200, 7200, "{}"]),
+      /CHECK constraint failed/,
+    );
+  }
 
   db.query("DELETE FROM _user WHERE id = X'01'").run();
   assert.equal(db.query("SELECT user_id FROM owned_currency_events WHERE id = 'gold-issue'").get().user_id, null);

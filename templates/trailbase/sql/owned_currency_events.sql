@@ -4,15 +4,23 @@
 -- Copy this template into a consumer migration and keep the migration
 -- forward-only. The optional user reference is set to NULL when the TrailBase
 -- user is deleted so a closed-period report does not regain a user identity.
+-- Identifier checks reject ASCII space, tab, LF, and CR padding. SQLite CHECK
+-- expressions cannot define a reusable local constant, so keep this charset
+-- literal identical wherever an identifier is compared with trim().
 CREATE TABLE IF NOT EXISTS owned_currency_events (
-  id TEXT PRIMARY KEY CHECK (length(trim(id)) BETWEEN 1 AND 128),
+  id TEXT PRIMARY KEY CHECK (
+    length(trim(id, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 128
+    AND id = trim(id, ' ' || char(9) || char(10) || char(13))
+  ),
   user_id BLOB REFERENCES _user(id) ON DELETE SET NULL,
   currency_code TEXT NOT NULL CHECK (
-    length(trim(currency_code)) BETWEEN 1 AND 64
+    length(trim(currency_code, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 64
+    AND currency_code = trim(currency_code, ' ' || char(9) || char(10) || char(13))
     AND currency_code NOT GLOB '*[^A-Za-z0-9._-]*'
   ),
   unit_code TEXT NOT NULL CHECK (
-    length(trim(unit_code)) BETWEEN 1 AND 64
+    length(trim(unit_code, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 64
+    AND unit_code = trim(unit_code, ' ' || char(9) || char(10) || char(13))
     AND unit_code NOT GLOB '*[^A-Za-z0-9._-]*'
   ),
   event_type TEXT NOT NULL CHECK (
@@ -29,12 +37,22 @@ CREATE TABLE IF NOT EXISTS owned_currency_events (
   -- Quantities are signed integer minor units. Never use floating point for
   -- grams, points, or valuation values.
   quantity INTEGER NOT NULL CHECK (quantity <> 0),
-  source_type TEXT NOT NULL CHECK (length(trim(source_type)) BETWEEN 1 AND 64),
-  source_id TEXT NOT NULL CHECK (length(trim(source_id)) BETWEEN 1 AND 256),
-  idempotency_key TEXT NOT NULL UNIQUE CHECK (
-    length(trim(idempotency_key)) BETWEEN 1 AND 256
+  source_type TEXT NOT NULL CHECK (
+    length(trim(source_type, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 64
+    AND source_type = trim(source_type, ' ' || char(9) || char(10) || char(13))
   ),
-  policy_version TEXT NOT NULL CHECK (length(trim(policy_version)) BETWEEN 1 AND 64),
+  source_id TEXT NOT NULL CHECK (
+    length(trim(source_id, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 256
+    AND source_id = trim(source_id, ' ' || char(9) || char(10) || char(13))
+  ),
+  idempotency_key TEXT NOT NULL UNIQUE CHECK (
+    length(trim(idempotency_key, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 256
+    AND idempotency_key = trim(idempotency_key, ' ' || char(9) || char(10) || char(13))
+  ),
+  policy_version TEXT NOT NULL CHECK (
+    length(trim(policy_version, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 64
+    AND policy_version = trim(policy_version, ' ' || char(9) || char(10) || char(13))
+  ),
   conversion_group_id TEXT CHECK (
     conversion_group_id IS NULL
     OR (
@@ -53,7 +71,8 @@ CREATE TABLE IF NOT EXISTS owned_currency_events (
   valuation_currency_code TEXT CHECK (
     valuation_currency_code IS NULL
     OR (
-      length(trim(valuation_currency_code)) BETWEEN 1 AND 64
+      length(trim(valuation_currency_code, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 64
+      AND valuation_currency_code = trim(valuation_currency_code, ' ' || char(9) || char(10) || char(13))
       AND valuation_currency_code NOT GLOB '*[^A-Za-z0-9._-]*'
     )
   ),
