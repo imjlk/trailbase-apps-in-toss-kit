@@ -125,11 +125,17 @@ try {
     event_count: 2,
   });
   assert.throws(() => add(["duplicate-idempotency", X01, "stars", "count", "ISSUE", 1, "vote", "v-2", "event:star-issue", "v1", null, null, null, null, 7000, 7000, "{}"]));
-  for (const conversionGroupId of [" ", " conversion-1"]) {
-    assert.throws(() => add(["invalid-conversion-id", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-invalid", "event:invalid-conversion-id", "v1", conversionGroupId, null, null, null, 7100, 7100, "{}"]));
+  for (const conversionGroupId of [" ", " conversion-1", "\tconversion-1", "\nconversion-1", "conversion-1\r"]) {
+    assert.throws(
+      () => add(["invalid-conversion-id", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-invalid", "event:invalid-conversion-id", "v1", conversionGroupId, null, null, null, 7100, 7100, "{}"]),
+      /CHECK constraint failed/,
+    );
   }
-  for (const exchangeId of [" ", " exchange-1"]) {
-    assert.throws(() => add(["invalid-exchange-id", X01, "gold_dust", "mg", "EXCHANGE", -1, "promotion", "p-invalid", "event:invalid-exchange-id", "v1", null, exchangeId, 1, "TOSS_POINT", 7100, 7100, "{}"]));
+  for (const exchangeId of [" ", " exchange-1", "\texchange-1", "\nexchange-1", "exchange-1\r"]) {
+    assert.throws(
+      () => add(["invalid-exchange-id", X01, "gold_dust", "mg", "EXCHANGE", -1, "promotion", "p-invalid", "event:invalid-exchange-id", "v1", null, exchangeId, 1, "TOSS_POINT", 7100, 7100, "{}"]),
+      /CHECK constraint failed/,
+    );
   }
 
   db.query("DELETE FROM _user WHERE id = X'01'").run();

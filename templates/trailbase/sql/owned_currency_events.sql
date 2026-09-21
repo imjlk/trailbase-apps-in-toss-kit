@@ -38,15 +38,15 @@ CREATE TABLE IF NOT EXISTS owned_currency_events (
   conversion_group_id TEXT CHECK (
     conversion_group_id IS NULL
     OR (
-      length(trim(conversion_group_id)) BETWEEN 1 AND 256
-      AND conversion_group_id = trim(conversion_group_id)
+      length(trim(conversion_group_id, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 256
+      AND conversion_group_id = trim(conversion_group_id, ' ' || char(9) || char(10) || char(13))
     )
   ),
   exchange_id TEXT CHECK (
     exchange_id IS NULL
     OR (
-      length(trim(exchange_id)) BETWEEN 1 AND 256
-      AND exchange_id = trim(exchange_id)
+      length(trim(exchange_id, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 256
+      AND exchange_id = trim(exchange_id, ' ' || char(9) || char(10) || char(13))
     )
   ),
   valuation_amount INTEGER CHECK (valuation_amount IS NULL OR valuation_amount >= 0),
