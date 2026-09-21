@@ -93,7 +93,10 @@ function parseArguments(args) {
       continue;
     }
     const key = names.get(argument);
-    if (!key || !args[index + 1] || args[index + 1].startsWith('--') || options[key] !== undefined) {
+    if (
+      !key || !args[index + 1] || args[index + 1].startsWith('--') || options[key] !== undefined
+      || (key === 'format' && options.json)
+    ) {
       throw new OwnedCurrencyReportCliError('INVALID_CLI_ARGUMENTS');
     }
     options[key] = args[++index];

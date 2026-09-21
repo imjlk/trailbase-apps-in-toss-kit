@@ -57,6 +57,13 @@ test('owned currency report CLI emits redacted JSON and CSV from a readonly snap
     expect(invalid.status).toBe(2);
     expect(invalid.stdout).toBe('');
     expect(invalid.stderr.trim()).toBe('INVALID_REPORT_PERIOD');
+
+    for (const flags of [['--json', '--format', 'csv'], ['--format', 'csv', '--json']]) {
+      const conflict = run(databasePath, ...flags);
+      expect(conflict.status).toBe(2);
+      expect(conflict.stdout).toBe('');
+      expect(conflict.stderr.trim()).toBe('INVALID_CLI_ARGUMENTS');
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
