@@ -51,9 +51,13 @@ test('owned currency report CLI emits redacted JSON and CSV from a readonly snap
     expect(csv.stderr).toBe('');
     expect(csv.stdout).toContain('rowType,currencyCode,unitCode');
     expect(csv.stdout).toContain('period,stars,count');
-    expect(csv.stdout).toContain('duplicateSourceCount,missingPolicyEventCount,policyWindowMismatchEventCount,unknownEventCount');
+    expect(csv.stdout).toContain('recordedValuationAmount,missingValuationEventCount,eventCount');
     const metadata = csv.stdout.split('\n').find(line => line.startsWith('metadata,'));
-    expect(metadata.split(',').slice(22, 25)).toEqual(['0', '2000', 'milliseconds']);
+    const header = csv.stdout.split('\n')[0].split(',');
+    const metadataValues = metadata.split(',');
+    expect(metadataValues[header.indexOf('periodStart')]).toBe('0');
+    expect(metadataValues[header.indexOf('periodEnd')]).toBe('2000');
+    expect(metadataValues[header.indexOf('timestampUnit')]).toBe('milliseconds');
 
     const invalid = run(databasePath, '--period-start', '10', '--period-end', '10');
     expect(invalid.status).toBe(2);

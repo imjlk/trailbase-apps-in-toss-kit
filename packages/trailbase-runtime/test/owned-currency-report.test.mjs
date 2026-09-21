@@ -28,6 +28,7 @@ describe("owned currency report", () => {
       insertEvent(db, ["policy-window", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "window-source", "event:policy-window", "v2", null, null, null, null, 2900]);
       insertEvent(db, ["duplicate-a", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-a", "v2", null, null, null, null, 3500]);
       insertEvent(db, ["duplicate-b", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-b", "v2", null, null, null, null, 3501]);
+      insertEvent(db, ["exchange-missing-valuation", "gold_dust", "mg", "EXCHANGE", -1, "promotion", "exchange-3", "event:exchange-3", "v2", null, "exchange-3", null, null, 4000]);
       insertEvent(db, ["boundary", "gold_dust", "mg", "ISSUE", 9, "mission", "boundary", "event:boundary", "v1", null, null, null, null, 5000]);
 
       const report = buildOwnedCurrencyReport({
@@ -42,6 +43,7 @@ describe("owned currency report", () => {
       expect(report.quality).toEqual({
         duplicateSourceCount: 1,
         missingPolicyEventCount: 1,
+        missingValuationEventCount: 1,
         policyWindowMismatchEventCount: 1,
         unknownEventCount: 0,
       });
@@ -63,13 +65,21 @@ describe("owned currency report", () => {
         recordedValuationAmount: 100,
         policy: { valuationCurrencyCode: "TOSS_POINT" },
       });
+      expect(report.lines.find(line => line.policyVersion === "v2")).toMatchObject({
+        missingValuationEventCount: 1,
+        policy: {
+          valuationMode: "MARKET_SNAPSHOT",
+          valuationCurrencyCode: "KRW",
+          effectiveFrom: 3000,
+        },
+      });
       expect(report.lines.find(line => line.policyVersion === "missing")).toMatchObject({
         currencyCode: "stars",
         policy: { present: false },
       });
       expect(report.balances).toEqual([
         { currencyCode: "gold_bar", unitCode: "mg", balanceQuantity: 2, eventCount: 1 },
-        { currencyCode: "gold_dust", unitCode: "mg", balanceQuantity: 68, eventCount: 7 },
+        { currencyCode: "gold_dust", unitCode: "mg", balanceQuantity: 67, eventCount: 8 },
         { currencyCode: "stars", unitCode: "count", balanceQuantity: 4, eventCount: 1 },
       ]);
 
@@ -87,13 +97,33 @@ describe("owned currency report", () => {
       expect(csv).toContain("rowType,currencyCode,unitCode");
       expect(csv).toContain("period,gold_dust,mg");
       expect(csv).toContain("balance,gold_dust,mg");
-      expect(csv).toContain("duplicateSourceCount,missingPolicyEventCount,policyWindowMismatchEventCount,unknownEventCount");
+      expect(csv).toContain("policyValuationMode,policyConversionNumerator,policyConversionDenominator,policyEffectiveFrom,policyEffectiveTo");
+      expect(csv).toContain("recordedValuationAmount,missingValuationEventCount,eventCount");
       const qualityRow = csv.split("\n").find(row => row.startsWith("quality,"));
-      expect(qualityRow.split(",").slice(18, 22)).toEqual(["1", "1", "1", "0"]);
+      const header = csv.split("\n")[0].split(",");
+      const column = name => header.indexOf(name);
+      const qualityValues = qualityRow.split(",");
+      expect(qualityValues[column("duplicateSourceCount")]).toBe("1");
+      expect(qualityValues[column("missingPolicyEventCount")]).toBe("1");
+      expect(qualityValues[column("missingValuationEventCount")]).toBe("1");
+      expect(qualityValues[column("policyWindowMismatchEventCount")]).toBe("1");
+      expect(qualityValues[column("unknownEventCount")]).toBe("0");
       const metadataRow = csv.split("\n").find(row => row.startsWith("metadata,"));
-      expect(metadataRow.split(",").slice(22, 26)).toEqual(["1000", "5000", "milliseconds", "5000"]);
+      const metadataValues = metadataRow.split(",");
+      expect(metadataValues[column("periodStart")]).toBe("1000");
+      expect(metadataValues[column("periodEnd")]).toBe("5000");
+      expect(metadataValues[column("timestampUnit")]).toBe("milliseconds");
+      expect(metadataValues[column("generatedAt")]).toBe("5000");
       const balanceRow = csv.split("\n").find(row => row.startsWith("balance,gold_dust,mg"));
-      expect(balanceRow.split(",").slice(14, 17)).toEqual(["", "7", "68"]);
+      const balanceValues = balanceRow.split(",");
+      expect(balanceValues[column("eventCount")]).toBe("8");
+      expect(balanceValues[column("balanceQuantity")]).toBe("67");
+      const fixedPeriodRow = csv.split("\n").find(row => row.startsWith("period,gold_dust,mg,v1,TOSS_POINT"));
+      const fixedPeriodValues = fixedPeriodRow.split(",");
+      expect(fixedPeriodValues[column("policyValuationMode")]).toBe("FIXED_RATE");
+      expect(fixedPeriodValues[column("policyConversionNumerator")]).toBe("1");
+      expect(fixedPeriodValues[column("policyConversionDenominator")]).toBe("100");
+      expect(fixedPeriodValues[column("policyEffectiveFrom")]).toBe("0");
       expect(csv).not.toContain("same-source");
     } finally {
       db.close();

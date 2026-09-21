@@ -23,7 +23,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
     requireTableColumns(db, "owned_currency_events", [
       "currency_code", "unit_code", "event_type", "quantity", "source_type",
       "source_id", "policy_version", "valuation_amount", "valuation_currency_code",
-      "occurred_at",
+      "occurred_at", "conversion_group_id",
     ]);
     requireTableColumns(db, "owned_currency_policies", [
       "currency_code", "unit_code", "policy_version", "valuation_mode",
@@ -46,6 +46,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
         SUM(CASE WHEN e.event_type = 'ADJUSTMENT' AND e.quantity > 0 THEN e.quantity ELSE 0 END) AS adjustment_credit_quantity,
         SUM(CASE WHEN e.event_type = 'ADJUSTMENT' AND e.quantity < 0 THEN -e.quantity ELSE 0 END) AS adjustment_debit_quantity,
         SUM(CASE WHEN e.event_type = 'EXCHANGE' THEN COALESCE(e.valuation_amount, 0) ELSE 0 END) AS recorded_valuation_amount,
+        SUM(CASE WHEN e.event_type = 'EXCHANGE' AND e.valuation_amount IS NULL THEN 1 ELSE 0 END) AS missing_valuation_event_count,
         COUNT(*) AS event_count,
         p.valuation_mode,
         p.valuation_currency_code AS policy_valuation_currency_code,
@@ -133,6 +134,15 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
         )
     `).get(periodStart, periodEnd).count);
 
+    const missingValuationEventCount = integer(db.query(`
+      SELECT COUNT(*) AS count
+      FROM owned_currency_events
+      WHERE occurred_at >= ?
+        AND occurred_at < ?
+        AND event_type = 'EXCHANGE'
+        AND valuation_amount IS NULL
+    `).get(periodStart, periodEnd).count);
+
     const unknownEventCount = integer(db.query(`
       SELECT COUNT(*) AS count
       FROM owned_currency_events
@@ -151,6 +161,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
       quality: {
         duplicateSourceCount,
         missingPolicyEventCount,
+        missingValuationEventCount,
         policyWindowMismatchEventCount,
         unknownEventCount,
       },
@@ -161,54 +172,81 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
 export function formatOwnedCurrencyCsv(report) {
   const header = [
     "rowType", "currencyCode", "unitCode", "policyVersion", "valuationCurrencyCode",
-    "policyValuationCurrencyCode",
+    "policyValuationCurrencyCode", "policyValuationMode", "policyConversionNumerator",
+    "policyConversionDenominator", "policyEffectiveFrom", "policyEffectiveTo",
     "issuedQuantity", "spentQuantity", "convertedOutQuantity", "convertedInQuantity",
     "exchangedQuantity", "expiredQuantity", "adjustmentCreditQuantity", "adjustmentDebitQuantity",
-    "recordedValuationAmount", "eventCount", "balanceQuantity", "policyPresent",
+    "recordedValuationAmount", "missingValuationEventCount", "eventCount", "balanceQuantity",
+    "policyPresent",
     "duplicateSourceCount", "missingPolicyEventCount", "policyWindowMismatchEventCount", "unknownEventCount",
     "periodStart", "periodEnd", "timestampUnit", "generatedAt",
     "toolName", "toolVersion", "sourceCommit", "reportedServerVersion",
   ];
+  const columns = new Map(header.map((name, index) => [name, index]));
   const rows = [header];
-  const pad = row => [...row, ...Array(header.length - row.length).fill("")];
+  const rowFor = values => {
+    const row = Array(header.length).fill("");
+    for (const [name, value] of Object.entries(values)) {
+      const index = columns.get(name);
+      if (index !== undefined) row[index] = value;
+    }
+    return row;
+  };
   for (const line of report.lines) {
-    rows.push(pad([
-      "period", line.currencyCode, line.unitCode, line.policyVersion, line.valuationCurrencyCode,
-      line.policy.valuationCurrencyCode,
-      line.issuedQuantity, line.spentQuantity, line.convertedOutQuantity, line.convertedInQuantity,
-      line.exchangedQuantity, line.expiredQuantity, line.adjustmentCreditQuantity,
-      line.adjustmentDebitQuantity, line.recordedValuationAmount, line.eventCount, "", line.policy.present,
-    ]));
+    rows.push(rowFor({
+      rowType: "period",
+      currencyCode: line.currencyCode,
+      unitCode: line.unitCode,
+      policyVersion: line.policyVersion,
+      valuationCurrencyCode: line.valuationCurrencyCode,
+      policyValuationCurrencyCode: line.policy.valuationCurrencyCode,
+      policyValuationMode: line.policy.valuationMode,
+      policyConversionNumerator: line.policy.conversionNumerator,
+      policyConversionDenominator: line.policy.conversionDenominator,
+      policyEffectiveFrom: line.policy.effectiveFrom,
+      policyEffectiveTo: line.policy.effectiveTo,
+      issuedQuantity: line.issuedQuantity,
+      spentQuantity: line.spentQuantity,
+      convertedOutQuantity: line.convertedOutQuantity,
+      convertedInQuantity: line.convertedInQuantity,
+      exchangedQuantity: line.exchangedQuantity,
+      expiredQuantity: line.expiredQuantity,
+      adjustmentCreditQuantity: line.adjustmentCreditQuantity,
+      adjustmentDebitQuantity: line.adjustmentDebitQuantity,
+      recordedValuationAmount: line.recordedValuationAmount,
+      missingValuationEventCount: line.missingValuationEventCount,
+      eventCount: line.eventCount,
+      policyPresent: line.policy.present,
+    }));
   }
   for (const balance of report.balances) {
-    const row = Array(header.length).fill("");
-    row[0] = "balance";
-    row[1] = balance.currencyCode;
-    row[2] = balance.unitCode;
-    row[15] = balance.eventCount;
-    row[16] = balance.balanceQuantity;
-    rows.push(row);
+    rows.push(rowFor({
+      rowType: "balance",
+      currencyCode: balance.currencyCode,
+      unitCode: balance.unitCode,
+      eventCount: balance.eventCount,
+      balanceQuantity: balance.balanceQuantity,
+    }));
   }
-  const quality = Array(header.length).fill("");
-  quality[0] = "quality";
-  const qualityOffset = 18;
-  quality[qualityOffset] = report.quality.duplicateSourceCount;
-  quality[qualityOffset + 1] = report.quality.missingPolicyEventCount;
-  quality[qualityOffset + 2] = report.quality.policyWindowMismatchEventCount;
-  quality[qualityOffset + 3] = report.quality.unknownEventCount;
-  rows.push(quality);
-  const metadata = Array(header.length).fill("");
-  metadata[0] = "metadata";
-  const metadataOffset = 22;
-  metadata[metadataOffset] = report.period.start;
-  metadata[metadataOffset + 1] = report.period.end;
-  metadata[metadataOffset + 2] = report.timestampUnit;
-  metadata[metadataOffset + 3] = report.generatedAt;
-  metadata[metadataOffset + 4] = report.tool?.name;
-  metadata[metadataOffset + 5] = report.tool?.version;
-  metadata[metadataOffset + 6] = report.tool?.sourceCommit;
-  metadata[metadataOffset + 7] = report.tool?.reportedServerVersion;
-  rows.push(metadata);
+  rows.push(rowFor({
+    rowType: "quality",
+    missingValuationEventCount: report.quality.missingValuationEventCount,
+    duplicateSourceCount: report.quality.duplicateSourceCount,
+    missingPolicyEventCount: report.quality.missingPolicyEventCount,
+    policyWindowMismatchEventCount: report.quality.policyWindowMismatchEventCount,
+    unknownEventCount: report.quality.unknownEventCount,
+  }));
+  rows.push(rowFor({
+    rowType: "metadata",
+    periodStart: report.period.start,
+    periodEnd: report.period.end,
+    timestampUnit: report.timestampUnit,
+    generatedAt: report.generatedAt,
+    toolName: report.tool?.name,
+    toolVersion: report.tool?.version,
+    sourceCommit: report.tool?.sourceCommit,
+    reportedServerVersion: report.tool?.reportedServerVersion,
+  }));
   return `${rows.map(row => row.map(csvCell).join(",")).join("\n")}\n`;
 }
 
@@ -248,6 +286,7 @@ function normalizeLine(row) {
     adjustmentCreditQuantity: integer(row.adjustment_credit_quantity),
     adjustmentDebitQuantity: integer(row.adjustment_debit_quantity),
     recordedValuationAmount: integer(row.recorded_valuation_amount),
+    missingValuationEventCount: integer(row.missing_valuation_event_count),
     eventCount: integer(row.event_count),
     policy: {
       present: row.policy_present === 1,
