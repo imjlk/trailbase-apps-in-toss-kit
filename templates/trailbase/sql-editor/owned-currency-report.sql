@@ -74,19 +74,21 @@ SELECT
   e.policy_version,
   p.effective_from,
   p.effective_to,
+  CASE WHEN p.policy_version IS NULL THEN 0 ELSE 1 END AS policy_present,
   COUNT(*) AS event_count
 FROM owned_currency_events e
-JOIN owned_currency_policies p
+LEFT JOIN owned_currency_policies p
   ON p.currency_code = e.currency_code
  AND p.unit_code = e.unit_code
  AND p.policy_version = e.policy_version
 WHERE e.occurred_at >= 1788192000000
   AND e.occurred_at < 1790870400000
   AND (
-    e.occurred_at < p.effective_from
+    p.policy_version IS NULL
+    OR e.occurred_at < p.effective_from
     OR (p.effective_to IS NOT NULL AND e.occurred_at >= p.effective_to)
   )
-GROUP BY e.currency_code, e.unit_code, e.policy_version, p.effective_from, p.effective_to
+GROUP BY e.currency_code, e.unit_code, e.policy_version, p.effective_from, p.effective_to, p.policy_version
 ORDER BY e.currency_code, e.unit_code, e.policy_version;
 
 -- Query: duplicate_source_check

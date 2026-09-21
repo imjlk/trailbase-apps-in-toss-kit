@@ -113,11 +113,28 @@ try {
   assert.equal(policy.find(row => row.currency_code === "gold_dust" && row.policy_version === "v2").issued_quantity, 0);
   const policyWindowMismatches = db.query(withTestWindow(queries.policy_window_check, 1000, 7000)).all();
   assert.deepEqual(policyWindowMismatches, [{
+    currency_code: "gold_bar",
+    unit_code: "mg",
+    policy_version: "v1",
+    effective_from: null,
+    effective_to: null,
+    policy_present: 0,
+    event_count: 1,
+  }, {
     currency_code: "gold_dust",
     unit_code: "mg",
     policy_version: "v2",
     effective_from: 6000,
     effective_to: null,
+    policy_present: 1,
+    event_count: 1,
+  }, {
+    currency_code: "stars",
+    unit_code: "count",
+    policy_version: "v1",
+    effective_from: null,
+    effective_to: null,
+    policy_present: 0,
     event_count: 1,
   }]);
 
