@@ -141,7 +141,7 @@ HMAC, sealed value를 출력하지 않아야 합니다.
   "urlEnv": "MTLS_PROXY_URL",
   "tokenEnv": "MTLS_PROXY_TOKEN",
   "expectedMode": "forward",
-  "requiredCapabilities": ["anonymous-key.verify", "promotion.status"],
+  "requiredCapabilities": ["anonymous-key.verify", "promotion.prepare.v2", "promotion.execute.v2", "promotion.status.v2", "promotion.anonymous-recipient"],
   "timeout": 5000
 }
 ```
@@ -166,3 +166,25 @@ HTTP(S) origin이어야 합니다. 인증된 `/internal/apps-in-toss/health` GET
 API 호출을 수행하지 않습니다.
 
 git 서브모듈에서 Node CLI를 직접 실행할 때 npm 설치가 필요하지 않습니다. 최소 버전은 사전 릴리즈 순서를 포함하고 빌드 메타데이터를 무시하는 엄격한 SemVer 비교를 사용하며, 입력은 128자와 안전한 정수 범위의 주 버전·부 버전·패치 값으로 제한합니다.
+
+
+## 프로모션 배포 전 점검
+
+익명 보상 흐름은 `templates/trailbase/release/promotion-release-doctor.config.example.json`을
+배포 설정에 복사하고 비공개 프록시 네트워크에 접근 가능한 호스트에서 실행하세요.
+
+```sh
+node vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/release-doctor.mjs --config path/to/promotion-release-doctor.config.json
+```
+
+`MTLS_PROXY_URL`과 `MTLS_PROXY_TOKEN`은 프로세스 환경 변수로 전달합니다. 필수 점검은
+health만 호출해 forward 모드, 익명 키 검증, 익명 프로모션 수신자와 세 가지
+`promotion.*.v2` 기능을 모두 확인합니다. 정상 health나 높은 버전만으로 통과하지 않으며,
+메타데이터 누락·구형 프로토콜·기능 누락은 지급 요청 없이 실패합니다. 로그인 전용 앱은
+익명 관련 두 기능을 제외할 수 있지만 v2 세 단계는 모두 유지해야 합니다.
+
+새 호출부 활성화 전에 실행하고 실패 시 배포를 중단하도록 연결하세요. 선택해서 적용하는
+예제이며 관련 없는 앱에 새 기본 조건을 강제하지 않습니다. 구형 단일 grant 호출은
+프록시 업그레이드 전에 저장된 키를 사용하는 prepare/execute/status로 이전해야 합니다.
+현재 프록시는 기존 grant 경로에 `410 PROMOTION_GRANT_REMOVED`를 반환합니다.
+Compose 예제 복사나 서브모듈 포인터 변경만으로 별도 운영 중인 프록시가 갱신되지는 않습니다.

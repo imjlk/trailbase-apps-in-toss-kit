@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { expect, test } from "bun:test";
 import { createProxyCapabilitiesCheck, evaluateProxyCapabilities } from "../src/proxy-capabilities.mjs";
 import { createReleaseDoctorChecksFromConfig, runReleaseDoctor } from "../src/release-doctor.mjs";
@@ -97,4 +98,21 @@ test("prerelease precedence and build metadata follow SemVer", () => {
     expect(evaluateProxyCapabilities({ ...health, kit: { ...metadata, proxyVersion: version } }, { minimumVersion }).ok).toBe(expected);
   }
   expect(evaluateProxyCapabilities({ ...health, kit: { ...metadata, proxyVersion: "0.3.0-rc.1" } }).ok).toBe(true);
+});
+
+
+test("anonymous promotion rollout recipe rejects healthy proxies missing any required adapter", () => {
+  const recipe = JSON.parse(readFileSync(new URL("../../../templates/trailbase/release/promotion-release-doctor.config.example.json", import.meta.url), "utf8"));
+  const requirement = recipe.checks[0];
+  expect(requirement.required).toBe(true);
+  const capabilities = ["anonymous-key.verify", "promotion.prepare.v2", "promotion.execute.v2", "promotion.status.v2", "promotion.anonymous-recipient"];
+  const ready = {ok: true, mode: "forward", kit: {contractVersion: 1, proxyVersion: "9.0.0", capabilities}};
+  expect(evaluateProxyCapabilities(ready, requirement).ok).toBe(true);
+  expect(evaluateProxyCapabilities({...ready, mode: "stub"}, requirement).ok).toBe(false);
+  expect(evaluateProxyCapabilities(health, requirement).ok).toBe(false);
+  for (const missing of capabilities) {
+    const result = evaluateProxyCapabilities({...ready, kit: {...ready.kit, capabilities: capabilities.filter(value => value !== missing)}}, requirement);
+    expect(result.ok).toBe(false);
+    expect(result.failures[0]).toContain(missing);
+  }
 });

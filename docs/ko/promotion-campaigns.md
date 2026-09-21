@@ -237,3 +237,52 @@ PREPARED는 미실행 키와 재생된 실행 후 상태를 구분할 수 없고
 호환 분기는 없습니다. 이 breaking 릴리스 이후 헬퍼는 v2 컬럼을 기대합니다.
 
 [검증된 익명 사용자 식별·발송·복구](anonymous-identity.md)를 참고하세요.
+
+
+## 수신자 종류를 명시적으로 선택하기
+
+익명 수신자는 `promotion_reward_prepare_payload(PromotionRecipient::AnonymousKey(key))`,
+토스 로그인 수신자는 `PromotionRecipient::TossUserKey(key)`를 사용합니다. 실행·조회에서도
+동일한 수신자를 `PromotionRewardRequest`에 넣고 `promotion_reward_payload_for_recipient`로
+요청을 만드세요. 이 요청은 비어 있지 않은 저장된 `provider_transaction_key`를 요구하며,
+helper 자체가 지급 키를 발급하거나 포인트를 지급하지 않습니다.
+
+```rust
+use trailbase_guest_common::promotion_rewards::{
+    PromotionRecipient, PromotionRewardRequest,
+    promotion_reward_prepare_payload, promotion_reward_payload_for_recipient,
+};
+
+let recipient = PromotionRecipient::AnonymousKey(anonymous_key);
+let prepare_payload = promotion_reward_prepare_payload(recipient)?;
+// prepare 응답의 키와 수신자 연결을 저장하고, execute 전에 실행 클레임을 커밋합니다.
+// HTTP 요청 중 DB transaction을 유지하지 않습니다.
+let payload = promotion_reward_payload_for_recipient(PromotionRewardRequest {
+    provider_request_id: request_id,
+    provider_transaction_key: stored_transaction_key,
+    promotion: &promotion_context,
+    requested_at,
+    recipient,
+    eligibility_id: None,
+    user_id: None,
+    source_type: Some("daily-reward"),
+    source_id: None,
+})?;
+// 신규 실행은 promotion_reward_execute를 한 번 호출합니다.
+// 이미 실행한 요청은 promotion_reward_status_with_payload로 조회합니다.
+```
+
+기존 `PromotionRewardPayloadInput` / `promotion_reward_payload`의 호출 방식과 JSON은
+호환성을 유지하지만 **토스 로그인 전용**입니다. `toss_user_key`는 항상 `tossUserKey`로
+직렬화되므로 익명 키를 넣으면 잘못된 인증 헤더가 선택됩니다. 신규 구현에서는 로그인
+payload를 만든 뒤 고치는 대신 명시적 수신자 API를 사용하세요. 수신자 타입에는
+`Debug`/`Serialize`가 없지만 최종 JSON에는 식별자가 포함되므로 기록하면 안 됩니다.
+
+helper는 수신자 저장·소유권 검증·원장 연결을 대신하지 않습니다. 거래 키와 원래 수신자
+연결을 함께 유지하고 재시작이나 로그인 변경 후에도 해당 연결을 사용하세요. 실패 또는
+불명확한 응답만으로 실행 상태를 초기화하거나 새 지급 키를 발급하면 안 됩니다.
+
+배포 전 [프로모션 호환성 점검](release-doctor.md#프로모션-배포-전-점검)을 실제 실행 중인
+비공개 프록시에 수행하세요. 이미지 태그만 확인해서는 안 됩니다.
+`bun test scripts/promotion-recipient-contract.test.mjs`는 실제 Rust helper가 만든 요청을
+프록시에 전달하고 익명·로그인 수신자의 최종 헤더와 거래 키 연결을 loopback 가짜 서버로 검증합니다.

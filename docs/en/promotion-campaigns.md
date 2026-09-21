@@ -157,6 +157,59 @@ error code. Consumers should map provider signals conservatively:
 - `4104`, `4105`, `4108`, `4109`: pause the campaign.
 - `4114`: treat as misconfiguration and pause or escalate before retrying.
 
+## Choose the Recipient Explicitly
+
+Use `promotion_reward_prepare_payload(PromotionRecipient::AnonymousKey(key))`
+for an anonymous recipient, or `PromotionRecipient::TossUserKey(key)` for a
+Toss Login recipient. Reuse that same recipient selection when building a
+`PromotionRewardRequest` with `promotion_reward_payload_for_recipient` for
+execute and status. The request requires a nonempty, previously stored
+`provider_transaction_key`; it never issues or executes a reward itself.
+
+```rust
+use trailbase_guest_common::promotion_rewards::{
+    PromotionRecipient, PromotionRewardRequest,
+    promotion_reward_prepare_payload, promotion_reward_payload_for_recipient,
+};
+
+let recipient = PromotionRecipient::AnonymousKey(anonymous_key);
+let prepare_payload = promotion_reward_prepare_payload(recipient)?;
+// Call prepare, persist its key and recipient binding, then commit the
+// execution claim before making an execute request. No transaction spans HTTP.
+let payload = promotion_reward_payload_for_recipient(PromotionRewardRequest {
+    provider_request_id: request_id,
+    provider_transaction_key: stored_transaction_key,
+    promotion: &promotion_context,
+    requested_at,
+    recipient,
+    eligibility_id: None,
+    user_id: None,
+    source_type: Some("daily-reward"),
+    source_id: None,
+})?;
+// Dispatch payload through promotion_reward_execute once, or through
+// promotion_reward_status_with_payload when reconciling an existing execution.
+```
+
+The legacy `PromotionRewardPayloadInput` / `promotion_reward_payload` builder
+remains source- and wire-compatible, but is **Toss Login only**. Its
+`toss_user_key` string is always serialized as `tossUserKey`; putting an anonymous
+key there silently chooses the wrong identity header. New integrations should
+use the explicit builder instead of constructing a login payload and repairing
+it afterward. Recipient types are not `Debug`/`Serialize` to discourage accidental
+secret logging. Do not log the resulting JSON, which contains the recipient.
+
+The helpers do not persist a recipient, prove ownership or bind it to a ledger
+row. Keep the original recipient binding with the stored transaction key and
+use that binding after restart or login changes. A failed or unknown response
+is not permission to reset execution state or allocate another key.
+
+Before deploying this flow, run the [promotion capability preflight](release-doctor.md#promotion-rollout-preflight)
+against the **running** private proxy, not only its configured image tag. The
+Rust-to-proxy contract test (`bun test scripts/promotion-recipient-contract.test.mjs`)
+generates real Rust helper payloads, runs both identity types through the proxy,
+and checks the final upstream identity headers and key binding on loopback only.
+
 ## Persist the Transaction Key Before Executing
 
 This is the only new-grant flow. The ledger stores the provider transaction

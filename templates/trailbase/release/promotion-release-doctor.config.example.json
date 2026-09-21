@@ -1,0 +1,20 @@
+{
+  "checks": [
+    {
+      "type": "proxy-capabilities",
+      "name": "Anonymous promotion protocol",
+      "urlEnv": "MTLS_PROXY_URL",
+      "tokenEnv": "MTLS_PROXY_TOKEN",
+      "required": true,
+      "expectedMode": "forward",
+      "requiredCapabilities": [
+        "anonymous-key.verify",
+        "promotion.prepare.v2",
+        "promotion.execute.v2",
+        "promotion.status.v2",
+        "promotion.anonymous-recipient"
+      ],
+      "timeout": 5000
+    }
+  ]
+}
