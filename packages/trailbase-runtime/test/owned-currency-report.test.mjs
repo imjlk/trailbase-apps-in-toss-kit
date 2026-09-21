@@ -25,6 +25,7 @@ describe("owned currency report", () => {
       insertEvent(db, ["convert-out", "gold_dust", "mg", "CONVERT_OUT", -20, "refine", "refine-1", "event:convert-out", "v1", "conversion-1", null, null, null, 2600]);
       insertEvent(db, ["convert-in", "gold_bar", "mg", "CONVERT_IN", 2, "refine", "refine-1", "event:convert-in", "v1", "conversion-1", null, null, null, 2600]);
       insertEvent(db, ["missing-policy", "stars", "count", "ISSUE", 4, "vote", "vote-1", "event:missing-policy", "missing", null, null, null, null, 3000]);
+      insertEvent(db, ["policy-window", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "window-source", "event:policy-window", "v2", null, null, null, null, 2900]);
       insertEvent(db, ["duplicate-a", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-a", "v2", null, null, null, null, 3500]);
       insertEvent(db, ["duplicate-b", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-b", "v2", null, null, null, null, 3501]);
       insertEvent(db, ["boundary", "gold_dust", "mg", "ISSUE", 9, "mission", "boundary", "event:boundary", "v1", null, null, null, null, 5000]);
@@ -38,7 +39,12 @@ describe("owned currency report", () => {
       });
 
       expect(report.period).toEqual({ start: 1000, end: 5000 });
-      expect(report.quality).toEqual({ duplicateSourceCount: 1, missingPolicyEventCount: 1, unknownEventCount: 0 });
+      expect(report.quality).toEqual({
+        duplicateSourceCount: 1,
+        missingPolicyEventCount: 1,
+        policyWindowMismatchEventCount: 1,
+        unknownEventCount: 0,
+      });
       expect(report.lines.find(line => line.valuationCurrencyCode === "TOSS_POINT")).toMatchObject({
         currencyCode: "gold_dust",
         exchangedQuantity: 10,
@@ -56,7 +62,7 @@ describe("owned currency report", () => {
       });
       expect(report.balances).toEqual([
         { currencyCode: "gold_bar", unitCode: "mg", balanceQuantity: 2, eventCount: 1 },
-        { currencyCode: "gold_dust", unitCode: "mg", balanceQuantity: 67, eventCount: 6 },
+        { currencyCode: "gold_dust", unitCode: "mg", balanceQuantity: 68, eventCount: 7 },
         { currencyCode: "stars", unitCode: "count", balanceQuantity: 4, eventCount: 1 },
       ]);
 
@@ -64,6 +70,8 @@ describe("owned currency report", () => {
       expect(csv).toContain("rowType,currencyCode,unitCode");
       expect(csv).toContain("period,gold_dust,mg");
       expect(csv).toContain("balance,gold_dust,mg");
+      expect(csv).toContain("duplicateSourceCount,missingPolicyEventCount,policyWindowMismatchEventCount,unknownEventCount");
+      expect(csv).toContain("quality,,,,,,,,,,,,,,,,,1,1,1,0");
       expect(csv).not.toContain("same-source");
     } finally {
       db.close();

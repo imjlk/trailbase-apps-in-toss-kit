@@ -100,6 +100,7 @@ try {
   ]);
 
   add(["gold-exchange-krw", X01, "gold_dust", "mg", "EXCHANGE", -5, "promotion", "p-2", "event:gold-exchange-krw", "v1", null, "exchange-2", 100, "KRW", 4500, 4500, "{}"]);
+  add(["gold-policy-window", X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "window-1", "event:gold-policy-window", "v2", null, null, null, null, 5500, 5500, "{}"]);
   const policy = db.query(withTestWindow(queries.policy_breakdown, 1000, 7000)).all();
   const valuedGoldPolicyRows = policy
     .filter(row => row.currency_code === "gold_dust" && row.policy_version === "v1" && row.valuation_currency_code)
@@ -110,6 +111,15 @@ try {
     { valuation_currency_code: "TOSS_POINT", exchanged_quantity: 10, recorded_valuation_amount: 50 },
   ]);
   assert.equal(policy.find(row => row.currency_code === "gold_dust" && row.policy_version === "v2").issued_quantity, 0);
+  const policyWindowMismatches = db.query(withTestWindow(queries.policy_window_check, 1000, 7000)).all();
+  assert.deepEqual(policyWindowMismatches, [{
+    currency_code: "gold_dust",
+    unit_code: "mg",
+    policy_version: "v2",
+    effective_from: 6000,
+    effective_to: null,
+    event_count: 1,
+  }]);
 
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), []);
   add(["duplicate-direction-1", X01, "gold_dust", "mg", "CONVERT_OUT", -2, "refine", "r-duplicate", "event:duplicate-direction-1", "v1", "conversion-duplicate", null, null, null, 6400, 6400, "{}"]);

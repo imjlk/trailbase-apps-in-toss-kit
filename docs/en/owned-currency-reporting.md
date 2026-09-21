@@ -57,6 +57,8 @@ The read-only examples in
   `period_end` literal is exclusive);
 - balance as of a timestamp;
 - policy-version breakdown with recorded valuation denominations; and
+- policy-window mismatches where an event falls outside its recorded policy's
+  effective interval; and
 - duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair.
 
 Replace the two timestamp literals at the top of each query with values in the
@@ -73,6 +75,31 @@ database snapshot when preparing a report.
 The queries intentionally report issued quantity separately from current
 balance. A month with 10,000 units issued and 6,000 units exchanged still has
 10,000 units of issuance in the report.
+
+## Read-only report CLI
+
+The runtime package also includes `trailbase-owned-currency-report`. It reads a
+consistent SQLite snapshot without writing to it and emits either redacted JSON
+or CSV. The snapshot must contain both `owned_currency_events` and
+`owned_currency_policies`.
+
+```bash
+bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-currency-report.mjs \
+  --db path/to/trailbase.sqlite \
+  --period-start 1788192000000 \
+  --period-end 1790870400000 \
+  --timestamp-unit milliseconds \
+  --format json
+```
+
+Use `--format csv` for a spreadsheet or submission worksheet. The output keeps
+issuance, consumption, conversion, exchange, valuation denominations, and
+as-of balances separate; it does not include source IDs or user identifiers.
+The quality section also counts events whose policy version is missing or whose
+event time falls outside that policy version's effective window. CSV output
+includes those quality counts as a final `quality` row.
+`trailbase-ledger-doctor` remains the diagnostic tool for the existing payment
+ledgers. Neither command submits data to Toss or changes the live database.
 
 ## Month-end workflow
 

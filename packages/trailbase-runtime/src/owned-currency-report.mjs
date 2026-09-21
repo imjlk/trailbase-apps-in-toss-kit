@@ -114,6 +114,21 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
         AND p.policy_version IS NULL
     `).get(periodStart, periodEnd).count);
 
+    const policyWindowMismatchEventCount = integer(db.query(`
+      SELECT COUNT(*) AS count
+      FROM owned_currency_events e
+      JOIN owned_currency_policies p
+        ON p.currency_code = e.currency_code
+       AND p.unit_code = e.unit_code
+       AND p.policy_version = e.policy_version
+      WHERE e.occurred_at >= ?
+        AND e.occurred_at < ?
+        AND (
+          e.occurred_at < p.effective_from
+          OR (p.effective_to IS NOT NULL AND e.occurred_at >= p.effective_to)
+        )
+    `).get(periodStart, periodEnd).count);
+
     const unknownEventCount = integer(db.query(`
       SELECT COUNT(*) AS count
       FROM owned_currency_events
@@ -129,7 +144,12 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
       generatedAt: now,
       lines,
       balances,
-      quality: { duplicateSourceCount, missingPolicyEventCount, unknownEventCount },
+      quality: {
+        duplicateSourceCount,
+        missingPolicyEventCount,
+        policyWindowMismatchEventCount,
+        unknownEventCount,
+      },
     };
   })();
 }
@@ -140,6 +160,7 @@ export function formatOwnedCurrencyCsv(report) {
     "issuedQuantity", "spentQuantity", "convertedOutQuantity", "convertedInQuantity",
     "exchangedQuantity", "expiredQuantity", "adjustmentCreditQuantity", "adjustmentDebitQuantity",
     "recordedValuationAmount", "eventCount", "balanceQuantity", "policyPresent",
+    "duplicateSourceCount", "missingPolicyEventCount", "policyWindowMismatchEventCount", "unknownEventCount",
   ];
   const rows = [header];
   for (const line of report.lines) {
@@ -148,14 +169,22 @@ export function formatOwnedCurrencyCsv(report) {
       line.issuedQuantity, line.spentQuantity, line.convertedOutQuantity, line.convertedInQuantity,
       line.exchangedQuantity, line.expiredQuantity, line.adjustmentCreditQuantity,
       line.adjustmentDebitQuantity, line.recordedValuationAmount, line.eventCount, "", line.policy.present,
+      "", "", "", "",
     ]);
   }
   for (const balance of report.balances) {
     rows.push([
       "balance", balance.currencyCode, balance.unitCode, "", "", "", "", "", "", "", "", "", "", "",
-      balance.eventCount, balance.balanceQuantity, "",
+      balance.eventCount, balance.balanceQuantity, "", "", "", "", "",
     ]);
   }
+  const quality = Array(header.length).fill("");
+  quality[0] = "quality";
+  quality[17] = report.quality.duplicateSourceCount;
+  quality[18] = report.quality.missingPolicyEventCount;
+  quality[19] = report.quality.policyWindowMismatchEventCount;
+  quality[20] = report.quality.unknownEventCount;
+  rows.push(quality);
   return `${rows.map(row => row.map(csvCell).join(",")).join("\n")}\n`;
 }
 

@@ -18,6 +18,7 @@
     "trailbase:version-policy:check": "node scripts/check-trailbase-version-policy.mjs",
     "trailbase:functional-ledgers:smoke": "bun scripts/smoke-trailbase-functional-ledgers.mjs",
     "trailbase:owned-currency:smoke": "bun scripts/smoke-trailbase-owned-currency.mjs",
+    "trailbase:owned-currency:report": "bun packages/trailbase-runtime/bin/owned-currency-report.mjs",
     "apps-in-toss:snapshot": "node scripts/snapshot-apps-in-toss-docs.mjs",
     "apps-in-toss:snapshot:test": "node --test scripts/apps-in-toss-snapshot*.test.mjs scripts/apps-in-toss-tracking.test.mjs",
     "apps-in-toss:tracking:check": "node scripts/check-apps-in-toss-tracking.mjs",

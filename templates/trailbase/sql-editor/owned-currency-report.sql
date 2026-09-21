@@ -67,6 +67,28 @@ WHERE occurred_at >= period_start
 GROUP BY currency_code, unit_code, policy_version, valuation_currency_code
 ORDER BY currency_code, unit_code, policy_version, valuation_currency_code;
 
+-- Query: policy_window_check
+SELECT
+  e.currency_code,
+  e.unit_code,
+  e.policy_version,
+  p.effective_from,
+  p.effective_to,
+  COUNT(*) AS event_count
+FROM owned_currency_events e
+JOIN owned_currency_policies p
+  ON p.currency_code = e.currency_code
+ AND p.unit_code = e.unit_code
+ AND p.policy_version = e.policy_version
+WHERE e.occurred_at >= 1788192000000
+  AND e.occurred_at < 1790870400000
+  AND (
+    e.occurred_at < p.effective_from
+    OR (p.effective_to IS NOT NULL AND e.occurred_at >= p.effective_to)
+  )
+GROUP BY e.currency_code, e.unit_code, e.policy_version, p.effective_from, p.effective_to
+ORDER BY e.currency_code, e.unit_code, e.policy_version;
+
 -- Query: duplicate_source_check
 SELECT
   source_type,

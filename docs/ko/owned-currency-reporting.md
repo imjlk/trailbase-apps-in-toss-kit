@@ -49,6 +49,7 @@
 - 반열린 구간 월별 집계(`period_start` 리터럴 포함, `period_end` 리터럴 제외)
 - 특정 시각 기준 잔액
 - 평가액 단위를 분리한 정책 버전별 집계
+- 이벤트가 기록된 정책의 적용 구간을 벗어났는지 확인하는 정책 구간 검사
 - 검증된 `CONVERT_IN`/`CONVERT_OUT` 한 쌍만 제외하는 중복 source 검사
 
 각 query의 timestamp 리터럴 두 개를 소비 앱 데이터베이스가 사용하는 단위로 바꾸세요.
@@ -63,6 +64,29 @@ snapshot을 사용해야 합니다.
 
 예문은 발행량과 현재 잔액을 의도적으로 분리합니다. 한 달에 10,000개를 발행하고
 6,000개를 교환했더라도 보고서의 발행량은 10,000개입니다.
+
+## 읽기 전용 보고 CLI
+
+runtime 패키지에는 `trailbase-owned-currency-report`도 포함되어 있습니다. 일관된
+SQLite snapshot을 읽고 쓰지 않으면서, 비식별화한 JSON 또는 CSV를 출력합니다.
+snapshot에는 `owned_currency_events`와 `owned_currency_policies`가 모두 있어야 합니다.
+
+```bash
+bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-currency-report.mjs \
+  --db path/to/trailbase.sqlite \
+  --period-start 1788192000000 \
+  --period-end 1790870400000 \
+  --timestamp-unit milliseconds \
+  --format json
+```
+
+스프레드시트나 제출용 작업표가 필요하면 `--format csv`를 사용하세요. 출력은 발행,
+소진, 변환, 교환, 평가액 단위, 기준 시각 잔액을 분리하며 source ID나 사용자 식별자를
+포함하지 않습니다. quality에는 정책 버전이 없거나 이벤트 시각이 해당 정책 버전의
+적용 구간 밖인 이벤트 수도 포함되며, CSV의 마지막 `quality` 행에도 이 값이 들어갑니다.
+기존 결제 원장 진단은 계속
+`trailbase-ledger-doctor`를 사용합니다.
+두 명령 모두 토스에 제출하지 않고 실시간 데이터베이스도 변경하지 않습니다.
 
 ## 월말 작업 순서
 
