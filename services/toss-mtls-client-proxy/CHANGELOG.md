@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.6.3 — 2026-09-21
+
+### Patch changes
+
+- [07ddf68](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/07ddf68095cb1da754a89aa790751cc1f67cbc0c) Adopt api-core/api-client 0.5.1 for shared promotion failure-text privacy and safe integer recipient validation. Remove the proxy's duplicate recursive redactor so a short recipient equal to a provider error code cannot corrupt that code. Existing v2 ledger schemas remain compatible; fractional or unsafe numeric recipient IDs must be replaced with exact strings before dispatch. — Thanks @imjlk!
+
 ## 0.6.2 — 2026-09-20
 
 ### Patch changes
