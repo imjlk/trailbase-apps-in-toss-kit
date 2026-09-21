@@ -1,17 +1,17 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-09-18T05:53:34.918Z
+- Fetched at: 2026-09-21T06:17:46.904Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
 - Apps in Toss release notes
   - URL: https://developers-apps-in-toss.toss.im/release-note/release-note.md
-  - SHA-256: `415ab6e8391bebcd7ed2ee9c9e93b850cb3608b98f634ba91ecc76c7eabc4fe6`
-  - Bytes: 21634
+  - SHA-256: `1234b52e8d569d2bf78678debfe777dc00609074994d852b2baa37aafc13a9fa`
+  - Bytes: 22175
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `b6800bd82649895487964860a22b90888f4094e41de26cbe6fb8bb459ddc2856`
-  - Bytes: 32846
+  - SHA-256: `5914106117456898c975b02ae7749355f76a4bf0b9e56209c116031af5bd3722`
+  - Bytes: 33184
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
   - SHA-256: `5e1de62ddaec01667f094e0f90eee5151b598aacd7971117180dfb9c42660f3c`
