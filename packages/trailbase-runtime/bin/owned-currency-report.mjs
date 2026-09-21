@@ -137,6 +137,12 @@ function sourceCommit() {
   } catch {
     return null;
   }
+  const status = spawnSync(
+    'git',
+    ['-C', kitRoot, 'status', '--porcelain=v1', '--untracked-files=no'],
+    { encoding: 'utf8' },
+  );
+  if (status.status !== 0 || status.stdout.trim()) return null;
   const head = spawnSync('git', ['-C', kitRoot, 'rev-parse', 'HEAD'], { encoding: 'utf8' });
   return head.status === 0 && /^[a-f0-9]{40,64}$/.test(head.stdout.trim()) ? head.stdout.trim() : null;
 }

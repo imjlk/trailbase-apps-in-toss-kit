@@ -42,6 +42,7 @@ describe("owned currency report", () => {
       expect(report.period).toEqual({ start: 1000, end: 5000 });
       expect(report.quality).toEqual({
         duplicateSourceCount: 1,
+        orphanedConversionGroupCount: 0,
         missingPolicyEventCount: 1,
         missingValuationEventCount: 1,
         policyWindowMismatchEventCount: 1,
@@ -104,6 +105,7 @@ describe("owned currency report", () => {
       const column = name => header.indexOf(name);
       const qualityValues = qualityRow.split(",");
       expect(qualityValues[column("duplicateSourceCount")]).toBe("1");
+      expect(qualityValues[column("orphanedConversionGroupCount")]).toBe("0");
       expect(qualityValues[column("missingPolicyEventCount")]).toBe("1");
       expect(qualityValues[column("missingValuationEventCount")]).toBe("1");
       expect(qualityValues[column("policyWindowMismatchEventCount")]).toBe("1");
@@ -125,6 +127,40 @@ describe("owned currency report", () => {
       expect(fixedPeriodValues[column("policyConversionDenominator")]).toBe("100");
       expect(fixedPeriodValues[column("policyEffectiveFrom")]).toBe("0");
       expect(csv).not.toContain("same-source");
+    } finally {
+      db.close();
+    }
+  });
+
+  test("only flags missing market valuations and detects orphaned conversion groups", () => {
+    const db = createDatabase();
+    try {
+      seedPolicy(db, "market_currency", "count", "v1", "MARKET_SNAPSHOT", "KRW", null, null, 0, null);
+      seedPolicy(db, "plain_currency", "count", "v1", "NONE", null, null, null, 0, null);
+      insertEvent(db, ["market-missing", "market_currency", "count", "EXCHANGE", -1, "promotion", "market-exchange", "event:market-exchange", "v1", null, "market-exchange", null, null, 1000]);
+      insertEvent(db, ["plain-none", "plain_currency", "count", "EXCHANGE", -1, "promotion", "plain-exchange", "event:plain-exchange", "v1", null, "plain-exchange", null, null, 1000]);
+      insertEvent(db, ["orphan-convert-out", "market_currency", "count", "CONVERT_OUT", -2, "refine", "orphan-refine", "event:orphan-refine", "v1", "orphan-group", null, null, null, 1000]);
+
+      const report = buildOwnedCurrencyReport({
+        db,
+        periodStart: 0,
+        periodEnd: 2000,
+        timestampUnit: "milliseconds",
+        now: 2000,
+      });
+
+      expect(report.quality).toMatchObject({
+        missingValuationEventCount: 1,
+        orphanedConversionGroupCount: 1,
+      });
+      expect(report.lines.find(line => line.currencyCode === "market_currency")).toMatchObject({
+        missingValuationEventCount: 1,
+        policy: { valuationMode: "MARKET_SNAPSHOT" },
+      });
+      expect(report.lines.find(line => line.currencyCode === "plain_currency")).toMatchObject({
+        missingValuationEventCount: 0,
+        policy: { valuationMode: "NONE" },
+      });
     } finally {
       db.close();
     }

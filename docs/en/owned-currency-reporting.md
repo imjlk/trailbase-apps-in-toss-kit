@@ -64,7 +64,9 @@ The read-only examples in
 - policy-version breakdown with recorded valuation denominations; and
 - policy-window mismatches where an event falls outside its recorded policy's
   effective interval; and
-- duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair.
+- duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair;
+- missing `MARKET_SNAPSHOT` valuation observations; and
+- orphaned conversion groups at an as-of cutoff.
 
 Replace the two timestamp literals at the top of each query with values in the
 unit used by the consumer database. The examples are for an authenticated
@@ -100,10 +102,16 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-curre
 Use `--format csv` for a spreadsheet or submission worksheet. The output keeps
 issuance, consumption, conversion, exchange, valuation denominations, and
 as-of balances separate; it does not include source IDs or user identifiers.
-The quality section also counts events whose policy version is missing or whose
-event time falls outside that policy version's effective window. CSV output
-includes those quality counts as a final `quality` row and records the period,
-timestamp unit, generation time, and CLI provenance in a `metadata` row.
+CSV period rows retain the policy valuation mode, rational conversion rate, and
+effective window. The quality section also counts events whose policy version
+is missing, whose event time falls outside that policy version's effective
+window, missing `MARKET_SNAPSHOT` valuation observations, and orphaned
+conversion groups at the report cutoff. An exchange under a `NONE` policy
+does not require a valuation observation. CSV output includes those quality
+counts as a final `quality` row and records the period, timestamp unit,
+generation time, and CLI provenance in a `metadata` row. If tracked files in
+the checkout are modified, the CLI omits `sourceCommit` rather than claiming
+the report came from the committed `HEAD`.
 `trailbase-ledger-doctor` remains the diagnostic tool for the existing payment
 ledgers. Neither command submits data to Toss or changes the live database.
 

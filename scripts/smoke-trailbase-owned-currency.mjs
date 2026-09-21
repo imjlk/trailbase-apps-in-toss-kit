@@ -138,9 +138,23 @@ try {
     event_count: 1,
   }]);
 
+  assert.deepEqual(
+    db.query(withTestWindow(queries.missing_market_valuation_check, 1000, 7000)).all(),
+    [],
+  );
+  assert.deepEqual(
+    db.query(withTestAsOf(queries.orphaned_conversion_group_check, 7000)).all(),
+    [],
+  );
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), []);
   add(["duplicate-direction-1", X01, "gold_dust", "mg", "CONVERT_OUT", -2, "refine", "r-duplicate", "event:duplicate-direction-1", "v1", "conversion-duplicate", null, null, null, 6400, 6400, "{}"]);
   add(["duplicate-direction-2", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-duplicate", "event:duplicate-direction-2", "v1", "conversion-duplicate", null, null, null, 6401, 6401, "{}"]);
+  assert.deepEqual(db.query(withTestAsOf(queries.orphaned_conversion_group_check, 7000)).all(), [{
+    conversion_group_id: "conversion-duplicate",
+    event_count: 2,
+    convert_in_count: 0,
+    convert_out_count: 2,
+  }]);
   let duplicates = db.query(queries.duplicate_source_check).all();
   assert.equal(duplicates.length, 1);
   assert.deepEqual(duplicates.find(row => row.source_id === "r-duplicate"), {
@@ -149,6 +163,20 @@ try {
     event_count: 2,
   });
   add(["duplicate-conversion", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-1", "event:duplicate-conversion", "v1", "conversion-1", null, null, null, 6400, 6400, "{}"]);
+  assert.deepEqual(db.query(withTestAsOf(queries.orphaned_conversion_group_check, 7000)).all(), [
+    {
+      conversion_group_id: "conversion-1",
+      event_count: 3,
+      convert_in_count: 1,
+      convert_out_count: 2,
+    },
+    {
+      conversion_group_id: "conversion-duplicate",
+      event_count: 2,
+      convert_in_count: 0,
+      convert_out_count: 2,
+    },
+  ]);
   duplicates = db.query(queries.duplicate_source_check).all();
   assert.equal(duplicates.length, 2);
   assert.deepEqual(duplicates.find(row => row.source_id === "r-1"), {

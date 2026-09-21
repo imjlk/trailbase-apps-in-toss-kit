@@ -56,6 +56,8 @@ forward-only migration으로 복사해 사용하세요. `owned_currency_events` 
 - 평가액 단위를 분리한 정책 버전별 집계
 - 이벤트가 기록된 정책의 적용 구간을 벗어났는지 확인하는 정책 구간 검사
 - 검증된 `CONVERT_IN`/`CONVERT_OUT` 한 쌍만 제외하는 중복 source 검사
+- `MARKET_SNAPSHOT` 평가액 누락 검사
+- 기준 시각의 짝이 맞지 않는 변환 그룹 검사
 
 각 query의 timestamp 리터럴 두 개를 소비 앱 데이터베이스가 사용하는 단위로 바꾸세요.
 예문은 운영자/admin SQL Editor 세션에서 실행하고, 보고서를 만들 때는 일관된 데이터베이스
@@ -87,9 +89,13 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-curre
 
 스프레드시트나 제출용 작업표가 필요하면 `--format csv`를 사용하세요. 출력은 발행,
 소진, 변환, 교환, 평가액 단위, 기준 시각 잔액을 분리하며 source ID나 사용자 식별자를
-포함하지 않습니다. quality에는 정책 버전이 없거나 이벤트 시각이 해당 정책 버전의
-적용 구간 밖인 이벤트 수도 포함되며, CSV의 마지막 `quality` 행에도 이 값이 들어갑니다.
-CSV에는 기간, timestamp 단위, 생성 시각, CLI provenance를 담은 `metadata` 행도 포함됩니다.
+포함하지 않습니다. CSV의 기간 행에는 정책의 평가 모드, 유리수 전환 비율, 적용 구간도
+남습니다. quality에는 정책 버전이 없거나 이벤트 시각이 해당 정책 버전의 적용 구간 밖인
+이벤트, `MARKET_SNAPSHOT` 평가액 누락, 보고 기준 시각의 짝이 맞지 않는 변환 그룹도
+포함됩니다. `NONE` 정책의 교환은 평가액이 없어도 누락으로 표시하지 않습니다. CSV의
+마지막 `quality` 행에는 이 값이 들어가며, 기간, timestamp 단위, 생성 시각, CLI provenance를
+담은 `metadata` 행도 포함됩니다. checkout의 추적 파일이 수정된 상태라면 CLI는 커밋된
+`HEAD`에서 생성된 것으로 오인하지 않도록 `sourceCommit`을 비워 둡니다.
 기존 결제 원장 진단은 계속
 `trailbase-ledger-doctor`를 사용합니다.
 두 명령 모두 토스에 제출하지 않고 실시간 데이터베이스도 변경하지 않습니다.

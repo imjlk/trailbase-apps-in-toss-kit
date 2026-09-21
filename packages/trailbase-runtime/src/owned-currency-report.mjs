@@ -46,7 +46,10 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
         SUM(CASE WHEN e.event_type = 'ADJUSTMENT' AND e.quantity > 0 THEN e.quantity ELSE 0 END) AS adjustment_credit_quantity,
         SUM(CASE WHEN e.event_type = 'ADJUSTMENT' AND e.quantity < 0 THEN -e.quantity ELSE 0 END) AS adjustment_debit_quantity,
         SUM(CASE WHEN e.event_type = 'EXCHANGE' THEN COALESCE(e.valuation_amount, 0) ELSE 0 END) AS recorded_valuation_amount,
-        SUM(CASE WHEN e.event_type = 'EXCHANGE' AND e.valuation_amount IS NULL THEN 1 ELSE 0 END) AS missing_valuation_event_count,
+        SUM(CASE WHEN e.event_type = 'EXCHANGE'
+                  AND p.valuation_mode = 'MARKET_SNAPSHOT'
+                  AND e.valuation_amount IS NULL
+                 THEN 1 ELSE 0 END) AS missing_valuation_event_count,
         COUNT(*) AS event_count,
         p.valuation_mode,
         p.valuation_currency_code AS policy_valuation_currency_code,
@@ -136,12 +139,31 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
 
     const missingValuationEventCount = integer(db.query(`
       SELECT COUNT(*) AS count
-      FROM owned_currency_events
-      WHERE occurred_at >= ?
-        AND occurred_at < ?
-        AND event_type = 'EXCHANGE'
-        AND valuation_amount IS NULL
+      FROM owned_currency_events e
+      JOIN owned_currency_policies p
+        ON p.currency_code = e.currency_code
+       AND p.unit_code = e.unit_code
+       AND p.policy_version = e.policy_version
+      WHERE e.occurred_at >= ?
+        AND e.occurred_at < ?
+        AND e.event_type = 'EXCHANGE'
+        AND p.valuation_mode = 'MARKET_SNAPSHOT'
+        AND e.valuation_amount IS NULL
     `).get(periodStart, periodEnd).count);
+
+    const orphanedConversionGroupCount = integer(db.query(`
+      SELECT COUNT(*) AS count
+      FROM (
+        SELECT conversion_group_id
+        FROM owned_currency_events
+        WHERE occurred_at < ?
+          AND conversion_group_id IS NOT NULL
+        GROUP BY conversion_group_id
+        HAVING COUNT(*) <> 2
+           OR SUM(CASE WHEN event_type = 'CONVERT_IN' THEN 1 ELSE 0 END) <> 1
+           OR SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) <> 1
+      )
+    `).get(periodEnd).count);
 
     const unknownEventCount = integer(db.query(`
       SELECT COUNT(*) AS count
@@ -160,6 +182,7 @@ export function buildOwnedCurrencyReport({ db, periodStart, periodEnd, timestamp
       balances,
       quality: {
         duplicateSourceCount,
+        orphanedConversionGroupCount,
         missingPolicyEventCount,
         missingValuationEventCount,
         policyWindowMismatchEventCount,
@@ -178,7 +201,8 @@ export function formatOwnedCurrencyCsv(report) {
     "exchangedQuantity", "expiredQuantity", "adjustmentCreditQuantity", "adjustmentDebitQuantity",
     "recordedValuationAmount", "missingValuationEventCount", "eventCount", "balanceQuantity",
     "policyPresent",
-    "duplicateSourceCount", "missingPolicyEventCount", "policyWindowMismatchEventCount", "unknownEventCount",
+    "duplicateSourceCount", "orphanedConversionGroupCount", "missingPolicyEventCount",
+    "policyWindowMismatchEventCount", "unknownEventCount",
     "periodStart", "periodEnd", "timestampUnit", "generatedAt",
     "toolName", "toolVersion", "sourceCommit", "reportedServerVersion",
   ];
@@ -232,6 +256,7 @@ export function formatOwnedCurrencyCsv(report) {
     rowType: "quality",
     missingValuationEventCount: report.quality.missingValuationEventCount,
     duplicateSourceCount: report.quality.duplicateSourceCount,
+    orphanedConversionGroupCount: report.quality.orphanedConversionGroupCount,
     missingPolicyEventCount: report.quality.missingPolicyEventCount,
     policyWindowMismatchEventCount: report.quality.policyWindowMismatchEventCount,
     unknownEventCount: report.quality.unknownEventCount,

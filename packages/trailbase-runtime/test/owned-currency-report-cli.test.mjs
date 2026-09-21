@@ -44,6 +44,13 @@ test('owned currency report CLI emits redacted JSON and CSV from a readonly snap
     const report = JSON.parse(json.stdout);
     expect(report.lines[0]).toMatchObject({ currencyCode: 'stars', issuedQuantity: 3 });
     expect(report.tool.name).toBe('trailbase-owned-currency-report');
+    const trackedStatus = spawnSync(
+      'git',
+      ['status', '--porcelain=v1', '--untracked-files=no'],
+      { cwd: repoRoot, encoding: 'utf8' },
+    );
+    if (trackedStatus.stdout.trim()) expect(report.tool.sourceCommit).toBeNull();
+    else expect(report.tool.sourceCommit).toMatch(/^[a-f0-9]{40}$/);
     expect(json.stdout).not.toContain('private-source-id');
 
     const csv = run(databasePath, '--format', 'csv');

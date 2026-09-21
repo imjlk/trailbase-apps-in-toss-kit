@@ -110,3 +110,46 @@ HAVING COUNT(*) > 1
      OR SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) <> 1
    )
 ORDER BY event_count DESC, source_type, source_id;
+
+-- Query: missing_market_valuation_check
+WITH period AS (
+  SELECT
+    CAST(1788192000000 AS INTEGER) AS period_start,
+    CAST(1790870400000 AS INTEGER) AS period_end
+)
+SELECT
+  e.currency_code,
+  e.unit_code,
+  e.policy_version,
+  COUNT(*) AS missing_valuation_event_count
+FROM owned_currency_events e
+JOIN owned_currency_policies p
+  ON p.currency_code = e.currency_code
+ AND p.unit_code = e.unit_code
+ AND p.policy_version = e.policy_version
+CROSS JOIN period
+WHERE e.occurred_at >= period_start
+  AND e.occurred_at < period_end
+  AND e.event_type = 'EXCHANGE'
+  AND p.valuation_mode = 'MARKET_SNAPSHOT'
+  AND e.valuation_amount IS NULL
+GROUP BY e.currency_code, e.unit_code, e.policy_version
+ORDER BY e.currency_code, e.unit_code, e.policy_version;
+
+-- Query: orphaned_conversion_group_check
+WITH period AS (
+  SELECT CAST(1790870400000 AS INTEGER) AS as_of
+)
+SELECT
+  conversion_group_id,
+  COUNT(*) AS event_count,
+  SUM(CASE WHEN event_type = 'CONVERT_IN' THEN 1 ELSE 0 END) AS convert_in_count,
+  SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) AS convert_out_count
+FROM owned_currency_events, period
+WHERE occurred_at < as_of
+  AND conversion_group_id IS NOT NULL
+GROUP BY conversion_group_id
+HAVING COUNT(*) <> 2
+   OR SUM(CASE WHEN event_type = 'CONVERT_IN' THEN 1 ELSE 0 END) <> 1
+   OR SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) <> 1
+ORDER BY conversion_group_id;
