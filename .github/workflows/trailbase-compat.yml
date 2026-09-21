@@ -17,7 +17,9 @@ on:
       - "packages/trailbase-client/**"
       - "rust-toolchain.toml"
       - "scripts/check-trailbase-version-policy.mjs"
+      - "scripts/smoke-trailbase-owned-currency.mjs"
       - "scripts/smoke-trailbase-wasm.mjs"
+      - "templates/trailbase/sql-editor/**"
       - "templates/trailbase/sql/**"
       - "services/toss-mtls-client-proxy/**"
       - "scripts/snapshot-trailbase-release.mjs"
@@ -154,3 +156,6 @@ jobs:
         env:
           KIT_SMOKE_OPERATIONS_HOLD: "1"
         run: bun run trailbase:wasm:smoke
+
+      - name: Verify owned-currency journal and SQL Editor queries
+        run: bun run trailbase:owned-currency:smoke
