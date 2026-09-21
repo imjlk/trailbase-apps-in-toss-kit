@@ -40,6 +40,11 @@ explicit `unit_code`. Store valuation as an integer amount and capture the
 `policy_version` that produced it. Do not recalculate historical value from a
 current exchange rate or market price.
 
+`idempotency_key` is globally unique within the journal. Prefix it with the app,
+source, and source-event scope rather than assuming that a user-local key is
+unique. The source check query still catches the same source action recorded
+under different idempotency keys.
+
 ## SQL Editor examples
 
 The read-only examples in

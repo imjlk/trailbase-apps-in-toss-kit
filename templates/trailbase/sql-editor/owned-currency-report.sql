@@ -74,7 +74,12 @@ SELECT
 FROM owned_currency_events
 GROUP BY source_type, source_id
 -- A conversion intentionally has one input and one output row. Its shared
--- conversion_group_id makes that pair safe; other repeated sources need review.
+-- conversion_group_id makes exactly that pair safe; other repeated sources
+-- need review. A third row in the same conversion group is also suspicious.
 HAVING COUNT(*) > 1
-   AND COUNT(DISTINCT COALESCE(conversion_group_id, '__no_conversion__')) > 1
+   AND (
+     COUNT(DISTINCT COALESCE(conversion_group_id, '__no_conversion__')) > 1
+     OR MAX(conversion_group_id) IS NULL
+     OR COUNT(*) <> 2
+   )
 ORDER BY event_count DESC, source_type, source_id;

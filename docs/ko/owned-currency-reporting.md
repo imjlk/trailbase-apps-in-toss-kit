@@ -34,6 +34,10 @@
 저장하세요. 평가액도 정수로 저장하고 그 값을 계산한 `policy_version`을 함께 남깁니다.
 현재 전환율이나 시세로 과거 값을 다시 계산하지 않습니다.
 
+`idempotency_key`는 이 원장 안에서 전역적으로 유일합니다. 사용자 로컬 키가 전역적으로
+유일하다고 가정하지 말고 앱·source·원본 이벤트 범위를 접두사로 포함하세요. source
+검사 query는 서로 다른 멱등 키로 같은 source 작업을 기록한 경우도 찾아냅니다.
+
 ## SQL Editor 예문
 
 `templates/trailbase/sql-editor/owned-currency-report.sql`의 읽기 전용 예문은
