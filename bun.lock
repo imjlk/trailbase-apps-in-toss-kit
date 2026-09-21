@@ -74,8 +74,8 @@
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
       "version": "0.6.2",
       "dependencies": {
-        "@ait-kit/api-client": "0.5.0",
-        "@ait-kit/api-core": "0.5.0",
+        "@ait-kit/api-client": "0.5.1",
+        "@ait-kit/api-core": "0.5.1",
       },
       "devDependencies": {
         "@trailbase-apps-in-toss-kit/trailbase-runtime": "workspace:*",
@@ -83,9 +83,9 @@
     },
   },
   "packages": {
-    "@ait-kit/api-client": ["@ait-kit/api-client@0.5.0", "", { "dependencies": { "@ait-kit/api-core": "0.5.0" } }, "sha512-cRU97hyxfgATpfLSk9mE6mWh+Wm7/tCO7o1+0OY3Nyi4TQwbVml0GRnb/VyOsLNgn6nOgGj1DmuqCxTrgPOGag=="],
+    "@ait-kit/api-client": ["@ait-kit/api-client@0.5.1", "", { "dependencies": { "@ait-kit/api-core": "0.5.1" } }, "sha512-DHue6Zt17kr4MSuGCukILycGrhxm+4n4ZluS4E0alaeNEvau13oxjPaXOPuG9p6vxr1s6JQGysOkqbFnLJQFfA=="],
 
-    "@ait-kit/api-core": ["@ait-kit/api-core@0.5.0", "", {}, "sha512-PAURuVdPKqtjCaUupKvKjEjkp6FZNeNtTi9XA9rBlXl5VwF4cls4djdLlWR/J0VnvtPcmoT6u0UeQsM2Rx1rpA=="],
+    "@ait-kit/api-core": ["@ait-kit/api-core@0.5.1", "", {}, "sha512-LmzRPW8PjcTlRJO/IktieSMd3m4g5JCTpA9DWHky+QRcJgc7/6cGdxueU239ueP0gpcQjnBhQANmSikfd3o6ZA=="],
 
     "@ait-kit/sdk": ["@ait-kit/sdk@0.3.0", "", { "peerDependencies": { "@apps-in-toss/framework": ">=2.10.10", "@apps-in-toss/web-framework": ">=3.4.0" }, "optionalPeers": ["@apps-in-toss/framework", "@apps-in-toss/web-framework"] }, "sha512-Odr8HSo9XlBl8iqcIX+v3dj7N5n046oo/Ba3OefYyM1E+rMVY8QXzJHkg3BPbUV2VCq52rugoD37GvBFJuX4TA=="],
 

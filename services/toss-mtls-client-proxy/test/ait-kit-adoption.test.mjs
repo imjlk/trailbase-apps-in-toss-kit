@@ -765,6 +765,42 @@ describe("toss-mtls-client-proxy ait-kit adoption", () => {
     });
   }
 
+  test("api-core privacy does not rewrite an error code equal to a short recipient", async () => {
+    const upstreamServer = http.createServer(async (req, res) => {
+      await readRequestJson(req);
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "FAIL", error: { errorCode: "4113", reason: "recipient 4113 rejected" } }));
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      const res = await handleRequest(request("POST", PROXY_ENDPOINTS.promotionExecuteReward, {
+        userKey: 4113, promotionCode: "campaign", amount: 5, providerTransactionKey: "key-4113",
+      }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(res.body.failureReason).toBe("[redacted]");
+      expect(res.body.providerErrorCode).toBe("4113");
+      expect(res.body.providerTransactionKey).toBe("key-4113");
+    });
+  });
+
+  test("invalid numeric promotion recipients never reach the upstream", async () => {
+    let calls = 0;
+    const upstreamServer = http.createServer((_req, res) => {
+      calls++;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end("{}");
+    });
+    await withServer(upstreamServer, async (upstreamBaseUrl) => {
+      for (const value of [1.5, Number.MAX_SAFE_INTEGER + 1]) {
+        for (const endpoint of [PROXY_ENDPOINTS.promotionPrepareReward, PROXY_ENDPOINTS.promotionExecuteReward, PROXY_ENDPOINTS.promotionRewardStatus]) {
+          await expect(handleRequest(request("POST", endpoint, {
+            userKey: value, promotionCode: "campaign", amount: 5, providerTransactionKey: "key",
+          }, { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl }))
+            .rejects.toMatchObject({ code: "INVALID_PROMOTION_RECIPIENT" });
+        }
+      }
+      expect(calls).toBe(0);
+    });
+  });
+
   test("plain-HTTP 204, 205, and 304 responses carry a null body without crashing", async () => {
     for (const status of [204, 205, 304]) {
       const upstreamServer = http.createServer((req, res) => {
