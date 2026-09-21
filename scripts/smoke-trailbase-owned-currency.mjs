@@ -101,26 +101,36 @@ try {
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), []);
   add(["duplicate-direction-1", X01, "gold_dust", "mg", "CONVERT_OUT", -2, "refine", "r-duplicate", "event:duplicate-direction-1", "v1", "conversion-duplicate", null, null, null, 6400, 6400, "{}"]);
   add(["duplicate-direction-2", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-duplicate", "event:duplicate-direction-2", "v1", "conversion-duplicate", null, null, null, 6401, 6401, "{}"]);
-  assert.deepEqual(db.query(queries.duplicate_source_check).all().find(row => row.source_id === "r-duplicate"), {
+  let duplicates = db.query(queries.duplicate_source_check).all();
+  assert.equal(duplicates.length, 1);
+  assert.deepEqual(duplicates.find(row => row.source_id === "r-duplicate"), {
     source_type: "refine",
     source_id: "r-duplicate",
     event_count: 2,
   });
   add(["duplicate-conversion", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-1", "event:duplicate-conversion", "v1", "conversion-1", null, null, null, 6400, 6400, "{}"]);
-  assert.deepEqual(db.query(queries.duplicate_source_check).all().find(row => row.source_id === "r-1"), {
+  duplicates = db.query(queries.duplicate_source_check).all();
+  assert.equal(duplicates.length, 2);
+  assert.deepEqual(duplicates.find(row => row.source_id === "r-1"), {
     source_type: "refine",
     source_id: "r-1",
     event_count: 3,
   });
   add(["duplicate-source", X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "a-1", "event:duplicate-source", "v2", null, null, null, null, 6500, 6500, "{}"]);
-  assert.deepEqual(db.query(queries.duplicate_source_check).all().find(row => row.source_id === "a-1"), {
+  duplicates = db.query(queries.duplicate_source_check).all();
+  assert.equal(duplicates.length, 3);
+  assert.deepEqual(duplicates.find(row => row.source_id === "a-1"), {
     source_type: "operator",
     source_id: "a-1",
     event_count: 2,
   });
   assert.throws(() => add(["duplicate-idempotency", X01, "stars", "count", "ISSUE", 1, "vote", "v-2", "event:star-issue", "v1", null, null, null, null, 7000, 7000, "{}"]));
-  assert.throws(() => add(["invalid-conversion-id", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-invalid", "event:invalid-conversion-id", "v1", " ", null, null, null, 7100, 7100, "{}"]));
-  assert.throws(() => add(["invalid-exchange-id", X01, "gold_dust", "mg", "EXCHANGE", -1, "promotion", "p-invalid", "event:invalid-exchange-id", "v1", null, " ", 1, "TOSS_POINT", 7100, 7100, "{}"]));
+  for (const conversionGroupId of [" ", " conversion-1"]) {
+    assert.throws(() => add(["invalid-conversion-id", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-invalid", "event:invalid-conversion-id", "v1", conversionGroupId, null, null, null, 7100, 7100, "{}"]));
+  }
+  for (const exchangeId of [" ", " exchange-1"]) {
+    assert.throws(() => add(["invalid-exchange-id", X01, "gold_dust", "mg", "EXCHANGE", -1, "promotion", "p-invalid", "event:invalid-exchange-id", "v1", null, exchangeId, 1, "TOSS_POINT", 7100, 7100, "{}"]));
+  }
 
   db.query("DELETE FROM _user WHERE id = X'01'").run();
   assert.equal(db.query("SELECT user_id FROM owned_currency_events WHERE id = 'gold-issue'").get().user_id, null);

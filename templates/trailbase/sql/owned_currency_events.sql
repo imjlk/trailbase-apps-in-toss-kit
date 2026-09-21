@@ -37,11 +37,17 @@ CREATE TABLE IF NOT EXISTS owned_currency_events (
   policy_version TEXT NOT NULL CHECK (length(trim(policy_version)) BETWEEN 1 AND 64),
   conversion_group_id TEXT CHECK (
     conversion_group_id IS NULL
-    OR length(trim(conversion_group_id)) BETWEEN 1 AND 256
+    OR (
+      length(trim(conversion_group_id)) BETWEEN 1 AND 256
+      AND conversion_group_id = trim(conversion_group_id)
+    )
   ),
   exchange_id TEXT CHECK (
     exchange_id IS NULL
-    OR length(trim(exchange_id)) BETWEEN 1 AND 256
+    OR (
+      length(trim(exchange_id)) BETWEEN 1 AND 256
+      AND exchange_id = trim(exchange_id)
+    )
   ),
   valuation_amount INTEGER CHECK (valuation_amount IS NULL OR valuation_amount >= 0),
   valuation_currency_code TEXT CHECK (

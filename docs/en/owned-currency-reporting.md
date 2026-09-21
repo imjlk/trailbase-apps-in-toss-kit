@@ -35,6 +35,9 @@ not another issuance. An exchange uses an `exchange_id`; its reservation and
 Toss provider state belong in a separate exchange table and the existing
 promotion ledger.
 
+Conversion and exchange identifiers must be non-empty and already trimmed. Treat
+them as stable join keys; do not normalize them differently in separate adapters.
+
 Store grams, points, and other fractional values as integer minor units with an
 explicit `unit_code`. Store valuation as an integer amount and capture the
 `policy_version` that produced it. Do not recalculate historical value from a
