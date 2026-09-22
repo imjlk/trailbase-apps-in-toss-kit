@@ -16,6 +16,19 @@ try {
   db.exec("CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT");
   db.exec("INSERT INTO _user VALUES (X'01')");
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_events.sql"), "utf8"));
+  db.exec(readFileSync(path.join(sqlDir, "owned_currency_policies.sql"), "utf8"));
+  db.query(`INSERT INTO owned_currency_policies
+    (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
+     conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "gold_dust", "mg", "v1", "FIXED_RATE", "TOSS_POINT", 1, 100, 0, null, 0,
+  );
+  db.query(`INSERT INTO owned_currency_policies
+    (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
+     conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "gold_dust", "mg", "v2", "MARKET_SNAPSHOT", "KRW", null, null, 6000, null, 6000,
+  );
   const indexes = db.query("PRAGMA index_list('owned_currency_events')").all().map(row => row.name);
   assert.ok(indexes.includes("idx_owned_currency_events_time"));
 
@@ -87,6 +100,7 @@ try {
   ]);
 
   add(["gold-exchange-krw", X01, "gold_dust", "mg", "EXCHANGE", -5, "promotion", "p-2", "event:gold-exchange-krw", "v1", null, "exchange-2", 100, "KRW", 4500, 4500, "{}"]);
+  add(["gold-policy-window", X01, "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "window-1", "event:gold-policy-window", "v2", null, null, null, null, 5500, 5500, "{}"]);
   const policy = db.query(withTestWindow(queries.policy_breakdown, 1000, 7000)).all();
   const valuedGoldPolicyRows = policy
     .filter(row => row.currency_code === "gold_dust" && row.policy_version === "v1" && row.valuation_currency_code)
@@ -97,10 +111,50 @@ try {
     { valuation_currency_code: "TOSS_POINT", exchanged_quantity: 10, recorded_valuation_amount: 50 },
   ]);
   assert.equal(policy.find(row => row.currency_code === "gold_dust" && row.policy_version === "v2").issued_quantity, 0);
+  const policyWindowMismatches = db.query(withTestWindow(queries.policy_window_check, 1000, 7000)).all();
+  assert.deepEqual(policyWindowMismatches, [{
+    currency_code: "gold_bar",
+    unit_code: "mg",
+    policy_version: "v1",
+    effective_from: null,
+    effective_to: null,
+    policy_present: 0,
+    event_count: 1,
+  }, {
+    currency_code: "gold_dust",
+    unit_code: "mg",
+    policy_version: "v2",
+    effective_from: 6000,
+    effective_to: null,
+    policy_present: 1,
+    event_count: 1,
+  }, {
+    currency_code: "stars",
+    unit_code: "count",
+    policy_version: "v1",
+    effective_from: null,
+    effective_to: null,
+    policy_present: 0,
+    event_count: 1,
+  }]);
 
+  assert.deepEqual(
+    db.query(withTestWindow(queries.missing_market_valuation_check, 1000, 7000)).all(),
+    [],
+  );
+  assert.deepEqual(
+    db.query(withTestAsOf(queries.orphaned_conversion_group_check, 7000)).all(),
+    [],
+  );
   assert.deepEqual(db.query(queries.duplicate_source_check).all(), []);
   add(["duplicate-direction-1", X01, "gold_dust", "mg", "CONVERT_OUT", -2, "refine", "r-duplicate", "event:duplicate-direction-1", "v1", "conversion-duplicate", null, null, null, 6400, 6400, "{}"]);
   add(["duplicate-direction-2", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-duplicate", "event:duplicate-direction-2", "v1", "conversion-duplicate", null, null, null, 6401, 6401, "{}"]);
+  assert.deepEqual(db.query(withTestAsOf(queries.orphaned_conversion_group_check, 7000)).all(), [{
+    conversion_group_id: "conversion-duplicate",
+    event_count: 2,
+    convert_in_count: 0,
+    convert_out_count: 2,
+  }]);
   let duplicates = db.query(queries.duplicate_source_check).all();
   assert.equal(duplicates.length, 1);
   assert.deepEqual(duplicates.find(row => row.source_id === "r-duplicate"), {
@@ -109,6 +163,20 @@ try {
     event_count: 2,
   });
   add(["duplicate-conversion", X01, "gold_dust", "mg", "CONVERT_OUT", -1, "refine", "r-1", "event:duplicate-conversion", "v1", "conversion-1", null, null, null, 6400, 6400, "{}"]);
+  assert.deepEqual(db.query(withTestAsOf(queries.orphaned_conversion_group_check, 7000)).all(), [
+    {
+      conversion_group_id: "conversion-1",
+      event_count: 3,
+      convert_in_count: 1,
+      convert_out_count: 2,
+    },
+    {
+      conversion_group_id: "conversion-duplicate",
+      event_count: 2,
+      convert_in_count: 0,
+      convert_out_count: 2,
+    },
+  ]);
   duplicates = db.query(queries.duplicate_source_check).all();
   assert.equal(duplicates.length, 2);
   assert.deepEqual(duplicates.find(row => row.source_id === "r-1"), {

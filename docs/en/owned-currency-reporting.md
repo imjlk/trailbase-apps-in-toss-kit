@@ -8,10 +8,15 @@ the Toss console.
 
 ## What the kit provides
 
-Copy `templates/trailbase/sql/owned_currency_events.sql` into a consumer
-migration. The `owned_currency_events` table is a private journal of signed
-integer minor units. It records the event type, source, idempotency key, policy
-version, and optional valuation captured at the time of the event.
+Copy both `templates/trailbase/sql/owned_currency_events.sql` and
+`templates/trailbase/sql/owned_currency_policies.sql` into forward-only
+consumer migrations. The `owned_currency_events` table is a private journal
+of signed integer minor units. The `owned_currency_policies` table keeps the
+valuation mode, denomination, rational rate, and effective window for each
+policy version. Populate a policy row before writing events that reference its
+version; existing consumers must add this migration and backfill the policy
+history they can support before running the report CLI. Updating the kit
+submodule does not update migrations copied into a consumer app.
 
 Keep the table out of the public Record API. The optional `_user` reference is
 set to `NULL` when a user is deleted, so a later closed-period aggregate does
@@ -57,7 +62,11 @@ The read-only examples in
   `period_end` literal is exclusive);
 - balance as of a timestamp;
 - policy-version breakdown with recorded valuation denominations; and
-- duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair.
+- policy-window mismatches where an event falls outside its recorded policy's
+  effective interval; and
+- duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair;
+- missing `MARKET_SNAPSHOT` valuation observations; and
+- orphaned conversion groups at an as-of cutoff.
 
 Replace the two timestamp literals at the top of each query with values in the
 unit used by the consumer database. The examples are for an authenticated
@@ -73,6 +82,38 @@ database snapshot when preparing a report.
 The queries intentionally report issued quantity separately from current
 balance. A month with 10,000 units issued and 6,000 units exchanged still has
 10,000 units of issuance in the report.
+
+## Read-only report CLI
+
+The runtime package also includes `trailbase-owned-currency-report`. It reads a
+consistent SQLite snapshot without writing to it and emits either redacted JSON
+or CSV. The snapshot must contain both `owned_currency_events` and
+`owned_currency_policies`.
+
+```bash
+bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-currency-report.mjs \
+  --db path/to/trailbase.sqlite \
+  --period-start 1788192000000 \
+  --period-end 1790870400000 \
+  --timestamp-unit milliseconds \
+  --format json
+```
+
+Use `--format csv` for a spreadsheet or submission worksheet. The output keeps
+issuance, consumption, conversion, exchange, valuation denominations, and
+as-of balances separate; it does not include source IDs or user identifiers.
+CSV period rows retain the policy valuation mode, rational conversion rate, and
+effective window. The quality section also counts events whose policy version
+is missing, whose event time falls outside that policy version's effective
+window, missing `MARKET_SNAPSHOT` valuation observations, and orphaned
+conversion groups at the report cutoff. An exchange under a `NONE` policy
+does not require a valuation observation. CSV output includes those quality
+counts as a final `quality` row and records the period, timestamp unit,
+generation time, and CLI provenance in a `metadata` row. If tracked files in
+the checkout are modified, the CLI omits `sourceCommit` rather than claiming
+the report came from the committed `HEAD`.
+`trailbase-ledger-doctor` remains the diagnostic tool for the existing payment
+ledgers. Neither command submits data to Toss or changes the live database.
 
 ## Month-end workflow
 

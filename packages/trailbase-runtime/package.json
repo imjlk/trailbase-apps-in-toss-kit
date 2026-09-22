@@ -10,12 +10,14 @@
     "./release-doctor": "./src/release-doctor.mjs",
     "./proxy-capabilities": "./src/proxy-capabilities.mjs",
     "./ledger-doctor": "./src/ledger-doctor.mjs",
+    "./owned-currency-report": "./src/owned-currency-report.mjs",
     "./restore-checkpoint": "./src/restore-checkpoint.mjs"
   },
   "bin": {
     "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
     "trailbase-release-doctor": "./bin/release-doctor.mjs",
     "trailbase-ledger-doctor": "./bin/ledger-doctor.mjs",
+    "trailbase-owned-currency-report": "./bin/owned-currency-report.mjs",
     "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
     "trailbase-prod-env-validate": "./bin/validate-production-env.mjs"
   },
