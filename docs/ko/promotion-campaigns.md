@@ -45,6 +45,8 @@ promotion code를 저장하지 않습니다. 승인 상태는 운영자가 입�
 프로모션 성공, provider 응답만으로 `APPROVED`로 바꾸면 안 됩니다. 자체재화 원장의
 `policy_version`과 이 승인 기록의 `revision`은 회계 평가 기준과 프로모션 승인이라는 서로 다른
 사실이므로 분리하세요.
+`UNCONFIRMED` 또는 `PENDING` 기록은 설정 revision과 근거 참조를 비워 둘 수 있지만, 결정된
+상태에는 검토 시각과 두 참조가 모두 필요합니다.
 
 공유 SQL 템플릿은 운영 화면처럼 여러 상태를 함께 보는 경로를 위해 `feature_key/status` index를
 유지하고, provider 지급 전 hot lookup에는 `ACTIVE` partial index를 추가합니다. 활성 캠페인

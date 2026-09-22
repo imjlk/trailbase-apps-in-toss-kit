@@ -51,6 +51,9 @@ operator; an SDK call, test promotion, or provider response must never change it
 to `APPROVED`. Keep `policy_version` in the owned-currency journal separate
 from this approval `revision`, because accounting valuation and promotion
 approval are different facts.
+For `UNCONFIRMED` or `PENDING` records, the configuration and evidence reference
+may remain empty; decided statuses require both a review timestamp and those
+references.
 
 The shared SQL template keeps a general `feature_key/status` index for mixed
 operator views and also adds an `ACTIVE` partial index for the hot lookup path

@@ -108,6 +108,9 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-curre
 timestamp 단위, 시간대, 실제 보고서 바이트의 SHA-256, 비공개 snapshot 참조, source commit,
 보고 도구 버전, policy version 목록, 승인 근거 revision, 그리고 다음 단계의 순서가 기록됩니다.
 
+마감 manifest 검증기는 JSON 보고서 출력 바이트를 그대로 해시에 묶습니다. CSV는 사람이 보는
+작업표·내보내기로 사용하고, manifest의 보고서로는 JSON 산출물을 검증하세요.
+
 ```text
 GENERATED → REVIEWED → SUBMITTED
 ```

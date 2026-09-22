@@ -125,6 +125,10 @@ exact report bytes, a private snapshot reference, source commit, report tool
 version, policy versions, approval revision, and an ordered prefix of close
 records:
 
+The close-manifest validator binds the JSON report output byte-for-byte. Keep
+CSV as a human worksheet/export; validate the JSON artifact as the manifest's
+report.
+
 ```text
 GENERATED → REVIEWED → SUBMITTED
 ```

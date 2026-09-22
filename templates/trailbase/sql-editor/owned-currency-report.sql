@@ -200,8 +200,10 @@ SELECT
   CASE
     WHEN c.id IS NULL THEN 'CAMPAIGN_MISSING'
     WHEN a.campaign_id IS NULL THEN 'APPROVAL_MISSING'
-    WHEN a.approved_config_revision <> s.current_config_revision THEN 'CONFIG_REVISION_MISMATCH'
     WHEN a.recorded_approval_status = 'UNCONFIRMED' THEN 'UNCONFIRMED'
+    WHEN a.recorded_approval_status = 'PENDING' THEN 'OPERATOR_REVIEW_REQUIRED'
+    WHEN a.classification <> 'OWNED_CURRENCY' THEN 'CLASSIFICATION_MISMATCH'
+    WHEN a.approved_config_revision IS NOT s.current_config_revision THEN 'CONFIG_REVISION_MISMATCH'
     WHEN a.recorded_approval_status = 'APPROVED' THEN 'APPROVED'
     WHEN a.recorded_approval_status IN ('REJECTED', 'EXPIRED') THEN a.recorded_approval_status
     ELSE 'OPERATOR_REVIEW_REQUIRED'

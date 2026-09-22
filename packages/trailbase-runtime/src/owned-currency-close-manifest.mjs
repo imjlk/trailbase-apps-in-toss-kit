@@ -1,16 +1,20 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import {
+  isOwnedCurrencySafeNonNegativeInteger,
+  OWNED_CURRENCY_TIMESTAMP_UNITS,
+} from "./owned-currency-report.mjs";
 
 const MANIFEST_SCHEMA_VERSION = 1;
-const REPORT_FORMATS = new Set(["json", "csv"]);
-const TIMESTAMP_UNITS = new Set(["seconds", "milliseconds"]);
+const REPORT_FORMATS = new Set(["json"]);
+const TIMESTAMP_UNITS = new Set(OWNED_CURRENCY_TIMESTAMP_UNITS);
 const CLOSE_STAGES = ["GENERATED", "REVIEWED", "SUBMITTED"];
 const SAFE_REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SAFE_TIMEZONE = /^[A-Za-z0-9][A-Za-z0-9._+/-]{0,63}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
-const COMMIT = /^[a-f0-9]{40,64}$/;
+const COMMIT = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const FORBIDDEN_REFERENCE =
-  /(promotion[_-]?code|user[_-]?key|hmac|sealed|token|secret|private[_-]?key)/i;
+  /(promotion[_-]?code|user[_-]?key|api[_-]?key|pass(word|phrase)?|credential|hmac|sealed|token|secret|private[_-]?key)/i;
 
 export class OwnedCurrencyCloseManifestError extends Error {
   constructor(code) {
@@ -22,7 +26,7 @@ export class OwnedCurrencyCloseManifestError extends Error {
 
 export function validateOwnedCurrencyCloseManifest(
   manifest,
-  { reportBytes, report } = {},
+  { reportBytes } = {},
 ) {
   const normalized = validateManifestShape(manifest);
   if (reportBytes === undefined) {
@@ -34,10 +38,7 @@ export function validateOwnedCurrencyCloseManifest(
     fail("MANIFEST_REPORT_HASH_MISMATCH");
   }
 
-  const reportValue = report ?? parseReport(bytes, normalized.reportFormat);
-  if (normalized.reportFormat === "json") {
-    validateReportMetadata(normalized, reportValue);
-  }
+  validateReportMetadata(normalized, parseReport(bytes));
 
   return {
     manifest: normalized,
@@ -72,9 +73,16 @@ export function createOwnedCurrencyCloseManifestCheck({
         return failure("MANIFEST_INVALID_JSON");
       }
 
+      let reportBytes;
+      try {
+        reportBytes = readFileSync(reportFile);
+      } catch {
+        return failure("MANIFEST_REPORT_READ_FAILED");
+      }
+
       try {
         const result = validateOwnedCurrencyCloseManifest(manifest, {
-          reportBytes: readFileSync(reportFile),
+          reportBytes,
         });
         return {
           ok: true,
@@ -128,8 +136,8 @@ function validateManifestShape(manifest) {
   if (!isRecord(manifest.period)) fail("MANIFEST_PERIOD_INVALID");
   knownKeys(manifest.period, ["start", "end"]);
   if (
-    !safeNonNegativeInteger(manifest.period.start) ||
-    !safeNonNegativeInteger(manifest.period.end)
+    !isOwnedCurrencySafeNonNegativeInteger(manifest.period.start) ||
+    !isOwnedCurrencySafeNonNegativeInteger(manifest.period.end)
   ) {
     fail("MANIFEST_PERIOD_INVALID");
   }
@@ -139,7 +147,8 @@ function validateManifestShape(manifest) {
     fail("MANIFEST_TIMESTAMP_UNIT_INVALID");
   if (
     typeof manifest.timezone !== "string" ||
-    !SAFE_TIMEZONE.test(manifest.timezone)
+    !SAFE_TIMEZONE.test(manifest.timezone) ||
+    !isValidTimezone(manifest.timezone)
   ) {
     fail("MANIFEST_TIMEZONE_INVALID");
   }
@@ -192,7 +201,7 @@ function validateRecords(records) {
     if (record.status !== CLOSE_STAGES[index])
       fail("MANIFEST_STAGE_ORDER_INVALID");
     if (
-      !safeNonNegativeInteger(record.recordedAt) ||
+      !isOwnedCurrencySafeNonNegativeInteger(record.recordedAt) ||
       record.recordedAt < previousRecordedAt
     ) {
       fail("MANIFEST_RECORD_TIME_INVALID");
@@ -238,10 +247,14 @@ function validateReportMetadata(manifest, report) {
       fail("MANIFEST_POLICY_VERSION_MISMATCH");
     }
   }
+  for (const policyVersion of manifest.policyVersions) {
+    if (!reportPolicies.has(policyVersion)) {
+      fail("MANIFEST_POLICY_VERSION_MISMATCH");
+    }
+  }
 }
 
-function parseReport(bytes, reportFormat) {
-  if (reportFormat !== "json") return undefined;
+function parseReport(bytes) {
   try {
     return JSON.parse(Buffer.from(bytes).toString("utf8"));
   } catch {
@@ -271,12 +284,17 @@ function toBytes(value) {
   fail("MANIFEST_REPORT_BYTES_INVALID");
 }
 
-function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
+function isValidTimezone(value) {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value }).format();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function safeNonNegativeInteger(value) {
-  return Number.isSafeInteger(value) && value >= 0;
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function isRecord(value) {

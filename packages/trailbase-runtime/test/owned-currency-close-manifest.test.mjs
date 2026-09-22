@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { Database } from "bun:sqlite";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -8,6 +9,7 @@ import {
   sha256ReportBytes,
   validateOwnedCurrencyCloseManifest,
 } from "../src/owned-currency-close-manifest.mjs";
+import { buildOwnedCurrencyReport } from "../src/owned-currency-report.mjs";
 
 const sourceCommit = "0123456789abcdef0123456789abcdef01234567";
 
@@ -85,6 +87,57 @@ describe("owned currency close manifest", () => {
         ),
       "MANIFEST_UNKNOWN_FIELD",
     );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          { ...manifest, approvalRevision: 0 },
+          { reportBytes },
+        ),
+      "MANIFEST_APPROVAL_REVISION_INVALID",
+    );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          { ...manifest, correctionOf: manifest.reportRevision },
+          { reportBytes },
+        ),
+      "MANIFEST_CORRECTION_REF_INVALID",
+    );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          { ...manifest, reportFormat: "csv" },
+          { reportBytes },
+        ),
+      "MANIFEST_REPORT_FORMAT_INVALID",
+    );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          { ...manifest, timezone: "Mars/Phobos" },
+          { reportBytes },
+        ),
+      "MANIFEST_TIMEZONE_INVALID",
+    );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          { ...manifest, sourceCommit: "a".repeat(45) },
+          { reportBytes },
+        ),
+      "MANIFEST_SOURCE_COMMIT_INVALID",
+    );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          {
+            ...manifest,
+            records: [{ ...manifest.records[0], evidenceRef: "api-key-2026" }],
+          },
+          { reportBytes },
+        ),
+      "MANIFEST_EVIDENCE_REF_INVALID",
+    );
   });
 
   test("does not infer review or submission from a generated report", () => {
@@ -104,6 +157,93 @@ describe("owned currency close manifest", () => {
         evidenceRef: "report-generated",
       },
     ]);
+  });
+
+  test("validates a report produced by the owned-currency report builder", () => {
+    const db = new Database(":memory:");
+    try {
+      db.exec(`
+        CREATE TABLE owned_currency_events (
+          id TEXT PRIMARY KEY,
+          currency_code TEXT NOT NULL,
+          unit_code TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          quantity INTEGER NOT NULL,
+          source_type TEXT NOT NULL,
+          source_id TEXT NOT NULL,
+          policy_version TEXT NOT NULL,
+          valuation_amount INTEGER,
+          valuation_currency_code TEXT,
+          occurred_at INTEGER NOT NULL,
+          conversion_group_id TEXT
+        ) STRICT;
+        CREATE TABLE owned_currency_policies (
+          currency_code TEXT NOT NULL,
+          unit_code TEXT NOT NULL,
+          policy_version TEXT NOT NULL,
+          valuation_mode TEXT NOT NULL,
+          valuation_currency_code TEXT,
+          conversion_numerator INTEGER,
+          conversion_denominator INTEGER,
+          effective_from INTEGER NOT NULL,
+          effective_to INTEGER,
+          PRIMARY KEY (currency_code, unit_code, policy_version)
+        ) STRICT;
+      `);
+      db.query(
+        `INSERT INTO owned_currency_policies
+        (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
+         conversion_numerator, conversion_denominator, effective_from)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        "gold_dust",
+        "mg",
+        "gold-dust-v1",
+        "FIXED_RATE",
+        "TOSS_POINT",
+        1,
+        100,
+        0,
+      );
+      db.query(
+        `INSERT INTO owned_currency_events
+        (id, currency_code, unit_code, event_type, quantity, source_type, source_id,
+         policy_version, occurred_at, conversion_group_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).run(
+        "event-1",
+        "gold_dust",
+        "mg",
+        "ISSUE",
+        1,
+        "mission",
+        "mission-1",
+        "gold-dust-v1",
+        1788192000000,
+        null,
+      );
+      const report = buildOwnedCurrencyReport({
+        db,
+        periodStart: 1788192000000,
+        periodEnd: 1790870400000,
+        timestampUnit: "milliseconds",
+        now: 1790870400000,
+      });
+      report.tool = {
+        name: "trailbase-owned-currency-report",
+        version: "0.5.0",
+        sourceCommit,
+      };
+      const reportBytes = Buffer.from(JSON.stringify(report, null, 2));
+
+      expect(
+        validateOwnedCurrencyCloseManifest(manifestFixture(reportBytes), {
+          reportBytes,
+        }),
+      ).toMatchObject({ reportSha256: sha256ReportBytes(reportBytes) });
+    } finally {
+      db.close();
+    }
   });
 
   test("runs as a read-only release doctor check", () => {

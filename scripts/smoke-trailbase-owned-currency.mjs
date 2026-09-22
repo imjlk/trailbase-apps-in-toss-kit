@@ -27,13 +27,45 @@ try {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     "daily-attendance", "attendance", "provider-code-fixture", 50, "ACTIVE", 0, 20000, 5000, 0, 0,
   );
-  db.query(`INSERT INTO promotion_campaign_approvals
+  const insertApproval = db.query(`INSERT INTO promotion_campaign_approvals
     (campaign_id, revision, classification, recorded_approval_status,
      approved_config_revision, approval_reference, monthly_reporting_required,
      reviewed_at, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  insertApproval.run(
     "daily-attendance", 1, "OWNED_CURRENCY", "APPROVED", "config-v3", "operator-review-fixture", 1, 100, 100,
   );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 1, "OWNED_CURRENCY", "AUTO_APPROVED", "config-v3", "invalid-status-fixture", 1, 100, 100),
+    /revisions must be appended|CHECK constraint failed/,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 2, "OWNED_CURRENCY", "APPROVED", "config-v3", "missing-reviewed-at", 1, null, 100),
+    /CHECK constraint failed/,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 2, "UNCONFIRMED", "APPROVED", "config-v3", "invalid-classification", 1, 100, 100),
+    /CHECK constraint failed/,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 2, "OWNED_CURRENCY", "APPROVED", "config-v3", "not-monthly", 0, 100, 100),
+    /CHECK constraint failed/,
+  );
+  insertApproval.run("daily-attendance", 2, "OWNED_CURRENCY", "APPROVED", "config-v3", "operator-review-fixture-v2", 1, 200, 200);
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "direct-reward", "direct-reward", "provider-code-fixture-2", 25, "ACTIVE", 0, 20000, 2500, 0, 0,
+  );
+  insertApproval.run("direct-reward", 1, "DIRECT_REWARD", "APPROVED", "config-v3", "operator-review-direct", 0, 100, 100);
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "pending-review", "pending-review", "provider-code-fixture-3", 25, "ACTIVE", 0, 20000, 2500, 0, 0,
+  );
+  insertApproval.run("pending-review", 1, "UNCONFIRMED", "PENDING", null, null, 0, null, 100);
   db.query(`INSERT INTO owned_currency_policies
     (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
      conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
@@ -68,6 +100,15 @@ try {
   const queries = loadQueries(readFileSync(path.join(editorDir, "owned-currency-report.sql"), "utf8"));
   assert.deepEqual(db.query(queries.approval_history).all(), [{
     campaign_id: "daily-attendance",
+    revision: 2,
+    classification: "OWNED_CURRENCY",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 1,
+    reviewed_at: 200,
+    created_at: 200,
+  }, {
+    campaign_id: "daily-attendance",
     revision: 1,
     classification: "OWNED_CURRENCY",
     recorded_approval_status: "APPROVED",
@@ -75,19 +116,53 @@ try {
     monthly_reporting_required: 1,
     reviewed_at: 100,
     created_at: 100,
+  }, {
+    campaign_id: "direct-reward",
+    revision: 1,
+    classification: "DIRECT_REWARD",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 0,
+    reviewed_at: 100,
+    created_at: 100,
+  }, {
+    campaign_id: "pending-review",
+    revision: 1,
+    classification: "UNCONFIRMED",
+    recorded_approval_status: "PENDING",
+    approved_config_revision: null,
+    monthly_reporting_required: 0,
+    reviewed_at: null,
+    created_at: 100,
   }]);
   assert.deepEqual(db.query(queries.approval_scope_check).all(), [{
     campaign_id: "daily-attendance",
     campaign_present: 1,
     current_config_revision: "config-v3",
-    approval_revision: 1,
+    approval_revision: 2,
     classification: "OWNED_CURRENCY",
     recorded_approval_status: "APPROVED",
     approved_config_revision: "config-v3",
     monthly_reporting_required: 1,
-    reviewed_at: 100,
+    reviewed_at: 200,
     approval_check: "APPROVED",
   }]);
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "daily-attendance", "config-v4")).all()[0].approval_check,
+    "CONFIG_REVISION_MISMATCH",
+  );
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "missing-campaign", "config-v3")).all()[0].approval_check,
+    "CAMPAIGN_MISSING",
+  );
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "direct-reward", "config-v3")).all()[0].approval_check,
+    "CLASSIFICATION_MISMATCH",
+  );
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "pending-review", "config-v3")).all()[0].approval_check,
+    "OPERATOR_REVIEW_REQUIRED",
+  );
   const monthly = db.query(withTestWindow(queries.monthly_summary, 1000, 6000)).all();
   assert.deepEqual(monthly, [
     {
@@ -259,6 +334,10 @@ try {
 
   db.query("DELETE FROM _user WHERE id = X'01'").run();
   assert.equal(db.query("SELECT user_id FROM owned_currency_events WHERE id = 'gold-issue'").get().user_id, null);
+  assert.throws(
+    () => db.query("DELETE FROM promotion_campaigns WHERE id = 'daily-attendance'").run(),
+    /FOREIGN KEY constraint failed/,
+  );
 
   console.log(JSON.stringify({
     ok: true,
@@ -281,4 +360,10 @@ function withTestWindow(sql, start, end) {
 
 function withTestAsOf(sql, asOf) {
   return sql.replace("1790870400000", String(asOf));
+}
+
+function withOperatorScope(sql, campaignId, configRevision) {
+  return sql
+    .replace("'daily-attendance'", `'${campaignId}'`)
+    .replace("'config-v3'", `'${configRevision}'`);
 }
