@@ -393,21 +393,21 @@ function smokeApprovalV2Migration() {
       PRIMARY KEY (campaign_id, revision)
     ) STRICT;
   `;
+  const beginStart = approvalV2Migration.indexOf("BEGIN IMMEDIATE;");
+  const createStart = approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2");
+  const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
+  const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
+  const insertStatement = approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "");
   const legacy = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
   try {
-    legacy.query(`INSERT INTO promotion_campaigns
-      (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
-       budget_limit_amount, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      "legacy-campaign", "legacy", "provider-code-legacy", 10, "ACTIVE", 0, 100, 100, 0, 0,
-    );
-    legacy.query(`INSERT INTO promotion_campaign_approvals
-      (campaign_id, revision, classification, recorded_approval_status,
-       approved_config_revision, approval_reference, monthly_reporting_required,
-       reviewed_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      "legacy-campaign", 1, "OWNED_CURRENCY", "APPROVED", "config-v1", "legacy-review", 1, 10, 10,
-    );
+    seedLegacyApproval(legacy, {
+      campaignId: "legacy-campaign",
+      featureKey: "legacy",
+      providerCode: "provider-code-legacy",
+      classification: "OWNED_CURRENCY",
+      status: "APPROVED",
+      reference: "legacy-review",
+    });
     legacy.exec(approvalV2Migration);
     assert.equal(legacy.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
     assert.throws(
@@ -435,11 +435,9 @@ function smokeApprovalV2Migration() {
   const invalid = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
   try {
     seedInvalidLegacyApproval(invalid);
-    const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
-    const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
-    invalid.exec(approvalV2Migration.slice(approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2"), insertStart));
+    invalid.exec(approvalV2Migration.slice(createStart, insertStart));
     assert.throws(
-      () => invalid.query(approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "")).run(),
+      () => invalid.query(insertStatement).run(),
       /CHECK constraint failed/,
     );
     assert.equal(invalid.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
@@ -451,20 +449,17 @@ function smokeApprovalV2Migration() {
   const invalidFull = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
   try {
     seedInvalidLegacyApproval(invalidFull);
-    const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
-    const createStart = approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2");
-    const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
-    invalidFull.exec("BEGIN IMMEDIATE;");
-    invalidFull.exec(approvalV2Migration.slice(createStart, insertStart));
+    invalidFull.exec("CREATE TABLE promotion_campaign_approvals_v2 (stale INTEGER);");
+    invalidFull.exec(approvalV2Migration.slice(beginStart, insertStart));
     assert.throws(
-      () => invalidFull.query(approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "")).run(),
+      () => invalidFull.query(insertStatement).run(),
       /CHECK constraint failed/,
     );
     invalidFull.exec("ROLLBACK;");
     assert.equal(invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
-    assert.throws(
-      () => invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2").get(),
-      /no such table/,
+    assert.equal(
+      invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2").get().count,
+      0,
     );
   } finally {
     invalidFull.close();
@@ -480,17 +475,31 @@ function createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema) {
 }
 
 function seedInvalidLegacyApproval(db) {
+  seedLegacyApproval(db, {
+    campaignId: "invalid-campaign",
+    featureKey: "invalid",
+    providerCode: "provider-code-invalid",
+    classification: "UNCONFIRMED",
+    status: "APPROVED",
+    reference: "invalid",
+  });
+}
+
+function seedLegacyApproval(
+  db,
+  { campaignId, featureKey, providerCode, classification, status, reference },
+) {
   db.query(`INSERT INTO promotion_campaigns
     (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
      budget_limit_amount, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    "invalid-campaign", "invalid", "provider-code-invalid", 10, "ACTIVE", 0, 100, 100, 0, 0,
+    campaignId, featureKey, providerCode, 10, "ACTIVE", 0, 100, 100, 0, 0,
   );
   db.query(`INSERT INTO promotion_campaign_approvals
     (campaign_id, revision, classification, recorded_approval_status,
      approved_config_revision, approval_reference, monthly_reporting_required,
      reviewed_at, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-    "invalid-campaign", 1, "UNCONFIRMED", "APPROVED", "config-v1", "invalid", 1, 10, 10,
+    campaignId, 1, classification, status, "config-v1", reference, 1, 10, 10,
   );
 }
