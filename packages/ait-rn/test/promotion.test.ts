@@ -171,6 +171,120 @@ describe("AppsInToss promotion helpers", () => {
     });
   });
 
+  test("preserves the more specific already-granted status within success responses", () => {
+    expect(
+      normalizeAppsInTossPromotionClaimResult({
+        campaignId: "invite",
+        providerStatus: "SUCCESS",
+        status: "alreadyGranted",
+      }),
+    ).toEqual({
+      alreadyGranted: true,
+      campaignId: "invite",
+      granted: true,
+      status: "ALREADY_GRANTED",
+    });
+  });
+
+  test("accepts an already-granted response with no newly granted reward", () => {
+    expect(
+      normalizeAppsInTossPromotionClaimResult({
+        alreadyGranted: true,
+        campaignId: "daily",
+        granted: false,
+        status: "ALREADY_GRANTED",
+      }),
+    ).toEqual({
+      alreadyGranted: true,
+      campaignId: "daily",
+      granted: true,
+      status: "ALREADY_GRANTED",
+    });
+    expect(
+      normalizeAppsInTossPromotionClaimResult({
+        alreadyGranted: true,
+        campaignId: "daily",
+        granted: false,
+      }),
+    ).toEqual({
+      alreadyGranted: true,
+      campaignId: "daily",
+      granted: true,
+      status: "ALREADY_GRANTED",
+    });
+  });
+
+  test("rejects contradictory status and flag combinations", () => {
+    const invalidResponses = [
+      { campaignId: "daily", status: "FAILED", granted: true },
+      { campaignId: "daily", status: "PENDING", alreadyGranted: true },
+      { campaignId: "daily", status: "GRANTED", granted: false },
+      { campaignId: "daily", status: "ALREADY_GRANTED", alreadyGranted: false },
+      { campaignId: "daily", status: "unknown", granted: true },
+    ];
+
+    for (const response of invalidResponses) {
+      let error: unknown;
+      try {
+        normalizeAppsInTossPromotionClaimResult(response);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(AppsInTossPromotionCampaignClientError);
+      expect(error).toMatchObject({
+        code: "PROMOTION_CLAIM_INVALID_RESPONSE",
+      });
+    }
+  });
+
+  test("rejects conflicting campaign ids and mismatched expected campaigns", () => {
+    for (const [response, options] of [
+      [
+        {
+          campaignId: "daily",
+          grant: { campaign_id: "invite", granted: true },
+        },
+        {},
+      ],
+      [{ campaignId: "invite", granted: true }, { campaignId: "daily" }],
+    ] as const) {
+      let error: unknown;
+      try {
+        normalizeAppsInTossPromotionClaimResult(response, options);
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(AppsInTossPromotionCampaignClientError);
+      expect(error).toMatchObject({
+        code: "PROMOTION_CLAIM_INVALID_RESPONSE",
+      });
+    }
+
+    expect(
+      normalizeAppsInTossPromotionClaimResult(
+        { granted: true },
+        { campaignId: "daily" },
+      ),
+    ).toEqual({
+      alreadyGranted: false,
+      campaignId: "daily",
+      granted: true,
+      status: "GRANTED",
+    });
+  });
+
+  test("keeps custom response normalization outside the default validation", async () => {
+    const client = createAppsInTossPromotionCampaignClient({
+      claimEndpoint: "/claim",
+      fetcher: async () => Response.json({ status: "not-a-default-result" }),
+      normalizeResponse: (value) => ({ raw: value }),
+    });
+
+    await expect(client.claim({ campaignId: "daily" })).resolves.toEqual({
+      raw: { status: "not-a-default-result" },
+    });
+  });
+
   test("sanitizes forbidden promotion client context keys recursively", () => {
     expect(
       sanitizePromotionClaimContext({

@@ -44,8 +44,7 @@ export interface AppsInTossPromotionCampaignClient<
 }
 
 export type AppsInTossPromotionCampaignClientErrorCode =
-  | "PROMOTION_CAMPAIGN_ID_REQUIRED"
-  | "PROMOTION_CLAIM_INVALID_RESPONSE";
+  "PROMOTION_CAMPAIGN_ID_REQUIRED" | "PROMOTION_CLAIM_INVALID_RESPONSE";
 
 export class AppsInTossPromotionCampaignClientError extends Error {
   code: AppsInTossPromotionCampaignClientErrorCode;
@@ -75,9 +74,7 @@ export function createAppsInTossPromotionCampaignClient<
   fetcher,
   getAuthHeaders,
   normalizeResponse,
-}: CreateAppsInTossPromotionCampaignClientOptions<TResult>): AppsInTossPromotionCampaignClient<
-  TResult
-> {
+}: CreateAppsInTossPromotionCampaignClientOptions<TResult>): AppsInTossPromotionCampaignClient<TResult> {
   return {
     async claim(input: AppsInTossPromotionClaimInput) {
       const { campaignId, context, eligibilityId, requestId } = input;
@@ -95,9 +92,7 @@ export function createAppsInTossPromotionCampaignClient<
           ...(normalizedEligibilityId
             ? { eligibilityId: normalizedEligibilityId }
             : {}),
-          ...(normalizedRequestId
-            ? { requestId: normalizedRequestId }
-            : {}),
+          ...(normalizedRequestId ? { requestId: normalizedRequestId } : {}),
         },
         fetcher,
         getAuthHeaders,
@@ -120,67 +115,45 @@ export function normalizeAppsInTossPromotionClaimResult(
   const nestedGrant = objectCandidate(record?.grant);
   const nestedPromotion = objectCandidate(record?.promotion);
   const nestedReward = objectCandidate(record?.reward);
-  const campaignId = stringCandidate(
-    record?.campaignId,
-    record?.campaign_id,
-    nestedGrant?.campaignId,
-    nestedGrant?.campaign_id,
-    nestedPromotion?.campaignId,
-    nestedPromotion?.campaign_id,
-    nestedReward?.campaignId,
-    nestedReward?.campaign_id,
-    options.campaignId,
+  const records = [record, nestedGrant, nestedPromotion, nestedReward].filter(
+    (candidate): candidate is Record<string, unknown> => candidate !== null,
   );
-  const alreadyGranted = booleanCandidate(
-    record?.alreadyGranted,
-    record?.already_granted,
-    nestedGrant?.alreadyGranted,
-    nestedGrant?.already_granted,
-    nestedPromotion?.alreadyGranted,
-    nestedPromotion?.already_granted,
-    nestedReward?.alreadyGranted,
-    nestedReward?.already_granted,
+  const responseCampaignIds = uniqueStringCandidates(
+    collectRecordValues(records, ["campaignId", "campaign_id"]),
   );
-  const granted = booleanCandidate(
-    record?.granted,
-    record?.isGranted,
-    record?.is_granted,
-    nestedGrant?.granted,
-    nestedGrant?.isGranted,
-    nestedGrant?.is_granted,
-    nestedPromotion?.granted,
-    nestedPromotion?.isGranted,
-    nestedPromotion?.is_granted,
-    nestedReward?.granted,
-    nestedReward?.isGranted,
-    nestedReward?.is_granted,
-  );
-  const status = normalizePromotionClaimStatus(
-    record?.status,
-    record?.rewardStatus,
-    record?.reward_status,
-    record?.providerStatus,
-    record?.provider_status,
-    nestedGrant?.status,
-    nestedGrant?.providerStatus,
-    nestedGrant?.provider_status,
-    nestedPromotion?.status,
-    nestedPromotion?.providerStatus,
-    nestedPromotion?.provider_status,
-    nestedReward?.status,
-    nestedReward?.providerStatus,
-    nestedReward?.provider_status,
-    alreadyGranted ? "ALREADY_GRANTED" : undefined,
-    granted ? "GRANTED" : undefined,
-  );
-
-  if (!campaignId || !status) {
-    throw new AppsInTossPromotionCampaignClientError({
-      cause: value,
-      code: "PROMOTION_CLAIM_INVALID_RESPONSE",
-      message: "Apps in Toss promotion claim response was invalid.",
-    });
+  const expectedCampaignId = normalizeOptionalString(options.campaignId);
+  if (
+    responseCampaignIds.length > 1 ||
+    (expectedCampaignId !== undefined &&
+      responseCampaignIds.length > 0 &&
+      responseCampaignIds[0] !== expectedCampaignId)
+  ) {
+    throwInvalidPromotionClaimResponse(value);
   }
+  const campaignId = responseCampaignIds[0] ?? expectedCampaignId;
+  if (!campaignId) {
+    throwInvalidPromotionClaimResponse(value);
+  }
+
+  const alreadyGranted = resolveBooleanClaimFlag(
+    collectRecordValues(records, ["alreadyGranted", "already_granted"]),
+    value,
+  );
+  const granted = resolveBooleanClaimFlag(
+    collectRecordValues(records, ["granted", "isGranted", "is_granted"]),
+    value,
+  );
+  const status = resolvePromotionClaimStatus(
+    collectRecordValues(records, [
+      "status",
+      "rewardStatus",
+      "reward_status",
+      "providerStatus",
+      "provider_status",
+    ]),
+    { alreadyGranted, granted },
+    value,
+  );
 
   const rewardAmount = numberCandidate(
     record?.rewardAmount,
@@ -196,12 +169,9 @@ export function normalizeAppsInTossPromotionClaimResult(
   );
 
   return {
-    alreadyGranted: status === "ALREADY_GRANTED" || alreadyGranted === true,
+    alreadyGranted: status === "ALREADY_GRANTED",
     campaignId,
-    granted:
-      status === "GRANTED" ||
-      status === "ALREADY_GRANTED" ||
-      granted === true,
+    granted: status === "GRANTED" || status === "ALREADY_GRANTED",
     ...(rewardAmount === undefined ? {} : { rewardAmount }),
     status,
   };
@@ -225,49 +195,118 @@ export function sanitizePromotionClaimContext(value: unknown): unknown {
   return sanitized;
 }
 
-function normalizePromotionClaimStatus(
-  ...values: unknown[]
-): AppsInTossPromotionClaimStatus | null {
-  for (const value of values) {
-    const normalized = stringCandidate(value)
-      ?.replace(/([a-z])([A-Z])/g, "$1_$2")
-      .replace(/[\s-]+/g, "_")
-      .toUpperCase();
-    if (!normalized) {
-      continue;
-    }
-    if (
-      normalized === "GRANTED" ||
-      normalized === "SUCCESS" ||
-      normalized === "SUCCEEDED"
-    ) {
-      return "GRANTED";
-    }
-    if (normalized === "ALREADY_GRANTED" || normalized === "DUPLICATE") {
-      return "ALREADY_GRANTED";
-    }
-    if (
-      normalized === "PENDING" ||
-      normalized === "REQUESTED" ||
-      normalized === "PROCESSING"
-    ) {
-      return "PENDING";
-    }
-    if (normalized === "NOT_ELIGIBLE" || normalized === "INELIGIBLE") {
-      return "NOT_ELIGIBLE";
-    }
-    if (normalized === "EXHAUSTED" || normalized === "BUDGET_EXHAUSTED") {
-      return "EXHAUSTED";
-    }
-    if (
-      normalized === "FAILED" ||
-      normalized === "FAIL" ||
-      normalized === "ERROR"
-    ) {
-      return "FAILED";
-    }
+function resolvePromotionClaimStatus(
+  values: unknown[],
+  flags: { alreadyGranted?: boolean; granted?: boolean },
+  cause: unknown,
+): AppsInTossPromotionClaimStatus {
+  const normalized = values.map(normalizePromotionClaimStatusValue);
+
+  if (normalized.includes("UNKNOWN")) {
+    throwInvalidPromotionClaimResponse(cause);
   }
-  return null;
+
+  const recognizedStatuses = uniqueStatuses(
+    normalized.filter(
+      (status): status is AppsInTossPromotionClaimStatus => status !== null,
+    ),
+  );
+  const successStatuses = recognizedStatuses.filter(
+    (status) => status === "GRANTED" || status === "ALREADY_GRANTED",
+  );
+  const nonSuccessStatuses = recognizedStatuses.filter(
+    (status) => status !== "GRANTED" && status !== "ALREADY_GRANTED",
+  );
+
+  if (
+    (successStatuses.length > 0 && nonSuccessStatuses.length > 0) ||
+    nonSuccessStatuses.length > 1
+  ) {
+    throwInvalidPromotionClaimResponse(cause);
+  }
+
+  if (successStatuses.length > 0) {
+    const alreadyGrantedOutcome =
+      flags.alreadyGranted === true ||
+      successStatuses.includes("ALREADY_GRANTED");
+    if (
+      (flags.granted === false && !alreadyGrantedOutcome) ||
+      (flags.alreadyGranted === false &&
+        successStatuses.includes("ALREADY_GRANTED"))
+    ) {
+      throwInvalidPromotionClaimResponse(cause);
+    }
+    return alreadyGrantedOutcome ? "ALREADY_GRANTED" : "GRANTED";
+  }
+
+  if (nonSuccessStatuses.length > 0) {
+    if (flags.granted === true || flags.alreadyGranted === true) {
+      throwInvalidPromotionClaimResponse(cause);
+    }
+    return nonSuccessStatuses[0];
+  }
+
+  if (flags.alreadyGranted === true) {
+    return "ALREADY_GRANTED";
+  }
+  if (flags.granted === true) {
+    return "GRANTED";
+  }
+
+  throwInvalidPromotionClaimResponse(cause);
+}
+
+type PromotionClaimStatusCandidate = AppsInTossPromotionClaimStatus | "UNKNOWN";
+
+function normalizePromotionClaimStatusValue(
+  value: unknown,
+): PromotionClaimStatusCandidate | null {
+  const normalized = stringCandidate(value)
+    ?.replace(/([a-z])([A-Z])/g, "$1_$2")
+    .replace(/[\s-]+/g, "_")
+    .toUpperCase();
+  if (!normalized) {
+    return null;
+  }
+  if (
+    normalized === "GRANTED" ||
+    normalized === "SUCCESS" ||
+    normalized === "SUCCEEDED"
+  ) {
+    return "GRANTED";
+  }
+  if (normalized === "ALREADY_GRANTED" || normalized === "DUPLICATE") {
+    return "ALREADY_GRANTED";
+  }
+  if (
+    normalized === "PENDING" ||
+    normalized === "REQUESTED" ||
+    normalized === "PROCESSING"
+  ) {
+    return "PENDING";
+  }
+  if (normalized === "NOT_ELIGIBLE" || normalized === "INELIGIBLE") {
+    return "NOT_ELIGIBLE";
+  }
+  if (normalized === "EXHAUSTED" || normalized === "BUDGET_EXHAUSTED") {
+    return "EXHAUSTED";
+  }
+  if (
+    normalized === "FAILED" ||
+    normalized === "FAIL" ||
+    normalized === "ERROR"
+  ) {
+    return "FAILED";
+  }
+  return "UNKNOWN";
+}
+
+function throwInvalidPromotionClaimResponse(cause: unknown): never {
+  throw new AppsInTossPromotionCampaignClientError({
+    cause,
+    code: "PROMOTION_CLAIM_INVALID_RESPONSE",
+    message: "Apps in Toss promotion claim response was invalid.",
+  });
 }
 
 function normalizeRequiredCampaignId(value: string) {
@@ -319,13 +358,37 @@ function normalizeOptionalString(value?: string | null) {
   return trimmed ? trimmed : undefined;
 }
 
-function booleanCandidate(...values: unknown[]) {
-  for (const value of values) {
-    if (typeof value === "boolean") {
-      return value;
-    }
+function collectRecordValues(
+  records: Record<string, unknown>[],
+  keys: string[],
+) {
+  return records.flatMap((record) => keys.map((key) => record[key]));
+}
+
+function resolveBooleanClaimFlag(values: unknown[], cause: unknown) {
+  const candidates = [
+    ...new Set(
+      values.filter((value): value is boolean => typeof value === "boolean"),
+    ),
+  ];
+  if (candidates.length > 1) {
+    throwInvalidPromotionClaimResponse(cause);
   }
-  return undefined;
+  return candidates[0];
+}
+
+function uniqueStatuses(values: AppsInTossPromotionClaimStatus[]) {
+  return [...new Set(values)];
+}
+
+function uniqueStringCandidates(values: unknown[]) {
+  return [
+    ...new Set(
+      values
+        .map((value) => stringCandidate(value))
+        .filter((value): value is string => value !== undefined),
+    ),
+  ];
 }
 
 function numberCandidate(...values: unknown[]) {
