@@ -8,7 +8,9 @@ const CONTROLLER_REGISTRY = new WeakMap();
  * records an attempt before calling the SDK and never records whether a review
  * was shown or written. Create one controller per storage instance and share
  * it for the app lifecycle; the factory returns that same controller when a
- * screen asks for the same storage/key pair again.
+ * screen asks for the same storage/key pair again. `getScreenState()` must
+ * return boolean `foreground` and `blockingOverlay` fields plus an optional
+ * `contextKey`; malformed state is rejected closed.
  */
 export function createReviewRequestController({
   review,
@@ -35,7 +37,13 @@ export function createReviewRequestController({
   }
   const existingByKey = CONTROLLER_REGISTRY.get(storage);
   const existing = existingByKey?.get(storageKey);
-  if (existing) return existing;
+  const config = { review, isEligible, getScreenState, now, cooldownMs, enabled, report };
+  if (existing) {
+    if (!sameControllerConfig(existing.config, config)) {
+      throw new TypeError("review controller already exists for this storage/key with different options");
+    }
+    return existing.controller;
+  }
 
   let sessionAttempted = false;
   let inFlight = false;
@@ -56,7 +64,14 @@ export function createReviewRequestController({
 
         const stored = await readStoredState();
         if (stored.status === "error") return skip("storage_unavailable");
-        if (stored.status === "invalid") return skip("corrupt_state");
+        if (stored.status === "invalid") {
+          try {
+            await storage.set(storageKey, { version: STATE_VERSION, lastAttemptAt: now() });
+          } catch (error) {
+            safeReport({ type: "review_request_failed", errorCode: errorCode(error), phase: "storage_repair" });
+          }
+          return skip("corrupt_state");
+        }
         if (stored.lastAttemptAt !== null && elapsed(now(), stored.lastAttemptAt) < cooldownMs) {
           return skip("cooldown");
         }
@@ -103,7 +118,7 @@ export function createReviewRequestController({
     },
   };
   const controllers = existingByKey ?? new Map();
-  controllers.set(storageKey, controller);
+  controllers.set(storageKey, { controller, config });
   CONTROLLER_REGISTRY.set(storage, controllers);
   return controller;
 
@@ -174,6 +189,10 @@ function isValidScreenState(state) {
     typeof state.foreground === "boolean" &&
     typeof state.blockingOverlay === "boolean"
   );
+}
+
+function sameControllerConfig(left, right) {
+  return Object.keys(right).every((key) => Object.is(left[key], right[key]));
 }
 
 function sameContext(left, right) {

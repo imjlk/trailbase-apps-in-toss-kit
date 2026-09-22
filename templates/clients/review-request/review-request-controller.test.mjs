@@ -5,7 +5,11 @@ import { createReviewRequestController } from "./review-request-controller.mjs";
 function setup(options = {}) {
   let stored = null;
   const events = [];
-  let screen = { foreground: true, blockingOverlay: false, contextKey: "account-a" };
+  const screen = { foreground: true, blockingOverlay: false, contextKey: "account-a" };
+  const clock = options.clock ?? (() => options.now ?? 1_000);
+  const eligibility = options.isEligible ?? (() => true);
+  const screenState = () => screen;
+  const reporter = options.report ?? ((event) => events.push(event));
   const calls = { request: 0 };
   const review = {
     async isSupported() {
@@ -29,14 +33,19 @@ function setup(options = {}) {
   const controller = createReviewRequestController({
     review,
     storage,
-    now: () => options.now ?? 1_000,
+    now: clock,
     cooldownMs: options.cooldownMs ?? 0,
-    isEligible: options.isEligible ?? (() => true),
-    getScreenState: () => screen,
-    report: options.report ?? ((event) => events.push(event)),
+    isEligible: eligibility,
+    getScreenState: screenState,
+    report: reporter,
   });
   return {
     controller,
+    review,
+    clock,
+    eligibility,
+    screenState,
+    reporter,
     calls,
     events,
     storage,
@@ -111,8 +120,12 @@ test("skips safely when storage fails, support is unavailable, or the screen con
 test("reuses one controller for the same storage/key and fails closed on invalid screen or state", async () => {
   const shared = setup();
   const sameController = createReviewRequestController({
-    review: { isSupported: async () => true, request: async () => {} },
+    review: shared.review,
     storage: shared.storage,
+    now: shared.clock,
+    isEligible: shared.eligibility,
+    getScreenState: shared.screenState,
+    report: shared.reporter,
   });
   assert.equal(sameController, shared.controller);
 
@@ -172,8 +185,13 @@ test("a never-settling SDK call does not block the caller's core completion", as
     },
   });
   const reviewPromise = state.controller.maybeRequest();
-  assert.equal(reviewPromise instanceof Promise, true);
-  assert.equal(await Promise.resolve("core-completed"), "core-completed");
+  let coreCompleted = false;
+  queueMicrotask(() => {
+    coreCompleted = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(coreCompleted, true);
+  void reviewPromise;
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(requestStarted, true);
 });
@@ -187,4 +205,11 @@ test("does not expose raw SDK errors and keeps a failed attempt from immediate r
   assert.deepEqual(await state.controller.maybeRequest(), { status: "failed", reason: "UNSUPPORTED_APP_VERSION" });
   assert.equal(JSON.stringify(state.events).includes("raw private payload"), false);
   assert.deepEqual(await state.controller.maybeRequest(), { status: "skipped", reason: "session_attempted" });
+});
+
+test("swallows async telemetry failures while keeping the optional request usable", async () => {
+  const state = setup({ report: async () => { throw new Error("analytics unavailable"); } });
+  assert.deepEqual(await state.controller.maybeRequest(), { status: "settled" });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.stored.lastAttemptAt, 1_000);
 });
