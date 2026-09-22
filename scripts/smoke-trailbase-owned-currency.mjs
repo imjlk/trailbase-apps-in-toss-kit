@@ -434,19 +434,7 @@ function smokeApprovalV2Migration() {
 
   const invalid = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
   try {
-    invalid.query(`INSERT INTO promotion_campaigns
-      (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
-       budget_limit_amount, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      "invalid-campaign", "invalid", "provider-code-invalid", 10, "ACTIVE", 0, 100, 100, 0, 0,
-    );
-    invalid.query(`INSERT INTO promotion_campaign_approvals
-      (campaign_id, revision, classification, recorded_approval_status,
-       approved_config_revision, approval_reference, monthly_reporting_required,
-       reviewed_at, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      "invalid-campaign", 1, "UNCONFIRMED", "APPROVED", "config-v1", "invalid", 1, 10, 10,
-    );
+    seedInvalidLegacyApproval(invalid);
     const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
     const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
     invalid.exec(approvalV2Migration.slice(approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2"), insertStart));
@@ -459,6 +447,28 @@ function smokeApprovalV2Migration() {
   } finally {
     invalid.close();
   }
+
+  const invalidFull = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
+  try {
+    seedInvalidLegacyApproval(invalidFull);
+    const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
+    const createStart = approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2");
+    const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
+    invalidFull.exec("BEGIN IMMEDIATE;");
+    invalidFull.exec(approvalV2Migration.slice(createStart, insertStart));
+    assert.throws(
+      () => invalidFull.query(approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "")).run(),
+      /CHECK constraint failed/,
+    );
+    invalidFull.exec("ROLLBACK;");
+    assert.equal(invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
+    assert.throws(
+      () => invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2").get(),
+      /no such table/,
+    );
+  } finally {
+    invalidFull.close();
+  }
 }
 
 function createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema) {
@@ -467,4 +477,20 @@ function createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema) {
   db.exec(promotionSchema);
   db.exec(legacyApprovalSchema);
   return db;
+}
+
+function seedInvalidLegacyApproval(db) {
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "invalid-campaign", "invalid", "provider-code-invalid", 10, "ACTIVE", 0, 100, 100, 0, 0,
+  );
+  db.query(`INSERT INTO promotion_campaign_approvals
+    (campaign_id, revision, classification, recorded_approval_status,
+     approved_config_revision, approval_reference, monthly_reporting_required,
+     reviewed_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "invalid-campaign", 1, "UNCONFIRMED", "APPROVED", "config-v1", "invalid", 1, 10, 10,
+  );
 }

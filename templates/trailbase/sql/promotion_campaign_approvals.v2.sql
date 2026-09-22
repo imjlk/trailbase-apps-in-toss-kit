@@ -8,6 +8,7 @@
 -- Execute this file outside a wrapping transaction; it owns the rebuild
 -- transaction so a failed copy rolls back without leaving a partial table.
 BEGIN IMMEDIATE;
+DROP TABLE IF EXISTS promotion_campaign_approvals_v2;
 CREATE TABLE promotion_campaign_approvals_v2 (
   campaign_id TEXT NOT NULL REFERENCES promotion_campaigns(id) ON DELETE RESTRICT,
   revision INTEGER NOT NULL CHECK (revision > 0),
