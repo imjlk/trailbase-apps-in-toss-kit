@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.6.1 — 2026-09-22
+
+### Patch changes
+
+- [0a53e17](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/0a53e171df51d913adcb5eaba9ea6992acd18ea7) Add a read-only promotion status client for app-owned endpoints, with public campaign and request identity validation and no payout retries. — Thanks @imjlk!
+- [356365b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/356365bc4ad7be989fe8042d93744efff524f17e) Reject inconsistent promotion claim status and flag combinations, validate response campaign IDs, and document the boundary for custom response normalizers. — Thanks @imjlk!
+- [f8b760b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/f8b760bc9b773176749fe4728d6513e2d00ebee4) Pin the shared Apps in Toss SDK adapters to 0.4.0, which includes the reviewed React Native and Web review and direct-promotion adapter contracts. — Thanks @imjlk!
+
 ## 0.6.0 — 2026-09-16
 
 ### Minor changes
