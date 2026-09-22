@@ -153,7 +153,7 @@ function isComparableRange(spec) {
   if (typeof spec !== "string" || spec.trim() === "") return false;
   const value = spec.trim();
   if (/^(?:workspace:|file:|link:|git(?:\+|:)|github:|bitbucket:|gist:|https?:|npm:)/i.test(value)) return false;
-  if (/^(?:\.{1,2}\/|~\/)/.test(value) || value.includes("/")) return false;
+  if (value.includes("/")) return false;
   if (/^[A-Za-z][A-Za-z0-9._-]*$/.test(value)) return false;
   return true;
 }

@@ -140,6 +140,17 @@ test("does not reject workspace, alias, file or dist-tag declarations", () => {
   }
 });
 
+test("does not reject a non-semver peer source", () => {
+  const root = packageFixture({ runtime: "rn", aitPeer: "workspace:^" });
+  try {
+    const result = checkConsumerSdkCompatibility({ root, runtime: "rn" });
+    assert.equal(result.ok, true);
+    assert.match(result.warnings.join("\n"), /peer range workspace:\^ is a non-semver package source/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("CLI emits JSON and does not mutate a consumer lockfile", () => {
   const root = packageFixture({ runtime: "rn" });
   const lockfile = join(root, "bun.lock");
