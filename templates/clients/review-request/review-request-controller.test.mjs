@@ -6,10 +6,9 @@ function setup(options = {}) {
   let stored = null;
   const events = [];
   let screen = { foreground: true, blockingOverlay: false, contextKey: "account-a" };
-  const calls = { supported: 0, request: 0, writes: 0 };
+  const calls = { request: 0 };
   const review = {
     async isSupported() {
-      calls.supported += 1;
       return options.supported ?? true;
     },
     async request() {
@@ -23,7 +22,6 @@ function setup(options = {}) {
       return stored;
     },
     async set(_key, value) {
-      calls.writes += 1;
       if (options.writeError) throw options.writeError;
       stored = value;
     },
@@ -35,17 +33,15 @@ function setup(options = {}) {
     cooldownMs: options.cooldownMs ?? 0,
     isEligible: options.isEligible ?? (() => true),
     getScreenState: () => screen,
-    report: (event) => events.push(event),
+    report: options.report ?? ((event) => events.push(event)),
   });
   return {
     controller,
     calls,
     events,
+    storage,
     get stored() {
       return stored;
-    },
-    set screen(value) {
-      screen = value;
     },
   };
 }
@@ -112,6 +108,38 @@ test("skips safely when storage fails, support is unavailable, or the screen con
   assert.deepEqual(await stale.controller.maybeRequest(), { status: "skipped", reason: "stale_context" });
 });
 
+test("reuses one controller for the same storage/key and fails closed on invalid screen or state", async () => {
+  const shared = setup();
+  const sameController = createReviewRequestController({
+    review: { isSupported: async () => true, request: async () => {} },
+    storage: shared.storage,
+  });
+  assert.equal(sameController, shared.controller);
+
+  const malformedScreen = createReviewRequestController({
+    review: { isSupported: async () => true, request: async () => {} },
+    storage: { get: async () => null, set: async () => {} },
+    getScreenState: async () => ({}),
+  });
+  assert.deepEqual(await malformedScreen.maybeRequest(), { status: "skipped", reason: "screen_blocked" });
+
+  const invalidState = createReviewRequestController({
+    review: { isSupported: async () => true, request: async () => {} },
+    storage: { get: async () => ({ version: 99, lastAttemptAt: 1 }), set: async () => {} },
+  });
+  assert.deepEqual(await invalidState.maybeRequest(), { status: "skipped", reason: "corrupt_state" });
+});
+
+test("does not call the SDK when writing the attempt or eligibility fails", async () => {
+  const writeFailure = setup({ writeError: new Error("write failed") });
+  assert.deepEqual(await writeFailure.controller.maybeRequest(), { status: "failed", reason: "storage_unavailable" });
+  assert.equal(writeFailure.calls.request, 0);
+
+  const ineligible = setup({ isEligible: async () => false });
+  assert.deepEqual(await ineligible.controller.maybeRequest(), { status: "skipped", reason: "ineligible" });
+  assert.equal(ineligible.calls.request, 0);
+});
+
 test("keeps the cooldown and attempt record across a new controller instance", async () => {
   const first = setup({ cooldownMs: 10_000 });
   assert.deepEqual(await first.controller.maybeRequest(), { status: "settled" });
@@ -143,12 +171,9 @@ test("a never-settling SDK call does not block the caller's core completion", as
       return new Promise(() => {});
     },
   });
-  let coreCompleted = false;
-  await Promise.resolve().then(() => {
-    coreCompleted = true;
-    void state.controller.maybeRequest();
-  });
-  assert.equal(coreCompleted, true);
+  const reviewPromise = state.controller.maybeRequest();
+  assert.equal(reviewPromise instanceof Promise, true);
+  assert.equal(await Promise.resolve("core-completed"), "core-completed");
   await new Promise((resolve) => setTimeout(resolve, 0));
   assert.equal(requestStarted, true);
 });

@@ -1,11 +1,14 @@
 const STATE_VERSION = 1;
 const DEFAULT_STORAGE_KEY = "review-request/v1";
+const CONTROLLER_REGISTRY = new WeakMap();
 
 /**
  * Copy this controller into a consumer app and inject the app's own review
  * adapter, storage, eligibility rule, clock, and screen state. The controller
  * records an attempt before calling the SDK and never records whether a review
- * was shown or written.
+ * was shown or written. Create one controller per storage instance and share
+ * it for the app lifecycle; the factory returns that same controller when a
+ * screen asks for the same storage/key pair again.
  */
 export function createReviewRequestController({
   review,
@@ -27,11 +30,17 @@ export function createReviewRequestController({
   if (!Number.isSafeInteger(cooldownMs) || cooldownMs < 0) {
     throw new TypeError("cooldownMs must be a non-negative safe integer");
   }
+  for (const [name, value] of Object.entries({ isEligible, getScreenState, now, report })) {
+    if (typeof value !== "function") throw new TypeError(`${name} must be a function`);
+  }
+  const existingByKey = CONTROLLER_REGISTRY.get(storage);
+  const existing = existingByKey?.get(storageKey);
+  if (existing) return existing;
 
   let sessionAttempted = false;
   let inFlight = false;
 
-  return {
+  const controller = {
     async maybeRequest() {
       if (inFlight) return skip("in_flight");
       inFlight = true;
@@ -47,6 +56,7 @@ export function createReviewRequestController({
 
         const stored = await readStoredState();
         if (stored.status === "error") return skip("storage_unavailable");
+        if (stored.status === "invalid") return skip("corrupt_state");
         if (stored.lastAttemptAt !== null && elapsed(now(), stored.lastAttemptAt) < cooldownMs) {
           return skip("cooldown");
         }
@@ -92,6 +102,10 @@ export function createReviewRequestController({
       }
     },
   };
+  const controllers = existingByKey ?? new Map();
+  controllers.set(storageKey, controller);
+  CONTROLLER_REGISTRY.set(storage, controllers);
+  return controller;
 
   async function readEligibility() {
     try {
@@ -105,7 +119,7 @@ export function createReviewRequestController({
   async function readScreenState() {
     try {
       const state = await getScreenState();
-      return state && typeof state === "object" ? state : { foreground: false, blockingOverlay: true };
+      return isValidScreenState(state) ? state : { foreground: false, blockingOverlay: true };
     } catch (error) {
       safeReport({ type: "review_request_failed", errorCode: errorCode(error), phase: "screen_state" });
       return { foreground: false, blockingOverlay: true };
@@ -117,7 +131,7 @@ export function createReviewRequestController({
       const value = await storage.get(storageKey);
       if (value === null || value === undefined) return { status: "ok", lastAttemptAt: null };
       if (!value || value.version !== STATE_VERSION || !Number.isSafeInteger(value.lastAttemptAt) || value.lastAttemptAt < 0) {
-        return { status: "error" };
+        return { status: "invalid" };
       }
       return { status: "ok", lastAttemptAt: value.lastAttemptAt };
     } catch (error) {
@@ -140,7 +154,8 @@ export function createReviewRequestController({
 
   function safeReport(event) {
     try {
-      report(event);
+      const result = report(event);
+      if (result && typeof result.then === "function") result.catch(() => {});
     } catch {
       // Observability must never turn an optional review request into a core-flow failure.
     }
@@ -148,7 +163,17 @@ export function createReviewRequestController({
 }
 
 function isUsableScreen(state) {
-  return state.foreground !== false && state.blockingOverlay !== true;
+  return isValidScreenState(state) && state.foreground && !state.blockingOverlay;
+}
+
+function isValidScreenState(state) {
+  return (
+    state &&
+    typeof state === "object" &&
+    !Array.isArray(state) &&
+    typeof state.foreground === "boolean" &&
+    typeof state.blockingOverlay === "boolean"
+  );
 }
 
 function sameContext(left, right) {
