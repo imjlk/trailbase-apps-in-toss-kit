@@ -11,8 +11,11 @@ on:
       - "package.json"
       - "renovate.json"
       - "scripts/check-apps-in-toss-tracking.mjs"
+      - "scripts/check-consumer-sdk-compatibility*"
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
+      - "packages/trailbase-runtime/src/internal/semver.mjs"
+      - "templates/clients/review-request/**"
   push:
     branches:
       - main
@@ -25,8 +28,11 @@ on:
       - "package.json"
       - "renovate.json"
       - "scripts/check-apps-in-toss-tracking.mjs"
+      - "scripts/check-consumer-sdk-compatibility*"
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
+      - "packages/trailbase-runtime/src/internal/semver.mjs"
+      - "templates/clients/review-request/**"
   workflow_dispatch:
 
 permissions:
@@ -56,6 +62,12 @@ jobs:
 
       - name: Test snapshot response validation
         run: bun run apps-in-toss:snapshot:test
+
+      - name: Test consumer SDK compatibility doctor
+        run: bun run consumer-sdk-compat:test
+
+      - name: Test review request template
+        run: bun run review-request:test
 
       - name: Check tracking metadata
         run: bun run apps-in-toss:tracking:check

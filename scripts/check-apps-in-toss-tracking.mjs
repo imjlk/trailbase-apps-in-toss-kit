@@ -10,6 +10,10 @@ const TRACKING_DOCS = [
 
 const TRACKED_PACKAGES = [
   {
+    packageName: "@ait-kit/sdk",
+    markerKey: "ait-kit-sdk"
+  },
+  {
     packageName: "@apps-in-toss/framework",
     markerKey: "apps-in-toss-framework",
     rootDevDependency: true

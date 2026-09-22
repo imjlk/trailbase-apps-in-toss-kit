@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-09-21T06:17:46.904Z",
+  "fetchedAt": "2026-09-22T08:58:38.576Z",
   "documents": [
     {
       "key": "release-notes",
@@ -105,6 +105,34 @@
       "url": "https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md",
       "sha256": "ec62e1d1080b533994d7e6966af20e13ad9046cd3ac0c0ece41fc0deb514ce93",
       "bytes": 27287
+    },
+    {
+      "key": "review-guide",
+      "title": "Review request guide",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md",
+      "sha256": "64df571bddfaf38a12b9cb7b047642089f583c422b7a8b941bd0efb83745575d",
+      "bytes": 6945
+    },
+    {
+      "key": "review-request-sdk",
+      "title": "Review.request SDK",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md",
+      "sha256": "1e28fede1df895e6fcb704ede81f67011a0d6cee014402335617870255a38573",
+      "bytes": 2977
+    },
+    {
+      "key": "promotion-grant-reward-sdk",
+      "title": "Promotion.grantReward SDK",
+      "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md",
+      "sha256": "e7327e3314893745fe91e4746eb8686f0b5d3a3572df52e9e108d2d36df8f9b8",
+      "bytes": 6347
+    },
+    {
+      "key": "promotion-guide",
+      "title": "Promotion operations guide",
+      "url": "https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md",
+      "sha256": "ec9ab470e57b7f7e2bb9f5acff68deac748e7f2c0ea5e9a7274ca3f1258582aa",
+      "bytes": 30001
     },
     {
       "key": "notification-agreement-sdk",

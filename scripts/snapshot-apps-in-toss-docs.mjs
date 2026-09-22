@@ -99,6 +99,30 @@ const DOC_SOURCES = [
     expectedText: "# 스마트 발송"
   },
   {
+    key: "review-guide",
+    title: "Review request guide",
+    url: "https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md",
+    expectedText: "# 리뷰 요청"
+  },
+  {
+    key: "review-request-sdk",
+    title: "Review.request SDK",
+    url: "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md",
+    expectedText: "# Review"
+  },
+  {
+    key: "promotion-grant-reward-sdk",
+    title: "Promotion.grantReward SDK",
+    url: "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md",
+    expectedText: "# Promotion.grantReward"
+  },
+  {
+    key: "promotion-guide",
+    title: "Promotion operations guide",
+    url: "https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md",
+    expectedText: "# 프로모션"
+  },
+  {
     key: "notification-agreement-sdk",
     title: "Notification agreement SDK requestNotificationAgreement",
     url: "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md",
@@ -131,6 +155,7 @@ const DOC_SOURCES = [
 ];
 
 const NPM_PACKAGES = [
+  { packageName: "@ait-kit/sdk", optional: false },
   { packageName: "@apps-in-toss/web-framework", optional: false },
   { packageName: "@apps-in-toss/framework", optional: false },
   { packageName: "@toss/tds-react-native", optional: false },

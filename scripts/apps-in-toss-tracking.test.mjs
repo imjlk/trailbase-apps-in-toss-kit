@@ -3,6 +3,7 @@ import test from "node:test";
 import { checkTracking } from "./check-apps-in-toss-tracking.mjs";
 
 const entries = [
+  ["@ait-kit/sdk", "ait-kit-sdk"],
   ["@apps-in-toss/framework", "apps-in-toss-framework"],
   ["@toss/tds-react-native", "tds-react-native"],
   ["create-granite-app", "create-granite-app"],
@@ -19,12 +20,12 @@ function fixture() {
 test("new discoveries do not silently raise or invalidate reviewed references", () => {
   const result = checkTracking(fixture());
   assert.deepEqual(result.failures, []);
-  assert.equal(result.discoveries.length, 4);
+  assert.equal(result.discoveries.length, 5);
 });
 test("reviewed root and translated references must still agree", () => {
   const input = fixture();
   input.packageJson.devDependencies["@apps-in-toss/framework"] = "1.1.0";
   input.trackingDocs[1].markdown = input.trackingDocs[1].markdown.replaceAll("`1.0.0`", "`1.2.0`");
   const result = checkTracking(input);
-  assert.equal(result.failures.length, 5);
+  assert.equal(result.failures.length, 6);
 });

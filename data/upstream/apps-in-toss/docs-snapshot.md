@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-09-21T06:17:46.904Z
+- Fetched at: 2026-09-22T08:58:38.576Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
@@ -64,6 +64,22 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
   - SHA-256: `ec62e1d1080b533994d7e6966af20e13ad9046cd3ac0c0ece41fc0deb514ce93`
   - Bytes: 27287
+- Review request guide
+  - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md
+  - SHA-256: `64df571bddfaf38a12b9cb7b047642089f583c422b7a8b941bd0efb83745575d`
+  - Bytes: 6945
+- Review.request SDK
+  - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md
+  - SHA-256: `1e28fede1df895e6fcb704ede81f67011a0d6cee014402335617870255a38573`
+  - Bytes: 2977
+- Promotion.grantReward SDK
+  - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md
+  - SHA-256: `e7327e3314893745fe91e4746eb8686f0b5d3a3572df52e9e108d2d36df8f9b8`
+  - Bytes: 6347
+- Promotion operations guide
+  - URL: https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md
+  - SHA-256: `ec9ab470e57b7f7e2bb9f5acff68deac748e7f2c0ea5e9a7274ca3f1258582aa`
+  - Bytes: 30001
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
   - SHA-256: `f986e7667ec1807d04ae7d7f9402b1b7f46978be57722e58f42b06beb6619159`
