@@ -2,9 +2,12 @@ import { describe, expect, test } from "bun:test";
 import {
   AppsInTossPromotionCampaignClientError,
   createAppsInTossPromotionCampaignClient,
+  createAppsInTossPromotionStatusClient,
   normalizeAppsInTossPromotionClaimResult,
+  normalizeAppsInTossPromotionStatusResult,
   sanitizePromotionClaimContext,
 } from "../src/promotion";
+import { AppsInTossClientRequestError } from "../src/internal/http";
 
 describe("AppsInToss promotion helpers", () => {
   test("posts campaign claim payloads with auth headers and without provider secrets", async () => {
@@ -300,5 +303,214 @@ describe("AppsInToss promotion helpers", () => {
       keep: "value",
       list: [{ safe: 1 }],
     });
+  });
+
+  test("reads app-owned promotion status without calling a payout endpoint", async () => {
+    const calls: Array<{
+      body: unknown;
+      headers: HeadersInit | undefined;
+      url: string;
+    }> = [];
+    const responses = [
+      Response.json({
+        campaignId: "daily",
+        requestId: "claim-1",
+        status: "PENDING",
+      }),
+      Response.json({
+        campaignId: "daily",
+        requestId: "claim-1",
+        rewardAmount: 50,
+        status: "GRANTED",
+      }),
+    ];
+    let responseIndex = 0;
+    let authToken = "session-a";
+    const client = createAppsInTossPromotionStatusClient({
+      baseUrl: "https://api.example.test",
+      fetcher: async (url, init) => {
+        calls.push({
+          body: JSON.parse(String(init.body)),
+          headers: init.headers,
+          url,
+        });
+        return responses[responseIndex++];
+      },
+      getAuthHeaders: () => ({ Authorization: `Bearer ${authToken}` }),
+      statusEndpoint: "/api/app/v1/promotions/status",
+    });
+
+    const pending = await client.getStatus({
+      campaignId: " daily ",
+      requestId: " claim-1 ",
+    });
+    authToken = "session-b";
+    const granted = await client.getStatus({
+      campaignId: "daily",
+      requestId: "claim-1",
+    });
+
+    expect(pending).toEqual({
+      alreadyGranted: false,
+      campaignId: "daily",
+      granted: false,
+      requestId: "claim-1",
+      status: "PENDING",
+    });
+    expect(granted).toEqual({
+      alreadyGranted: false,
+      campaignId: "daily",
+      granted: true,
+      requestId: "claim-1",
+      rewardAmount: 50,
+      status: "GRANTED",
+    });
+    expect(calls).toEqual([
+      {
+        body: { campaignId: "daily", requestId: "claim-1" },
+        headers: {
+          Authorization: "Bearer session-a",
+          "Content-Type": "application/json",
+        },
+        url: "https://api.example.test/api/app/v1/promotions/status",
+      },
+      {
+        body: { campaignId: "daily", requestId: "claim-1" },
+        headers: {
+          Authorization: "Bearer session-b",
+          "Content-Type": "application/json",
+        },
+        url: "https://api.example.test/api/app/v1/promotions/status",
+      },
+    ]);
+  });
+
+  test("requires a public request id before calling the status endpoint", async () => {
+    let fetcherCalled = false;
+    const client = createAppsInTossPromotionStatusClient({
+      statusEndpoint: "/status",
+      fetcher: async () => {
+        fetcherCalled = true;
+        return Response.json({});
+      },
+    });
+
+    let error: unknown;
+    try {
+      await client.getStatus({ campaignId: "daily", requestId: "  " });
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(AppsInTossPromotionCampaignClientError);
+    expect(error).toMatchObject({
+      code: "PROMOTION_REQUEST_ID_REQUIRED",
+    });
+    expect(fetcherCalled).toBe(false);
+  });
+
+  test("rejects lost, mismatched, and provider-only status identities", async () => {
+    const invalidResponses = [
+      { campaignId: "daily", status: "PENDING" },
+      {
+        campaignId: "daily",
+        providerRequestId: "provider-1",
+        status: "PENDING",
+      },
+      { campaignId: "daily", requestId: "other-request", status: "PENDING" },
+      { campaignId: "invite", requestId: "claim-1", status: "PENDING" },
+    ];
+
+    for (const response of invalidResponses) {
+      const client = createAppsInTossPromotionStatusClient({
+        statusEndpoint: "/status",
+        fetcher: async () => Response.json(response),
+      });
+      let error: unknown;
+      try {
+        await client.getStatus({ campaignId: "daily", requestId: "claim-1" });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(AppsInTossPromotionCampaignClientError);
+      expect(error).toMatchObject({
+        code: "PROMOTION_STATUS_INVALID_RESPONSE",
+      });
+    }
+  });
+
+  test("keeps timeout and network errors as errors", async () => {
+    const timeout = new Error("request timed out");
+    const client = createAppsInTossPromotionStatusClient({
+      statusEndpoint: "/status",
+      fetcher: async () => {
+        throw timeout;
+      },
+    });
+
+    await expect(
+      client.getStatus({ campaignId: "daily", requestId: "claim-1" }),
+    ).rejects.toBe(timeout);
+  });
+
+  test("keeps not-found and ownership responses as request errors", async () => {
+    for (const status of [403, 404]) {
+      const client = createAppsInTossPromotionStatusClient({
+        statusEndpoint: "/status",
+        fetcher: async () =>
+          Response.json({ error: "not available" }, { status }),
+      });
+
+      let error: unknown;
+      try {
+        await client.getStatus({ campaignId: "daily", requestId: "claim-1" });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(AppsInTossClientRequestError);
+      expect(error).toMatchObject({ status });
+    }
+  });
+
+  test("validates status response identities when normalizing directly", () => {
+    expect(
+      normalizeAppsInTossPromotionStatusResult(
+        {
+          campaignId: "daily",
+          requestId: "claim-1",
+          status: "PENDING",
+        },
+        { campaignId: "daily", requestId: "claim-1" },
+      ),
+    ).toMatchObject({
+      campaignId: "daily",
+      requestId: "claim-1",
+      status: "PENDING",
+    });
+    expect(
+      normalizeAppsInTossPromotionStatusResult(
+        {
+          campaignId: "daily",
+          requestId: 12345,
+          status: "PENDING",
+        },
+        { campaignId: "daily", requestId: "12345" },
+      ),
+    ).toMatchObject({
+      campaignId: "daily",
+      requestId: "12345",
+      status: "PENDING",
+    });
+  });
+
+  test("keeps custom status normalization outside default validation", async () => {
+    const client = createAppsInTossPromotionStatusClient({
+      statusEndpoint: "/status",
+      fetcher: async () => Response.json({ status: "provider-only" }),
+      normalizeResponse: (value) => ({ raw: value }),
+    });
+
+    await expect(
+      client.getStatus({ campaignId: "daily", requestId: "claim-1" }),
+    ).resolves.toEqual({ raw: { status: "provider-only" } });
   });
 });

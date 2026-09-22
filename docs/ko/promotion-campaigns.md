@@ -104,6 +104,33 @@ key, proxy token은 알지 않습니다. `campaignId`를 RN과 백엔드 사이�
 요청한 ID를 사용할 수 있습니다. `normalizeResponse`를 직접 주입한 소비자는 기본 정규화기를 거치지
 않으므로 자신의 응답 정합성 검사를 책임집니다.
 
+## React Native 읽기 전용 상태 조회 client
+
+claim에 공개 request ID가 생긴 뒤에는 React Native 앱에서 추가 지급을 시작하지 않고 앱이
+소유한 상태 조회 endpoint를 호출할 수 있습니다.
+
+```ts
+const status = createAppsInTossPromotionStatusClient({
+  statusEndpoint: "/api/app/v1/promotions/status",
+});
+
+const result = await status.getStatus({
+  campaignId: "daily-attendance",
+  requestId: "daily-attendance:claim-123",
+});
+```
+
+이 client는 `campaignId`와 공개 `requestId`만 보냅니다. claim, prepare, execute endpoint를
+호출하지 않고 ledger row를 삽입하지 않으며, 요청을 재시도하거나 제공자 request/transaction ID를
+노출하지도 않습니다. 한 번의 호출은 한 번의 조회로 끝나므로 polling이 필요하면 소비자가 다음
+조회 시점을 직접 예약하세요. `PENDING`은 그대로 pending으로 남고, 네트워크 오류와 `403`, `404`
+응답은 `FAILED`로 바꾸지 않고 request error로 전달합니다.
+
+앱이 소유한 endpoint는 현재 사용자를 인증하고 해당 campaign과 공개 request ID가 그 사용자에게
+속하는지 확인해야 합니다. 기본 응답에는 같은 공개 `campaignId`와 `requestId`가 있어야 하며,
+정규화기는 ID가 없거나 달라진 응답을 거부합니다. `normalizeResponse`를 직접 주입하면 claim 응답과
+마찬가지로 소비자가 이 응답 계약을 책임집니다.
+
 ## 지급 요청 멱등성
 
 프로모션 지급 요청(claim)은 앱 지급 원장 계층에서 멱등(idempotent)해야 합니다. 즉 같은
