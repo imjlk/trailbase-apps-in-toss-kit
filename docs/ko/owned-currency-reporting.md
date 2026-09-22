@@ -100,12 +100,48 @@ bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/owned-curre
 `trailbase-ledger-doctor`를 사용합니다.
 두 명령 모두 토스에 제출하지 않고 실시간 데이터베이스도 변경하지 않습니다.
 
+## 마감 manifest와 승인 근거
+
+보고서 옆에는 별도의 JSON 마감 manifest를 보관하세요.
+`templates/trailbase/release/owned-currency-close-manifest.example.json`을 복사한 뒤 예시 값을
+바꿉니다. manifest에는 manifest와 보고서 schema version, 앱 식별명, 시작 포함·종료 제외 기간,
+timestamp 단위, 시간대, 실제 보고서 바이트의 SHA-256, 비공개 snapshot 참조, source commit,
+보고 도구 버전, policy version 목록, 승인 근거 revision, 그리고 다음 단계의 순서가 기록됩니다.
+
+```text
+GENERATED → REVIEWED → SUBMITTED
+```
+
+`SUBMITTED`는 운영자가 제출했다고 기록한 상태이며 토스가 보고서를 접수하거나 승인했다는 뜻이
+아닙니다. 기록한 각 단계에는 별도 시각과 비공개 근거 참조가 필요합니다. 정정은 새
+`reportRevision`으로 만들고 이전 revision을 `correctionOf`로 가리키며, 기존 manifest와 이벤트
+행은 보존합니다. manifest에는 사용자 ID, Toss 식별자, promotion code, 인증정보, 보고서 파일
+경로를 넣지 않습니다.
+
+릴리스 handoff 전에 보고서 바이트와 manifest를 함께 검증하세요. runtime helper는 DB에 쓰지
+않고 해시, 기간, timestamp 단위, source, policy, 단계 순서, 근거 참조 불일치를 거부합니다.
+Release Doctor에는 다음 선택적 check를 추가할 수 있습니다.
+
+```json
+{
+  "type": "owned-currency-close-manifest",
+  "name": "Owned currency close evidence",
+  "manifest": "apps/trailbase/reports/2026-09.manifest.json",
+  "report": "apps/trailbase/reports/2026-09.json",
+  "required": false
+}
+```
+
+보고서와 manifest 경로는 Release Doctor 설정에만 두고 manifest 자체에는 기록하지 않습니다.
+소비 앱에 운영자 소유 승인 절차가 생길 때까지는 이 check를 선택적으로 두고, 준비가 끝난 뒤
+required로 올리세요.
+
 ## 월말 작업 순서
 
 1. 앱 adapter가 모든 원본 이벤트와 정책 버전을 기록했는지 확인합니다.
 2. 일관된 snapshot에서 SQL Editor 월별 집계를 실행합니다.
 3. 변환 그룹, 교환 상태, 확인되지 않은 provider 결과, 중복 source ID를 확인합니다.
-4. 검토 후 사용자 식별자가 없는 앱 소유 기간 마감 집계를 저장합니다.
+4. 운영자 검토 후 JSON 보고서와 마감 manifest를 저장합니다.
 5. 정정은 새 adjustment 이벤트나 새 보고서 revision으로 기록하고 기존 이벤트 행은
    수정하지 않습니다.
 

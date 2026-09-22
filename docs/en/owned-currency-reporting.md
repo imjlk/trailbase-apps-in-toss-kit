@@ -115,13 +115,53 @@ the report came from the committed `HEAD`.
 `trailbase-ledger-doctor` remains the diagnostic tool for the existing payment
 ledgers. Neither command submits data to Toss or changes the live database.
 
+## Close manifest and approval evidence
+
+Keep a separate JSON close manifest beside the report. Copy
+`templates/trailbase/release/owned-currency-close-manifest.example.json` and
+replace its example values. The manifest records the manifest and report schema
+versions, app id, half-open period, timestamp unit, timezone, SHA-256 of the
+exact report bytes, a private snapshot reference, source commit, report tool
+version, policy versions, approval revision, and an ordered prefix of close
+records:
+
+```text
+GENERATED → REVIEWED → SUBMITTED
+```
+
+`SUBMITTED` means that an operator recorded a submission; it does not assert
+that Toss accepted or approved the report. Each recorded stage needs its own
+timestamp and private evidence reference. A correction creates a new
+`reportRevision` and points `correctionOf` at the previous revision; existing
+manifests and event rows are retained. The manifest contains no user ids, Toss
+identifiers, promotion codes, credentials, or report file paths.
+
+Validate the manifest against the report bytes before a release handoff. The
+runtime helper rejects hash, period, timestamp-unit, source, policy, stage-order,
+and evidence-reference mismatches without writing to the database. A Release
+Doctor configuration can add this optional check:
+
+```json
+{
+  "type": "owned-currency-close-manifest",
+  "name": "Owned currency close evidence",
+  "manifest": "apps/trailbase/reports/2026-09.manifest.json",
+  "report": "apps/trailbase/reports/2026-09.json",
+  "required": false
+}
+```
+
+The report and manifest paths belong to the Release Doctor configuration, not
+the manifest itself. Keep the check optional during adoption and make it
+required only after the consumer app has an operator-owned approval workflow.
+
 ## Month-end workflow
 
 1. Confirm the app adapter has recorded all source events and policy versions.
 2. Run the SQL Editor summary against a consistent snapshot.
 3. Check conversion groups, exchange states, unknown provider outcomes, and
    duplicate source IDs.
-4. Save an app-owned, user-independent period-close aggregate after review.
+4. Save the JSON report and its close manifest after operator review.
 5. Record corrections as new adjustment events or a new report revision; do not
    rewrite old event rows.
 

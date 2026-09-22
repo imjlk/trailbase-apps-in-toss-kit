@@ -89,10 +89,25 @@ root보다 아래에 있지만 명령은 repository root에서 실행해야 한�
 - `production-env`: 공통 운영 env 검증기를 실행합니다.
 - `command`: 앱이 소유한 명령을 실행하고 기본적으로 exit code `0`을 성공으로 봅니다. 명령 출력은 기본적으로 실패 시에만 캡처하며, `captureOutput`을 `always` 또는 `none`으로 바꿀 수 있습니다. `timeout` 기본값은 300,000 ms입니다.
 - `changeset`: `.sampo/changesets/*.md` 대기 changeset이 있는지 확인합니다.
+- `owned-currency-close-manifest`: 정확한 보고서 바이트와 마감 manifest를 대조해 보고서 해시, 기간, timestamp 단위, source/tool 메타데이터, policy version, 단계 순서를 확인합니다.
 
 `"required": false`를 설정하면 실패한 check를 전체 실패가 아니라 경고로 보고합니다.
 템플릿은 복사된 파일과 릴리스 프로세스를 정리한 뒤에 strict 정책으로 올리는 경우가 많아서,
 템플릿 차이와 changeset check를 기본적으로 경고로 둡니다.
+
+마감 manifest check는 Release Doctor 설정에서 보고서와 manifest 경로를 받습니다. 이 경로를
+manifest에 저장하지 않으며 DB에도 쓰지 않습니다. 도입할 때는 `required: false`로 추가하고,
+소비 앱에 운영자가 소유한 승인 절차가 생긴 뒤 required로 올리세요.
+
+```json
+{
+  "type": "owned-currency-close-manifest",
+  "name": "Owned currency close evidence",
+  "manifest": "apps/trailbase/reports/2026-09.manifest.json",
+  "report": "apps/trailbase/reports/2026-09.json",
+  "required": false
+}
+```
 
 ## JavaScript 헬퍼
 
@@ -141,7 +156,13 @@ HMAC, sealed value를 출력하지 않아야 합니다.
   "urlEnv": "MTLS_PROXY_URL",
   "tokenEnv": "MTLS_PROXY_TOKEN",
   "expectedMode": "forward",
-  "requiredCapabilities": ["anonymous-key.verify", "promotion.prepare.v2", "promotion.execute.v2", "promotion.status.v2", "promotion.anonymous-recipient"],
+  "requiredCapabilities": [
+    "anonymous-key.verify",
+    "promotion.prepare.v2",
+    "promotion.execute.v2",
+    "promotion.status.v2",
+    "promotion.anonymous-recipient"
+  ],
   "timeout": 5000
 }
 ```
@@ -166,7 +187,6 @@ HTTP(S) origin이어야 합니다. 인증된 `/internal/apps-in-toss/health` GET
 API 호출을 수행하지 않습니다.
 
 git 서브모듈에서 Node CLI를 직접 실행할 때 npm 설치가 필요하지 않습니다. 최소 버전은 사전 릴리즈 순서를 포함하고 빌드 메타데이터를 무시하는 엄격한 SemVer 비교를 사용하며, 입력은 128자와 안전한 정수 범위의 주 버전·부 버전·패치 값으로 제한합니다.
-
 
 ## 프로모션 배포 전 점검
 

@@ -8,6 +8,8 @@ import path from "node:path";
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const sqlDir = path.join(root, "templates", "trailbase", "sql");
 const editorDir = path.join(root, "templates", "trailbase", "sql-editor");
+const promotionSchema = readFileSync(path.join(sqlDir, "promotion_campaigns.sql"), "utf8");
+const approvalSchema = readFileSync(path.join(sqlDir, "promotion_campaign_approvals.sql"), "utf8");
 const db = new Database(":memory:");
 const X01 = new Uint8Array([1]);
 
@@ -15,8 +17,23 @@ try {
   db.exec("PRAGMA foreign_keys = ON");
   db.exec("CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT");
   db.exec("INSERT INTO _user VALUES (X'01')");
+  db.exec(promotionSchema);
+  db.exec(approvalSchema);
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_events.sql"), "utf8"));
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_policies.sql"), "utf8"));
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "daily-attendance", "attendance", "provider-code-fixture", 50, "ACTIVE", 0, 20000, 5000, 0, 0,
+  );
+  db.query(`INSERT INTO promotion_campaign_approvals
+    (campaign_id, revision, classification, recorded_approval_status,
+     approved_config_revision, approval_reference, monthly_reporting_required,
+     reviewed_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "daily-attendance", 1, "OWNED_CURRENCY", "APPROVED", "config-v3", "operator-review-fixture", 1, 100, 100,
+  );
   db.query(`INSERT INTO owned_currency_policies
     (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
      conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
@@ -49,6 +66,28 @@ try {
   add(["star-issue", X01, "stars", "count", "ISSUE", 5, "vote", "v-1", "event:star-issue", "v1", null, null, null, null, 1500, 1500, "{}"]);
 
   const queries = loadQueries(readFileSync(path.join(editorDir, "owned-currency-report.sql"), "utf8"));
+  assert.deepEqual(db.query(queries.approval_history).all(), [{
+    campaign_id: "daily-attendance",
+    revision: 1,
+    classification: "OWNED_CURRENCY",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 1,
+    reviewed_at: 100,
+    created_at: 100,
+  }]);
+  assert.deepEqual(db.query(queries.approval_scope_check).all(), [{
+    campaign_id: "daily-attendance",
+    campaign_present: 1,
+    current_config_revision: "config-v3",
+    approval_revision: 1,
+    classification: "OWNED_CURRENCY",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 1,
+    reviewed_at: 100,
+    approval_check: "APPROVED",
+  }]);
   const monthly = db.query(withTestWindow(queries.monthly_summary, 1000, 6000)).all();
   assert.deepEqual(monthly, [
     {

@@ -91,11 +91,27 @@ Supported check types are:
 - `production-env`: runs the shared production env validator.
 - `command`: runs an app-owned command and treats exit code `0` as success by default. Command output is captured only on failure unless `captureOutput` is set to `always` or `none`; `timeout` defaults to 300,000 ms.
 - `changeset`: checks for pending `.sampo/changesets/*.md` files.
+- `owned-currency-close-manifest`: validates a close manifest against the exact report bytes, including the report hash, period, timestamp unit, source/tool metadata, policy versions, and ordered close records.
 
 Set `"required": false` to report a failed check as a warning instead of failing
 the whole doctor run. The template keeps template drift and changeset checks as
 warnings by default because those policies often become strict only after a
 service has reconciled its copied files and release process.
+
+The close-manifest check takes report and manifest paths from the Release Doctor
+configuration. It does not store those paths in the manifest and it never writes
+to the database. Add it during adoption with `required: false`, then make it
+required after the consumer has an operator-owned approval workflow:
+
+```json
+{
+  "type": "owned-currency-close-manifest",
+  "name": "Owned currency close evidence",
+  "manifest": "apps/trailbase/reports/2026-09.manifest.json",
+  "report": "apps/trailbase/reports/2026-09.json",
+  "required": false
+}
+```
 
 ## JavaScript Helpers
 
@@ -145,7 +161,13 @@ a new adapter flow. JSON configuration supports the same check:
   "urlEnv": "MTLS_PROXY_URL",
   "tokenEnv": "MTLS_PROXY_TOKEN",
   "expectedMode": "forward",
-  "requiredCapabilities": ["anonymous-key.verify", "promotion.prepare.v2", "promotion.execute.v2", "promotion.status.v2", "promotion.anonymous-recipient"],
+  "requiredCapabilities": [
+    "anonymous-key.verify",
+    "promotion.prepare.v2",
+    "promotion.execute.v2",
+    "promotion.status.v2",
+    "promotion.anonymous-recipient"
+  ],
   "timeout": 5000
 }
 ```
@@ -173,7 +195,6 @@ the existing application and integration flows. This preflight never grants, sen
 or invokes an upstream API.
 
 The Node CLI remains self-contained when run from a git submodule; no npm install is required. Minimum versions use strict SemVer precedence (including prereleases and ignoring build metadata), limited to 128 characters and safe integer core components.
-
 
 ## Promotion Rollout Preflight
 
