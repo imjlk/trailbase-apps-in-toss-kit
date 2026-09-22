@@ -1,6 +1,10 @@
 const STATE_VERSION = 1;
 const DEFAULT_STORAGE_KEY = "review-request/v1";
 const CONTROLLER_REGISTRY = new WeakMap();
+const defaultEligibility = () => true;
+const defaultScreenState = () => ({ foreground: true, blockingOverlay: false, contextKey: undefined });
+const defaultNow = () => Date.now();
+const defaultReport = () => {};
 
 /**
  * Copy this controller into a consumer app and inject the app's own review
@@ -15,13 +19,13 @@ const CONTROLLER_REGISTRY = new WeakMap();
 export function createReviewRequestController({
   review,
   storage,
-  isEligible = () => true,
-  getScreenState = () => ({ foreground: true, blockingOverlay: false, contextKey: undefined }),
-  now = () => Date.now(),
+  isEligible = defaultEligibility,
+  getScreenState = defaultScreenState,
+  now = defaultNow,
   cooldownMs = 0,
   enabled = true,
   storageKey = DEFAULT_STORAGE_KEY,
-  report = () => {},
+  report = defaultReport,
 } = {}) {
   if (!review || typeof review.isSupported !== "function" || typeof review.request !== "function") {
     throw new TypeError("review adapter must implement isSupported() and request()");
@@ -192,7 +196,8 @@ function isValidScreenState(state) {
 }
 
 function sameControllerConfig(left, right) {
-  return Object.keys(right).every((key) => Object.is(left[key], right[key]));
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  return [...keys].every((key) => Object.is(left[key], right[key]));
 }
 
 function sameContext(left, right) {

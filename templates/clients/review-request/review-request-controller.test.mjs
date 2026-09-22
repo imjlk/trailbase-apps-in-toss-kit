@@ -128,6 +128,18 @@ test("reuses one controller for the same storage/key and fails closed on invalid
     report: shared.reporter,
   });
   assert.equal(sameController, shared.controller);
+  assert.throws(
+    () => createReviewRequestController({
+      review: shared.review,
+      storage: shared.storage,
+      now: shared.clock,
+      isEligible: shared.eligibility,
+      getScreenState: shared.screenState,
+      report: shared.reporter,
+      cooldownMs: 1,
+    }),
+    /already exists/,
+  );
 
   const malformedScreen = createReviewRequestController({
     review: { isSupported: async () => true, request: async () => {} },
@@ -136,11 +148,30 @@ test("reuses one controller for the same storage/key and fails closed on invalid
   });
   assert.deepEqual(await malformedScreen.maybeRequest(), { status: "skipped", reason: "screen_blocked" });
 
+  let repaired;
   const invalidState = createReviewRequestController({
     review: { isSupported: async () => true, request: async () => {} },
-    storage: { get: async () => ({ version: 99, lastAttemptAt: 1 }), set: async () => {} },
+    storage: {
+      get: async () => repaired ?? ({ version: 99, lastAttemptAt: 1 }),
+      set: async (_key, value) => {
+        repaired = value;
+      },
+    },
+    now: () => 1_000,
+    cooldownMs: 10_000,
   });
   assert.deepEqual(await invalidState.maybeRequest(), { status: "skipped", reason: "corrupt_state" });
+  assert.deepEqual(repaired, { version: 1, lastAttemptAt: 1_000 });
+  assert.deepEqual(await invalidState.maybeRequest(), { status: "skipped", reason: "cooldown" });
+
+  const repairEvents = [];
+  const failedRepair = createReviewRequestController({
+    review: { isSupported: async () => true, request: async () => {} },
+    storage: { get: async () => ({ version: 99, lastAttemptAt: 1 }), set: async () => { throw new Error("repair failed"); } },
+    report: (event) => repairEvents.push(event),
+  });
+  assert.deepEqual(await failedRepair.maybeRequest(), { status: "skipped", reason: "corrupt_state" });
+  assert.deepEqual(repairEvents[0], { type: "review_request_failed", errorCode: "UNKNOWN_ERROR", phase: "storage_repair" });
 });
 
 test("does not call the SDK when writing the attempt or eligibility fails", async () => {
