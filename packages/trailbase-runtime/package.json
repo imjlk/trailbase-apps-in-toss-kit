@@ -11,6 +11,7 @@
     "./proxy-capabilities": "./src/proxy-capabilities.mjs",
     "./ledger-doctor": "./src/ledger-doctor.mjs",
     "./owned-currency-report": "./src/owned-currency-report.mjs",
+    "./owned-currency-close-manifest": "./src/owned-currency-close-manifest.mjs",
     "./restore-checkpoint": "./src/restore-checkpoint.mjs"
   },
   "bin": {

@@ -8,6 +8,9 @@ import path from "node:path";
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const sqlDir = path.join(root, "templates", "trailbase", "sql");
 const editorDir = path.join(root, "templates", "trailbase", "sql-editor");
+const promotionSchema = readFileSync(path.join(sqlDir, "promotion_campaigns.sql"), "utf8");
+const approvalSchema = readFileSync(path.join(sqlDir, "promotion_campaign_approvals.sql"), "utf8");
+const approvalV2Migration = readFileSync(path.join(sqlDir, "promotion_campaign_approvals.v2.sql"), "utf8");
 const db = new Database(":memory:");
 const X01 = new Uint8Array([1]);
 
@@ -15,8 +18,55 @@ try {
   db.exec("PRAGMA foreign_keys = ON");
   db.exec("CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT");
   db.exec("INSERT INTO _user VALUES (X'01')");
+  db.exec(promotionSchema);
+  db.exec(approvalSchema);
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_events.sql"), "utf8"));
   db.exec(readFileSync(path.join(sqlDir, "owned_currency_policies.sql"), "utf8"));
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "daily-attendance", "attendance", "provider-code-fixture", 50, "ACTIVE", 0, 20000, 5000, 0, 0,
+  );
+  const insertApproval = db.query(`INSERT INTO promotion_campaign_approvals
+    (campaign_id, revision, classification, recorded_approval_status,
+     approved_config_revision, approval_reference, monthly_reporting_required,
+     reviewed_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  insertApproval.run(
+    "daily-attendance", 1, "OWNED_CURRENCY", "APPROVED", "config-v3", "operator-review-fixture", 1, 100, 100,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 1, "OWNED_CURRENCY", "AUTO_APPROVED", "config-v3", "invalid-status-fixture", 1, 100, 100),
+    /revisions must be appended|CHECK constraint failed/,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 2, "OWNED_CURRENCY", "APPROVED", "config-v3", "missing-reviewed-at", 1, null, 100),
+    /CHECK constraint failed/,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 2, "UNCONFIRMED", "APPROVED", "config-v3", "invalid-classification", 1, 100, 100),
+    /CHECK constraint failed/,
+  );
+  assert.throws(
+    () => insertApproval.run("daily-attendance", 2, "OWNED_CURRENCY", "APPROVED", "config-v3", "not-monthly", 0, 100, 100),
+    /CHECK constraint failed/,
+  );
+  insertApproval.run("daily-attendance", 2, "OWNED_CURRENCY", "APPROVED", "config-v3", "operator-review-fixture-v2", 1, 200, 200);
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "direct-reward", "direct-reward", "provider-code-fixture-2", 25, "ACTIVE", 0, 20000, 2500, 0, 0,
+  );
+  insertApproval.run("direct-reward", 1, "DIRECT_REWARD", "APPROVED", "config-v3", "operator-review-direct", 0, 100, 100);
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    "pending-review", "pending-review", "provider-code-fixture-3", 25, "ACTIVE", 0, 20000, 2500, 0, 0,
+  );
+  insertApproval.run("pending-review", 1, "UNCONFIRMED", "PENDING", null, null, 0, null, 100);
   db.query(`INSERT INTO owned_currency_policies
     (currency_code, unit_code, policy_version, valuation_mode, valuation_currency_code,
      conversion_numerator, conversion_denominator, effective_from, effective_to, created_at)
@@ -49,6 +99,71 @@ try {
   add(["star-issue", X01, "stars", "count", "ISSUE", 5, "vote", "v-1", "event:star-issue", "v1", null, null, null, null, 1500, 1500, "{}"]);
 
   const queries = loadQueries(readFileSync(path.join(editorDir, "owned-currency-report.sql"), "utf8"));
+  assert.deepEqual(db.query(queries.approval_history).all(), [{
+    campaign_id: "daily-attendance",
+    revision: 2,
+    classification: "OWNED_CURRENCY",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 1,
+    reviewed_at: 200,
+    created_at: 200,
+  }, {
+    campaign_id: "daily-attendance",
+    revision: 1,
+    classification: "OWNED_CURRENCY",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 1,
+    reviewed_at: 100,
+    created_at: 100,
+  }, {
+    campaign_id: "direct-reward",
+    revision: 1,
+    classification: "DIRECT_REWARD",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 0,
+    reviewed_at: 100,
+    created_at: 100,
+  }, {
+    campaign_id: "pending-review",
+    revision: 1,
+    classification: "UNCONFIRMED",
+    recorded_approval_status: "PENDING",
+    approved_config_revision: null,
+    monthly_reporting_required: 0,
+    reviewed_at: null,
+    created_at: 100,
+  }]);
+  assert.deepEqual(db.query(queries.approval_scope_check).all(), [{
+    campaign_id: "daily-attendance",
+    campaign_present: 1,
+    current_config_revision: "config-v3",
+    approval_revision: 2,
+    classification: "OWNED_CURRENCY",
+    recorded_approval_status: "APPROVED",
+    approved_config_revision: "config-v3",
+    monthly_reporting_required: 1,
+    reviewed_at: 200,
+    approval_check: "APPROVED",
+  }]);
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "daily-attendance", "config-v4")).all()[0].approval_check,
+    "CONFIG_REVISION_MISMATCH",
+  );
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "missing-campaign", "config-v3")).all()[0].approval_check,
+    "CAMPAIGN_MISSING",
+  );
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "direct-reward", "config-v3")).all()[0].approval_check,
+    "CLASSIFICATION_MISMATCH",
+  );
+  assert.equal(
+    db.query(withOperatorScope(queries.approval_scope_check, "pending-review", "config-v3")).all()[0].approval_check,
+    "OPERATOR_REVIEW_REQUIRED",
+  );
   const monthly = db.query(withTestWindow(queries.monthly_summary, 1000, 6000)).all();
   assert.deepEqual(monthly, [
     {
@@ -220,6 +335,19 @@ try {
 
   db.query("DELETE FROM _user WHERE id = X'01'").run();
   assert.equal(db.query("SELECT user_id FROM owned_currency_events WHERE id = 'gold-issue'").get().user_id, null);
+  assert.throws(
+    () => db.query("UPDATE promotion_campaign_approvals SET reviewed_at = 300 WHERE campaign_id = 'daily-attendance' AND revision = 2").run(),
+    /append-only/,
+  );
+  assert.throws(
+    () => db.query("DELETE FROM promotion_campaign_approvals WHERE campaign_id = 'daily-attendance' AND revision = 2").run(),
+    /append-only/,
+  );
+  assert.throws(
+    () => db.query("DELETE FROM promotion_campaigns WHERE id = 'daily-attendance'").run(),
+    /FOREIGN KEY constraint failed/,
+  );
+  smokeApprovalV2Migration();
 
   console.log(JSON.stringify({
     ok: true,
@@ -242,4 +370,136 @@ function withTestWindow(sql, start, end) {
 
 function withTestAsOf(sql, asOf) {
   return sql.replace("1790870400000", String(asOf));
+}
+
+function withOperatorScope(sql, campaignId, configRevision) {
+  return sql
+    .replace("'daily-attendance'", `'${campaignId}'`)
+    .replace("'config-v3'", `'${configRevision}'`);
+}
+
+function smokeApprovalV2Migration() {
+  const legacyApprovalSchema = `
+    CREATE TABLE promotion_campaign_approvals (
+      campaign_id TEXT NOT NULL REFERENCES promotion_campaigns(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      classification TEXT NOT NULL CHECK (classification IN ('UNCONFIRMED', 'DIRECT_REWARD', 'OWNED_CURRENCY', 'OTHER')),
+      recorded_approval_status TEXT NOT NULL CHECK (recorded_approval_status IN ('UNCONFIRMED', 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED')),
+      approved_config_revision TEXT NOT NULL CHECK (length(trim(approved_config_revision)) BETWEEN 1 AND 128),
+      approval_reference TEXT NOT NULL CHECK (length(trim(approval_reference)) BETWEEN 1 AND 256),
+      monthly_reporting_required INTEGER NOT NULL CHECK (monthly_reporting_required IN (0, 1)),
+      reviewed_at INTEGER CHECK (reviewed_at IS NULL OR reviewed_at >= 0),
+      created_at INTEGER NOT NULL CHECK (created_at >= 0),
+      PRIMARY KEY (campaign_id, revision)
+    ) STRICT;
+  `;
+  const beginStart = approvalV2Migration.indexOf("BEGIN IMMEDIATE;");
+  const createStart = approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2");
+  const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
+  const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
+  const insertStatement = approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "");
+  const legacy = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
+  try {
+    seedLegacyApproval(legacy, {
+      campaignId: "legacy-campaign",
+      featureKey: "legacy",
+      providerCode: "provider-code-legacy",
+      classification: "OWNED_CURRENCY",
+      status: "APPROVED",
+      reference: "legacy-review",
+    });
+    legacy.exec(approvalV2Migration);
+    assert.equal(legacy.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
+    assert.throws(
+      () => legacy.query("UPDATE promotion_campaign_approvals SET reviewed_at = 20").run(),
+      /append-only/,
+    );
+    assert.throws(
+      () => legacy.query("DELETE FROM promotion_campaign_approvals").run(),
+      /append-only/,
+    );
+    assert.throws(
+      () => legacy.query(`INSERT INTO promotion_campaign_approvals
+        (campaign_id, revision, classification, recorded_approval_status,
+         approved_config_revision, approval_reference, monthly_reporting_required,
+         reviewed_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        "legacy-campaign", 1, "OWNED_CURRENCY", "APPROVED", "config-v1", "duplicate", 1, 20, 20,
+      ),
+      /revisions must be appended/,
+    );
+  } finally {
+    legacy.close();
+  }
+
+  const invalid = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
+  try {
+    seedInvalidLegacyApproval(invalid);
+    invalid.exec(approvalV2Migration.slice(createStart, insertStart));
+    assert.throws(
+      () => invalid.query(insertStatement).run(),
+      /CHECK constraint failed/,
+    );
+    assert.equal(invalid.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
+    assert.equal(invalid.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2").get().count, 0);
+  } finally {
+    invalid.close();
+  }
+
+  const invalidFull = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
+  try {
+    seedInvalidLegacyApproval(invalidFull);
+    invalidFull.exec("CREATE TABLE promotion_campaign_approvals_v2 (stale INTEGER);");
+    invalidFull.exec(approvalV2Migration.slice(beginStart, insertStart));
+    assert.throws(
+      () => invalidFull.query(insertStatement).run(),
+      /CHECK constraint failed/,
+    );
+    invalidFull.exec("ROLLBACK;");
+    assert.equal(invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
+    assert.equal(
+      invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2 WHERE stale IS NULL").get().count,
+      0,
+    );
+  } finally {
+    invalidFull.close();
+  }
+}
+
+function createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema) {
+  const db = new Database(":memory:");
+  db.exec("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT;");
+  db.exec(promotionSchema);
+  db.exec(legacyApprovalSchema);
+  return db;
+}
+
+function seedInvalidLegacyApproval(db) {
+  seedLegacyApproval(db, {
+    campaignId: "invalid-campaign",
+    featureKey: "invalid",
+    providerCode: "provider-code-invalid",
+    classification: "UNCONFIRMED",
+    status: "APPROVED",
+    reference: "invalid",
+  });
+}
+
+function seedLegacyApproval(
+  db,
+  { campaignId, featureKey, providerCode, classification, status, reference },
+) {
+  db.query(`INSERT INTO promotion_campaigns
+    (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+     budget_limit_amount, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    campaignId, featureKey, providerCode, 10, "ACTIVE", 0, 100, 100, 0, 0,
+  );
+  db.query(`INSERT INTO promotion_campaign_approvals
+    (campaign_id, revision, classification, recorded_approval_status,
+     approved_config_revision, approval_reference, monthly_reporting_required,
+     reviewed_at, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    campaignId, 1, classification, status, "config-v1", reference, 1, 10, 10,
+  );
 }

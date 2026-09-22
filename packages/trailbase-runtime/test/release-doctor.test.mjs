@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import {
   createCommandCheck,
   createPendingChangesetCheck,
+  createOwnedCurrencyCloseManifestCheck,
   createProductionEnvCheck,
   createReleaseDoctorChecksFromConfig,
   formatDoctorResultLines,
@@ -295,6 +296,23 @@ describe("release doctor", () => {
     });
   });
 
+  test("runs owned-currency close manifest checks as optional evidence", async () => {
+    await withTempDir(async (dir) => {
+      const check = createOwnedCurrencyCloseManifestCheck({
+        manifestFile: path.join(dir, "missing-manifest.json"),
+        reportFile: path.join(dir, "missing-report.json"),
+        required: false,
+      });
+      const summary = await runReleaseDoctor({ checks: [check] });
+
+      expect(summary.ok).toBe(true);
+      expect(summary.warnings).toBe(1);
+      expect(summary.warningMessages).toEqual([
+        "Owned currency close manifest: MANIFEST_FILE_NOT_FOUND",
+      ]);
+    });
+  });
+
   test("loads JSON config checks", async () => {
     await withTempDir(async (dir) => {
       mkdirSync(path.join(dir, "ops"), { recursive: true });
@@ -321,6 +339,13 @@ describe("release doctor", () => {
                 command: process.execPath,
                 args: ["-e", "process.exit(0)"],
               },
+              {
+                type: "owned-currency-close-manifest",
+                name: "Close evidence",
+                manifest: "missing-manifest.json",
+                report: "missing-report.json",
+                required: false,
+              },
             ],
           },
           null,
@@ -329,13 +354,14 @@ describe("release doctor", () => {
       );
 
       const config = loadReleaseDoctorConfig(path.join(dir, "release-doctor.json"));
-      expect(createReleaseDoctorChecksFromConfig(config)).toHaveLength(2);
+      expect(createReleaseDoctorChecksFromConfig(config)).toHaveLength(3);
 
       const summary = await runConfiguredReleaseDoctor({
         configPath: path.join(dir, "release-doctor.json"),
       });
       expect(summary.ok).toBe(true);
       expect(summary.passed).toBe(2);
+      expect(summary.warnings).toBe(1);
     });
   });
 

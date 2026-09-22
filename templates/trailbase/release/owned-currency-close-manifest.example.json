@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "reportSchemaVersion": 1,
+  "reportFormat": "json",
+  "reportRevision": "2026-09-r1",
+  "appId": "gold-dust",
+  "period": {
+    "start": 1788192000000,
+    "end": 1790870400000
+  },
+  "timestampUnit": "milliseconds",
+  "timezone": "Asia/Seoul",
+  "reportSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "snapshotRef": "snapshot-2026-09-r1",
+  "sourceCommit": "0000000000000000000000000000000000000000",
+  "tool": {
+    "name": "trailbase-owned-currency-report",
+    "version": "0.5.0"
+  },
+  "policyVersions": ["gold-dust-v1"],
+  "approvalRevision": 1,
+  "records": [
+    {
+      "status": "GENERATED",
+      "recordedAt": 1790870400000,
+      "evidenceRef": "report-generated"
+    },
+    {
+      "status": "REVIEWED",
+      "recordedAt": 1790874000000,
+      "evidenceRef": "operator-review-2026-09"
+    },
+    {
+      "status": "SUBMITTED",
+      "recordedAt": 1790877600000,
+      "evidenceRef": "operator-submit-2026-09"
+    }
+  ],
+  "correctionOf": null
+}

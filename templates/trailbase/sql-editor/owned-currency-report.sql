@@ -153,3 +153,63 @@ HAVING COUNT(*) <> 2
    OR SUM(CASE WHEN event_type = 'CONVERT_IN' THEN 1 ELSE 0 END) <> 1
    OR SUM(CASE WHEN event_type = 'CONVERT_OUT' THEN 1 ELSE 0 END) <> 1
 ORDER BY conversion_group_id;
+
+-- Query: approval_history
+-- This query intentionally omits provider promotion codes and operator
+-- identities. Use an authenticated operator/admin SQL Editor session.
+SELECT
+  campaign_id,
+  revision,
+  classification,
+  recorded_approval_status,
+  approved_config_revision,
+  monthly_reporting_required,
+  reviewed_at,
+  created_at
+FROM promotion_campaign_approvals
+ORDER BY campaign_id, revision DESC;
+
+-- Query: approval_scope_check
+-- Replace the values in operator_scope with the app's current configuration
+-- revision before reviewing a campaign. This query is read-only.
+WITH operator_scope(campaign_id, current_config_revision) AS (
+  VALUES ('daily-attendance', 'config-v3')
+),
+latest_revision AS (
+  SELECT campaign_id, MAX(revision) AS revision
+  FROM promotion_campaign_approvals
+  GROUP BY campaign_id
+),
+latest_approval AS (
+  SELECT a.*
+  FROM promotion_campaign_approvals a
+  JOIN latest_revision r
+    ON r.campaign_id = a.campaign_id
+   AND r.revision = a.revision
+)
+SELECT
+  s.campaign_id,
+  CASE WHEN c.id IS NULL THEN 0 ELSE 1 END AS campaign_present,
+  s.current_config_revision,
+  a.revision AS approval_revision,
+  a.classification,
+  a.recorded_approval_status,
+  a.approved_config_revision,
+  a.monthly_reporting_required,
+  a.reviewed_at,
+  CASE
+    WHEN c.id IS NULL THEN 'CAMPAIGN_MISSING'
+    WHEN a.campaign_id IS NULL THEN 'APPROVAL_MISSING'
+    WHEN a.recorded_approval_status = 'UNCONFIRMED' THEN 'UNCONFIRMED'
+    WHEN a.recorded_approval_status = 'PENDING' THEN 'OPERATOR_REVIEW_REQUIRED'
+    WHEN a.classification <> 'OWNED_CURRENCY' THEN 'CLASSIFICATION_MISMATCH'
+    WHEN a.approved_config_revision IS NOT s.current_config_revision THEN 'CONFIG_REVISION_MISMATCH'
+    WHEN a.recorded_approval_status = 'APPROVED' THEN 'APPROVED'
+    WHEN a.recorded_approval_status IN ('REJECTED', 'EXPIRED') THEN a.recorded_approval_status
+    ELSE 'OPERATOR_REVIEW_REQUIRED'
+  END AS approval_check
+FROM operator_scope s
+LEFT JOIN promotion_campaigns c
+  ON c.id = s.campaign_id
+LEFT JOIN latest_approval a
+  ON a.campaign_id = s.campaign_id;

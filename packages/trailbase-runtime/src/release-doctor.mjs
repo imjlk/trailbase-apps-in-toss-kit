@@ -3,7 +3,9 @@ import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { validateProductionEnv } from "./production-env.mjs";
 import { createProxyCapabilitiesCheck } from "./proxy-capabilities.mjs";
+import { createOwnedCurrencyCloseManifestCheck } from "./owned-currency-close-manifest.mjs";
 export { createProxyCapabilitiesCheck } from "./proxy-capabilities.mjs";
+export { createOwnedCurrencyCloseManifestCheck } from "./owned-currency-close-manifest.mjs";
 
 export async function runReleaseDoctor({
   checks = [],
@@ -303,6 +305,15 @@ function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
       changesetDir,
       required,
       root,
+    });
+  }
+  if (type === "owned-currency-close-manifest") {
+    const { name, manifest, report, required } = entry;
+    return createOwnedCurrencyCloseManifestCheck({
+      name,
+      manifestFile: manifest ? resolve(root, manifest) : undefined,
+      reportFile: report ? resolve(root, report) : undefined,
+      required,
     });
   }
   throw new Error(`Unsupported release doctor check type at index ${index + 1}: ${type}`);

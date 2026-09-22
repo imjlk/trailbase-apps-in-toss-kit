@@ -41,6 +41,25 @@ Choose feature keys for people who operate the service. A short, stable key such
 as `share_reward` or `onboarding_bonus` is usually easier to maintain than a key
 that encodes every eligibility detail.
 
+For operator-entered approval evidence, copy
+`templates/trailbase/sql/promotion_campaign_approvals.sql` into a separate
+consumer migration. It keeps a revisioned classification, recorded approval
+status, approved app configuration revision, private evidence reference, and
+whether monthly reporting is required for each campaign. The table is private
+and does not contain a provider promotion code. Approval status is entered by an
+operator; an SDK call, test promotion, or provider response must never change it
+to `APPROVED`. Keep `policy_version` in the owned-currency journal separate
+from this approval `revision`, because accounting valuation and promotion
+approval are different facts.
+For `UNCONFIRMED` or `PENDING` records, the configuration and evidence reference
+may remain empty; decided statuses require both a review timestamp and those
+references.
+If a consumer already copied the first draft of this table, apply
+`templates/trailbase/sql/promotion_campaign_approvals.v2.sql` as an explicit
+forward migration; re-running `CREATE TABLE IF NOT EXISTS` does not alter an
+existing SQLite table. Run the v2 file outside a wrapping transaction because
+the rebuild owns its transaction and rolls back on a failed evidence check.
+
 The shared SQL template keeps a general `feature_key/status` index for mixed
 operator views and also adds an `ACTIVE` partial index for the hot lookup path
 used before provider grants. Keep active campaign resolution in one app-owned
@@ -145,6 +164,13 @@ campaign and public request id belong to that user. A default response must
 include the same public `campaignId` and `requestId`; the normalizer rejects
 missing or mismatched identities. A custom `normalizeResponse` callback takes
 ownership of that response contract, just as it does for claim responses.
+
+Use the read-only `approval_scope_check` example in
+`templates/trailbase/sql-editor/owned-currency-report.sql` to compare the
+current app configuration revision with the latest recorded approval. It reports
+missing or unconfirmed evidence; it does not change campaign state or pause a
+payout flow. If an operational stop is needed, use the existing
+`operation_policies` controls.
 
 ## Claim Idempotency
 

@@ -7,7 +7,11 @@ const EVENT_TYPES = Object.freeze([
   "EXPIRE",
   "ADJUSTMENT",
 ]);
-const TIMESTAMP_UNITS = new Set(["seconds", "milliseconds"]);
+export const OWNED_CURRENCY_TIMESTAMP_UNITS = Object.freeze([
+  "seconds",
+  "milliseconds",
+]);
+const TIMESTAMP_UNITS = new Set(OWNED_CURRENCY_TIMESTAMP_UNITS);
 export class OwnedCurrencyReportError extends Error {
   constructor(code) {
     super(code);
@@ -333,8 +337,12 @@ function csvCell(value) {
   return /[",\n\r]/.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
-function safeNonNegativeInteger(value) {
+export function isOwnedCurrencySafeNonNegativeInteger(value) {
   return Number.isSafeInteger(value) && value >= 0;
+}
+
+function safeNonNegativeInteger(value) {
+  return isOwnedCurrencySafeNonNegativeInteger(value);
 }
 
 function integer(value) {

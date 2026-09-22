@@ -37,6 +37,22 @@ TrailBase가 프록시 환경 변수뿐 아니라 프로모션 설정까지 관�
 모든 자격 조건을 키에 넣기보다 `share_reward`, `onboarding_bonus`처럼 짧고 안정적인 이름을
 선택하는 편이 유지보수에 좋습니다.
 
+운영자가 입력하는 승인 근거가 필요하면
+`templates/trailbase/sql/promotion_campaign_approvals.sql`을 소비 앱의 별도 migration으로
+복사하세요. 이 테이블은 campaign별 분류, 기록된 승인 상태, 승인 확인 대상 앱 설정 revision,
+비공개 근거 참조, 월간 보고 대상 여부를 revision별로 보관합니다. 테이블은 비공개이며 provider
+promotion code를 저장하지 않습니다. 승인 상태는 운영자가 입력해야 하며 SDK 호출, 테스트
+프로모션 성공, provider 응답만으로 `APPROVED`로 바꾸면 안 됩니다. 자체재화 원장의
+`policy_version`과 이 승인 기록의 `revision`은 회계 평가 기준과 프로모션 승인이라는 서로 다른
+사실이므로 분리하세요.
+`UNCONFIRMED` 또는 `PENDING` 기록은 설정 revision과 근거 참조를 비워 둘 수 있지만, 결정된
+상태에는 검토 시각과 두 참조가 모두 필요합니다.
+이미 첫 초안의 테이블을 복사한 소비 앱은
+`templates/trailbase/sql/promotion_campaign_approvals.v2.sql`을 명시적인 forward migration으로
+한 번 적용하세요. `CREATE TABLE IF NOT EXISTS`를 다시 실행해도 기존 SQLite 테이블 구조는
+바뀌지 않습니다. v2 파일은 자체 transaction으로 rebuild하고 실패 시 rollback하므로, 외부에서
+transaction으로 감싸지 말고 실행하세요.
+
 공유 SQL 템플릿은 운영 화면처럼 여러 상태를 함께 보는 경로를 위해 `feature_key/status` index를
 유지하고, provider 지급 전 hot lookup에는 `ACTIVE` partial index를 추가합니다. 활성 캠페인
 해석은 사용량 확인 및 원장 상태 전이와 같은 앱 소유 transaction 안에서 처리하고, provider
@@ -130,6 +146,12 @@ const result = await status.getStatus({
 속하는지 확인해야 합니다. 기본 응답에는 같은 공개 `campaignId`와 `requestId`가 있어야 하며,
 정규화기는 ID가 없거나 달라진 응답을 거부합니다. `normalizeResponse`를 직접 주입하면 claim 응답과
 마찬가지로 소비자가 이 응답 계약을 책임집니다.
+
+최신 기록된 승인과 현재 앱 설정 revision을 비교하려면
+`templates/trailbase/sql-editor/owned-currency-report.sql`의 읽기 전용
+`approval_scope_check` 예문을 사용하세요. 이 query는 근거 누락·미확정 상태를 표시할 뿐 campaign
+상태를 바꾸거나 지급 흐름을 중단하지 않습니다. 운영상 중단이 필요하면 기존
+`operation_policies` 제어를 사용하세요.
 
 ## 지급 요청 멱등성
 
