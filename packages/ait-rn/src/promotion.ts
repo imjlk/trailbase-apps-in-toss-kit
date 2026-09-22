@@ -174,11 +174,8 @@ export function normalizeAppsInTossPromotionClaimResult(
   value: unknown,
   options: { campaignId?: string } = {},
 ): AppsInTossPromotionClaimResult {
-  const { record, nestedGrant, nestedPromotion, nestedReward } =
+  const { record, nestedGrant, nestedPromotion, nestedReward, records } =
     promotionResponseCandidates(value);
-  const records = [record, nestedGrant, nestedPromotion, nestedReward].filter(
-    (candidate): candidate is Record<string, unknown> => candidate !== null,
-  );
   const responseCampaignIds = uniqueStringCandidates(
     collectRecordValues(records, ["campaignId", "campaign_id"]),
   );
@@ -454,20 +451,22 @@ function objectCandidate(value: unknown): Record<string, unknown> | null {
 }
 
 function promotionResponseRecords(value: unknown) {
-  const { record, nestedGrant, nestedPromotion, nestedReward } =
-    promotionResponseCandidates(value);
-  return [record, nestedGrant, nestedPromotion, nestedReward].filter(
-    (candidate): candidate is Record<string, unknown> => candidate !== null,
-  );
+  return promotionResponseCandidates(value).records;
 }
 
 function promotionResponseCandidates(value: unknown) {
   const record = objectCandidate(value);
+  const nestedGrant = objectCandidate(record?.grant);
+  const nestedPromotion = objectCandidate(record?.promotion);
+  const nestedReward = objectCandidate(record?.reward);
   return {
     record,
-    nestedGrant: objectCandidate(record?.grant),
-    nestedPromotion: objectCandidate(record?.promotion),
-    nestedReward: objectCandidate(record?.reward),
+    nestedGrant,
+    nestedPromotion,
+    nestedReward,
+    records: [record, nestedGrant, nestedPromotion, nestedReward].filter(
+      (candidate): candidate is Record<string, unknown> => candidate !== null,
+    ),
   };
 }
 
