@@ -29,6 +29,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Link anonymous users to Toss Login | [toss-identity.md](toss-identity.md) |
 | Rotate identity encryption keys and reseal private rows | [identity-key-rotation.md](identity-key-rotation.md) |
 | Model Toss promotion reward campaigns | [promotion-campaigns.md](promotion-campaigns.md) |
+| Add a safe review request flow | [review-request.md](review-request.md) |
 | Issue app-owned ad/share credits once | [app-rewards.md](app-rewards.md) |
 | Prepare reports for self-issued currency | [owned-currency-reporting.md](owned-currency-reporting.md) |
 | Persist in-app purchase order/grant state | [iap-orders.md](iap-orders.md) |

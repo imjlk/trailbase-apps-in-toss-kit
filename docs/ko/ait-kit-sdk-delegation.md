@@ -6,7 +6,7 @@
 TrailBase는 자신이 소유한 부분(공개 API 표면, TrailBase 서버 연동, 세션
 부트스트랩, 저장 키 호환성)을 계속 담당합니다.
 
-두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.3.0`).
+두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.4.0`).
 SDK의 peer 하한이 이 kit의 RN 최소 버전을 정의합니다:
 `@apps-in-toss/framework >=2.10.10`(SDK pin 채택 시 `>=2.5.0`에서 상향).
 WebView 소비자는 `@apps-in-toss/web-framework >=3.4.0 <4`를 유지합니다.
@@ -21,12 +21,21 @@ WebView 소비자는 `@apps-in-toss/web-framework >=3.4.0 <4`를 유지합니다
 | 전면 광고 로드 | 기본 경로 (주입 함수 없을 때) | — (광고는 RN 전용) |
 | IAP 결제 + 대기 주문 | 기본 경로 (`IAP` 모듈 미주입 시) | — (아래 경계 참고) |
 | 공유 링크 / 공유 시트 | — | `createShareLink` / `share` |
+| 리뷰 요청 | `createReactNativeReview()` | `createWebReview()` |
+| 직접 프로모션 adapter | `createReactNativePromotion()` | `createWebPromotion()` |
 
 "기본 경로"는 대체 함수나 모듈을 주입하지 않은 프로덕션 흐름입니다. 주입
 seam(`appLogin`, `getAnonymousKey`, `loadFullScreenAd`, `IAP` 등)은 로컬
 흐름을 유지합니다. 주입 seam은 동기 등록과 정밀한 오류 분류가 이 패키지의
 공개 계약인 테스트/대체 지점이고, 공유 어댑터는 항상 자체 비동기 로더를
 거치기 때문입니다.
+
+SDK 0.4.0에는 리뷰와 직접 프로모션 adapter 계약이 추가되었습니다. 이 기능은
+명시적으로 선택해야 하며 `ait-rn`과 `ait-web`이 암묵적으로 호출하지 않습니다.
+리뷰는 `templates/clients/review-request/`의 controller를 복사해 컨슈머 앱이
+호출 시점, cooldown, storage, 화면 상태를 직접 소유하도록 연결하세요. 리뷰
+Promise가 끝났다고 리뷰 화면 표시나 작성이 확인되는 것은 아닙니다. 직접 프로모션
+adapter도 TrailBase의 3단계 서버 지급 흐름을 대체하거나 자동 fallback하지 않습니다.
 
 ## 이 저장소에 남는 것 (그 이유)
 

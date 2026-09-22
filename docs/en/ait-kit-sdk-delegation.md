@@ -7,7 +7,7 @@ deadline budgets, and cleanup locally. TrailBase keeps what it owns: the
 public API surface, TrailBase server integration, session bootstrap, and
 storage-key compatibility.
 
-Both packages pin `@ait-kit/sdk` exactly (currently `0.3.0`). The SDK's
+Both packages pin `@ait-kit/sdk` exactly (currently `0.4.0`). The SDK's
 peer floor defines this kit's RN minimum: `@apps-in-toss/framework`
 `>=2.10.10` (raised from `>=2.5.0` when adopting the SDK pin). WebView
 consumers keep `@apps-in-toss/web-framework >=3.4.0 <4`.
@@ -22,6 +22,8 @@ consumers keep `@apps-in-toss/web-framework >=3.4.0 <4`.
 | Full-screen ad load | Default path (no injected function) | — (ads are RN-only) |
 | IAP purchases + pending orders | Default path (no injected `IAP` module) | — (see boundary below) |
 | Share link / share sheet | — | `createShareLink` / `share` |
+| Review request | `createReactNativeReview()` | `createWebReview()` |
+| Direct promotion adapter | `createReactNativePromotion()` | `createWebPromotion()` |
 
 "Default path" means the production flow when no replacement function or
 module is injected. Injected seams (`appLogin`, `getAnonymousKey`,
@@ -29,6 +31,14 @@ module is injected. Injected seams (`appLogin`, `getAnonymousKey`,
 seams whose synchronous registration and precise error taxonomies are part of
 this package's public contract, and the shared adapter always routes through
 its own async loader.
+
+SDK 0.4.0 adds review and direct-promotion adapter contracts. They are explicit
+opt-in entry points; `ait-rn` and `ait-web` do not call either one implicitly.
+For reviews, copy the controller in `templates/clients/review-request/` so the
+consumer app owns timing, cooldown, storage, and screen checks. A settled review
+promise never proves that a review was shown or written. Direct promotion
+adapters likewise do not replace the TrailBase three-step server flow or add an
+automatic fallback.
 
 ## What stays in this repository (and why)
 
