@@ -108,9 +108,12 @@ as the RN-to-backend contract; the backend resolves that value to campaign
 configuration and ledger state before calling the proxy.
 
 The default normalizer also rejects contradictory claim responses. Explicit
-status values and success flags must agree, and an explicit response
-`campaignId` must match the requested campaign. A response with no campaign ID
-can use the requested ID for compatibility. If a consumer supplies
+status values and success flags must agree; `granted: false` is compatible
+with an explicitly already-granted outcome because it can mean that this
+attempt created no new grant. The normalized result still reports both
+`granted` and `alreadyGranted` as `true`. An explicit response `campaignId`
+must match the requested campaign. A response with no campaign ID can use the
+requested ID for compatibility. If a consumer supplies
 `normalizeResponse`, the payload is returned through that custom function and
 the consumer owns its response validation contract.
 

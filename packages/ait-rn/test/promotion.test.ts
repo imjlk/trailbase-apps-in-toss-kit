@@ -186,6 +186,34 @@ describe("AppsInToss promotion helpers", () => {
     });
   });
 
+  test("accepts an already-granted response with no newly granted reward", () => {
+    expect(
+      normalizeAppsInTossPromotionClaimResult({
+        alreadyGranted: true,
+        campaignId: "daily",
+        granted: false,
+        status: "ALREADY_GRANTED",
+      }),
+    ).toEqual({
+      alreadyGranted: true,
+      campaignId: "daily",
+      granted: true,
+      status: "ALREADY_GRANTED",
+    });
+    expect(
+      normalizeAppsInTossPromotionClaimResult({
+        alreadyGranted: true,
+        campaignId: "daily",
+        granted: false,
+      }),
+    ).toEqual({
+      alreadyGranted: true,
+      campaignId: "daily",
+      granted: true,
+      status: "ALREADY_GRANTED",
+    });
+  });
+
   test("rejects contradictory status and flag combinations", () => {
     const invalidResponses = [
       { campaignId: "daily", status: "FAILED", granted: true },

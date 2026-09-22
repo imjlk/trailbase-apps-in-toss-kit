@@ -200,20 +200,15 @@ function resolvePromotionClaimStatus(
   flags: { alreadyGranted?: boolean; granted?: boolean },
   cause: unknown,
 ): AppsInTossPromotionClaimStatus {
-  const statuses = values
-    .map(normalizePromotionClaimStatusValue)
-    .filter(
-      (status): status is PromotionClaimStatusCandidate => status !== null,
-    );
+  const normalized = values.map(normalizePromotionClaimStatusValue);
 
-  if (statuses.includes("UNKNOWN")) {
+  if (normalized.includes("UNKNOWN")) {
     throwInvalidPromotionClaimResponse(cause);
   }
 
   const recognizedStatuses = uniqueStatuses(
-    statuses.filter(
-      (status): status is AppsInTossPromotionClaimStatus =>
-        status !== "UNKNOWN",
+    normalized.filter(
+      (status): status is AppsInTossPromotionClaimStatus => status !== null,
     ),
   );
   const successStatuses = recognizedStatuses.filter(
@@ -231,8 +226,11 @@ function resolvePromotionClaimStatus(
   }
 
   if (successStatuses.length > 0) {
+    const alreadyGrantedOutcome =
+      flags.alreadyGranted === true ||
+      successStatuses.includes("ALREADY_GRANTED");
     if (
-      flags.granted === false ||
+      (flags.granted === false && !alreadyGrantedOutcome) ||
       (flags.alreadyGranted === false &&
         successStatuses.includes("ALREADY_GRANTED"))
     ) {
@@ -252,9 +250,6 @@ function resolvePromotionClaimStatus(
   }
 
   if (flags.alreadyGranted === true) {
-    if (flags.granted === false) {
-      throwInvalidPromotionClaimResponse(cause);
-    }
     return "ALREADY_GRANTED";
   }
   if (flags.granted === true) {
