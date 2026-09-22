@@ -1,0 +1,91 @@
+# Owned Currency Reporting
+
+Apps may keep their current reward and balance implementations while recording
+accounting facts in a shared, private journal. This template is intended for
+the month-end reporting requested for self-issued currency promotions. It does
+not classify a promotion for Apps in Toss and it does not submit a report to
+the Toss console.
+
+## What the kit provides
+
+Copy `templates/trailbase/sql/owned_currency_events.sql` into a consumer
+migration. The `owned_currency_events` table is a private journal of signed
+integer minor units. It records the event type, source, idempotency key, policy
+version, and optional valuation captured at the time of the event.
+
+Keep the table out of the public Record API. The optional `_user` reference is
+set to `NULL` when a user is deleted, so a later closed-period aggregate does
+not retain the TrailBase identity. `source_id` and `metadata_json` must remain
+opaque and must not contain raw Toss user keys, HMACs, sealed values, tokens, or
+secrets.
+
+The journal is not a balance projection. Existing app-owned balances remain
+app-owned. A grant in `app_reward_grants` is still the app credit, and a row in
+`promotion_reward_ledger` still records a Toss provider grant. If either one is
+also mirrored into this journal, use a stable source and idempotency key so the
+same credit is not counted twice.
+
+## Event rules
+
+`ISSUE` and `CONVERT_IN` use positive quantities. `SPEND`, `CONVERT_OUT`,
+`EXCHANGE`, and `EXPIRE` use negative quantities. `ADJUSTMENT` may be positive
+or negative and must point to an operator-approved source record. A conversion
+uses the same `conversion_group_id` on its input and output rows; the output is
+not another issuance. An exchange uses an `exchange_id`; its reservation and
+Toss provider state belong in a separate exchange table and the existing
+promotion ledger.
+
+Conversion and exchange identifiers must be non-empty and already trimmed. Treat
+them as stable join keys; do not normalize them differently in separate adapters.
+
+Store grams, points, and other fractional values as integer minor units with an
+explicit `unit_code`. Store valuation as an integer amount and capture the
+`policy_version` that produced it. Do not recalculate historical value from a
+current exchange rate or market price.
+
+`idempotency_key` is globally unique within the journal. Prefix it with the app,
+source, and source-event scope rather than assuming that a user-local key is
+unique. The source check query still catches the same source action recorded
+under different idempotency keys.
+
+## SQL Editor examples
+
+The read-only examples in
+`templates/trailbase/sql-editor/owned-currency-report.sql` cover:
+
+- a half-open monthly summary (the `period_start` literal is inclusive and the
+  `period_end` literal is exclusive);
+- balance as of a timestamp;
+- policy-version breakdown with recorded valuation denominations; and
+- duplicate source detection that ignores only a validated `CONVERT_IN`/`CONVERT_OUT` pair.
+
+Replace the two timestamp literals at the top of each query with values in the
+unit used by the consumer database. The examples are for an authenticated
+operator/admin SQL Editor session and should be run against a consistent
+database snapshot when preparing a report.
+
+```sql
+-- Example parameters for a millisecond database:
+-- Replace 1788192000000 with the inclusive period start.
+-- Replace 1790870400000 with the exclusive period end.
+```
+
+The queries intentionally report issued quantity separately from current
+balance. A month with 10,000 units issued and 6,000 units exchanged still has
+10,000 units of issuance in the report.
+
+## Month-end workflow
+
+1. Confirm the app adapter has recorded all source events and policy versions.
+2. Run the SQL Editor summary against a consistent snapshot.
+3. Check conversion groups, exchange states, unknown provider outcomes, and
+   duplicate source IDs.
+4. Save an app-owned, user-independent period-close aggregate after review.
+5. Record corrections as new adjustment events or a new report revision; do not
+   rewrite old event rows.
+
+Valuation totals stay grouped by `valuation_currency_code`; never add integer
+amounts from different denominations into one total. The first version is deliberately read-only. It does not infer missing history
+from a balance, call the Toss provider, or enforce a fixed monthly budget. The
+consumer app must confirm the applicable reporting period, valuation rule, and
+retention policy with Toss before submitting an official report.
