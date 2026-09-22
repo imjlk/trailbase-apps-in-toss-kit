@@ -174,11 +174,11 @@ export function normalizeAppsInTossPromotionClaimResult(
   value: unknown,
   options: { campaignId?: string } = {},
 ): AppsInTossPromotionClaimResult {
-  const record = objectCandidate(value);
-  const nestedGrant = objectCandidate(record?.grant);
-  const nestedPromotion = objectCandidate(record?.promotion);
-  const nestedReward = objectCandidate(record?.reward);
-  const records = promotionResponseRecords(value);
+  const { record, nestedGrant, nestedPromotion, nestedReward } =
+    promotionResponseCandidates(value);
+  const records = [record, nestedGrant, nestedPromotion, nestedReward].filter(
+    (candidate): candidate is Record<string, unknown> => candidate !== null,
+  );
   const responseCampaignIds = uniqueStringCandidates(
     collectRecordValues(records, ["campaignId", "campaign_id"]),
   );
@@ -244,7 +244,7 @@ export function normalizeAppsInTossPromotionStatusResult(
 ): AppsInTossPromotionStatusResult {
   const campaignId = normalizeRequiredCampaignId(options.campaignId);
   const requestId = normalizeRequiredRequestId(options.requestId);
-  const responseRequestIds = uniqueRequestIds(
+  const responseRequestIds = uniqueStringCandidates(
     collectRecordValues(promotionResponseRecords(value), [
       "requestId",
       "request_id",
@@ -254,10 +254,20 @@ export function normalizeAppsInTossPromotionStatusResult(
     throwInvalidPromotionStatusResponse(value);
   }
 
-  return {
-    ...normalizeAppsInTossPromotionClaimResult(value, { campaignId }),
-    requestId,
-  };
+  try {
+    return {
+      ...normalizeAppsInTossPromotionClaimResult(value, { campaignId }),
+      requestId,
+    };
+  } catch (error) {
+    if (
+      error instanceof AppsInTossPromotionCampaignClientError &&
+      error.code === "PROMOTION_CLAIM_INVALID_RESPONSE"
+    ) {
+      throwInvalidPromotionStatusResponse(value);
+    }
+    throw error;
+  }
 }
 
 export function sanitizePromotionClaimContext(value: unknown): unknown {
@@ -444,13 +454,21 @@ function objectCandidate(value: unknown): Record<string, unknown> | null {
 }
 
 function promotionResponseRecords(value: unknown) {
-  const record = objectCandidate(value);
-  const nestedGrant = objectCandidate(record?.grant);
-  const nestedPromotion = objectCandidate(record?.promotion);
-  const nestedReward = objectCandidate(record?.reward);
+  const { record, nestedGrant, nestedPromotion, nestedReward } =
+    promotionResponseCandidates(value);
   return [record, nestedGrant, nestedPromotion, nestedReward].filter(
     (candidate): candidate is Record<string, unknown> => candidate !== null,
   );
+}
+
+function promotionResponseCandidates(value: unknown) {
+  const record = objectCandidate(value);
+  return {
+    record,
+    nestedGrant: objectCandidate(record?.grant),
+    nestedPromotion: objectCandidate(record?.promotion),
+    nestedReward: objectCandidate(record?.reward),
+  };
 }
 
 function stringCandidate(...values: unknown[]) {
@@ -499,19 +517,6 @@ function uniqueStringCandidates(values: unknown[]) {
       values
         .map((value) => stringCandidate(value))
         .filter((value): value is string => value !== undefined),
-    ),
-  ];
-}
-
-function uniqueRequestIds(values: unknown[]) {
-  return [
-    ...new Set(
-      values
-        .filter(
-          (value): value is string =>
-            typeof value === "string" && value.trim().length > 0,
-        )
-        .map((value) => value.trim()),
     ),
   ];
 }

@@ -433,10 +433,7 @@ describe("AppsInToss promotion helpers", () => {
       }
       expect(error).toBeInstanceOf(AppsInTossPromotionCampaignClientError);
       expect(error).toMatchObject({
-        code:
-          response.campaignId === "invite"
-            ? "PROMOTION_CLAIM_INVALID_RESPONSE"
-            : "PROMOTION_STATUS_INVALID_RESPONSE",
+        code: "PROMOTION_STATUS_INVALID_RESPONSE",
       });
     }
   });
@@ -487,6 +484,20 @@ describe("AppsInToss promotion helpers", () => {
     ).toMatchObject({
       campaignId: "daily",
       requestId: "claim-1",
+      status: "PENDING",
+    });
+    expect(
+      normalizeAppsInTossPromotionStatusResult(
+        {
+          campaignId: "daily",
+          requestId: 12345,
+          status: "PENDING",
+        },
+        { campaignId: "daily", requestId: "12345" },
+      ),
+    ).toMatchObject({
+      campaignId: "daily",
+      requestId: "12345",
       status: "PENDING",
     });
   });
