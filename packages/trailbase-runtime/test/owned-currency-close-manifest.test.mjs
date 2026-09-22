@@ -138,6 +138,37 @@ describe("owned currency close manifest", () => {
         ),
       "MANIFEST_EVIDENCE_REF_INVALID",
     );
+    expect(
+      validateOwnedCurrencyCloseManifest(
+        {
+          ...manifest,
+          snapshotRef: "qa-passed-2026-09",
+        },
+        { reportBytes },
+      ),
+    ).toMatchObject({ reportSha256: manifest.reportSha256 });
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          {
+            ...manifest,
+            snapshotRef: "user-pass",
+          },
+          { reportBytes },
+        ),
+      "MANIFEST_SNAPSHOT_REF_INVALID",
+    );
+    expectCode(
+      () =>
+        validateOwnedCurrencyCloseManifest(
+          {
+            ...manifest,
+            snapshotRef: "passcode-2026",
+          },
+          { reportBytes },
+        ),
+      "MANIFEST_SNAPSHOT_REF_INVALID",
+    );
   });
 
   test("does not infer review or submission from a generated report", () => {

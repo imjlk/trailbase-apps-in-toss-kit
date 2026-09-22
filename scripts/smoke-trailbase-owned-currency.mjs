@@ -10,6 +10,7 @@ const sqlDir = path.join(root, "templates", "trailbase", "sql");
 const editorDir = path.join(root, "templates", "trailbase", "sql-editor");
 const promotionSchema = readFileSync(path.join(sqlDir, "promotion_campaigns.sql"), "utf8");
 const approvalSchema = readFileSync(path.join(sqlDir, "promotion_campaign_approvals.sql"), "utf8");
+const approvalV2Migration = readFileSync(path.join(sqlDir, "promotion_campaign_approvals.v2.sql"), "utf8");
 const db = new Database(":memory:");
 const X01 = new Uint8Array([1]);
 
@@ -346,6 +347,7 @@ try {
     () => db.query("DELETE FROM promotion_campaigns WHERE id = 'daily-attendance'").run(),
     /FOREIGN KEY constraint failed/,
   );
+  smokeApprovalV2Migration();
 
   console.log(JSON.stringify({
     ok: true,
@@ -374,4 +376,91 @@ function withOperatorScope(sql, campaignId, configRevision) {
   return sql
     .replace("'daily-attendance'", `'${campaignId}'`)
     .replace("'config-v3'", `'${configRevision}'`);
+}
+
+function smokeApprovalV2Migration() {
+  const legacyApprovalSchema = `
+    CREATE TABLE promotion_campaign_approvals (
+      campaign_id TEXT NOT NULL REFERENCES promotion_campaigns(id) ON DELETE CASCADE,
+      revision INTEGER NOT NULL CHECK (revision > 0),
+      classification TEXT NOT NULL CHECK (classification IN ('UNCONFIRMED', 'DIRECT_REWARD', 'OWNED_CURRENCY', 'OTHER')),
+      recorded_approval_status TEXT NOT NULL CHECK (recorded_approval_status IN ('UNCONFIRMED', 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED')),
+      approved_config_revision TEXT NOT NULL CHECK (length(trim(approved_config_revision)) BETWEEN 1 AND 128),
+      approval_reference TEXT NOT NULL CHECK (length(trim(approval_reference)) BETWEEN 1 AND 256),
+      monthly_reporting_required INTEGER NOT NULL CHECK (monthly_reporting_required IN (0, 1)),
+      reviewed_at INTEGER CHECK (reviewed_at IS NULL OR reviewed_at >= 0),
+      created_at INTEGER NOT NULL CHECK (created_at >= 0),
+      PRIMARY KEY (campaign_id, revision)
+    ) STRICT;
+  `;
+  const legacy = new Database(":memory:");
+  try {
+    legacy.exec("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT;");
+    legacy.exec(promotionSchema);
+    legacy.exec(legacyApprovalSchema);
+    legacy.query(`INSERT INTO promotion_campaigns
+      (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+       budget_limit_amount, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      "legacy-campaign", "legacy", "provider-code-legacy", 10, "ACTIVE", 0, 100, 100, 0, 0,
+    );
+    legacy.query(`INSERT INTO promotion_campaign_approvals
+      (campaign_id, revision, classification, recorded_approval_status,
+       approved_config_revision, approval_reference, monthly_reporting_required,
+       reviewed_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      "legacy-campaign", 1, "OWNED_CURRENCY", "APPROVED", "config-v1", "legacy-review", 1, 10, 10,
+    );
+    legacy.exec(approvalV2Migration);
+    assert.equal(legacy.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
+    assert.throws(
+      () => legacy.query("UPDATE promotion_campaign_approvals SET reviewed_at = 20").run(),
+      /append-only/,
+    );
+    assert.throws(
+      () => legacy.query("DELETE FROM promotion_campaign_approvals").run(),
+      /append-only/,
+    );
+    assert.throws(
+      () => legacy.query(`INSERT INTO promotion_campaign_approvals
+        (campaign_id, revision, classification, recorded_approval_status,
+         approved_config_revision, approval_reference, monthly_reporting_required,
+         reviewed_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        "legacy-campaign", 1, "OWNED_CURRENCY", "APPROVED", "config-v1", "duplicate", 1, 20, 20,
+      ),
+      /revisions must be appended/,
+    );
+  } finally {
+    legacy.close();
+  }
+
+  const invalid = new Database(":memory:");
+  try {
+    invalid.exec("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT;");
+    invalid.exec(promotionSchema);
+    invalid.exec(legacyApprovalSchema);
+    invalid.query(`INSERT INTO promotion_campaigns
+      (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
+       budget_limit_amount, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      "invalid-campaign", "invalid", "provider-code-invalid", 10, "ACTIVE", 0, 100, 100, 0, 0,
+    );
+    invalid.query(`INSERT INTO promotion_campaign_approvals
+      (campaign_id, revision, classification, recorded_approval_status,
+       approved_config_revision, approval_reference, monthly_reporting_required,
+       reviewed_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      "invalid-campaign", 1, "UNCONFIRMED", "APPROVED", "config-v1", "invalid", 1, 10, 10,
+    );
+    const insertStart = approvalV2Migration.indexOf("INSERT INTO promotion_campaign_approvals_v2");
+    const dropStart = approvalV2Migration.indexOf("DROP TABLE promotion_campaign_approvals;", insertStart);
+    invalid.exec(approvalV2Migration.slice(approvalV2Migration.indexOf("CREATE TABLE promotion_campaign_approvals_v2"), insertStart));
+    assert.throws(
+      () => invalid.query(approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "")).run(),
+      /CHECK constraint failed/,
+    );
+  } finally {
+    invalid.close();
+  }
 }
