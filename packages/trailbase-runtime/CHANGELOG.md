@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.5.1 — 2026-09-22
+
+### Patch changes
+
+- [567d3d3](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/567d3d35c51e6a0c3fd0d0578e4c5520c8e7225f) Add operator-entered promotion approval templates and read-only owned-currency close manifest validation for report hash, period, policy, and submission evidence. — Thanks @imjlk!
+
 ## 0.5.0 — 2026-09-22
 
 ### Minor changes

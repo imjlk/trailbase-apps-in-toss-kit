@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-web
 
+## 0.3.1 — 2026-09-22
+
+### Patch changes
+
+- [f8b760b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/f8b760bc9b773176749fe4728d6513e2d00ebee4) Pin the shared Apps in Toss SDK adapters to 0.4.0, which includes the reviewed React Native and Web review and direct-promotion adapter contracts. — Thanks @imjlk!
+
 ## 0.3.0 — 2026-09-16
 
 ### Minor changes
