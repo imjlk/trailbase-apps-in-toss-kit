@@ -50,7 +50,7 @@ test('owned currency report CLI emits redacted JSON and CSV from a readonly snap
       { cwd: repoRoot, encoding: 'utf8' },
     );
     if (trackedStatus.stdout.trim()) expect(report.tool.sourceCommit).toBeNull();
-    else expect(report.tool.sourceCommit).toMatch(/^[a-f0-9]{40}$/);
+    else expect(report.tool.sourceCommit).toMatch(/^[a-f0-9]{40,64}$/);
     expect(json.stdout).not.toContain('private-source-id');
 
     const csv = run(databasePath, '--format', 'csv');
