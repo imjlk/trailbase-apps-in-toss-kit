@@ -236,10 +236,7 @@ function resolvePromotionClaimStatus(
     ) {
       throwInvalidPromotionClaimResponse(cause);
     }
-    return flags.alreadyGranted === true ||
-      successStatuses.includes("ALREADY_GRANTED")
-      ? "ALREADY_GRANTED"
-      : "GRANTED";
+    return alreadyGrantedOutcome ? "ALREADY_GRANTED" : "GRANTED";
   }
 
   if (nonSuccessStatuses.length > 0) {
