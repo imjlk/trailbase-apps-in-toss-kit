@@ -57,7 +57,8 @@ references.
 If a consumer already copied the first draft of this table, apply
 `templates/trailbase/sql/promotion_campaign_approvals.v2.sql` as an explicit
 forward migration; re-running `CREATE TABLE IF NOT EXISTS` does not alter an
-existing SQLite table.
+existing SQLite table. Run the v2 file outside a wrapping transaction because
+the rebuild owns its transaction and rolls back on a failed evidence check.
 
 The shared SQL template keeps a general `feature_key/status` index for mixed
 operator views and also adds an `ACTIVE` partial index for the hot lookup path

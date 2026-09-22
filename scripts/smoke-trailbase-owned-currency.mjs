@@ -393,11 +393,8 @@ function smokeApprovalV2Migration() {
       PRIMARY KEY (campaign_id, revision)
     ) STRICT;
   `;
-  const legacy = new Database(":memory:");
+  const legacy = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
   try {
-    legacy.exec("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT;");
-    legacy.exec(promotionSchema);
-    legacy.exec(legacyApprovalSchema);
     legacy.query(`INSERT INTO promotion_campaigns
       (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
        budget_limit_amount, created_at, updated_at)
@@ -435,11 +432,8 @@ function smokeApprovalV2Migration() {
     legacy.close();
   }
 
-  const invalid = new Database(":memory:");
+  const invalid = createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema);
   try {
-    invalid.exec("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT;");
-    invalid.exec(promotionSchema);
-    invalid.exec(legacyApprovalSchema);
     invalid.query(`INSERT INTO promotion_campaigns
       (id, feature_key, provider_promotion_code, reward_amount, status, starts_at, ends_at,
        budget_limit_amount, created_at, updated_at)
@@ -460,7 +454,17 @@ function smokeApprovalV2Migration() {
       () => invalid.query(approvalV2Migration.slice(insertStart, dropStart).trim().replace(/;$/, "")).run(),
       /CHECK constraint failed/,
     );
+    assert.equal(invalid.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
+    assert.equal(invalid.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2").get().count, 0);
   } finally {
     invalid.close();
   }
+}
+
+function createLegacyApprovalsDb(promotionSchema, legacyApprovalSchema) {
+  const db = new Database(":memory:");
+  db.exec("PRAGMA foreign_keys = ON; CREATE TABLE _user (id BLOB PRIMARY KEY) STRICT;");
+  db.exec(promotionSchema);
+  db.exec(legacyApprovalSchema);
+  return db;
 }

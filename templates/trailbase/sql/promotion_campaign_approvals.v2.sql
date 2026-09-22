@@ -5,7 +5,9 @@
 -- existing rows. It preserves rows and fails closed when existing evidence
 -- violates the new invariants. New consumers should use
 -- promotion_campaign_approvals.sql instead.
-DROP TABLE IF EXISTS promotion_campaign_approvals_v2;
+-- Execute this file outside a wrapping transaction; it owns the rebuild
+-- transaction so a failed copy rolls back without leaving a partial table.
+BEGIN IMMEDIATE;
 CREATE TABLE promotion_campaign_approvals_v2 (
   campaign_id TEXT NOT NULL REFERENCES promotion_campaigns(id) ON DELETE RESTRICT,
   revision INTEGER NOT NULL CHECK (revision > 0),
@@ -105,3 +107,5 @@ BEFORE DELETE ON promotion_campaign_approvals
 BEGIN
   SELECT RAISE(ABORT, 'promotion_campaign_approvals revisions are append-only');
 END;
+
+COMMIT;
