@@ -92,9 +92,11 @@ export function checkConsumerSdkCompatibility({ root, runtime } = {}) {
   const peerRange = aitPackage?.metadata?.peerDependencies?.[runtimeConfig.officialPackage];
   result.checks.aitKitPeerRange = typeof peerRange === "string" ? peerRange : null;
   if (aitPackage && typeof peerRange !== "string") {
-    failures.push(`Resolved @ait-kit/sdk does not declare a peer range for ${runtimeConfig.officialPackage}.`);
+    failures.push(`Resolved ${AIT_KIT_PACKAGE} does not declare a peer range for ${runtimeConfig.officialPackage}.`);
+  } else if (aitPackage && officialPackage?.metadata?.version && typeof peerRange === "string" && !isComparableRange(peerRange)) {
+    warnings.push(`${AIT_KIT_PACKAGE} peer range ${peerRange} is a non-semver package source; resolved version ${officialPackage.metadata.version} was inspected without comparing the peer declaration.`);
   } else if (aitPackage && officialPackage?.metadata?.version && !satisfiesRange(officialPackage.metadata.version, peerRange)) {
-    failures.push(`${runtimeConfig.officialPackage}@${officialPackage.metadata.version} does not satisfy @ait-kit/sdk peer range ${peerRange}.`);
+    failures.push(`${runtimeConfig.officialPackage}@${officialPackage.metadata.version} does not satisfy ${AIT_KIT_PACKAGE} peer range ${peerRange}.`);
   } else if (aitPackage && officialPackage?.metadata?.version) {
     result.checks.officialSdkPeerSatisfied = true;
   }
@@ -149,8 +151,10 @@ function inspectResolvedPackage({ packageName, declaration, resolved, failures, 
 
 function isComparableRange(spec) {
   if (typeof spec !== "string" || spec.trim() === "") return false;
-  if (/^(?:workspace:|file:|link:|git(?:\+|:)|https?:|npm:)/i.test(spec.trim())) return false;
-  if (/^[A-Za-z][A-Za-z0-9._-]*$/.test(spec.trim())) return false;
+  const value = spec.trim();
+  if (/^(?:workspace:|file:|link:|git(?:\+|:)|github:|bitbucket:|gist:|https?:|npm:)/i.test(value)) return false;
+  if (/^(?:\.{1,2}\/|~\/)/.test(value) || value.includes("/")) return false;
+  if (/^[A-Za-z][A-Za-z0-9._-]*$/.test(value)) return false;
   return true;
 }
 
@@ -231,8 +235,9 @@ function parseRangeAlternative(alternative) {
         : { operator: "<=", target: end },
     ];
   }
+  const normalized = alternative.replace(/(>=|<=|~>|[><=^~])\s+/g, "$1");
   const comparators = [];
-  for (const token of alternative.split(/\s+/)) {
+  for (const token of normalized.split(/\s+/)) {
     const comparator = parseComparator(token);
     if (!comparator) return null;
     if (!comparator.any) comparators.push(comparator);
@@ -242,9 +247,9 @@ function parseRangeAlternative(alternative) {
 
 function parseComparator(token) {
   if (token === "" || token === "*" || token.toLowerCase() === "x") return { any: true };
-  const match = /^(\^|~|>=|<=|>|<|=)?(.*)$/.exec(token);
+  const match = /^(\^|~>|~|>=|<=|>|<|=)?(.*)$/.exec(token);
   if (!match) return null;
-  const operator = match[1] ?? "";
+  const operator = match[1] === "~>" ? "~" : match[1] ?? "";
   const target = parseRangeVersion(match[2]);
   if (!target) return null;
   if (target.any) return { any: true };
@@ -253,6 +258,7 @@ function parseComparator(token) {
   if ((operator === "" || operator === "=") && target.partial) {
     return { operator: ">=", target, upper: upperBound(target) };
   }
+  if (operator === ">" && target.partial) return { operator: ">=", target: upperBound(target) };
   if (operator === "<=" && target.partial) return { operator: "<", target: upperBound(target) };
   return { operator: operator || "=", target };
 }
@@ -263,12 +269,18 @@ function parseRangeVersion(value) {
   if (!match) return null;
   const [major, minor, patch] = match.slice(1, 4);
   if (major === "x" || major === "X" || major === "*") return { any: true, prerelease: [] };
-  const precision = patch !== undefined && !isWildcard(patch) ? 3 : minor !== undefined && !isWildcard(minor) ? 2 : 1;
+  const precision = rangePrecision(minor, patch);
   const core = [Number(major), isWildcard(minor) || minor === undefined ? 0 : Number(minor), isWildcard(patch) || patch === undefined ? 0 : Number(patch)];
   const prerelease = match[4]?.split(".") ?? [];
   const parsed = parseSemver(`${core.join(".")}${prerelease.length > 0 ? `-${prerelease.join(".")}` : ""}`);
   if (!parsed) return null;
   return { core: parsed.core, prerelease: parsed.prerelease, partial: precision < 3, precision };
+}
+
+function rangePrecision(minor, patch) {
+  if (patch !== undefined && !isWildcard(patch)) return 3;
+  if (minor !== undefined && !isWildcard(minor)) return 2;
+  return 1;
 }
 
 function comparatorMatches(version, comparator) {

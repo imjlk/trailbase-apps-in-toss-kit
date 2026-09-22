@@ -117,20 +117,26 @@ test("supports the peer range forms used by published adapter metadata", () => {
   assert.equal(satisfiesRange("2.0.0-beta", "^1.9.0"), false);
   assert.equal(satisfiesRange("2.11.0-beta", ">=2.10.10"), false);
   assert.equal(satisfiesRange("2.10.10+build.5", ">=2.10.10"), true);
+  assert.equal(satisfiesRange("2.10.10", ">= 2.10.10"), true);
+  assert.equal(satisfiesRange("1.2.5", ">1.2"), false);
+  assert.equal(satisfiesRange("1.2.3", "~>1.2.3"), true);
 });
 
 test("does not reject workspace, alias, file or dist-tag declarations", () => {
-  const root = packageFixture({
-    runtime: "rn",
-    aitSpec: "workspace:^",
-    officialSpec: "npm:@apps-in-toss/framework@2.10.10",
-  });
-  try {
-    const result = checkConsumerSdkCompatibility({ root, runtime: "rn" });
-    assert.equal(result.ok, true);
-    assert.match(result.warnings.join("\n"), /non-semver package source/);
-  } finally {
-    rmSync(root, { recursive: true, force: true });
+  for (const [aitSpec, officialSpec] of [
+    ["workspace:^", "npm:@apps-in-toss/framework@2.10.10"],
+    ["file:../sdk", "link:../framework"],
+    ["git+https://github.com/example/sdk.git", "github:example/framework"],
+    ["latest", "next"],
+  ]) {
+    const root = packageFixture({ runtime: "rn", aitSpec, officialSpec });
+    try {
+      const result = checkConsumerSdkCompatibility({ root, runtime: "rn" });
+      assert.equal(result.ok, true);
+      assert.match(result.warnings.join("\n"), /non-semver package source/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 

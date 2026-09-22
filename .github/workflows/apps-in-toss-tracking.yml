@@ -14,6 +14,7 @@ on:
       - "scripts/check-consumer-sdk-compatibility*"
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
+      - "packages/trailbase-runtime/src/internal/semver.mjs"
   push:
     branches:
       - main
@@ -29,6 +30,7 @@ on:
       - "scripts/check-consumer-sdk-compatibility*"
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
+      - "packages/trailbase-runtime/src/internal/semver.mjs"
   workflow_dispatch:
 
 permissions:
