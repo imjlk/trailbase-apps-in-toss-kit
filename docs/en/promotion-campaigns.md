@@ -107,6 +107,13 @@ codes, campaign budgets, raw Toss user keys, or proxy tokens. Treat `campaignId`
 as the RN-to-backend contract; the backend resolves that value to campaign
 configuration and ledger state before calling the proxy.
 
+The default normalizer also rejects contradictory claim responses. Explicit
+status values and success flags must agree, and an explicit response
+`campaignId` must match the requested campaign. A response with no campaign ID
+can use the requested ID for compatibility. If a consumer supplies
+`normalizeResponse`, the payload is returned through that custom function and
+the consumer owns its response validation contract.
+
 ## Claim Idempotency
 
 Promotion claims should be idempotent at the app ledger layer.
