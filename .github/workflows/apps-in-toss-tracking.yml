@@ -15,6 +15,7 @@ on:
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
       - "packages/trailbase-runtime/src/internal/semver.mjs"
+      - "templates/clients/review-request/**"
   push:
     branches:
       - main
@@ -31,6 +32,7 @@ on:
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
       - "packages/trailbase-runtime/src/internal/semver.mjs"
+      - "templates/clients/review-request/**"
   workflow_dispatch:
 
 permissions:
@@ -63,6 +65,9 @@ jobs:
 
       - name: Test consumer SDK compatibility doctor
         run: bun run consumer-sdk-compat:test
+
+      - name: Test review request template
+        run: bun run review-request:test
 
       - name: Check tracking metadata
         run: bun run apps-in-toss:tracking:check

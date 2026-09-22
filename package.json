@@ -23,6 +23,7 @@
     "apps-in-toss:snapshot:test": "node --test scripts/apps-in-toss-snapshot*.test.mjs scripts/apps-in-toss-tracking.test.mjs",
     "apps-in-toss:tracking:check": "node scripts/check-apps-in-toss-tracking.mjs",
     "consumer-sdk-compat:test": "node --test scripts/check-consumer-sdk-compatibility.test.mjs",
+    "review-request:test": "node --test templates/clients/review-request/review-request-controller.test.mjs",
     "sampo:release-notes:draft": "node scripts/draft-sampo-release-notes.mjs",
     "skills:sync": "bun scripts/sync-agent-skills.mjs --target codex --all --mode link",
     "skills:sync:copy": "bun scripts/sync-agent-skills.mjs --target codex --all --mode copy",
