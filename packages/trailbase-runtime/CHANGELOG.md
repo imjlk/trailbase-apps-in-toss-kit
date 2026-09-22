@@ -1,5 +1,17 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.5.0 — 2026-09-22
+
+### Minor changes
+
+- [f103cd4](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/f103cd4ac2c9fe296b79dd7734c2c8fc1e9365c1) Add a read-only owned-currency month-end report CLI with JSON and CSV output.
+  Existing databases must apply the forward-only event and policy migrations and
+  backfill `owned_currency_policies` before running the report; otherwise the CLI
+  fails closed with `REPORT_SCHEMA_UNAVAILABLE`.
+  The report quality output also flags missing market-snapshot valuations and
+  orphaned conversion groups, and the CLI omits commit provenance for tracked
+  dirty checkouts. — Thanks @imjlk!
+
 ## 0.4.1 — 2026-09-20
 
 ### Patch changes
