@@ -117,6 +117,35 @@ requested ID for compatibility. If a consumer supplies
 `normalizeResponse`, the payload is returned through that custom function and
 the consumer owns its response validation contract.
 
+## React Native Read-only Status Client
+
+After a claim has a public request id, a React Native app can query an
+app-owned status endpoint without starting another payout:
+
+```ts
+const status = createAppsInTossPromotionStatusClient({
+  statusEndpoint: "/api/app/v1/promotions/status",
+});
+
+const result = await status.getStatus({
+  campaignId: "daily-attendance",
+  requestId: "daily-attendance:claim-123",
+});
+```
+
+The client sends only `campaignId` and the public `requestId`. It never calls
+claim, prepare, or execute endpoints, inserts ledger rows, retries a request,
+or exposes provider request or transaction identifiers. Each call is a single
+read; callers that need polling should schedule their own subsequent reads.
+`PENDING` remains pending, and network, `403`, or `404` responses remain
+request errors instead of being converted to `FAILED`.
+
+The app-owned endpoint must authenticate the current user and verify that the
+campaign and public request id belong to that user. A default response must
+include the same public `campaignId` and `requestId`; the normalizer rejects
+missing or mismatched identities. A custom `normalizeResponse` callback takes
+ownership of that response contract, just as it does for claim responses.
+
 ## Claim Idempotency
 
 Promotion claims should be idempotent at the app ledger layer.

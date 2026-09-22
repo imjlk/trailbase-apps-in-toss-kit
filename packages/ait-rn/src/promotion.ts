@@ -27,11 +27,30 @@ export interface AppsInTossPromotionClaimInput {
   requestId?: string | null;
 }
 
+export interface AppsInTossPromotionStatusInput {
+  campaignId: string;
+  requestId: string;
+}
+
+export interface AppsInTossPromotionStatusResult extends AppsInTossPromotionClaimResult {
+  requestId: string;
+}
+
 export interface CreateAppsInTossPromotionCampaignClientOptions<
   TResult = AppsInTossPromotionClaimResult,
 > {
   baseUrl?: string;
   claimEndpoint: string;
+  fetcher?: AppsInTossJsonFetcher;
+  getAuthHeaders?: () => AppsInTossHeaders | Promise<AppsInTossHeaders>;
+  normalizeResponse?: (value: unknown) => TResult;
+}
+
+export interface CreateAppsInTossPromotionStatusClientOptions<
+  TResult = AppsInTossPromotionStatusResult,
+> {
+  baseUrl?: string;
+  statusEndpoint: string;
   fetcher?: AppsInTossJsonFetcher;
   getAuthHeaders?: () => AppsInTossHeaders | Promise<AppsInTossHeaders>;
   normalizeResponse?: (value: unknown) => TResult;
@@ -43,8 +62,17 @@ export interface AppsInTossPromotionCampaignClient<
   claim(input: AppsInTossPromotionClaimInput): Promise<TResult>;
 }
 
+export interface AppsInTossPromotionStatusClient<
+  TResult = AppsInTossPromotionStatusResult,
+> {
+  getStatus(input: AppsInTossPromotionStatusInput): Promise<TResult>;
+}
+
 export type AppsInTossPromotionCampaignClientErrorCode =
-  "PROMOTION_CAMPAIGN_ID_REQUIRED" | "PROMOTION_CLAIM_INVALID_RESPONSE";
+  | "PROMOTION_CAMPAIGN_ID_REQUIRED"
+  | "PROMOTION_CLAIM_INVALID_RESPONSE"
+  | "PROMOTION_REQUEST_ID_REQUIRED"
+  | "PROMOTION_STATUS_INVALID_RESPONSE";
 
 export class AppsInTossPromotionCampaignClientError extends Error {
   code: AppsInTossPromotionCampaignClientErrorCode;
@@ -107,6 +135,41 @@ export function createAppsInTossPromotionCampaignClient<
   };
 }
 
+export function createAppsInTossPromotionStatusClient<
+  TResult = AppsInTossPromotionStatusResult,
+>({
+  baseUrl,
+  fetcher,
+  getAuthHeaders,
+  normalizeResponse,
+  statusEndpoint,
+}: CreateAppsInTossPromotionStatusClientOptions<TResult>): AppsInTossPromotionStatusClient<TResult> {
+  return {
+    async getStatus(input: AppsInTossPromotionStatusInput) {
+      const normalizedCampaignId = normalizeRequiredCampaignId(
+        input.campaignId,
+      );
+      const normalizedRequestId = normalizeRequiredRequestId(input.requestId);
+      const payload = await postAppsInTossJson({
+        baseUrl,
+        body: {
+          campaignId: normalizedCampaignId,
+          requestId: normalizedRequestId,
+        },
+        fetcher,
+        getAuthHeaders,
+        path: statusEndpoint,
+      });
+      return normalizeResponse
+        ? normalizeResponse(payload)
+        : (normalizeAppsInTossPromotionStatusResult(payload, {
+            campaignId: normalizedCampaignId,
+            requestId: normalizedRequestId,
+          }) as TResult);
+    },
+  };
+}
+
 export function normalizeAppsInTossPromotionClaimResult(
   value: unknown,
   options: { campaignId?: string } = {},
@@ -115,9 +178,7 @@ export function normalizeAppsInTossPromotionClaimResult(
   const nestedGrant = objectCandidate(record?.grant);
   const nestedPromotion = objectCandidate(record?.promotion);
   const nestedReward = objectCandidate(record?.reward);
-  const records = [record, nestedGrant, nestedPromotion, nestedReward].filter(
-    (candidate): candidate is Record<string, unknown> => candidate !== null,
-  );
+  const records = promotionResponseRecords(value);
   const responseCampaignIds = uniqueStringCandidates(
     collectRecordValues(records, ["campaignId", "campaign_id"]),
   );
@@ -174,6 +235,28 @@ export function normalizeAppsInTossPromotionClaimResult(
     granted: status === "GRANTED" || status === "ALREADY_GRANTED",
     ...(rewardAmount === undefined ? {} : { rewardAmount }),
     status,
+  };
+}
+
+export function normalizeAppsInTossPromotionStatusResult(
+  value: unknown,
+  options: { campaignId: string; requestId: string },
+): AppsInTossPromotionStatusResult {
+  const campaignId = normalizeRequiredCampaignId(options.campaignId);
+  const requestId = normalizeRequiredRequestId(options.requestId);
+  const responseRequestIds = uniqueRequestIds(
+    collectRecordValues(promotionResponseRecords(value), [
+      "requestId",
+      "request_id",
+    ]),
+  );
+  if (responseRequestIds.length !== 1 || responseRequestIds[0] !== requestId) {
+    throwInvalidPromotionStatusResponse(value);
+  }
+
+  return {
+    ...normalizeAppsInTossPromotionClaimResult(value, { campaignId }),
+    requestId,
   };
 }
 
@@ -309,12 +392,31 @@ function throwInvalidPromotionClaimResponse(cause: unknown): never {
   });
 }
 
+function throwInvalidPromotionStatusResponse(cause: unknown): never {
+  throw new AppsInTossPromotionCampaignClientError({
+    cause,
+    code: "PROMOTION_STATUS_INVALID_RESPONSE",
+    message: "Apps in Toss promotion status response was invalid.",
+  });
+}
+
 function normalizeRequiredCampaignId(value: string) {
   const normalized = normalizeOptionalString(value);
   if (!normalized) {
     throw new AppsInTossPromotionCampaignClientError({
       code: "PROMOTION_CAMPAIGN_ID_REQUIRED",
       message: "Apps in Toss promotion campaignId is required.",
+    });
+  }
+  return normalized;
+}
+
+function normalizeRequiredRequestId(value: string) {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    throw new AppsInTossPromotionCampaignClientError({
+      code: "PROMOTION_REQUEST_ID_REQUIRED",
+      message: "Apps in Toss promotion requestId is required.",
     });
   }
   return normalized;
@@ -339,6 +441,16 @@ function objectCandidate(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : null;
+}
+
+function promotionResponseRecords(value: unknown) {
+  const record = objectCandidate(value);
+  const nestedGrant = objectCandidate(record?.grant);
+  const nestedPromotion = objectCandidate(record?.promotion);
+  const nestedReward = objectCandidate(record?.reward);
+  return [record, nestedGrant, nestedPromotion, nestedReward].filter(
+    (candidate): candidate is Record<string, unknown> => candidate !== null,
+  );
 }
 
 function stringCandidate(...values: unknown[]) {
@@ -387,6 +499,19 @@ function uniqueStringCandidates(values: unknown[]) {
       values
         .map((value) => stringCandidate(value))
         .filter((value): value is string => value !== undefined),
+    ),
+  ];
+}
+
+function uniqueRequestIds(values: unknown[]) {
+  return [
+    ...new Set(
+      values
+        .filter(
+          (value): value is string =>
+            typeof value === "string" && value.trim().length > 0,
+        )
+        .map((value) => value.trim()),
     ),
   ];
 }
