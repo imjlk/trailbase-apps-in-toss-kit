@@ -5,7 +5,7 @@
 
 ## Release notes
 
-- Implement more robust schema (tables, views, ...) name handling, i.e robustly parse escaped/unescaped as well as unqualified/qualified names both on the server and in the admin UI.
+- Implement more robust schema (tables, views, ...) name handling, i.e robustly parse escaped/unescpaed as well as unqualified/qualified names both on the server and in the admin UI.
   - This was an issue during config parsing and using the admin APIs, not API access.
   - Finally APIs can make use of tables with emojis in their names 🎉
 - Admin UI: fix unnecessary editor scrollbars on mobile when the on-screen keyboard is up.
