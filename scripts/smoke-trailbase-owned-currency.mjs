@@ -335,6 +335,14 @@ try {
   db.query("DELETE FROM _user WHERE id = X'01'").run();
   assert.equal(db.query("SELECT user_id FROM owned_currency_events WHERE id = 'gold-issue'").get().user_id, null);
   assert.throws(
+    () => db.query("UPDATE promotion_campaign_approvals SET reviewed_at = 300 WHERE campaign_id = 'daily-attendance' AND revision = 2").run(),
+    /append-only/,
+  );
+  assert.throws(
+    () => db.query("DELETE FROM promotion_campaign_approvals WHERE campaign_id = 'daily-attendance' AND revision = 2").run(),
+    /append-only/,
+  );
+  assert.throws(
     () => db.query("DELETE FROM promotion_campaigns WHERE id = 'daily-attendance'").run(),
     /FOREIGN KEY constraint failed/,
   );

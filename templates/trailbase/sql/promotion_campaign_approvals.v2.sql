@@ -1,13 +1,13 @@
--- Private operator-entered approval evidence for promotion_campaigns.
--- Do not expose this table through the Record API or infer approval from an
--- SDK call, a test promotion, or a provider response.
+-- Forward migration for consumers that copied the first promotion approval
+-- template before the close-evidence constraints were added.
 --
--- Copy this template into a consumer migration and keep each revision. An
--- approval revision is separate from an owned-currency policy_version.
--- This is a copy-in migration for new consumers. Re-running it does not alter
--- an existing table; use promotion_campaign_approvals.v2.sql for installations
--- that copied the earlier draft of this template.
-CREATE TABLE IF NOT EXISTS promotion_campaign_approvals (
+-- Run this once in an authenticated migration process after inspecting the
+-- existing rows. It preserves rows and fails closed when existing evidence
+-- violates the new invariants. New consumers should use
+-- promotion_campaign_approvals.sql instead.
+PRAGMA foreign_keys = OFF;
+
+CREATE TABLE promotion_campaign_approvals_v2 (
   campaign_id TEXT NOT NULL REFERENCES promotion_campaigns(id) ON DELETE RESTRICT,
   revision INTEGER NOT NULL CHECK (revision > 0),
   classification TEXT NOT NULL CHECK (
@@ -19,8 +19,8 @@ CREATE TABLE IF NOT EXISTS promotion_campaign_approvals (
   approved_config_revision TEXT CHECK (
     approved_config_revision IS NULL
     OR (
-    length(trim(approved_config_revision, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 128
-    AND approved_config_revision = trim(approved_config_revision, ' ' || char(9) || char(10) || char(13))
+      length(trim(approved_config_revision, ' ' || char(9) || char(10) || char(13))) BETWEEN 1 AND 128
+      AND approved_config_revision = trim(approved_config_revision, ' ' || char(9) || char(10) || char(13))
     )
   ),
   approval_reference TEXT CHECK (
@@ -52,6 +52,32 @@ CREATE TABLE IF NOT EXISTS promotion_campaign_approvals (
   )
 ) STRICT;
 
+INSERT INTO promotion_campaign_approvals_v2 (
+  campaign_id,
+  revision,
+  classification,
+  recorded_approval_status,
+  approved_config_revision,
+  approval_reference,
+  monthly_reporting_required,
+  reviewed_at,
+  created_at
+)
+SELECT
+  campaign_id,
+  revision,
+  classification,
+  recorded_approval_status,
+  approved_config_revision,
+  approval_reference,
+  monthly_reporting_required,
+  reviewed_at,
+  created_at
+FROM promotion_campaign_approvals;
+
+DROP TABLE promotion_campaign_approvals;
+ALTER TABLE promotion_campaign_approvals_v2 RENAME TO promotion_campaign_approvals;
+
 CREATE INDEX IF NOT EXISTS idx_promotion_campaign_approvals_latest
   ON promotion_campaign_approvals(campaign_id, revision DESC);
 
@@ -80,3 +106,5 @@ BEFORE DELETE ON promotion_campaign_approvals
 BEGIN
   SELECT RAISE(ABORT, 'promotion_campaign_approvals revisions are append-only');
 END;
+
+PRAGMA foreign_keys = ON;

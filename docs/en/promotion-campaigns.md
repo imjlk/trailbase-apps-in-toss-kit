@@ -54,6 +54,10 @@ approval are different facts.
 For `UNCONFIRMED` or `PENDING` records, the configuration and evidence reference
 may remain empty; decided statuses require both a review timestamp and those
 references.
+If a consumer already copied the first draft of this table, apply
+`templates/trailbase/sql/promotion_campaign_approvals.v2.sql` as an explicit
+forward migration; re-running `CREATE TABLE IF NOT EXISTS` does not alter an
+existing SQLite table.
 
 The shared SQL template keeps a general `feature_key/status` index for mixed
 operator views and also adds an `ACTIVE` partial index for the hot lookup path

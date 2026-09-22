@@ -14,7 +14,7 @@ const SAFE_TIMEZONE = /^[A-Za-z0-9][A-Za-z0-9._+/-]{0,63}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const COMMIT = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const FORBIDDEN_REFERENCE =
-  /(promotion[_-]?code|user[_-]?key|api[_-]?key|pass(word|phrase)?|credential|hmac|sealed|token|secret|private[_-]?key)/i;
+  /(promotion[_-]?code|user[_-]?key|api[_-]?key|pass(?:word|phrase)|credential|hmac|sealed|token|secret|private[_-]?key)/i;
 
 export class OwnedCurrencyCloseManifestError extends Error {
   constructor(code) {
