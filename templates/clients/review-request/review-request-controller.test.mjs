@@ -140,6 +140,13 @@ test("reuses one controller for the same storage/key and fails closed on invalid
     }),
     /already exists/,
   );
+  const defaultStorage = { get: async () => null, set: async () => {} };
+  const defaultReview = { isSupported: async () => true, request: async () => {} };
+  const defaultController = createReviewRequestController({ review: defaultReview, storage: defaultStorage });
+  assert.equal(
+    createReviewRequestController({ review: defaultReview, storage: defaultStorage }),
+    defaultController,
+  );
 
   const malformedScreen = createReviewRequestController({
     review: { isSupported: async () => true, request: async () => {} },
