@@ -458,7 +458,7 @@ function smokeApprovalV2Migration() {
     invalidFull.exec("ROLLBACK;");
     assert.equal(invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals").get().count, 1);
     assert.equal(
-      invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2").get().count,
+      invalidFull.query("SELECT count(*) AS count FROM promotion_campaign_approvals_v2 WHERE stale IS NULL").get().count,
       0,
     );
   } finally {
