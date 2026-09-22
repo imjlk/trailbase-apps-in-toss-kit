@@ -11,6 +11,7 @@ on:
       - "package.json"
       - "renovate.json"
       - "scripts/check-apps-in-toss-tracking.mjs"
+      - "scripts/check-consumer-sdk-compatibility*"
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
   push:
@@ -25,6 +26,7 @@ on:
       - "package.json"
       - "renovate.json"
       - "scripts/check-apps-in-toss-tracking.mjs"
+      - "scripts/check-consumer-sdk-compatibility*"
       - "scripts/apps-in-toss-*.mjs"
       - "scripts/snapshot-apps-in-toss-docs.mjs"
   workflow_dispatch:
@@ -56,6 +58,9 @@ jobs:
 
       - name: Test snapshot response validation
         run: bun run apps-in-toss:snapshot:test
+
+      - name: Test consumer SDK compatibility doctor
+        run: bun run consumer-sdk-compat:test
 
       - name: Check tracking metadata
         run: bun run apps-in-toss:tracking:check

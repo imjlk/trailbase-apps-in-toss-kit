@@ -3,7 +3,9 @@
 import { readFileSync, existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
+
+import { compareVersions as compareSemver, parseVersion as parseSemver } from "../packages/trailbase-runtime/src/internal/semver.mjs";
 
 const RUNTIMES = {
   rn: {
@@ -17,6 +19,7 @@ const RUNTIMES = {
 };
 
 const PACKAGE_FIELDS = ["dependencies", "devDependencies", "optionalDependencies", "peerDependencies"];
+const AIT_KIT_PACKAGE = "@ait-kit/sdk";
 
 /**
  * Check a consumer's installed package metadata without importing or installing
@@ -62,59 +65,37 @@ export function checkConsumerSdkCompatibility({ root, runtime } = {}) {
     return result;
   }
 
-  const aitDeclaration = findDeclaration(consumerPackage, "@ait-kit/sdk");
+  const aitDeclaration = findDeclaration(consumerPackage, AIT_KIT_PACKAGE);
   const officialDeclaration = findDeclaration(consumerPackage, runtimeConfig.officialPackage);
   result.checks.aitKitDeclared = aitDeclaration !== null;
   result.checks.officialSdkDeclared = officialDeclaration !== null;
 
-  const aitPackage = loadResolvedPackage(absoluteRoot, "@ait-kit/sdk", failures);
-  if (aitPackage) {
-    result.packages.aitKitSdk = {
-      name: aitPackage.metadata.name ?? "@ait-kit/sdk",
-      version: aitPackage.metadata.version ?? null,
-      resolvedFrom: aitPackage.path,
-      declaredSpec: aitDeclaration?.spec ?? null,
-      declaredIn: aitDeclaration?.field ?? null,
-    };
-    if (!isValidVersion(aitPackage.metadata.version)) {
-      failures.push("Resolved @ait-kit/sdk has no valid semver version.");
-    }
-    if (aitDeclaration === null) {
-      warnings.push("@ait-kit/sdk is resolved transitively; declare it in the consumer app when its API is imported directly.");
-    } else if (!satisfiesRange(aitPackage.metadata.version, aitDeclaration.spec)) {
-      failures.push(`Consumer declaration @ait-kit/sdk@${aitDeclaration.spec} does not match resolved ${aitPackage.metadata.version}.`);
-    }
-  }
-
+  const aitPackage = loadResolvedPackage(absoluteRoot, AIT_KIT_PACKAGE, failures);
   const officialPackage = loadResolvedPackage(absoluteRoot, runtimeConfig.officialPackage, failures);
-  if (officialPackage) {
-    result.packages.officialSdk = {
-      name: officialPackage.metadata.name ?? runtimeConfig.officialPackage,
-      version: officialPackage.metadata.version ?? null,
-      resolvedFrom: officialPackage.path,
-      declaredSpec: officialDeclaration?.spec ?? null,
-      declaredIn: officialDeclaration?.field ?? null,
-    };
-    if (!isValidVersion(officialPackage.metadata.version)) {
-      failures.push(`Resolved ${runtimeConfig.officialPackage} has no valid semver version.`);
-    }
-    if (officialDeclaration === null) {
-      warnings.push(`${runtimeConfig.officialPackage} is resolved transitively; declare the selected platform SDK in the consumer app.`);
-    } else if (!satisfiesRange(officialPackage.metadata.version, officialDeclaration.spec)) {
-      failures.push(`Consumer declaration ${runtimeConfig.officialPackage}@${officialDeclaration.spec} does not match resolved ${officialPackage.metadata.version}.`);
-    }
-  }
+  result.packages.aitKitSdk = inspectResolvedPackage({
+    packageName: AIT_KIT_PACKAGE,
+    declaration: aitDeclaration,
+    resolved: aitPackage,
+    failures,
+    warnings,
+    transitiveWarning: `${AIT_KIT_PACKAGE} is resolved transitively; declare it in the consumer app when its API is imported directly.`,
+  });
+  result.packages.officialSdk = inspectResolvedPackage({
+    packageName: runtimeConfig.officialPackage,
+    declaration: officialDeclaration,
+    resolved: officialPackage,
+    failures,
+    warnings,
+    transitiveWarning: `${runtimeConfig.officialPackage} is resolved transitively; declare the selected platform SDK in the consumer app.`,
+  });
 
   const peerRange = aitPackage?.metadata?.peerDependencies?.[runtimeConfig.officialPackage];
   result.checks.aitKitPeerRange = typeof peerRange === "string" ? peerRange : null;
-  if (!aitPackage) {
-    // The package resolution failure already explains why the peer check was
-    // skipped; do not add a misleading comparison against an undefined range.
-  } else if (typeof peerRange !== "string") {
+  if (aitPackage && typeof peerRange !== "string") {
     failures.push(`Resolved @ait-kit/sdk does not declare a peer range for ${runtimeConfig.officialPackage}.`);
-  } else if (officialPackage?.metadata?.version && !satisfiesRange(officialPackage.metadata.version, peerRange)) {
+  } else if (aitPackage && officialPackage?.metadata?.version && !satisfiesRange(officialPackage.metadata.version, peerRange)) {
     failures.push(`${runtimeConfig.officialPackage}@${officialPackage.metadata.version} does not satisfy @ait-kit/sdk peer range ${peerRange}.`);
-  } else if (officialPackage?.metadata?.version) {
+  } else if (aitPackage && officialPackage?.metadata?.version) {
     result.checks.officialSdkPeerSatisfied = true;
   }
 
@@ -141,6 +122,36 @@ function findDeclaration(packageJson, packageName) {
     if (typeof spec === "string" && spec.length > 0) return { field, spec };
   }
   return null;
+}
+
+function inspectResolvedPackage({ packageName, declaration, resolved, failures, warnings, transitiveWarning }) {
+  if (!resolved) return null;
+  const version = resolved.metadata.version ?? null;
+  const entry = {
+    name: resolved.metadata.name ?? packageName,
+    version,
+    resolvedFrom: resolved.path,
+    declaredSpec: declaration?.spec ?? null,
+    declaredIn: declaration?.field ?? null,
+  };
+  if (!isValidVersion(version)) {
+    failures.push(`Resolved ${packageName} has no valid semver version.`);
+  }
+  if (declaration === null) {
+    warnings.push(transitiveWarning);
+  } else if (version && !isComparableRange(declaration.spec)) {
+    warnings.push(`${packageName}@${declaration.spec} is a non-semver package source; resolved version ${version} was inspected without comparing the declaration.`);
+  } else if (version && !satisfiesRange(version, declaration.spec)) {
+    failures.push(`Consumer declaration ${packageName}@${declaration.spec} does not match resolved ${version}.`);
+  }
+  return entry;
+}
+
+function isComparableRange(spec) {
+  if (typeof spec !== "string" || spec.trim() === "") return false;
+  if (/^(?:workspace:|file:|link:|git(?:\+|:)|https?:|npm:)/i.test(spec.trim())) return false;
+  if (/^[A-Za-z][A-Za-z0-9._-]*$/.test(spec.trim())) return false;
+  return true;
 }
 
 function loadResolvedPackage(root, packageName, failures) {
@@ -189,82 +200,125 @@ function safeErrorMessage(error) {
 }
 
 function isValidVersion(value) {
-  return parseVersion(value) !== null;
-}
-
-function parseVersion(value, allowPartial = false) {
-  if (typeof value !== "string") return null;
-  const match = /^v?(\d+)(?:\.(\d+|x|X|\*))?(?:\.(\d+|x|X|\*))?(?:-([0-9A-Za-z.-]+))?$/.exec(value.trim());
-  if (!match) return null;
-  if (!allowPartial && (match[2] === undefined || match[3] === undefined || /[xX*]/.test(`${match[2]}${match[3]}`))) return null;
-  return {
-    major: Number(match[1]),
-    minor: match[2] === undefined || /[xX*]/.test(match[2]) ? 0 : Number(match[2]),
-    patch: match[3] === undefined || /[xX*]/.test(match[3]) ? 0 : Number(match[3]),
-    partial: match[2] === undefined || match[3] === undefined || /[xX*]/.test(`${match[2] ?? ""}${match[3] ?? ""}`),
-    prerelease: match[4]?.split(".") ?? [],
-  };
+  return parseSemver(value) !== null;
 }
 
 export function satisfiesRange(version, range) {
-  const actual = parseVersion(version);
+  const actual = parseSemver(version);
   if (!actual || typeof range !== "string" || range.trim() === "") return false;
-  return range.split("||").some((alternative) => alternative.trim().split(/\s+/).every((token) => satisfiesComparator(actual, token)));
+  const alternatives = range.split("||").map((value) => value.trim());
+  if (alternatives.some((value) => value === "")) return false;
+  return alternatives.some((alternative) => {
+    const comparators = parseRangeAlternative(alternative);
+    if (!comparators || !comparators.every((comparator) => comparatorMatches(actual, comparator))) return false;
+    if (actual.prerelease.length === 0) return true;
+    return comparators.some((comparator) =>
+      comparator.target?.prerelease.length > 0 && sameCore(actual, comparator.target),
+    );
+  });
 }
 
-function satisfiesComparator(version, token) {
-  if (!token || token === "*" || token.toLowerCase() === "x") return true;
-  const operator = /^(\^|~|>=|<=|>|<|=)?(.*)$/.exec(token);
-  if (!operator) return false;
-  const [, prefix = "", raw] = operator;
-  const target = parseVersion(raw, true);
-  if (!target) return false;
-  if (prefix === "^") {
-    if (compareVersions(version, target) < 0) return false;
-    const upper = target.major > 0 ? { major: target.major + 1, minor: 0, patch: 0, prerelease: [] } : target.minor > 0
-      ? { major: 0, minor: target.minor + 1, patch: 0, prerelease: [] }
-      : { major: 0, minor: 0, patch: target.patch + 1, prerelease: [] };
-    return compareVersions(version, upper) < 0;
+function parseRangeAlternative(alternative) {
+  const hyphen = /^(\S+)\s+-\s+(\S+)$/.exec(alternative);
+  if (hyphen) {
+    const start = parseRangeVersion(hyphen[1]);
+    const end = parseRangeVersion(hyphen[2]);
+    if (!start || !end || start.any || end.any) return null;
+    return [
+      { operator: ">=", target: start },
+      end.partial
+        ? { operator: "<", target: upperBound(end) }
+        : { operator: "<=", target: end },
+    ];
   }
-  if (prefix === "~") {
-    if (compareVersions(version, target) < 0) return false;
-    const upper = { major: target.major, minor: target.minor + 1, patch: 0, prerelease: [] };
-    return compareVersions(version, upper) < 0;
+  const comparators = [];
+  for (const token of alternative.split(/\s+/)) {
+    const comparator = parseComparator(token);
+    if (!comparator) return null;
+    if (!comparator.any) comparators.push(comparator);
   }
-  const comparison = compareVersions(version, target);
-  if (prefix === ">=") return comparison >= 0;
-  if (prefix === ">") return comparison > 0;
-  if (prefix === "<=") return comparison <= 0;
-  if (prefix === "<") return comparison < 0;
-  if (prefix === "=") return comparison === 0;
-  if (target.partial) {
-    if (version.major !== target.major) return false;
-    if (raw.includes(".")) return version.minor === target.minor;
-    return true;
+  return comparators;
+}
+
+function parseComparator(token) {
+  if (token === "" || token === "*" || token.toLowerCase() === "x") return { any: true };
+  const match = /^(\^|~|>=|<=|>|<|=)?(.*)$/.exec(token);
+  if (!match) return null;
+  const operator = match[1] ?? "";
+  const target = parseRangeVersion(match[2]);
+  if (!target) return null;
+  if (target.any) return { any: true };
+  if (operator === "^") return { operator: ">=", target, upper: caretUpperBound(target) };
+  if (operator === "~") return { operator: ">=", target, upper: tildeUpperBound(target) };
+  if ((operator === "" || operator === "=") && target.partial) {
+    return { operator: ">=", target, upper: upperBound(target) };
   }
+  if (operator === "<=" && target.partial) return { operator: "<", target: upperBound(target) };
+  return { operator: operator || "=", target };
+}
+
+function parseRangeVersion(value) {
+  if (typeof value !== "string") return null;
+  const match = /^v?(0|[1-9][0-9]*|x|X|\*)(?:\.(0|[1-9][0-9]*|x|X|\*))?(?:\.(0|[1-9][0-9]*|x|X|\*))?(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.exec(value);
+  if (!match) return null;
+  const [major, minor, patch] = match.slice(1, 4);
+  if (major === "x" || major === "X" || major === "*") return { any: true, prerelease: [] };
+  const precision = patch !== undefined && !isWildcard(patch) ? 3 : minor !== undefined && !isWildcard(minor) ? 2 : 1;
+  const core = [Number(major), isWildcard(minor) || minor === undefined ? 0 : Number(minor), isWildcard(patch) || patch === undefined ? 0 : Number(patch)];
+  const prerelease = match[4]?.split(".") ?? [];
+  const parsed = parseSemver(`${core.join(".")}${prerelease.length > 0 ? `-${prerelease.join(".")}` : ""}`);
+  if (!parsed) return null;
+  return { core: parsed.core, prerelease: parsed.prerelease, partial: precision < 3, precision };
+}
+
+function comparatorMatches(version, comparator) {
+  if (comparator.any) return true;
+  const comparison = compareParsed(version, comparator.target);
+  if (comparator.upper) {
+    const lowerMatches = comparator.operator === ">=" ? comparison >= 0 : comparison > 0;
+    return lowerMatches && compareParsed(version, comparator.upper) < 0;
+  }
+  if (comparator.operator === ">=") return comparison >= 0;
+  if (comparator.operator === ">") return comparison > 0;
+  if (comparator.operator === "<=") return comparison <= 0;
+  if (comparator.operator === "<") return comparison < 0;
   return comparison === 0;
 }
 
-function compareVersions(left, right) {
-  for (const key of ["major", "minor", "patch"]) {
-    if (left[key] !== right[key]) return left[key] > right[key] ? 1 : -1;
-  }
-  if (left.prerelease.length === 0 && right.prerelease.length > 0) return 1;
-  if (left.prerelease.length > 0 && right.prerelease.length === 0) return -1;
-  for (let index = 0; index < Math.max(left.prerelease.length, right.prerelease.length); index += 1) {
-    const leftPart = left.prerelease[index];
-    const rightPart = right.prerelease[index];
-    if (leftPart === undefined) return -1;
-    if (rightPart === undefined) return 1;
-    if (leftPart === rightPart) continue;
-    const leftNumber = /^\d+$/.test(leftPart) ? Number(leftPart) : null;
-    const rightNumber = /^\d+$/.test(rightPart) ? Number(rightPart) : null;
-    if (leftNumber !== null && rightNumber !== null) return leftNumber > rightNumber ? 1 : -1;
-    if (leftNumber !== null) return -1;
-    if (rightNumber !== null) return 1;
-    return leftPart > rightPart ? 1 : -1;
-  }
-  return 0;
+function upperBound(target) {
+  if (target.precision <= 1) return parsedVersion([target.core[0] + 1, 0, 0]);
+  return parsedVersion([target.core[0], target.core[1] + 1, 0]);
+}
+
+function caretUpperBound(target) {
+  if (target.core[0] > 0 || target.precision === 1) return parsedVersion([target.core[0] + 1, 0, 0]);
+  if (target.core[1] > 0 || target.precision === 2) return parsedVersion([0, target.core[1] + 1, 0]);
+  return parsedVersion([0, 0, target.core[2] + 1]);
+}
+
+function tildeUpperBound(target) {
+  if (target.precision <= 1) return parsedVersion([target.core[0] + 1, 0, 0]);
+  return parsedVersion([target.core[0], target.core[1] + 1, 0]);
+}
+
+function parsedVersion(core) {
+  return { core, prerelease: [], partial: false, precision: 3 };
+}
+
+function compareParsed(left, right) {
+  return compareSemver(serializeParsed(left), serializeParsed(right));
+}
+
+function serializeParsed(value) {
+  return `${value.core.join(".")}${value.prerelease.length > 0 ? `-${value.prerelease.join(".")}` : ""}`;
+}
+
+function sameCore(left, right) {
+  return left.core.every((value, index) => value === right.core[index]);
+}
+
+function isWildcard(value) {
+  return value === "x" || value === "X" || value === "*";
 }
 
 function parseArgs(argv) {

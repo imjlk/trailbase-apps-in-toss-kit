@@ -18,14 +18,21 @@ function writeJson(root, path, value) {
   writeFileSync(target, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function packageFixture({ runtime = "rn", aitVersion = "0.4.0", officialVersion = runtime === "rn" ? "2.10.10" : "3.5.0", aitPeer, declarations = true } = {}) {
+function packageFixture({
+  runtime = "rn",
+  aitVersion = "0.4.0",
+  officialVersion = runtime === "rn" ? "2.10.10" : "3.5.0",
+  aitSpec = aitVersion,
+  officialSpec = officialVersion,
+  aitPeer,
+  declarations = true,
+} = {}) {
   const root = mkdtempSync(join(tmpdir(), "consumer-sdk-compat-"));
   const officialName = runtime === "rn" ? "@apps-in-toss/framework" : "@apps-in-toss/web-framework";
-  const officialSpec = runtime === "rn" ? "2.10.10" : "3.5.0";
   writeJson(root, "package.json", {
     name: "fixture-consumer",
     dependencies: declarations
-      ? { "@ait-kit/sdk": aitVersion, [officialName]: officialSpec }
+      ? { "@ait-kit/sdk": aitSpec, [officialName]: officialSpec }
       : {},
   });
   writeJson(root, "node_modules/@ait-kit/sdk/package.json", {
@@ -46,8 +53,8 @@ function packageFixture({ runtime = "rn", aitVersion = "0.4.0", officialVersion 
   return root;
 }
 
-test("reports installed RN and Web SDK versions while leaving runtime support unchecked", () => {
-  for (const runtime of ["rn", "web"]) {
+for (const runtime of ["rn", "web"]) {
+  test(`reports installed ${runtime} SDK versions while leaving runtime support unchecked`, () => {
     const root = packageFixture({ runtime });
     try {
       const result = checkConsumerSdkCompatibility({ root, runtime });
@@ -59,16 +66,17 @@ test("reports installed RN and Web SDK versions while leaving runtime support un
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
-  }
-});
+  });
+}
 
 test("fails peer mismatches and missing platform packages without importing SDK code", () => {
-  const root = packageFixture({ runtime: "rn", officialVersion: "2.9.0" });
+  const root = packageFixture({ runtime: "rn", officialVersion: "2.9.0", officialSpec: "2.10.10" });
   try {
     const result = checkConsumerSdkCompatibility({ root, runtime: "rn" });
     assert.equal(result.ok, false);
     assert.match(result.failures.join("\n"), /does not satisfy @ait-kit\/sdk peer range/);
-    assert.doesNotThrow(() => readFileSync(join(root, "node_modules/@ait-kit/sdk/index.js"), "utf8"));
+    assert.match(result.failures.join("\n"), /Consumer declaration @apps-in-toss\/framework@2\.10\.10 does not match resolved 2\.9\.0/);
+    assert.equal(result.checks.aitKitPeerRange, ">=2.10.10");
     rmSync(join(root, "node_modules/@apps-in-toss/framework"), { recursive: true, force: true });
     const missing = checkConsumerSdkCompatibility({ root, runtime: "rn" });
     assert.equal(missing.ok, false);
@@ -98,6 +106,32 @@ test("supports the peer range forms used by published adapter metadata", () => {
   assert.equal(satisfiesRange("4.0.0", ">=3.4.0 <4"), false);
   assert.equal(satisfiesRange("0.4.3", "^0.4.0"), true);
   assert.equal(satisfiesRange("0.5.0", "^0.4.0"), false);
+  assert.equal(satisfiesRange("2.5.0", "~2"), true);
+  assert.equal(satisfiesRange("2.11.0", "~2.10"), false);
+  assert.equal(satisfiesRange("0.5.0", "^0"), true);
+  assert.equal(satisfiesRange("2.10.0", "2.10.x"), true);
+  assert.equal(satisfiesRange("2.9.9", "2.10"), false);
+  assert.equal(satisfiesRange("1.5.0", "1.2.3 - 2.0.0"), true);
+  assert.equal(satisfiesRange("3.5.0", ">=3.4.0 <4 || >=4.1.0"), true);
+  assert.equal(satisfiesRange("3.0.0", "1.2.3 ||"), false);
+  assert.equal(satisfiesRange("2.0.0-beta", "^1.9.0"), false);
+  assert.equal(satisfiesRange("2.11.0-beta", ">=2.10.10"), false);
+  assert.equal(satisfiesRange("2.10.10+build.5", ">=2.10.10"), true);
+});
+
+test("does not reject workspace, alias, file or dist-tag declarations", () => {
+  const root = packageFixture({
+    runtime: "rn",
+    aitSpec: "workspace:^",
+    officialSpec: "npm:@apps-in-toss/framework@2.10.10",
+  });
+  try {
+    const result = checkConsumerSdkCompatibility({ root, runtime: "rn" });
+    assert.equal(result.ok, true);
+    assert.match(result.warnings.join("\n"), /non-semver package source/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("CLI emits JSON and does not mutate a consumer lockfile", () => {
@@ -108,14 +142,23 @@ test("CLI emits JSON and does not mutate a consumer lockfile", () => {
     const result = spawnSync(process.execPath, [script, "--root", root, "--runtime", "rn", "--json"], {
       encoding: "utf8",
     });
+    assert.equal(result.error, undefined);
     assert.equal(result.status, 0);
     const output = JSON.parse(result.stdout);
     assert.equal(output.ok, true);
     assert.equal(output.runtimeSupport, "not_checked");
     assert.equal(readFileSync(lockfile, "utf8"), "fixture lock\n");
     const invalid = spawnSync(process.execPath, [script, "--root", root, "--runtime", "ios", "--json"], { encoding: "utf8" });
+    assert.equal(invalid.error, undefined);
     assert.equal(invalid.status, 1);
     assert.match(JSON.parse(invalid.stdout).failures.join("\n"), /Unsupported runtime/);
+    const plain = spawnSync(process.execPath, [script, "--root", root, "--runtime", "rn"], { encoding: "utf8" });
+    assert.equal(plain.status, 0);
+    assert.match(plain.stdout, /PASS consumer SDK compatibility \(rn\)/);
+    assert.match(plain.stdout, /Runtime support: not_checked/);
+    const help = spawnSync(process.execPath, [script, "--help"], { encoding: "utf8" });
+    assert.equal(help.status, 0);
+    assert.match(help.stdout, /--root <consumer-root>/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
