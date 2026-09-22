@@ -22,6 +22,10 @@ only after app-level smoke tests.
 - Promotion API: https://developers-apps-in-toss.toss.im/api/promotion.md
 - Push and Smart Message API: https://developers-apps-in-toss.toss.im/api/push.md
 - Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
+- Review request guide: https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md
+- Review.request SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md
+- Promotion.grantReward SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md
+- Promotion operations guide: https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md
 - Notification agreement SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
 - Non-game user identity key: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md
 - Anonymous user key verification API: https://developers-apps-in-toss.toss.im/api/user-key.md
@@ -62,6 +66,9 @@ only after app-level smoke tests.
 
 ## Renovate-Tracked Reference Versions
 
+<!-- renovate: datasource=npm depName=@ait-kit/sdk versioning=npm -->
+- `ait-kit-sdk`: `0.4.0`
+
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
 - `apps-in-toss-framework`: `2.10.10`
 
@@ -92,6 +99,10 @@ not automatically raise the reviewed version or fail a detection-only PR.
 
 The repository reference has been reviewed through `@apps-in-toss/framework`
 `2.10.10`.
+
+- `@ait-kit/sdk` `0.4.0`: Adds the shared RN and Web review request and direct
+  promotion adapter contracts. The kit pins this version exactly; consumer
+  Apps in Toss SDK versions remain app-owned and require their own smoke tests.
 
 - `2.8.0`: Added non-game navigation bar theme settings.
 - `2.9.0`: Added the `ait deploy --timeout` option for app bundle deployment.

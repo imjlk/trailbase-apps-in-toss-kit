@@ -21,6 +21,10 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - Promotion API: https://developers-apps-in-toss.toss.im/api/promotion.md
 - Push and Smart Message API: https://developers-apps-in-toss.toss.im/api/push.md
 - Smart Message overview and notification agreement policy: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
+- Review request guide: https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md
+- Review.request SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md
+- Promotion.grantReward SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md
+- Promotion operations guide: https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md
 - Notification agreement SDK: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
 - Non-game user identity key: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md
 - Anonymous user key verification API: https://developers-apps-in-toss.toss.im/api/user-key.md
@@ -58,6 +62,9 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 
 ## Renovate가 추적하는 reference version
 
+<!-- renovate: datasource=npm depName=@ait-kit/sdk versioning=npm -->
+- `ait-kit-sdk`: `0.4.0`
+
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
 - `apps-in-toss-framework`: `2.10.10`
 
@@ -85,6 +92,10 @@ root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새
 ## 최근 검토한 SDK 변경
 
 저장소 reference는 `@apps-in-toss/framework` `2.10.10`까지 검토했습니다.
+
+- `@ait-kit/sdk` `0.4.0`: RN과 Web에서 공통으로 사용하는 리뷰 요청 및 직접
+  프로모션 adapter 계약을 추가했습니다. Kit는 이 버전을 정확히 pin하며,
+  컨슈머의 Apps in Toss SDK version과 실기기 검증은 각 앱이 소유합니다.
 
 - `2.8.0`: 비게임 내비게이션 바 테마 설정 기능이 추가되었습니다.
 - `2.9.0`: 앱 번들 배포 명령어에 `ait deploy --timeout` 옵션이 추가되었습니다.
