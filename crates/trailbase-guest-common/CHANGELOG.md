@@ -1,5 +1,11 @@
 # trailbase-guest-common
 
+## 0.13.0 — 2026-09-22
+
+### Minor changes
+
+- [0d83406](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/0d83406abdd72f5cd60d9c9d677043aad533c705) Add explicit promotion recipient payload builders for anonymous and Toss Login rewards, requiring a stored transaction key for execute/status requests while preserving the legacy login-only builder. Add a Rust-to-proxy contract test and an opt-in, health-only promotion capability preflight recipe. Before enabling a new caller, verify all three v2 capabilities on the deployed private proxy; older single-call grant callers must migrate before upgrading their proxy. No schema migration or automatic payment retry is introduced. — Thanks @imjlk!
+
 ## 0.12.2 — 2026-09-20
 
 ### Patch changes

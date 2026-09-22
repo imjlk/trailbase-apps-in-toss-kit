@@ -13,12 +13,12 @@
 
 | 구성 요소 | 버전 | 비고 |
 |---|---|---|
-| 프록시 이미지 | `toss-mtls-client-proxy:0.6.3` | 게시된 프로모션 v2 기준선. 아래의 버전 표기된 프로모션 capability 세 가지 필수 |
+| 프록시 이미지 | `toss-mtls-client-proxy:0.6.4` | 게시된 프로모션 v2 기준선. 아래의 버전 표기된 프로모션 capability 세 가지 필수 |
 | 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.5.1` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패 |
 | RN/Web `@ait-kit/sdk` | `0.3.0` (정확한 고정) | `ait-rn` 0.6.0 / `ait-web` 0.3.0 (비공개, Sampo 버전 관리) |
 | RN 최소 `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.3.0 peer 하한. 최소 fixture도 같은 검토 pin으로 컴파일 |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | 변경 없음 |
-| Rust guest 크레이트 | `trailbase-guest-common` / `trailbase-toss-identity` 0.12.2 | 고정 묶음. 함께 이동 |
+| Rust guest 크레이트 | `trailbase-guest-common` / `trailbase-toss-identity` 0.13.0 | 고정 묶음. 함께 이동 |
 | SQL 템플릿 | 추가 전용 v2 마이그레이션 필수 | 기존 v1 원장에 `promotion_reward_ledger.v2.sql` 적용. 레거시 행 보존 |
 
 ## 롤아웃 순서
@@ -130,7 +130,7 @@
 ## 이전 검증 기록: proxy 0.5.0 (2026-09-17)
 
 아래 기록은 이전 기준선이며 프로모션 v2 검증 결과가 아닙니다. 현재 기준선은
-proxy 0.6.3과 Rust 크레이트 0.12.2(릴리즈 PR #147)입니다. v2 마이그레이션과
+proxy 0.6.4와 Rust 크레이트 0.13.0(릴리즈 PR #151)입니다. v2 마이그레이션과
 버전 표기된 capability는 별도로 검증해야 합니다.
 
 로컬 검사는 기능 범위 `ced5f86..08ae12f`(PR #133, #134, #138 — 이 기준선의

@@ -58,7 +58,7 @@
     },
     "packages/trailbase-runtime": {
       "name": "@trailbase-apps-in-toss-kit/trailbase-runtime",
-      "version": "0.4.1",
+      "version": "0.5.0",
       "bin": {
         "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
         "trailbase-release-doctor": "./bin/release-doctor.mjs",
@@ -72,7 +72,7 @@
     },
     "services/toss-mtls-client-proxy": {
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-      "version": "0.6.3",
+      "version": "0.6.4",
       "dependencies": {
         "@ait-kit/api-client": "0.5.1",
         "@ait-kit/api-core": "0.5.1",
