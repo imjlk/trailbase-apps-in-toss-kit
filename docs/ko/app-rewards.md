@@ -21,11 +21,10 @@ SDK의 [보상형 광고 이벤트](https://developers-apps-in-toss.toss.im/bedr
 독립적인 증거가 필요한데 확보할 수 없다면 거절합니다. Kit이 앱인토스의 서버 광고 검증
 API를 제공하는 것은 아닙니다.
 
-[공유 리워드](https://developers-apps-in-toss.toss.im/bedrock/reference/framework/친구초대/contactsViral.html)는
-설정된 보상 이벤트를 전달합니다. 콘솔·연동 설정에서 앱 자체 보상인지 플랫폼 지급인지
-구분하고, 앱 자체 재화만 이 원장으로 처리하세요. 플랫폼이 지급하는 이벤트에 로컬 재화나
-결제를 중복 지급하지 않습니다. 일반 공유 시트가 닫힌 것은 공유 완료 확인이 아닙니다.
-어댑터는 이벤트를 정규화하며 클라이언트 관찰을 서버에서 신뢰할 증거로 바꾸지 않습니다.
+종료된 `contactsViral` 공유 리워드 브리지는 더 이상 `ait-rn`에서 export하지 않습니다.
+일반 공유 시트의 결과는 실제 공유·초대·보상 자격의 증거가 아닙니다. 종료된 리워드
+이벤트를 일반 공유 callback으로 대체해 지급하지 마세요. 다른 유효한 앱 자체 보상에는
+이 원장을 계속 사용할 수 있습니다.
 
 ## 엔드포인트 계약
 
@@ -68,6 +67,22 @@ trailbase_guest_common::db::tx_commit(&mut tx)?;
 지갑 projection을 쓰려면 같은 트랜잭션에서 고유 `attempt_id` 처리 표시와 함께 반영합니다.
 중복 claim 영수증이 잔액을 다시 늘려서는 안 됩니다. 가장 단순한 참조 잔액은 사용자·단위별
 커밋된 grant/attempt join의 수량 합계에서 앱의 트랜잭션 기반 사용 원장을 뺀 값입니다.
+
+## 기존 공유 리워드 placement 종료
+
+`@trailbase-apps-in-toss-kit/ait-rn/share-reward`를 import하거나 루트 export였던
+`createAppsInTossContactsViralBridge`, `runContactsViralReward`를 사용하는 소비 앱은
+해당 import와 직접 SDK 호출을 제거해야 합니다. 대상 캠페인·placement마다 앱 서버
+정책에서 신규 시도 발급과 미지급 claim을 차단하세요. 이미 지급한 grant 행과 읽기
+전용 영수증 조회는 앱의 보관 정책에 따라 유지합니다. 광고나 다른 정상 앱 자체 보상이
+의존한다면 `app-reward` 기능 전체를 끄지 않습니다.
+
+소비 앱에서 보상 진입 버튼, 보상 문구, `moduleId` 설정, 이벤트 처리, 보상 전용 경로를
+정리하세요. 기존 초대 링크는 일반 화면으로 계속 연결할 수 있고, 과거 보상 화면으로
+들어오는 링크는 일반 화면이나 종료 안내로 보냅니다. 배포 후에는 종료된 보상을
+시작·청구할 수 없는지, 기존 영수증을 조회할 수 있는지, 일반 공유·광고·별도
+프로모션이 정상인지 확인하세요. 신규 바이럴 SDK의 보상 흐름은 별도 연동과 서버
+자격 증거를 검토한 뒤 활성화해야 합니다.
 
 ## 보관과 검증
 

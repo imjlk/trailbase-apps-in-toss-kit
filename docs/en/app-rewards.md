@@ -23,12 +23,10 @@ transactional quotas, and approve only under the consumer's explicit risk policy
 If independent evidence is required and unavailable, reject the claim. The kit does
 not provide an Apps in Toss server-side ad verification API.
 
-[Contacts viral](https://developers-apps-in-toss.toss.im/bedrock/reference/framework/친구초대/contactsViral.html)
-reports configured reward events. Decide in the console/integration whether the
-reward is app-owned or platform-paid. Route only app-owned credits through this
-ledger. Do not issue another local/payment reward for a platform-paid event. A plain
-share-sheet close is not confirmation of sharing. The adapter normalizes events;
-it does not make client observations trustworthy on the server.
+The retired `contactsViral` share-reward bridge is no longer exported by `ait-rn`.
+An ordinary share-sheet result does not prove sharing, a referral, or reward
+eligibility. Do not substitute a general share callback for the retired reward
+event. App-owned rewards from other eligible sources can still use this ledger.
 
 ## Endpoint contract
 
@@ -74,6 +72,26 @@ For a wallet projection, perform it inside that transaction using a unique
 `attempt_id` projection marker; repeated claim receipts must not update the balance
 again. The simplest reference balance is a sum of joined committed grant/attempt
 amounts by owner and unit, minus the app's transactional spending ledger.
+
+## Retiring a legacy share-reward placement
+
+Consumers importing `@trailbase-apps-in-toss-kit/ait-rn/share-reward` or the
+former root exports `createAppsInTossContactsViralBridge` and
+`runContactsViralReward` must remove those imports and any direct SDK call.
+For each affected campaign/placement, disable new attempt issuance and unpaid
+claims in the app-owned server policy. Keep the read-only receipt endpoint and
+already committed grant rows available under the app's retention policy. Do not
+turn off the entire `app-reward` feature if ad or other valid app-owned rewards
+still depend on it.
+
+Remove the reward entry button, reward text, `moduleId` configuration, event
+handler and reward-only route in the consumer app. Existing referral links can
+continue to open a normal destination; route old reward-screen links to a
+normal screen or an end notice. After deploying, check that the retired reward
+cannot be started or claimed, prior receipts remain readable, and ordinary
+sharing, ads and separate promotions still work. A new viral SDK needs its own
+reviewed integration and server eligibility evidence before any reward flow is
+enabled.
 
 ## Retention and validation
 
