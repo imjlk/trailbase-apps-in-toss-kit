@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.7.0 — 2026-09-23
+
+### Minor changes
+
+- [08c6bea](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/08c6bea2dabbfbc57cfa84d31f6a3225ce4713a4) Remove the retired `contactsViral` share-reward bridge, including the root exports and `@trailbase-apps-in-toss-kit/ait-rn/share-reward` subpath. Consumers must remove `createAppsInTossContactsViralBridge`, `runContactsViralReward`, and direct legacy SDK calls, then disable new attempts and unpaid claims for affected placements before deploying. Keep committed receipts readable; ordinary sharing, ad rewards, and separate promotion campaigns remain available. — Thanks @imjlk!
+
 ## 0.6.1 — 2026-09-22
 
 ### Patch changes
