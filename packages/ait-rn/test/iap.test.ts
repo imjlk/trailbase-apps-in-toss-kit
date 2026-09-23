@@ -231,10 +231,19 @@ describe("AppsInToss IAP bridge", () => {
     }
   });
 
-  test("fails closed when the SDK or method is unavailable or unsupported", async () => {
-    const missingBridge = createAppsInTossIapBridge({ IAP: undefined });
-    await expect(missingBridge.getProducts()).rejects.toMatchObject({
-      code: "IAP_SDK_UNAVAILABLE",
+  test("fails closed for unsupported SDKs and missing or unsupported product methods", async () => {
+    // An undefined injection loads the global SDK, which another test file may
+    // have mocked. Inject the missing method explicitly to keep this test local.
+    const missingMethodBridge = createAppsInTossIapBridge({ IAP: {} });
+    await expect(missingMethodBridge.getProducts()).rejects.toMatchObject({
+      code: "IAP_GET_PRODUCTS_UNAVAILABLE",
+    });
+
+    const unsupportedSdkBridge = createAppsInTossIapBridge({
+      IAP: { isSupported: () => false },
+    });
+    await expect(unsupportedSdkBridge.getProducts()).rejects.toMatchObject({
+      code: "IAP_SDK_UNSUPPORTED",
     });
 
     const unsupportedGetProducts = Object.assign(
