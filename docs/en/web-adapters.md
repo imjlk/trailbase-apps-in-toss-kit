@@ -70,9 +70,10 @@ subscription query alone. A lost response must not allocate a new transaction id
 
 `createShareLink` accepts an `intoss://` path and `share` opens a share sheet. A
 resolved share sheet is not evidence of sharing and does not issue a reward. For
-other SDK surfaces such as ads/contacts viral, use their official SDK 3 APIs and
+other supported SDK surfaces such as ads, use their official SDK 3 APIs and
 connect only app-owned credits to [server reward attempts](app-rewards.md), with
-explicit server policies. This adapter does not wrap every SDK feature.
+explicit server policies. The legacy `contactsViral` reward integration has
+been retired. This adapter does not wrap every SDK feature.
 
 ## Consumer migration and verification
 

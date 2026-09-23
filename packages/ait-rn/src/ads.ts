@@ -731,8 +731,7 @@ function normalizeAdGroupId(adGroupId: string) {
 
 /**
  * SDK listener cleanup is best-effort and must not leave an ad promise
- * unsettled or replace its settled result (see iap.ts / share-reward.ts
- * for the same pattern in the other settle flows).
+ * unsettled or replace its settled result.
  */
 function cleanupBestEffort(cleanup: () => void) {
   try {
