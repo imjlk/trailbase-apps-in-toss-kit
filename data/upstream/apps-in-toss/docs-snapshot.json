@@ -1,12 +1,12 @@
 {
-  "fetchedAt": "2026-09-22T08:58:38.576Z",
+  "fetchedAt": "2026-09-28T06:49:28.591Z",
   "documents": [
     {
       "key": "release-notes",
       "title": "Apps in Toss release notes",
       "url": "https://developers-apps-in-toss.toss.im/release-note/release-note.md",
-      "sha256": "1234b52e8d569d2bf78678debfe777dc00609074994d852b2baa37aafc13a9fa",
-      "bytes": 22175
+      "sha256": "a344c96fd8634b92ae241cdd43186ad2056a6e8c9d3c4aae935e86091638988e",
+      "bytes": 22712
     },
     {
       "key": "llms",
