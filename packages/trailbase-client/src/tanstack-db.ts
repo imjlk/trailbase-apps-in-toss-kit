@@ -90,7 +90,10 @@ export interface RecordCollectionOptions<Row, Key, Collection, Config> {
   id: string;
   recordApi: TrailbaseRecordApi<Row>;
   getKey: (row: Row) => Key;
+  /** In replace mode pagination.limit is page size, not a total-row limit. */
   snapshotListOptions?: unknown;
+  /** Fail before applying an oversized snapshot. Omit for the existing unlimited behavior. */
+  snapshotMaxRecords?: number;
   snapshotEnabled?: boolean;
   /** Replace reconciles a complete snapshot; merge keeps paginated/windowed callers compatible. */
   snapshotMode?: "replace" | "merge";
@@ -118,12 +121,16 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
   getKey,
   snapshotListOptions = { pagination: { limit: 10 } },
   snapshotEnabled = true,
+  snapshotMaxRecords,
   snapshotMode = "replace",
   reconnectDelayMs = 3_000,
   gcTime = Number.POSITIVE_INFINITY,
   rowUpdateMode = "full",
   onSubscriptionError,
 }: Omit<RecordCollectionOptions<Row, Key, unknown, unknown>, "createCollection">) {
+  if (snapshotMaxRecords !== undefined && (!Number.isSafeInteger(snapshotMaxRecords) || snapshotMaxRecords < 1)) {
+    throw new TypeError("snapshotMaxRecords must be a positive safe integer");
+  }
   let cancelReader: (() => void) | undefined;
   let applySnapshotFromSync: ((rows: Row | Row[] | null | undefined) => void) | undefined;
 
@@ -179,7 +186,7 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
               // Subscribe before fetching. The stream queues events until the
               // snapshot has committed, so a late list cannot overwrite them.
               if (snapshotEnabled) {
-                const rows = await readCollectionSnapshot(recordApi, snapshotListOptions, snapshotMode, () => cancelled);
+                const rows = await readCollectionSnapshot(recordApi, snapshotListOptions, snapshotMode, () => cancelled, snapshotMaxRecords);
                 if (cancelled) return;
                 if (snapshotMode === "replace") {
                   const keys = new Set(rows.map(getKey));
@@ -242,6 +249,7 @@ async function readCollectionSnapshot<Row>(
   options: unknown,
   mode: "replace" | "merge",
   cancelled: () => boolean,
+  maxRecords?: number,
 ): Promise<Row[]> {
   const opts = (options ?? {}) as { pagination?: { cursor?: string; offset?: number; limit?: number } };
   if (mode === "replace" && (opts.pagination?.cursor || opts.pagination?.offset)) {
@@ -252,6 +260,9 @@ async function readCollectionSnapshot<Row>(
   let pageOptions = opts;
   while (!cancelled()) {
     const page = await api.list(pageOptions);
+    if (maxRecords !== undefined && rows.length + page.records.length > maxRecords) {
+      throw new Error("Snapshot exceeds snapshotMaxRecords; narrow the query or use snapshotMode: merge for a page");
+    }
     rows.push(...page.records);
     if (mode === "merge" || !page.cursor || page.records.length === 0) break;
     if (seen.has(page.cursor)) throw new Error("TrailBase snapshot returned a repeated pagination cursor");

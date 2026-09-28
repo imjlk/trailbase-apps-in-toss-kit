@@ -365,3 +365,17 @@ XHR SSE 연결 준비는 `subscribe(id, { signal })`과 collection cleanup으로
 ## 계정 전환과 앱 복귀
 
 요청 무효화, 사용자별 캐시, 구독 정리, 앱 복귀 시 서버 재검증은 [계정 전환과 앱 복귀](session-lifecycle.md)를 참고하세요.
+
+## 스냅샷 조회 범위와 크기
+
+`pagination.limit`는 페이지 크기이며 전체 조회 건수 제한이 아닙니다. 기본값인
+`snapshotMode: "replace"`는 모든 커서를 따라 조회한 전체 스냅샷으로 동기화합니다.
+최근 한 페이지가 필요하면 `snapshotMode: "merge"`와 `['-published_at']` 같은
+정렬, `pagination: { limit: 10 }`을 명시하세요. Merge는 이전 행을 제거하지 않으며
+실시간 이벤트로 collection이 커질 수 있어, 최신 N개만 유지하는 캐시는 아닙니다.
+
+`snapshotMaxRecords`에 양의 정수를 지정하면 제한을 초과한 스냅샷을 행 추가나
+삭제 적용 전에 거부합니다. 오류는 `onSubscriptionError`로 전달되고 기존 재연결
+정책으로 재시도합니다. 스냅샷을 잘라 적용하거나 준비 완료로 표시하지 않습니다.
+생략하면 기존의 무제한 동작을 유지합니다. 이 제한은 누적 행 수를 제한하며
+개별 응답의 바이트 크기를 제한하지는 않습니다.

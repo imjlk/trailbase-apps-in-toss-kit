@@ -385,3 +385,17 @@ stream. Stalled setup aborts the request and lets collection reconnection retry.
 ## Account lifecycle
 
 Use [Account Changes and App Foreground](session-lifecycle.md) for guarded requests, user-scoped caches, subscription cleanup, and authoritative revalidation on app foreground.
+
+## Snapshot scope and size
+
+`pagination.limit` is a page size, not a total-row cap. The default
+`snapshotMode: "replace"` follows every cursor to reconcile the complete snapshot.
+For a recent-page view, explicitly use `snapshotMode: "merge"` and an order such as
+`['-published_at']` with `pagination: { limit: 10 }`. Merge does not evict older
+rows and live events can grow the collection; it is not a rolling top-N cache.
+
+Set `snapshotMaxRecords` to a positive integer to reject oversized snapshots
+before applying any rows or deletions. The error reaches `onSubscriptionError`
+and the existing reconnect policy retries; it does not truncate the snapshot or
+mark the collection ready. Omit the option to retain existing unlimited behavior.
+The guard bounds accumulated records, not the bytes of an individual response.

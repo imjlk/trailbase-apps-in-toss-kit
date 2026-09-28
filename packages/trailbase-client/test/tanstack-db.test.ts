@@ -437,3 +437,40 @@ test("filtered subscribeAll fallback forwards cancellation to a signal-aware rec
   expect(await reader.read()).toEqual({ done: true, value: undefined });
   reader.releaseLock();
 });
+
+test("snapshot size guard rejects before applying a partial replacement", async () => {
+  const errors: unknown[] = [];
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "snapshot-budget", getKey: (row: { id: number }) => row.id,
+    snapshotMaxRecords: 1, reconnectDelayMs: 60_000,
+    onSubscriptionError: (error) => errors.push(error),
+    recordApi: {
+      subscribe: async () => new ReadableStream(),
+      list: async () => ++lists === 1
+        ? { records: [{ id: 1 }], cursor: "next" }
+        : { records: [{ id: 2 }] },
+    },
+  }));
+  try {
+    void collection.preload().catch(() => {});
+    await eventually(() => errors.length === 1);
+    expect(String(errors[0])).toContain("snapshotMaxRecords");
+    expect(collection.has(1)).toBe(false);
+    expect(collection.has(2)).toBe(false);
+  } finally { await collection.cleanup(); }
+});
+
+test("merge reads one page even when a cursor is present", async () => {
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "snapshot-window", getKey: (row: { id: number }) => row.id,
+    snapshotMode: "merge", snapshotMaxRecords: 1,
+    recordApi: {
+      subscribe: async () => new ReadableStream(),
+      list: async () => { lists++; return { records: [{ id: 1 }], cursor: "next" }; },
+    },
+  }));
+  try { await collection.preload(); expect(lists).toBe(1); expect(collection.has(1)).toBe(true); }
+  finally { await collection.cleanup(); }
+});
