@@ -261,7 +261,10 @@ async function readCollectionSnapshot<Row>(
   while (!cancelled()) {
     const page = await api.list(pageOptions);
     if (maxRecords !== undefined && rows.length + page.records.length > maxRecords) {
-      throw new Error("Snapshot exceeds snapshotMaxRecords; narrow the query or use snapshotMode: merge for a page");
+      const hint = mode === "merge"
+        ? "reduce pagination.limit or raise snapshotMaxRecords"
+        : "narrow the query or use snapshotMode: merge for a single page";
+      throw new Error(`Snapshot exceeds snapshotMaxRecords (${maxRecords}); ${hint}`);
     }
     rows.push(...page.records);
     if (mode === "merge" || !page.cursor || page.records.length === 0) break;
