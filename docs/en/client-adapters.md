@@ -386,42 +386,27 @@ stream. Stalled setup aborts the request and lets collection reconnection retry.
 
 Use [Account Changes and App Foreground](session-lifecycle.md) for guarded requests, user-scoped caches, subscription cleanup, and authoritative revalidation on app foreground.
 
-## React Native back navigation for local panels
+## React Native screen history and Back navigation
 
-The consumer owns screen history. The Kit does not turn React state or a TDS
-`BottomSheet.Root` into a Granite route. With Apps in Toss RN SDK 2.10.10 and
-Granite 1.0.45, the header and Android hardware back handler consult Granite's
-`useBackEvent` before falling back to navigation history and app close.
+Navigation history belongs to the consumer app. When a user opens another
+screen, Back should return to the previous screen with its state preserved.
+An app-exit report must be investigated against the actual screen transition;
+it is not evidence of a Kit runtime defect.
 
-For state-driven panels, register **one** `useBackEvent` callback while a panel
-is open. Pop the active panel and restore its parent on back; remove the callback
-at the root and on unmount. For example, `Ranking → My activity → Profile` must
-return through `My activity → Ranking → home`. Do not clear the parent history
-when opening a child. A normal Granite route stack is another valid approach.
+Use the navigator's history for screen transitions. If the product expects Back
+to return to previously visited tabs, configure tab history accordingly. For
+example, opening a detail screen from a ranking screen should preserve the
+ranking screen as the return destination.
 
-```tsx
-import { useBackEvent } from '@granite-js/react-native';
-import { useEffect } from 'react';
+Check whether `replace`, `reset`, or a plain React state change discarded that
+return destination. Use replacement only when returning to the replaced screen
+is intentionally unwanted, such as a completed first-visit introduction. Do not
+add a global Back interceptor as a substitute for missing navigation history.
+Keep the SDK's explicit close action distinct from returning to a previous screen.
 
-function usePanelBack(activePanel: string | undefined, closePanel: (id: string) => void) {
-  const { addEventListener, removeEventListener } = useBackEvent();
-  useEffect(() => {
-    if (!activePanel) return;
-    const onBack = () => closePanel(activePanel);
-    addEventListener(onBack);
-    return () => removeEventListener(onBack);
-  }, [activePanel, closePanel, addEventListener, removeEventListener]);
-}
-```
-
-`closePanel(id)` must only pop when `id` is still the active panel. This makes
-repeated close notifications harmless: TDS 2.0.5 can call both `onClose` and
-`onDimmerClick` for a single dimmer tap. Granite's legacy back event broadcasts
-to its listeners, so independent per-panel listeners can dismiss multiple layers.
-Do not replace the SDK's explicit close button or permanently swallow root back.
-An Android-only `BackHandler` listener does not cover the RN header back button.
-
-Before submitting a consumer release, test header back, Android system back,
-iOS swipe where supported, nested panel dismissal, keyboard-open behavior, root
-exit, and listener cleanup after navigation. Keep panel visibility and history in
-one owner, including panels opened automatically by reward/mission completion.
+Before resubmitting, record the starting screen, navigation steps, Back input,
+and expected return destination. Reproduce the reported path on the submitted
+bundle and platform, checking header Back, Android system Back, and supported
+gestures as applicable. Confirm both previous-screen restoration and intended
+root behavior. A local implementation change alone does not establish that the
+reported review issue is resolved.
