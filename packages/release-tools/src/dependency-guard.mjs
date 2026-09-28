@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 
 // Compare semantic lock data, permitting only local workspace version bumps.
 export function releaseDependencyState(path, source) {
@@ -28,16 +29,17 @@ export function releaseDependencyState(path, source) {
 
 export function assertReleaseDependenciesUnchanged({ root, baseRef = 'HEAD' }) {
   const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  assert.equal(realpathSync(root), realpathSync(git(['rev-parse', '--show-toplevel']).trim()), 'Release root must be the repository root');
   const base = git(['rev-parse', '--verify', `${baseRef}^{commit}`]).trim();
   const oldPaths = git(['ls-tree', '-r', '--name-only', '-z', base]).split('\0');
-  const newPaths = git(['ls-files', '-z']).split('\0');
+  const newPaths = git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0');
   const locks = [...new Set([...oldPaths, ...newPaths])].filter(p => !p.startsWith('vendor/') && /(?:^|\/)(?:bun\.lock|Cargo\.lock)$/.test(p));
   assert(locks.length > 0, 'No tracked Bun or Cargo locks to check');
   for (const path of locks) {
     assert(oldPaths.includes(path) && newPaths.includes(path), `Release added or removed lockfile: ${path}`);
     const before = releaseDependencyState(path, git(['show', `${base}:${path}`]));
     const after = releaseDependencyState(path, readFileSync(resolve(root, path), 'utf8'));
-    assert.deepEqual(after, before, `Dependency drift in ${path}; keep dependency updates separate from version-only releases`);
+    assert(isDeepStrictEqual(after, before), `Dependency drift in ${path}; keep dependency updates separate from version-only releases`);
   }
   return { checked: locks, base };
 }

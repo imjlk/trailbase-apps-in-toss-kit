@@ -111,3 +111,5 @@ bun vendor/trailbase-apps-in-toss-kit/scripts/check-release-dependencies.mjs --r
 분리하고, 일괄 업데이트 없이 잠금 파일을 재생성하세요. 이 검사는 매니페스트를
 비교하지 않으며 bun.lockb, npm, Yarn, pnpm 잠금 파일은 지원하지 않습니다.
 버전만 올리는 릴리즈를 게시하기 전에 실행하세요.
+
+`--root`에는 하위 디렉터리가 아닌 저장소 루트를 지정하세요. ignore되지 않은 신규 잠금 파일도 staging 전에 차단합니다.

@@ -121,3 +121,5 @@ in those locks. A failure does not restore files automatically. Review the diff,
 keep intentional dependency upgrades in a separate change, and regenerate locks
 without broad updates. The guard does not compare manifests or support bun.lockb,
 npm, Yarn, or pnpm lockfiles. Run it before publishing a version-only release.
+
+Pass the repository root, not a subdirectory, as `--root`. New non-ignored lockfiles are also rejected before staging.
