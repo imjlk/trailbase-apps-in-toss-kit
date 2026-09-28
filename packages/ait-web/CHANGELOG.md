@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/ait-web
 
+## 0.3.2 — 2026-09-28
+
+### Patch changes
+
+- [eb4b23d](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/eb4b23dc3fe6a56016006cf8da5b4c81650af430) Add an optional snapshotMaxRecords guard that rejects oversized collection snapshots before reconciliation. Clarify full replacement versus single-page merging without changing defaults. Add a read-only Bun/Cargo release dependency guard that permits workspace version changes and rejects unrelated lockfile drift before publishing.
+  
+  Adopt @ait-kit/sdk 0.5.1 with explicit React Native export conditions so consumers can remove their SDK package export patches. — Thanks @imjlk!
+- Updated dependencies: trailbase-client (npm)@1.2.0
+
 ## 0.3.1 — 2026-09-22
 
 ### Patch changes
