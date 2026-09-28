@@ -1,13 +1,13 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-09-22T08:58:38.576Z
+- Fetched at: 2026-09-28T06:49:28.591Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
 - Apps in Toss release notes
   - URL: https://developers-apps-in-toss.toss.im/release-note/release-note.md
-  - SHA-256: `1234b52e8d569d2bf78678debfe777dc00609074994d852b2baa37aafc13a9fa`
-  - Bytes: 22175
+  - SHA-256: `a344c96fd8634b92ae241cdd43186ad2056a6e8c9d3c4aae935e86091638988e`
+  - Bytes: 22712
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
   - SHA-256: `5914106117456898c975b02ae7749355f76a4bf0b9e56209c116031af5bd3722`
