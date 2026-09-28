@@ -437,3 +437,66 @@ test("filtered subscribeAll fallback forwards cancellation to a signal-aware rec
   expect(await reader.read()).toEqual({ done: true, value: undefined });
   reader.releaseLock();
 });
+
+test("snapshot size guard rejects before applying a partial replacement", async () => {
+  const errors: unknown[] = [];
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "snapshot-budget", getKey: (row: { id: number }) => row.id,
+    snapshotMaxRecords: 1, reconnectDelayMs: 60_000,
+    onSubscriptionError: (error) => errors.push(error),
+    recordApi: {
+      subscribe: async () => new ReadableStream(),
+      list: async () => ++lists === 1
+        ? { records: [{ id: 1 }], cursor: "next" }
+        : { records: [{ id: 2 }] },
+    },
+  }));
+  try {
+    void collection.preload().catch(() => {});
+    await eventually(() => errors.length === 1);
+    expect(String(errors[0])).toContain("snapshotMaxRecords");
+    expect(collection.has(1)).toBe(false);
+    expect(collection.has(2)).toBe(false);
+  } finally { await collection.cleanup(); }
+});
+
+test("merge reads one page even when a cursor is present", async () => {
+  let lists = 0;
+  const collection = createCollection(trailbaseRecordCollectionOptions({
+    id: "snapshot-window", getKey: (row: { id: number }) => row.id,
+    snapshotMode: "merge", snapshotMaxRecords: 1,
+    recordApi: {
+      subscribe: async () => new ReadableStream(),
+      list: async () => { lists++; return { records: [{ id: 1 }], cursor: "next" }; },
+    },
+  }));
+  try { await collection.preload(); expect(lists).toBe(1); expect(collection.has(1)).toBe(true); }
+  finally { await collection.cleanup(); }
+});
+
+for (const snapshotMode of ["replace", "merge"] as const) {
+  test(`manual ${snapshotMode} snapshots enforce the limit before any writes`, async () => {
+    const options = trailbaseRecordCollectionOptions({
+      id: `manual-budget-${snapshotMode}`, getKey: (row: { id: number; value: string }) => row.id,
+      snapshotEnabled: false, snapshotMode, snapshotMaxRecords: 1,
+      recordApi: {
+        subscribe: async () => new ReadableStream(),
+        list: async () => { throw new Error("automatic snapshot disabled"); },
+      },
+    });
+    const collection = createCollection(options);
+    try {
+      await collection.preload();
+      options.utils.applySnapshot({ id: 1, value: "original" });
+      expect(() => options.utils.applySnapshot([
+        { id: 1, value: "overwritten" }, { id: 2, value: "extra" },
+      ])).toThrow("snapshotMaxRecords");
+      expect(collection.get(1)?.value).toBe("original");
+      expect(collection.has(2)).toBe(false);
+      options.utils.applySnapshot(null);
+      options.utils.applySnapshot([{ id: 1, value: "valid" }]);
+      expect(collection.get(1)?.value).toBe("valid");
+    } finally { await collection.cleanup(); }
+  });
+}

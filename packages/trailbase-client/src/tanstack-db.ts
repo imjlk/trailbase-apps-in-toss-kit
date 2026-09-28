@@ -90,7 +90,10 @@ export interface RecordCollectionOptions<Row, Key, Collection, Config> {
   id: string;
   recordApi: TrailbaseRecordApi<Row>;
   getKey: (row: Row) => Key;
+  /** In replace mode pagination.limit is page size, not a total-row limit. */
   snapshotListOptions?: unknown;
+  /** Fail before applying an oversized snapshot. Omit for the existing unlimited behavior. */
+  snapshotMaxRecords?: number;
   snapshotEnabled?: boolean;
   /** Replace reconciles a complete snapshot; merge keeps paginated/windowed callers compatible. */
   snapshotMode?: "replace" | "merge";
@@ -118,12 +121,16 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
   getKey,
   snapshotListOptions = { pagination: { limit: 10 } },
   snapshotEnabled = true,
+  snapshotMaxRecords,
   snapshotMode = "replace",
   reconnectDelayMs = 3_000,
   gcTime = Number.POSITIVE_INFINITY,
   rowUpdateMode = "full",
   onSubscriptionError,
 }: Omit<RecordCollectionOptions<Row, Key, unknown, unknown>, "createCollection">) {
+  if (snapshotMaxRecords !== undefined && (!Number.isSafeInteger(snapshotMaxRecords) || snapshotMaxRecords < 1)) {
+    throw new TypeError("snapshotMaxRecords must be a positive safe integer");
+  }
   let cancelReader: (() => void) | undefined;
   let applySnapshotFromSync: ((rows: Row | Row[] | null | undefined) => void) | undefined;
 
@@ -161,7 +168,10 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
           knownKeys.delete(key);
         };
         const applyRows = (rows: Row | Row[] | null | undefined) => {
-          if (!cancelled) for (const row of normalizeSnapshotRows(rows)) writeRow(row);
+          if (cancelled) return;
+          const normalized = normalizeSnapshotRows(rows);
+          assertSnapshotSize(normalized.length, snapshotMaxRecords, snapshotMode);
+          for (const row of normalized) writeRow(row);
         };
         applySnapshotFromSync = applyRows;
         cancelReader = cancel;
@@ -179,7 +189,7 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
               // Subscribe before fetching. The stream queues events until the
               // snapshot has committed, so a late list cannot overwrite them.
               if (snapshotEnabled) {
-                const rows = await readCollectionSnapshot(recordApi, snapshotListOptions, snapshotMode, () => cancelled);
+                const rows = await readCollectionSnapshot(recordApi, snapshotListOptions, snapshotMode, () => cancelled, snapshotMaxRecords);
                 if (cancelled) return;
                 if (snapshotMode === "replace") {
                   const keys = new Set(rows.map(getKey));
@@ -237,11 +247,21 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
   };
 }
 
+function assertSnapshotSize(count: number, maxRecords: number | undefined, mode: "replace" | "merge") {
+  if (maxRecords !== undefined && count > maxRecords) {
+    const hint = mode === "merge"
+      ? "reduce pagination.limit or raise snapshotMaxRecords"
+      : "narrow the query or use snapshotMode: merge for a single page";
+    throw new Error(`Snapshot exceeds snapshotMaxRecords (${maxRecords}); ${hint}`);
+  }
+}
+
 async function readCollectionSnapshot<Row>(
   api: TrailbaseRecordApi<Row>,
   options: unknown,
   mode: "replace" | "merge",
   cancelled: () => boolean,
+  maxRecords?: number,
 ): Promise<Row[]> {
   const opts = (options ?? {}) as { pagination?: { cursor?: string; offset?: number; limit?: number } };
   if (mode === "replace" && (opts.pagination?.cursor || opts.pagination?.offset)) {
@@ -252,6 +272,7 @@ async function readCollectionSnapshot<Row>(
   let pageOptions = opts;
   while (!cancelled()) {
     const page = await api.list(pageOptions);
+    assertSnapshotSize(rows.length + page.records.length, maxRecords, mode);
     rows.push(...page.records);
     if (mode === "merge" || !page.cursor || page.records.length === 0) break;
     if (seen.has(page.cursor)) throw new Error("TrailBase snapshot returned a repeated pagination cursor");

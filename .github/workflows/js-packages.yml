@@ -6,9 +6,11 @@ on:
       - "fixtures/contracts/**"
       - ".github/workflows/js-packages.yml"
       - "bun.lock"
+      - "**/Cargo.lock"
       - "package.json"
       - "tsconfig*.json"
       - "scripts/check-sdk-minimum.mjs"
+      - "scripts/check-release-dependencies.mjs"
       - "packages/**"
   push:
     branches:
@@ -17,9 +19,11 @@ on:
       - "fixtures/contracts/**"
       - ".github/workflows/js-packages.yml"
       - "bun.lock"
+      - "**/Cargo.lock"
       - "package.json"
       - "tsconfig*.json"
       - "scripts/check-sdk-minimum.mjs"
+      - "scripts/check-release-dependencies.mjs"
       - "packages/**"
   workflow_dispatch:
 
@@ -42,11 +46,18 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
+
+      - name: Reject dependency drift in version-only release PRs
+        if: github.event_name == 'pull_request' && github.head_ref == 'release/main'
+        env:
+          RELEASE_BASE: ${{ github.event.pull_request.base.sha }}
+        run: bun scripts/check-release-dependencies.mjs --base "$RELEASE_BASE"
 
       - name: Run package tests
         run: bun run packages:test

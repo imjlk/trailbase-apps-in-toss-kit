@@ -105,3 +105,21 @@ Use the general `$sampo` skill for Sampo changeset, release, publish, or bot
 work. Load `trailbase-ops` only when the release note touches TrailBase
 migrations, Record API exposure, WASM auth behavior, deployment, production
 reset, or mTLS certificate handling.
+
+## Check dependency drift after versioning
+
+Before running Sampo, record the source commit. After versioning and lockfile
+synchronization, run this read-only guard (Bun required):
+
+```sh
+bun vendor/trailbase-apps-in-toss-kit/scripts/check-release-dependencies.mjs --root . --base <source-commit>
+```
+
+It permits workspace version changes in tracked Bun/Cargo locks but rejects
+changes to resolved dependencies, checksums, and dependency requirements stored
+in those locks. A failure does not restore files automatically. Review the diff,
+keep intentional dependency upgrades in a separate change, and regenerate locks
+without broad updates. The guard does not compare manifests or support bun.lockb,
+npm, Yarn, or pnpm lockfiles. Run it before publishing a version-only release.
+
+Pass the repository root, not a subdirectory, as `--root`. New non-ignored lockfiles are also rejected before staging.

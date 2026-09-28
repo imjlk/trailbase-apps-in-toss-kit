@@ -95,3 +95,21 @@ node vendor/trailbase-apps-in-toss-kit/scripts/draft-sampo-release-notes.mjs \
 changeset, release, publish, bot 작업에는 공통 `$sampo` skill을 사용하세요. 릴리스 노트가
 TrailBase migration, Record API 노출, WASM auth 동작, 배포, production reset, mTLS 인증서
 처리를 건드릴 때만 `trailbase-ops`를 함께 사용합니다.
+
+## 버전 갱신 후 의존성 변경 확인
+
+Sampo 실행 전 소스 커밋을 기록하세요. 버전 및 잠금 파일을 동기화한 뒤 다음
+읽기 전용 검사를 실행하세요(Bun 필요).
+
+```sh
+bun vendor/trailbase-apps-in-toss-kit/scripts/check-release-dependencies.mjs --root . --base <source-commit>
+```
+
+추적 중인 Bun/Cargo 잠금 파일의 워크스페이스 버전 변경은 허용하고, 잠금 파일에
+기록된 해결된 의존성, 체크섬, 의존성 요구사항 변경은 차단합니다. 실패해도 파일을
+자동 복구하지 않습니다. 차이를 검토해 의도적인 의존성 갱신은 별도 변경으로
+분리하고, 일괄 업데이트 없이 잠금 파일을 재생성하세요. 이 검사는 매니페스트를
+비교하지 않으며 bun.lockb, npm, Yarn, pnpm 잠금 파일은 지원하지 않습니다.
+버전만 올리는 릴리즈를 게시하기 전에 실행하세요.
+
+`--root`에는 하위 디렉터리가 아닌 저장소 루트를 지정하세요. ignore되지 않은 신규 잠금 파일도 staging 전에 차단합니다.
