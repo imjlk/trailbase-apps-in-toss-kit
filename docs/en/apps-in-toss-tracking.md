@@ -67,7 +67,7 @@ only after app-level smoke tests.
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@ait-kit/sdk versioning=npm -->
-- `ait-kit-sdk`: `0.4.0`
+- `ait-kit-sdk`: `0.5.1`
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
 - `apps-in-toss-framework`: `2.10.10`
@@ -196,3 +196,5 @@ The alias is not a runtime SDK dependency. Passing both compilers demonstrates t
 compatibility at the two tested versions; retain per-method availability guards and
 real-device checks for the APIs a consumer enables. This does not prove every
 intermediate version, device or native feature is available.
+
+- `@ait-kit/sdk` `0.5.1`: Adds explicit React Native export conditions; consumer-side package export patches can be removed after upgrading.

@@ -63,7 +63,7 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 ## Renovate가 추적하는 reference version
 
 <!-- renovate: datasource=npm depName=@ait-kit/sdk versioning=npm -->
-- `ait-kit-sdk`: `0.4.0`
+- `ait-kit-sdk`: `0.5.1`
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
 - `apps-in-toss-framework`: `2.10.10`
@@ -180,3 +180,5 @@ fixture를 자동 갱신하지 않습니다.
 런타임 SDK 의존성이 아닙니다. 두 컴파일 성공은 검사한 두 버전의 타입 호환성을 뜻하며,
 소비 앱에서 사용할 API별 가용성 검사와 실기기 검증은 유지하세요. 중간의 모든 버전,
 기기, 네이티브 기능의 지원을 보장하지는 않습니다.
+
+- `@ait-kit/sdk` `0.5.1`: React Native exports 조건을 명시합니다. 업그레이드 후 컨슈머의 패키지 exports 임시 패치를 제거할 수 있습니다.

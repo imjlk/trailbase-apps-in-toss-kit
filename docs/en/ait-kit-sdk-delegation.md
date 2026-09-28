@@ -7,7 +7,7 @@ deadline budgets, and cleanup locally. TrailBase keeps what it owns: the
 public API surface, TrailBase server integration, session bootstrap, and
 storage-key compatibility.
 
-Both packages pin `@ait-kit/sdk` exactly (currently `0.4.0`). The SDK's
+Both packages pin `@ait-kit/sdk` exactly (currently `0.5.1`). The SDK's
 peer floor defines this kit's RN minimum: `@apps-in-toss/framework`
 `>=2.10.10` (raised from `>=2.5.0` when adopting the SDK pin). WebView
 consumers keep `@apps-in-toss/web-framework >=3.4.0 <4`.
