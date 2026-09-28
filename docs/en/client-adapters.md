@@ -385,3 +385,28 @@ stream. Stalled setup aborts the request and lets collection reconnection retry.
 ## Account lifecycle
 
 Use [Account Changes and App Foreground](session-lifecycle.md) for guarded requests, user-scoped caches, subscription cleanup, and authoritative revalidation on app foreground.
+
+## React Native screen history and Back navigation
+
+Navigation history belongs to the consumer app. When a user opens another
+screen, Back should return to the previous screen with its state preserved.
+An app-exit report must be investigated against the actual screen transition;
+it is not evidence of a Kit runtime defect.
+
+Use the navigator's history for screen transitions. If the product expects Back
+to return to previously visited tabs, configure tab history accordingly. For
+example, opening a detail screen from a ranking screen should preserve the
+ranking screen as the return destination.
+
+Check whether `replace`, `reset`, or a plain React state change discarded that
+return destination. Use replacement only when returning to the replaced screen
+is intentionally unwanted, such as a completed first-visit introduction. Do not
+add a global Back interceptor as a substitute for missing navigation history.
+Keep the SDK's explicit close action distinct from returning to a previous screen.
+
+Before resubmitting, record the starting screen, navigation steps, Back input,
+and expected return destination. Reproduce the reported path on the submitted
+bundle and platform, checking header Back, Android system Back, and supported
+gestures as applicable. Confirm both previous-screen restoration and intended
+root behavior. A local implementation change alone does not establish that the
+reported review issue is resolved.
