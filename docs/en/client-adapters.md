@@ -385,3 +385,43 @@ stream. Stalled setup aborts the request and lets collection reconnection retry.
 ## Account lifecycle
 
 Use [Account Changes and App Foreground](session-lifecycle.md) for guarded requests, user-scoped caches, subscription cleanup, and authoritative revalidation on app foreground.
+
+## React Native back navigation for local panels
+
+The consumer owns screen history. The Kit does not turn React state or a TDS
+`BottomSheet.Root` into a Granite route. With Apps in Toss RN SDK 2.10.10 and
+Granite 1.0.45, the header and Android hardware back handler consult Granite's
+`useBackEvent` before falling back to navigation history and app close.
+
+For state-driven panels, register **one** `useBackEvent` callback while a panel
+is open. Pop the active panel and restore its parent on back; remove the callback
+at the root and on unmount. For example, `Ranking → My activity → Profile` must
+return through `My activity → Ranking → home`. Do not clear the parent history
+when opening a child. A normal Granite route stack is another valid approach.
+
+```tsx
+import { useBackEvent } from '@granite-js/react-native';
+import { useEffect } from 'react';
+
+function usePanelBack(activePanel: string | undefined, closePanel: (id: string) => void) {
+  const { addEventListener, removeEventListener } = useBackEvent();
+  useEffect(() => {
+    if (!activePanel) return;
+    const onBack = () => closePanel(activePanel);
+    addEventListener(onBack);
+    return () => removeEventListener(onBack);
+  }, [activePanel, closePanel, addEventListener, removeEventListener]);
+}
+```
+
+`closePanel(id)` must only pop when `id` is still the active panel. This makes
+repeated close notifications harmless: TDS 2.0.5 can call both `onClose` and
+`onDimmerClick` for a single dimmer tap. Granite's legacy back event broadcasts
+to its listeners, so independent per-panel listeners can dismiss multiple layers.
+Do not replace the SDK's explicit close button or permanently swallow root back.
+An Android-only `BackHandler` listener does not cover the RN header back button.
+
+Before submitting a consumer release, test header back, Android system back,
+iOS swipe where supported, nested panel dismissal, keyboard-open behavior, root
+exit, and listener cleanup after navigation. Keep panel visibility and history in
+one owner, including panels opened automatically by reward/mission completion.

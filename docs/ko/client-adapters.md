@@ -365,3 +365,43 @@ XHR SSE 연결 준비는 `subscribe(id, { signal })`과 collection cleanup으로
 ## 계정 전환과 앱 복귀
 
 요청 무효화, 사용자별 캐시, 구독 정리, 앱 복귀 시 서버 재검증은 [계정 전환과 앱 복귀](session-lifecycle.md)를 참고하세요.
+
+## React Native 로컬 패널의 뒤로가기
+
+화면 이력은 컨슈머 앱이 관리합니다. Kit는 React 상태나 TDS `BottomSheet.Root`를
+Granite 라우트로 변환하지 않습니다. Apps in Toss RN SDK 2.10.10과 Granite 1.0.45의
+헤더·Android 하드웨어 뒤로가기는 Granite `useBackEvent`를 먼저 확인하고,
+처리할 이벤트가 없으면 라우터 이력 또는 앱 종료로 이어집니다.
+
+상태로 전환하는 패널은 열려 있는 동안 **하나의** `useBackEvent` 콜백을 등록하세요.
+뒤로가기에서 현재 패널을 제거하고 부모를 복원하며, 루트와 언마운트에서는 콜백을
+해제합니다. 예를 들어 `랭킹 → 내 활동 → 프로필`은 `내 활동 → 랭킹 → 홈` 순서로
+돌아가야 합니다. 자식 패널을 열 때 부모 이력을 지우지 마세요. 일반 Granite 라우트
+스택으로 구현하는 것도 가능합니다.
+
+```tsx
+import { useBackEvent } from '@granite-js/react-native';
+import { useEffect } from 'react';
+
+function usePanelBack(activePanel: string | undefined, closePanel: (id: string) => void) {
+  const { addEventListener, removeEventListener } = useBackEvent();
+  useEffect(() => {
+    if (!activePanel) return;
+    const onBack = () => closePanel(activePanel);
+    addEventListener(onBack);
+    return () => removeEventListener(onBack);
+  }, [activePanel, closePanel, addEventListener, removeEventListener]);
+}
+```
+
+`closePanel(id)`는 해당 ID가 여전히 현재 패널일 때만 제거해야 합니다.
+TDS 2.0.5는 배경을 한 번 눌러도 `onClose`와 `onDimmerClick`을 모두 호출할 수
+있으므로 중복 콜백에 안전해야 합니다. Granite의 기존 back event는 등록된 리스너
+전체에 전달되므로 패널마다 리스너를 등록하면 여러 단계가 함께 닫힐 수 있습니다.
+SDK의 명시적인 닫기 버튼을 대체하거나 루트 뒤로가기를 계속 차단하지 마세요.
+Android `BackHandler`만 등록하면 RN 헤더 뒤로가기는 처리하지 못합니다.
+
+출시 전 헤더 뒤로가기, Android 시스템 뒤로가기, 지원 환경의 iOS 스와이프,
+중첩 패널 닫기, 키보드가 열린 상태, 루트 종료, 화면 전환 후 리스너 해제를 확인하세요.
+미션·보상 완료로 자동 표시되는 패널도 포함하여 표시 상태와 이력의 관리 주체를
+하나로 유지하세요.
