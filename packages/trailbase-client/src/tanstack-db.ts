@@ -168,7 +168,10 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
           knownKeys.delete(key);
         };
         const applyRows = (rows: Row | Row[] | null | undefined) => {
-          if (!cancelled) for (const row of normalizeSnapshotRows(rows)) writeRow(row);
+          if (cancelled) return;
+          const normalized = normalizeSnapshotRows(rows);
+          assertSnapshotSize(normalized.length, snapshotMaxRecords, snapshotMode);
+          for (const row of normalized) writeRow(row);
         };
         applySnapshotFromSync = applyRows;
         cancelReader = cancel;
@@ -244,6 +247,15 @@ export function trailbaseRecordCollectionOptions<Row, Key extends string | numbe
   };
 }
 
+function assertSnapshotSize(count: number, maxRecords: number | undefined, mode: "replace" | "merge") {
+  if (maxRecords !== undefined && count > maxRecords) {
+    const hint = mode === "merge"
+      ? "reduce pagination.limit or raise snapshotMaxRecords"
+      : "narrow the query or use snapshotMode: merge for a single page";
+    throw new Error(`Snapshot exceeds snapshotMaxRecords (${maxRecords}); ${hint}`);
+  }
+}
+
 async function readCollectionSnapshot<Row>(
   api: TrailbaseRecordApi<Row>,
   options: unknown,
@@ -260,12 +272,7 @@ async function readCollectionSnapshot<Row>(
   let pageOptions = opts;
   while (!cancelled()) {
     const page = await api.list(pageOptions);
-    if (maxRecords !== undefined && rows.length + page.records.length > maxRecords) {
-      const hint = mode === "merge"
-        ? "reduce pagination.limit or raise snapshotMaxRecords"
-        : "narrow the query or use snapshotMode: merge for a single page";
-      throw new Error(`Snapshot exceeds snapshotMaxRecords (${maxRecords}); ${hint}`);
-    }
+    assertSnapshotSize(rows.length + page.records.length, maxRecords, mode);
     rows.push(...page.records);
     if (mode === "merge" || !page.cursor || page.records.length === 0) break;
     if (seen.has(page.cursor)) throw new Error("TrailBase snapshot returned a repeated pagination cursor");

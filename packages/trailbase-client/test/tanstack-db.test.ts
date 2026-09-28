@@ -474,3 +474,29 @@ test("merge reads one page even when a cursor is present", async () => {
   try { await collection.preload(); expect(lists).toBe(1); expect(collection.has(1)).toBe(true); }
   finally { await collection.cleanup(); }
 });
+
+for (const snapshotMode of ["replace", "merge"] as const) {
+  test(`manual ${snapshotMode} snapshots enforce the limit before any writes`, async () => {
+    const options = trailbaseRecordCollectionOptions({
+      id: `manual-budget-${snapshotMode}`, getKey: (row: { id: number; value: string }) => row.id,
+      snapshotEnabled: false, snapshotMode, snapshotMaxRecords: 1,
+      recordApi: {
+        subscribe: async () => new ReadableStream(),
+        list: async () => { throw new Error("automatic snapshot disabled"); },
+      },
+    });
+    const collection = createCollection(options);
+    try {
+      await collection.preload();
+      options.utils.applySnapshot({ id: 1, value: "original" });
+      expect(() => options.utils.applySnapshot([
+        { id: 1, value: "overwritten" }, { id: 2, value: "extra" },
+      ])).toThrow("snapshotMaxRecords");
+      expect(collection.get(1)?.value).toBe("original");
+      expect(collection.has(2)).toBe(false);
+      options.utils.applySnapshot(null);
+      options.utils.applySnapshot([{ id: 1, value: "valid" }]);
+      expect(collection.get(1)?.value).toBe("valid");
+    } finally { await collection.cleanup(); }
+  });
+}
