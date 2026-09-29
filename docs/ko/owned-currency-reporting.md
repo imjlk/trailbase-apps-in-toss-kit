@@ -152,3 +152,33 @@ required로 올리세요.
 하나의 합계로 더하지 않습니다. 첫 버전은 의도적으로 읽기 전용입니다. 잔액에서 누락된 과거 이력을 추정하거나,
 토스 provider를 호출하거나, 고정된 월별 예산을 강제하지 않습니다. 공식 보고 전에
 대상 기간, 평가 기준, 보관 정책은 소비 앱이 토스에 확인해야 합니다.
+
+## 트랜잭션 연결과 마감 명령
+
+`owned_currency::record_event_tx`는 호출자의 트랜잭션에서 기록합니다. 같은 내용의 재시도는
+false, 내용 충돌·정책 누락·기간 불일치는 오류이며 원본과 잔액 변경도 함께 롤백해야 합니다.
+반환값으로 지급을 승인하지 마세요. 임의 metadata는 받지 않으며 source에는 식별자나 비밀이
+아닌 업무 ID만 씁니다. 변환 쌍의 기록은 앱 소유입니다. 예약은 음수 ADJUSTMENT, 성공은 양수
+예약 해제 ADJUSTMENT와 음수 EXCHANGE를 동시에 기록합니다. 환급은 ADJUSTMENT이며 ISSUE가 아닙니다.
+
+보고 원장이 아닌 앱 원본에서 다음 비공개 view를 제공합니다.
+- owned_currency_expected_events: idempotency_key, user_id(BLOB/NULL), currency_code, unit_code,
+  event_type, quantity, source_type, source_id, policy_version, exchange_id, occurred_at, valuation_amount, valuation_currency_code.
+- owned_currency_expected_balances: user_id, currency_code, unit_code, quantity(스냅샷 현재 잔액).
+- owned_currency_reporting_issues: 승인·과거 이력·불확실한 지급 등 미해결 항목당 한 행.
+  개별 내용은 내보내지 않습니다.
+
+`reconcileOwnedCurrency({db})`는 집계 수만 반환하고 view가 없으면 실패합니다. 보고 종료 시점의
+과거 잔액이 아닌 전체 스냅샷을 대사합니다. 원본 삭제로 보고 기록만 남았다면 운영자 확인이
+필요하며 검사를 통과시키려고 원장을 삭제하지 마세요.
+
+`bun packages/trailbase-runtime/bin/owned-currency-close.mjs --db backup.sqlite --config close.json --out 새폴더`
+설정: period {start,end}, timestampUnit, timezone, appId, reportRevision, snapshotRef,
+approvalRevision(운영자 확인 근거), 선택적 correctionOf. 커밋된 Kit에서 실행합니다.
+하나의 읽기 트랜잭션에서 비공개 report.json/report.csv/reconciliation.json을 만듭니다.
+품질과 대사가 통과해야 GENERATED manifest를 만들며 검토·승인·제출을 자동 인정하지 않습니다.
+차단 시 종료 코드 2와 진단 파일을 남기고 기존 폴더는 덮어쓰지 않습니다. 빈 기간은 별도
+운영자 확인이 필요합니다. 앱 view가 실제 정책과 승인 근거를 확인해야 하며 다른 앱의 합산
+예산이나 토스 콘솔 승인 상태까지 확인하는 기능은 아닙니다.
+
+문제 view의 occurred_at은 기간별 검사 시각이며, NULL이면 스냅샷 전체에 적용합니다.
