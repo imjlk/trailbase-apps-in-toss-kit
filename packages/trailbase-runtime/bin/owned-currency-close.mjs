@@ -29,7 +29,7 @@ try {
   report.tool={name:'trailbase-owned-currency-close',version,sourceCommit,reportedServerVersion:null};
   const reportBytes=JSON.stringify(report,null,2)+'\n';
   const policyVersions=[...new Set(report.lines.map(l=>l.policyVersion))].sort();
-  const ready = reconciliation.ok && Object.values(report.quality).every(n=>n===0);
+  const ready = policyVersions.length > 0 && reconciliation.ok && Object.values(report.quality).every(n=>n===0);
   // Operator-supplied approvalRevision is evidence, never inferred from payout success.
   const manifest={
     schemaVersion:1,reportSchemaVersion:report.schemaVersion,reportFormat:'json',
