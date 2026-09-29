@@ -29,7 +29,7 @@ export function reconcileOwnedCurrency({ db, periodStart = 0, periodEnd = Number
       // A claimed revision must identify the evidence actually present in this snapshot.
       checks.approvalRevisionMismatch = !Number.isSafeInteger(approvalRevision) || approvalRevision < 1
         ? 1
-        : count('SELECT CASE WHEN COUNT(*)=0 OR SUM(CASE WHEN revision <> ? THEN 1 ELSE 0 END)>0 THEN 1 ELSE 0 END n FROM owned_currency_close_approvals', approvalRevision);
+        : count('SELECT CASE WHEN COUNT(*)=0 OR SUM(CASE WHEN revision IS NOT ? THEN 1 ELSE 0 END)>0 THEN 1 ELSE 0 END n FROM owned_currency_close_approvals', approvalRevision);
     }
     return { scope: 'entire-snapshot', ok: Object.values(checks).every(n => n === 0), checks };
   })();
