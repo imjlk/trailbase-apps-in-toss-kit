@@ -16,6 +16,7 @@ export function reconcileOwnedCurrency({ db, periodStart = 0, periodEnd = Number
         OR e.event_type IS NOT s.event_type OR e.quantity IS NOT s.quantity OR e.policy_version IS NOT s.policy_version
         OR e.source_type IS NOT s.source_type OR e.source_id IS NOT s.source_id
         OR e.valuation_amount IS NOT s.valuation_amount OR e.valuation_currency_code IS NOT s.valuation_currency_code
+        OR e.conversion_group_id IS NOT s.conversion_group_id
         OR e.exchange_id IS NOT s.exchange_id OR e.occurred_at IS NOT s.occurred_at`),
       unexpectedEvents: count('SELECT COUNT(*) n FROM owned_currency_events e LEFT JOIN owned_currency_expected_events s USING(idempotency_key) WHERE s.idempotency_key IS NULL'),
       balanceMismatches: count(`WITH a AS (SELECT user_id,currency_code,unit_code,SUM(quantity) quantity FROM owned_currency_events WHERE user_id IS NOT NULL GROUP BY user_id,currency_code,unit_code),

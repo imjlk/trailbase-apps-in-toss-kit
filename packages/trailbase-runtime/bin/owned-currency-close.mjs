@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 // Never submits to Toss, opens production connections, or modifies the snapshot.
 import { Database } from 'bun:sqlite';
-import { readFileSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
+import { readFileSync, mkdirSync, writeFileSync, realpathSync, renameSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -29,7 +29,7 @@ try {
   report.tool={name:'trailbase-owned-currency-close',version,sourceCommit,reportedServerVersion:null};
   const reportBytes=JSON.stringify(report,null,2)+'\n';
   const policyVersions=[...new Set(report.lines.map(l=>l.policyVersion))].sort();
-  const ready = policyVersions.length > 0 && reconciliation.ok && Object.values(report.quality).every(n=>n===0);
+  const ready = report.period.end <= report.generatedAt && policyVersions.length > 0 && reconciliation.ok && Object.values(report.quality).every(n=>n===0);
   // Operator-supplied approvalRevision is evidence, never inferred from payout success.
   const manifest={
     schemaVersion:1,reportSchemaVersion:report.schemaVersion,reportFormat:'json',
@@ -47,7 +47,10 @@ try {
   const write=(name,value)=>writeFileSync(resolve(args[5],name),value,{flag:'wx',mode:0o600});
   write('report.json',reportBytes);write('report.csv',formatOwnedCurrencyCsv(report));
   write('reconciliation.json',JSON.stringify(reconciliation,null,2)+'\n');
-  if(manifestValid) write('manifest.json',JSON.stringify(manifest,null,2)+'\n');
+  if(manifestValid) {
+    write('manifest.json.tmp',JSON.stringify(manifest,null,2)+'\n');
+    renameSync(resolve(args[5],'manifest.json.tmp'),resolve(args[5],'manifest.json'));
+  }
   console.log(JSON.stringify({generated:true,readyForReview:manifestValid,submitted:false}));
   if(!manifestValid) process.exitCode=2;
  } catch (error) {

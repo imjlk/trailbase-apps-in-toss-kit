@@ -4,6 +4,7 @@ use crate::{
     db,
     responses::{ApiResult, bad_request, conflict},
 };
+use sha2::{Digest, Sha256};
 use trailbase_wasm::db::{Transaction, Value};
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,9 @@ fn record_with(
 ) -> ApiResult<bool> {
     let mut params = event_params(event)?;
     params.push(Value::Integer(recorded_at));
+    params.push(Value::Text(hex::encode(Sha256::digest(
+        event.key.as_bytes(),
+    ))));
     if query(INSERT, &params)? {
         return Ok(true);
     }
@@ -53,6 +57,20 @@ fn record_with(
             "Conflicting accounting event",
         ));
     }
+    if query(
+        "SELECT 1 FROM owned_currency_policies WHERE currency_code=?1 AND unit_code=?2 AND policy_version=?3 AND effective_from<=?4 AND (effective_to IS NULL OR effective_to>?4)",
+        &[
+            params[2].clone(),
+            params[3].clone(),
+            params[8].clone(),
+            params[10].clone(),
+        ],
+    )? {
+        return Err(bad_request(
+            "CURRENCY_VALUATION_MISMATCH",
+            "Valuation does not match the effective policy",
+        ));
+    }
     Err(crate::responses::ApiError::new(
         trailbase_wasm::http::StatusCode::INTERNAL_SERVER_ERROR,
         "CURRENCY_POLICY_NOT_EFFECTIVE",
@@ -62,15 +80,17 @@ fn record_with(
 
 const INSERT: &str = "INSERT INTO owned_currency_events
 (id,user_id,currency_code,unit_code,event_type,quantity,source_type,source_id,idempotency_key,policy_version,exchange_id,occurred_at,created_at,valuation_amount,valuation_currency_code)
-SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?1,?9,?10,?11,?14,?12,?13
-WHERE EXISTS (SELECT 1 FROM owned_currency_policies WHERE currency_code=?3 AND unit_code=?4 AND policy_version=?9 AND effective_from<=?11 AND (effective_to IS NULL OR effective_to>?11))
+SELECT ?15,?2,?3,?4,?5,?6,?7,?8,?1,?9,?10,?11,?14,?12,?13
+WHERE EXISTS (SELECT 1 FROM owned_currency_policies WHERE currency_code=?3 AND unit_code=?4 AND policy_version=?9 AND effective_from<=?11 AND (effective_to IS NULL OR effective_to>?11)
+AND (?12 IS NULL OR (valuation_mode <> 'NONE' AND valuation_currency_code IS ?13))
+AND (valuation_mode <> 'MARKET_SNAPSHOT' OR ?5 <> 'EXCHANGE' OR ?12 IS NOT NULL))
 ON CONFLICT(idempotency_key) DO NOTHING RETURNING id";
 const REPLAY: &str = "SELECT id FROM owned_currency_events WHERE idempotency_key=?1
 AND user_id IS ?2 AND currency_code=?3 AND unit_code=?4 AND event_type=?5 AND quantity=?6
 AND source_type=?7 AND source_id=?8 AND policy_version=?9 AND exchange_id IS ?10 AND occurred_at=?11 AND valuation_amount IS ?12 AND valuation_currency_code IS ?13";
 fn event_params(e: &CurrencyEvent<'_>) -> ApiResult<Vec<Value>> {
     let valid_text = |s: &str, max: usize| !s.is_empty() && s.len() <= max && s.trim() == s;
-    if !valid_text(e.key, 128)
+    if !valid_text(e.key, 256)
         || !valid_text(e.source_type, 64)
         || !valid_text(e.source_id, 256)
         || !valid_text(e.policy, 64)
@@ -179,6 +199,57 @@ mod tests {
                 .unwrap(),
             0
         );
+    }
+    #[test]
+    fn valuation_contract_and_long_keys() {
+        let db = crate::sql_test_support::database();
+        db.execute_batch(include_str!(
+            "../../../templates/trailbase/sql/owned_currency_events.sql"
+        ))
+        .unwrap();
+        db.execute_batch(include_str!(
+            "../../../templates/trailbase/sql/owned_currency_policies.sql"
+        ))
+        .unwrap();
+        db.execute_batch("INSERT INTO owned_currency_policies(currency_code,unit_code,policy_version,valuation_mode,valuation_currency_code,effective_from,created_at) VALUES ('STAR','STAR','v1','MARKET_SNAPSHOT','KRW',0,0)").unwrap();
+        let run = |e: &CurrencyEvent<'_>| {
+            record_with(
+                e,
+                100,
+                |sql, params| Ok(!query(&db, sql, params).is_empty()),
+            )
+        };
+        let key = "x".repeat(256);
+        let mut e = event();
+        e.key = &key;
+        assert!(run(&e).unwrap());
+        assert!(!run(&e).unwrap());
+        e.key = "exchange";
+        e.kind = "EXCHANGE";
+        e.quantity = -10;
+        e.exchange_id = Some("ex");
+        assert_eq!(run(&e).unwrap_err().code, "CURRENCY_VALUATION_MISMATCH");
+        e.valuation = Some((1, "USD"));
+        assert_eq!(run(&e).unwrap_err().code, "CURRENCY_VALUATION_MISMATCH");
+        e.valuation = Some((1, "KRW"));
+        assert!(run(&e).unwrap());
+        // Existing rows with the former key-as-ID representation still replay.
+        db.execute_batch(
+            "UPDATE owned_currency_events SET id=idempotency_key WHERE idempotency_key='exchange'",
+        )
+        .unwrap();
+        assert!(!run(&e).unwrap());
+        e.key = "none";
+        db.execute_batch(
+            "UPDATE owned_currency_policies SET valuation_mode='NONE',valuation_currency_code=NULL",
+        )
+        .unwrap();
+        assert_eq!(run(&e).unwrap_err().code, "CURRENCY_VALUATION_MISMATCH");
+        e.valuation = None;
+        assert!(run(&e).unwrap());
+        let oversized = "x".repeat(257);
+        e.key = &oversized;
+        assert_eq!(run(&e).unwrap_err().code, "INVALID_CURRENCY_EVENT");
     }
     #[test]
     fn rejects_invalid_events() {

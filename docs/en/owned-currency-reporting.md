@@ -186,7 +186,7 @@ negative EXCHANGE atomically; refund is positive ADJUSTMENT, never ISSUE.
 
 Provide private views derived from original app data, not the reporting mirror:
 - owned_currency_expected_events: idempotency_key, user_id (BLOB/NULL), currency_code, unit_code,
-  event_type, quantity, source_type, source_id, policy_version, exchange_id, occurred_at, valuation_amount, valuation_currency_code.
+  event_type, quantity, source_type, source_id, policy_version, conversion_group_id, exchange_id, occurred_at, valuation_amount, valuation_currency_code.
 - owned_currency_expected_balances: user_id, currency_code, unit_code, quantity (current snapshot).
 - owned_currency_reporting_issues: one row per unresolved app issue (approval, unknown history,
   uncertain payout). Individual values are not exported.
@@ -209,3 +209,5 @@ Adapter issues include occurred_at (NULL for snapshot-wide issues; otherwise res
 Close additionally requires owned_currency_close_approvals(revision), a private view of the actual approved revisions. Every row must match config.approvalRevision; empty or mismatched evidence blocks the manifest. Multiple independent revisions need an operator-reviewed common close revision adapter, not an arbitrary maximum.
 
 The Rust recording helper uses millisecond timestamps and captures created_at from the database clock separately from occurred_at. Policy gaps return CURRENCY_POLICY_NOT_EFFECTIVE; conflicting source keys return CURRENCY_EVENT_CONFLICT.
+
+Live writes allow unvalued issuance and fixed-rate events, but MARKET_SNAPSHOT EXCHANGE requires a valuation. Supplied valuations must match the policy denomination and are rejected for NONE policies (CURRENCY_VALUATION_MISMATCH). Source keys support up to 256 bytes; row IDs are independent hashes, and existing rows remain replayable. Expected-event views must provide conversion_group_id (NULL when not applicable). Close refuses a period ending after generation time, in the selected timestamp unit. The manifest is published by same-directory atomic rename after all artifacts are written.

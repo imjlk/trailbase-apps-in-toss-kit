@@ -28,6 +28,14 @@ const dirty=spawnSync('git',['-C',root,'status','--porcelain','--untracked-files
  expect(run('wrong-revision').status).toBe(2);
  expect(existsSync(join(dir,'wrong-revision/manifest.json'))).toBe(false);
  writeFileSync(join(dir,'config.json'),JSON.stringify(cfg));
+ for (const timestampUnit of ['seconds','milliseconds']) {
+   const end=Math.floor(Date.now()/(timestampUnit==='seconds'?1000:1))+86400000;
+   writeFileSync(join(dir,'config.json'),JSON.stringify({...cfg,timestampUnit,period:{start:0,end}}));
+   expect(run('future-'+timestampUnit).status).toBe(2);
+   expect(existsSync(join(dir,'future-'+timestampUnit+'/manifest.json'))).toBe(false);
+ }
+ writeFileSync(join(dir,'config.json'),JSON.stringify(cfg));
+ expect(existsSync(join(dir,'first/manifest.json.tmp'))).toBe(false);
  const edit=new Database(join(dir,'snapshot.sqlite'));edit.exec("INSERT INTO owned_currency_reporting_issues VALUES('unconfirmed',NULL)");edit.close();
  expect(run('blocked').status).toBe(2);expect(existsSync(join(dir,'blocked/report.json'))).toBe(true);expect(existsSync(join(dir,'blocked/manifest.json'))).toBe(false);
  } finally {rmSync(dir,{recursive:true,force:true});}
