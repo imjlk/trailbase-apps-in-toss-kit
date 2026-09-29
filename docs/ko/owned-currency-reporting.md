@@ -184,3 +184,5 @@ approvalRevision(운영자 확인 근거), 선택적 correctionOf. 커밋된 Kit
 문제 view의 occurred_at은 기간별 검사 시각이며, NULL이면 스냅샷 전체에 적용합니다.
 
 마감에는 실제 승인 revision을 반환하는 비공개 owned_currency_close_approvals(revision) view도 필요합니다. 모든 행이 설정의 approvalRevision과 일치해야 하며 빈 근거나 불일치는 manifest를 차단합니다. 서로 다른 승인 revision은 임의 최댓값이 아니라 운영자가 검토한 공통 마감 revision 연결이 필요합니다.
+
+Rust 기록 헬퍼의 시각 단위는 밀리초이며 created_at은 occurred_at과 별도로 DB 시계에서 기록합니다. 정책 누락·기간 불일치는 CURRENCY_POLICY_NOT_EFFECTIVE, 원본 키 충돌은 CURRENCY_EVENT_CONFLICT로 구분합니다.

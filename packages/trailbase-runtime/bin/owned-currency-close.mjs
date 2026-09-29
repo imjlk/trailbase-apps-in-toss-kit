@@ -5,9 +5,9 @@ import { readFileSync, mkdirSync, writeFileSync, realpathSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import { buildOwnedCurrencyReport, formatOwnedCurrencyCsv } from '../src/owned-currency-report.mjs';
+import { OwnedCurrencyReportError, buildOwnedCurrencyReport, formatOwnedCurrencyCsv } from '../src/owned-currency-report.mjs';
 import { reconcileOwnedCurrency } from '../src/owned-currency-reconcile.mjs';
-import { sha256ReportBytes, validateOwnedCurrencyCloseManifest } from '../src/owned-currency-close-manifest.mjs';
+import { OwnedCurrencyCloseManifestError, sha256ReportBytes, validateOwnedCurrencyCloseManifest } from '../src/owned-currency-close-manifest.mjs';
 
 let db;
 try {
@@ -22,8 +22,8 @@ try {
   db = new Database(realpathSync(args[1]), { readonly:true, strict:true });
   db.exec('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA busy_timeout=3000;');
   const {report,reconciliation} = db.transaction(() => ({
-    report:buildOwnedCurrencyReport({db,...config.period,timestampUnit:config.timestampUnit,
-      periodStart:config.period?.start,periodEnd:config.period?.end,approvalRevision:config.approvalRevision??null}),
+    report:buildOwnedCurrencyReport({db,timestampUnit:config.timestampUnit,
+      periodStart:config.period?.start,periodEnd:config.period?.end}),
     reconciliation:reconcileOwnedCurrency({db,periodStart:config.period?.start,periodEnd:config.period?.end,approvalRevision:config.approvalRevision??null}),
   }))();
   report.tool={name:'trailbase-owned-currency-close',version,sourceCommit,reportedServerVersion:null};
@@ -50,5 +50,12 @@ try {
   if(manifestValid) write('manifest.json',JSON.stringify(manifest,null,2)+'\n');
   console.log(JSON.stringify({generated:true,readyForReview:manifestValid,submitted:false}));
   if(!manifestValid) process.exitCode=2;
-} catch { console.error('OWNED_CURRENCY_CLOSE_FAILED: check arguments, private adapter views, policy/approval evidence and fresh output directory');process.exitCode=2; }
+ } catch (error) {
+  const ownCodes = new Set(['INVALID_ARGUMENTS','SOURCE_UNAVAILABLE','COMMITTED_KIT_REQUIRED']);
+  const code = error instanceof OwnedCurrencyReportError || error instanceof OwnedCurrencyCloseManifestError
+    ? error.code
+    : ownCodes.has(error?.message) ? error.message
+    : error?.code === 'EEXIST' ? 'OUTPUT_ALREADY_EXISTS' : 'OWNED_CURRENCY_CLOSE_FAILED';
+  console.error(code); process.exitCode=2;
+}
 finally { db?.close(); }

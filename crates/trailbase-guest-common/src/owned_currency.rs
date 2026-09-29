@@ -23,24 +23,46 @@ pub struct CurrencyEvent<'a> {
     pub valuation: Option<(i64, &'a str)>,
 }
 /// Exact replay is accepted, conflicting reuse rejected. Returns true only for insertion.
+/// Event timestamps use milliseconds; created_at is captured from the database clock.
 /// Caller owns eligibility, balance mutation, rollback on errors, and commit.
 pub fn record_event_tx(tx: &mut Transaction, event: &CurrencyEvent<'_>) -> ApiResult<bool> {
-    let params = event_params(event)?;
-    let inserted = db::tx_query(tx, INSERT, &params)?;
-    if !inserted.is_empty() {
+    let recorded_at = db::now_ms_tx(tx)?;
+    record_with(event, recorded_at, |sql, params| {
+        Ok(!db::tx_query(tx, sql, params)?.is_empty())
+    })
+}
+fn record_with(
+    event: &CurrencyEvent<'_>,
+    recorded_at: i64,
+    mut query: impl FnMut(&str, &[Value]) -> ApiResult<bool>,
+) -> ApiResult<bool> {
+    let mut params = event_params(event)?;
+    params.push(Value::Integer(recorded_at));
+    if query(INSERT, &params)? {
         return Ok(true);
     }
-    if db::tx_query(tx, REPLAY, &params)?.is_empty() {
+    if query(REPLAY, &params[..13])? {
+        return Ok(false);
+    }
+    if query(
+        "SELECT id FROM owned_currency_events WHERE idempotency_key=?1",
+        &params[..1],
+    )? {
         return Err(conflict(
             "CURRENCY_EVENT_CONFLICT",
-            "Missing policy or conflicting accounting event",
+            "Conflicting accounting event",
         ));
     }
-    Ok(false)
+    Err(crate::responses::ApiError::new(
+        trailbase_wasm::http::StatusCode::INTERNAL_SERVER_ERROR,
+        "CURRENCY_POLICY_NOT_EFFECTIVE",
+        "No effective policy for this accounting event",
+    ))
 }
+
 const INSERT: &str = "INSERT INTO owned_currency_events
 (id,user_id,currency_code,unit_code,event_type,quantity,source_type,source_id,idempotency_key,policy_version,exchange_id,occurred_at,created_at,valuation_amount,valuation_currency_code)
-SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?1,?9,?10,?11,?11,?12,?13
+SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?1,?9,?10,?11,?14,?12,?13
 WHERE EXISTS (SELECT 1 FROM owned_currency_policies WHERE currency_code=?3 AND unit_code=?4 AND policy_version=?9 AND effective_from<=?11 AND (effective_to IS NULL OR effective_to>?11))
 ON CONFLICT(idempotency_key) DO NOTHING RETURNING id";
 const REPLAY: &str = "SELECT id FROM owned_currency_events WHERE idempotency_key=?1
@@ -131,13 +153,25 @@ mod tests {
         ))
         .unwrap();
         let mut e = event();
-        assert!(query(&db, INSERT, &event_params(&e).unwrap()).is_empty());
+        let run = |e: &CurrencyEvent<'_>| {
+            record_with(
+                e,
+                100,
+                |sql, params| Ok(!query(&db, sql, params).is_empty()),
+            )
+        };
+        assert_eq!(run(&e).unwrap_err().code, "CURRENCY_POLICY_NOT_EFFECTIVE");
         db.execute_batch("INSERT INTO owned_currency_policies(currency_code,unit_code,policy_version,valuation_mode,valuation_currency_code,conversion_numerator,conversion_denominator,effective_from,created_at) VALUES ('STAR','STAR','v1','FIXED_RATE','KRW',1,10,0,0); BEGIN;").unwrap();
-        assert_eq!(query(&db, INSERT, &event_params(&e).unwrap()).len(), 1);
-        assert!(query(&db, INSERT, &event_params(&e).unwrap()).is_empty());
-        assert_eq!(query(&db, REPLAY, &event_params(&e).unwrap()).len(), 1);
+        assert!(run(&e).unwrap());
+        assert!(!run(&e).unwrap());
+        assert_eq!(
+            db.query_row("SELECT created_at FROM owned_currency_events", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            100
+        );
         e.quantity = 11;
-        assert!(query(&db, REPLAY, &event_params(&e).unwrap()).is_empty());
+        assert_eq!(run(&e).unwrap_err().code, "CURRENCY_EVENT_CONFLICT");
         execute(&db, "ROLLBACK", &[]);
         assert_eq!(
             db.query_row("SELECT count(*) FROM owned_currency_events", [], |r| r

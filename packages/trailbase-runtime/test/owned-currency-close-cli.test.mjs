@@ -6,7 +6,8 @@ import {join,resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {validateOwnedCurrencyCloseManifest} from '../src/owned-currency-close-manifest.mjs';
 const root=resolve(import.meta.dir,'../../..');
-test('close creates immutable redacted artifacts, blocks unresolved issues and refuses overwrite',()=>{
+const dirty=spawnSync('git',['-C',root,'status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).stdout.trim();
+(dirty ? test.skip : test)('close creates immutable redacted artifacts, blocks unresolved issues and refuses overwrite',()=>{
  const dir=mkdtempSync(join(tmpdir(),'currency-close-'));
  try {
  const db=new Database(join(dir,'snapshot.sqlite'));
@@ -16,9 +17,8 @@ test('close creates immutable redacted artifacts, blocks unresolved issues and r
  const cfg={period:{start:0,end:10},timestampUnit:'milliseconds',timezone:'Asia/Seoul',appId:'fixture',reportRevision:'r1',snapshotRef:'fixture-snapshot',approvalRevision:1};
  writeFileSync(join(dir,'config.json'),JSON.stringify(cfg));
  const run=out=>spawnSync(process.execPath,[join(root,'packages/trailbase-runtime/bin/owned-currency-close.mjs'),'--db',join(dir,'snapshot.sqlite'),'--config',join(dir,'config.json'),'--out',join(dir,out)],{encoding:'utf8'});
- const dirty=spawnSync('git',['-C',root,'status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).stdout.trim();
+
  const first=run('first');
- if(dirty){expect(first.status).toBe(2);return;}
  expect(first.status).toBe(0);
  const bytes=readFileSync(join(dir,'first/report.json'));
  expect(bytes.toString()).not.toContain('private-source');
@@ -31,4 +31,8 @@ test('close creates immutable redacted artifacts, blocks unresolved issues and r
  const edit=new Database(join(dir,'snapshot.sqlite'));edit.exec("INSERT INTO owned_currency_reporting_issues VALUES('unconfirmed',NULL)");edit.close();
  expect(run('blocked').status).toBe(2);expect(existsSync(join(dir,'blocked/report.json'))).toBe(true);expect(existsSync(join(dir,'blocked/manifest.json'))).toBe(false);
  } finally {rmSync(dir,{recursive:true,force:true});}
+});
+test('close reports a safe argument diagnostic even in a dirty checkout',()=>{
+ const result=spawnSync(process.execPath,[join(root,'packages/trailbase-runtime/bin/owned-currency-close.mjs')],{encoding:'utf8'});
+ expect(result.status).toBe(2);expect(result.stderr.trim()).toBe('INVALID_ARGUMENTS');
 });

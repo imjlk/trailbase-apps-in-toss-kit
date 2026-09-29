@@ -207,3 +207,5 @@ This does not check other apps' combined budgets or query Toss Console approval.
 Adapter issues include occurred_at (NULL for snapshot-wide issues; otherwise restricted to the report period).
 
 Close additionally requires owned_currency_close_approvals(revision), a private view of the actual approved revisions. Every row must match config.approvalRevision; empty or mismatched evidence blocks the manifest. Multiple independent revisions need an operator-reviewed common close revision adapter, not an arbitrary maximum.
+
+The Rust recording helper uses millisecond timestamps and captures created_at from the database clock separately from occurred_at. Policy gaps return CURRENCY_POLICY_NOT_EFFECTIVE; conflicting source keys return CURRENCY_EVENT_CONFLICT.
