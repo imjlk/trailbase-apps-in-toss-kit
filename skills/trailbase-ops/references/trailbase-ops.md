@@ -270,3 +270,7 @@ fixture results, source/lock/image versions, bundle bytes and local measurements
 The WASM compatibility guests are disposable and must never be copied to consumers.
 Passing this reference does not verify production providers, authorize release or
 replace consumer/device/restore checks. See the English/Korean `kit-reference.md`.
+
+## Owned-currency consumer adapters
+
+Use owned_currency::record_event_tx in the app source/balance transaction. Preserve source rows, snapshot policies, and keep refund/reservation adjustments separate from ISSUE. See owned-currency-reporting docs for private expected event/balance/issues views and snapshot-only close command. Reporting cannot approve campaigns or authorize provider retries.

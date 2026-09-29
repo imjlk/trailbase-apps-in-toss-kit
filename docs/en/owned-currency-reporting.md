@@ -174,3 +174,40 @@ amounts from different denominations into one total. The first version is delibe
 from a balance, call the Toss provider, or enforce a fixed monthly budget. The
 consumer app must confirm the applicable reporting period, valuation rule, and
 retention policy with Toss before submitting an official report.
+
+## Transaction adapter and close command
+
+`owned_currency::record_event_tx` records an event in the caller transaction. Exact replay returns
+false; conflicting reuse or missing/out-of-window policy fails. Roll back the source and balance
+change on any error. Never use the result as payment authorization. No arbitrary metadata is accepted;
+source keys must be opaque business IDs, never identities or secrets. Conversion-pair writing remains
+app-owned. Reservation is negative ADJUSTMENT; success records positive release ADJUSTMENT plus
+negative EXCHANGE atomically; refund is positive ADJUSTMENT, never ISSUE.
+
+Provide private views derived from original app data, not the reporting mirror:
+- owned_currency_expected_events: idempotency_key, user_id (BLOB/NULL), currency_code, unit_code,
+  event_type, quantity, source_type, source_id, policy_version, conversion_group_id, exchange_id, occurred_at, valuation_amount, valuation_currency_code.
+- owned_currency_expected_balances: user_id, currency_code, unit_code, quantity (current snapshot).
+- owned_currency_reporting_issues: one row per unresolved app issue (approval, unknown history,
+  uncertain payout). Individual values are not exported.
+
+`reconcileOwnedCurrency({db})` returns counts only and fails on missing views. It compares the entire
+snapshot, not historical balances at report end. If original sources were deleted, retained mirror
+rows require operator remediation; never delete the journal to pass a check.
+
+Run `bun packages/trailbase-runtime/bin/owned-currency-close.mjs --db backup.sqlite --config close.json --out new-directory`.
+Config: period {start,end}, timestampUnit, timezone, appId, reportRevision, snapshotRef,
+approvalRevision (operator evidence), optional correctionOf. A committed Kit checkout is required.
+One read transaction produces private report.json, report.csv and reconciliation.json. Only clean
+quality/reconciliation creates a GENERATED manifest. No review, approval or submission is inferred.
+Blocked closes exit 2 and retain diagnostic files; output directories cannot be reused. Empty report
+periods require operator handling (no manifest). App views must verify approval against actual policy.
+This does not check other apps' combined budgets or query Toss Console approval.
+
+Adapter issues include occurred_at (NULL for snapshot-wide issues; otherwise restricted to the report period).
+
+Close additionally requires owned_currency_close_approvals(revision), a private view of the actual approved revisions. Every row must match config.approvalRevision; empty or mismatched evidence blocks the manifest. Multiple independent revisions need an operator-reviewed common close revision adapter, not an arbitrary maximum.
+
+The Rust recording helper uses millisecond timestamps and captures created_at from the database clock separately from occurred_at. Policy gaps return CURRENCY_POLICY_NOT_EFFECTIVE; conflicting source keys return CURRENCY_EVENT_CONFLICT.
+
+Live writes allow unvalued issuance and fixed-rate events, but MARKET_SNAPSHOT EXCHANGE requires a valuation. Supplied valuations must match the policy denomination and are rejected for NONE policies (CURRENCY_VALUATION_MISMATCH). Source keys support up to 256 bytes; row IDs are independent hashes, and existing rows remain replayable. Expected-event views must provide conversion_group_id (NULL when not applicable). Close refuses a period ending after generation time, in the selected timestamp unit. The manifest is published by same-directory atomic rename after all artifacts are written.

@@ -12,7 +12,8 @@
     "./ledger-doctor": "./src/ledger-doctor.mjs",
     "./owned-currency-report": "./src/owned-currency-report.mjs",
     "./owned-currency-close-manifest": "./src/owned-currency-close-manifest.mjs",
-    "./restore-checkpoint": "./src/restore-checkpoint.mjs"
+    "./restore-checkpoint": "./src/restore-checkpoint.mjs",
+    "./owned-currency-reconcile": "./src/owned-currency-reconcile.mjs"
   },
   "bin": {
     "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
@@ -20,7 +21,8 @@
     "trailbase-ledger-doctor": "./bin/ledger-doctor.mjs",
     "trailbase-owned-currency-report": "./bin/owned-currency-report.mjs",
     "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
-    "trailbase-prod-env-validate": "./bin/validate-production-env.mjs"
+    "trailbase-prod-env-validate": "./bin/validate-production-env.mjs",
+    "trailbase-owned-currency-close": "./bin/owned-currency-close.mjs"
   },
   "scripts": {
     "test": "bun test"
