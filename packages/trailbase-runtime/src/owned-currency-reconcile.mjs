@@ -1,6 +1,6 @@
 // Consumer-owned private views describe the original sources, never the mirror itself.
 // Run against the same immutable SQLite snapshot used for the monthly report.
-export function reconcileOwnedCurrency({ db, periodStart = 0, periodEnd = Number.MAX_SAFE_INTEGER } = {}) {
+export function reconcileOwnedCurrency({ db, periodStart = 0, periodEnd = Number.MAX_SAFE_INTEGER, approvalRevision } = {}) {
   if (!Number.isSafeInteger(periodStart) || !Number.isSafeInteger(periodEnd) || periodStart < 0 || periodEnd <= periodStart) throw new Error('INVALID_RECONCILIATION_PERIOD');
   return db.transaction(() => {
     const count = sql => {
@@ -25,6 +25,12 @@ export function reconcileOwnedCurrency({ db, periodStart = 0, periodEnd = Number
         WHERE COALESCE(a.quantity,0)<>COALESCE(b.quantity,0)`),
       unresolvedOperations: count('SELECT COUNT(*) n FROM owned_currency_reporting_issues WHERE occurred_at IS NULL OR (occurred_at >= '+periodStart+' AND occurred_at < '+periodEnd+')'),
     };
+    if (approvalRevision !== undefined) {
+      // A claimed revision must identify the evidence actually present in this snapshot.
+      checks.approvalRevisionMismatch = !Number.isSafeInteger(approvalRevision) || approvalRevision < 1
+        ? 1
+        : count('SELECT CASE WHEN COUNT(*)=0 OR SUM(CASE WHEN revision <> '+approvalRevision+' THEN 1 ELSE 0 END)>0 THEN 1 ELSE 0 END n FROM owned_currency_close_approvals');
+    }
     return { scope: 'entire-snapshot', ok: Object.values(checks).every(n => n === 0), checks };
   })();
 }

@@ -182,3 +182,5 @@ approvalRevision(운영자 확인 근거), 선택적 correctionOf. 커밋된 Kit
 예산이나 토스 콘솔 승인 상태까지 확인하는 기능은 아닙니다.
 
 문제 view의 occurred_at은 기간별 검사 시각이며, NULL이면 스냅샷 전체에 적용합니다.
+
+마감에는 실제 승인 revision을 반환하는 비공개 owned_currency_close_approvals(revision) view도 필요합니다. 모든 행이 설정의 approvalRevision과 일치해야 하며 빈 근거나 불일치는 manifest를 차단합니다. 서로 다른 승인 revision은 임의 최댓값이 아니라 운영자가 검토한 공통 마감 revision 연결이 필요합니다.

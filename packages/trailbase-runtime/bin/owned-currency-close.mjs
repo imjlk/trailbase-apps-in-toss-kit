@@ -23,8 +23,8 @@ try {
   db.exec('PRAGMA query_only=ON; PRAGMA trusted_schema=OFF; PRAGMA busy_timeout=3000;');
   const {report,reconciliation} = db.transaction(() => ({
     report:buildOwnedCurrencyReport({db,...config.period,timestampUnit:config.timestampUnit,
-      periodStart:config.period?.start,periodEnd:config.period?.end}),
-    reconciliation:reconcileOwnedCurrency({db,periodStart:config.period?.start,periodEnd:config.period?.end}),
+      periodStart:config.period?.start,periodEnd:config.period?.end,approvalRevision:config.approvalRevision??null}),
+    reconciliation:reconcileOwnedCurrency({db,periodStart:config.period?.start,periodEnd:config.period?.end,approvalRevision:config.approvalRevision??null}),
   }))();
   report.tool={name:'trailbase-owned-currency-close',version,sourceCommit,reportedServerVersion:null};
   const reportBytes=JSON.stringify(report,null,2)+'\n';
