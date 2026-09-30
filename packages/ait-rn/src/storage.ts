@@ -8,11 +8,13 @@ import {
 import {
   createAppsInTossIdentityStorage,
   type ResolveAppsInTossAnonymousHashOptions,
+  type CreateAppsInTossIdentityStorageOptions,
 } from "./identity";
 import { isProductionEnv, resolveRuntimeEnv } from "./internal/runtime";
 
 export interface CreateAppsInTossSessionStorageOptions
   extends ResolveAppsInTossAnonymousHashOptions,
+    Pick<CreateAppsInTossIdentityStorageOptions, "revalidateAnonymousHash">,
     Pick<
       CreateAppsInTossKeyValueStorageOptions,
       "allowFallback" | "fallbackStorage" | "productionRequired"
@@ -85,7 +87,7 @@ export function createAppsInTossSessionStorage({
     storage: createAppsInTossIdentityStorage(keyValueStorage, {
       ...resolverOptions,
       anonymousHashStorageKey,
-      appSessionStorageKey,
+      appSessionStorageKey: [appSessionStorageKey, tossSessionStorageKey],
       production,
     }),
     tossSessionStorageKey,

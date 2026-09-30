@@ -17,7 +17,8 @@ Explicit anonymous bootstrap also refuses an incomplete namespace; clear it or
 perform a fresh Toss sign-in first. Storage key names and the marker must be distinct.
 Restoration preserves credentials on network, timeout and server failures. Only
 `isInvalidSessionError(error) === true` clears rejected credentials; by default this
-recognizes `TrailBaseHttpError` 401/403. Custom backend adapters should supply their
+recognizes `TrailBaseHttpError` 401/403 for legacy consumers and only 401 when
+`refreshAuthTokens` is enabled. Custom backend adapters should supply their
 own authoritative invalid/revoked-session predicate. Other errors remain retryable.
 
 `createAppsInTossSessionLifecycle` adds a single entry point for account transitions
@@ -118,3 +119,49 @@ reports cleanup errors separately through the rejected operation.
 No schema migration or proxy deployment is required. Validate canonical-account
 upgrades, delayed A-account requests after switching to B, changed subscription
 rights on foreground, failed cleanup, and reconnect after unlink in the consumer.
+
+## Restore and refresh anonymous sessions
+
+Passwordless UX can still use a service-managed TrailBase password during bootstrap.
+Avoid repeating that login on every launch: provide `refreshAuthTokens` to the existing
+session manager, and make `loadSession` an authenticated app-data endpoint that does
+not issue tokens or invoke bootstrap.
+
+```ts
+import { createTrailBaseTokenRefresher, TrailBaseHttpError } from "@trailbase-apps-in-toss-kit/trailbase-client";
+// Additional createAppsInTossSessionManager options:
+const sessionOptions = {
+  refreshAuthTokens: createTrailBaseTokenRefresher({ baseUrl }),
+  // Classify only authoritative credential rejection (not a generic 403,
+  // a disabled account, a permissions error, a timeout, or an outage).
+  isInvalidSessionError: error => error instanceof TrailBaseHttpError && error.status === 401,
+};
+```
+
+`getOrCreateAppSession()` coalesces concurrent acquisitions. It loads fresh app data
+using persisted credentials; expiring JWTs (within 60 seconds) refresh first, and
+rejected access tokens get one refresh and data retry. Tokens are only scheduling
+hints on the client; the server must validate authentication and account status.
+`renewAppSession()` forces refresh for expiry timers or rejected requests and recovers
+with bootstrap only after an authoritative invalid-session error or absent storage.
+If refresh is unavailable, the normal load/bootstrap recovery remains available.
+
+The official refresh helper calls `/api/auth/v1/refresh`, retains an omitted refresh
+token, and accepts a rotated one. Refreshed credentials are persisted before the data
+request so an outage cannot discard rotation. Network/storage errors preserve the
+session and propagate; corrupted JSON is treated as absent storage. Keep storage
+namespaces separate per backend/environment. Data responses can omit credentials.
+
+App-owned account-link flows must call `adoptAppSession(response, "toss")` with the
+canonical user's tokens before exposing the new session. This supersedes pending
+refreshes and mirrors the new credentials to both storage keys. Use
+`clearSessions()` on disconnect and one manager per namespace. Do not automatically
+replay mutations after refreshing; the app owns idempotency and retry decisions.
+The refresh option is additive; applications using custom session tokens can keep
+using their existing callbacks.
+
+Enable `revalidateAnonymousHash: true` on `createAppsInTossSessionStorage` for persisted RN authentication. It resolves the current SDK identity before session reads, clears both credential mirrors before storing a changed identity, and propagates SDK/storage failures instead of restoring another account. This option takes effect only in production; development fallbacks retain their stored identity. Official Storage documents persistence across restarts but does not promise account-switch isolation: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
+
+With refresh enabled, unchanged canonical anonymous credentials/user skip native storage writes. Toss restoration synchronizes both credential mirrors even if the source key is unchanged. A refresh already synchronizes the mirrors before loading app data, so unchanged post-refresh state skips a second write. Changed user metadata and legacy credential shapes are still saved.
+
+Storage adapters may implement `getItemWithSignal(key, signal)` for abort-aware reads; legacy `getItem(key)` still receives exactly one argument. The RN identity adapter checks it before invalidation or identity writes and serializes those mutations with credential writes, so late SDK results cannot erase a newer adopted session. Custom storage adapters with mutating reads should honor this signal too.

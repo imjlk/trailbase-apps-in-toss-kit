@@ -111,3 +111,49 @@ Disconnect는 사용자 리소스 정리가 실패해도 인증 정보 삭제를
 스키마 마이그레이션이나 프록시 배포는 필요하지 않습니다. Canonical 계정 통합, B로 전환한
 뒤 늦게 온 A 요청, 복귀 중 구독 권한 변경, 정리 실패, 연결 해제 후 재접속을 소비 앱에서
 검증하세요.
+
+## 익명 세션 복원과 갱신
+
+사용자가 비밀번호를 입력하지 않아도 bootstrap 내부에서는 서버 관리 비밀번호로
+TrailBase에 로그인할 수 있습니다. 매 실행마다 로그인하지 않도록 기존 세션 매니저에
+`refreshAuthTokens`를 전달하고, `loadSession`은 토큰 발급이나 bootstrap 호출 없이
+인증된 앱 데이터를 반환하는 API로 연결하세요.
+
+```ts
+import { createTrailBaseTokenRefresher, TrailBaseHttpError } from "@trailbase-apps-in-toss-kit/trailbase-client";
+// createAppsInTossSessionManager에 추가할 옵션:
+const sessionOptions = {
+  refreshAuthTokens: createTrailBaseTokenRefresher({ baseUrl }),
+  // 확실한 인증 거부만 분류합니다. 일반 403, 계정 정지, 권한 오류,
+  // timeout이나 서버 장애를 인증 만료로 처리하지 마세요.
+  isInvalidSessionError: error => error instanceof TrailBaseHttpError && error.status === 401,
+};
+```
+
+`getOrCreateAppSession()`은 동시 요청을 하나로 합칩니다. 저장된 토큰으로 최신 앱
+데이터를 읽으며, 60초 이내 만료할 JWT는 먼저 갱신합니다. access token이 거부되면
+갱신과 데이터 조회를 한 번 재시도합니다. 클라이언트의 만료 정보는 일정 계산용이며
+서버가 인증과 계정 상태를 검증해야 합니다. `renewAppSession()`은 만료 타이머나
+요청 거부 시 강제 갱신하며, 확실한 세션 무효 또는 저장 정보 부재일 때만 bootstrap으로
+복구합니다. 갱신 수단이 없으면 기존 조회/bootstrap 복구 흐름을 사용합니다.
+
+공식 갱신 헬퍼는 `/api/auth/v1/refresh`를 호출하고 응답에서 생략된 refresh token은
+유지하며 회전된 토큰도 지원합니다. 데이터 조회 전에 새 토큰을 저장하므로 후속 장애로
+회전된 토큰을 잃지 않습니다. 네트워크/저장소 오류는 세션을 유지하고 전달하며, 손상된
+JSON은 저장 정보 부재로 처리합니다. 백엔드/환경마다 저장소 namespace를 분리하세요.
+데이터 응답은 인증 정보를 다시 포함하지 않아도 됩니다.
+
+앱 자체 계정 연결 흐름은 새 세션을 노출하기 전에 최종 사용자의 토큰으로
+`adoptAppSession(response, "toss")`를 호출해야 합니다. 진행 중인 갱신은 취소되고
+두 저장 키 모두 새 계정으로 갱신됩니다. 연결 해제 시 `clearSessions()`를 사용하고
+namespace마다 매니저 하나를 사용하세요. 갱신 후 쓰기 요청을 자동 재전송하지 마세요.
+멱등성과 재시도 판단은 앱이 담당합니다. 갱신 옵션은 선택 사항이며 자체 세션 토큰을
+사용하는 앱은 기존 콜백을 유지할 수 있습니다.
+
+`refreshAuthTokens` 옵션을 사용하면 기본 인증 오류 분류는 401만 포함합니다. 기존 옵션 없는 소비 앱의 401/403 분류는 유지합니다.
+
+RN 인증 정보를 유지할 때 `createAppsInTossSessionStorage`의 `revalidateAnonymousHash: true`를 설정하세요. 세션을 읽기 전에 SDK의 현재 식별값을 확인하고, 값이 바뀌면 두 세션 키를 모두 지운 뒤 새 식별값을 저장합니다. SDK/저장소 실패 시 다른 계정을 복원하지 않고 오류를 전달합니다. 이 옵션은 production에서만 동작하며 개발 fallback은 저장된 식별값을 유지합니다. 공식 Storage 문서는 재시작 후 유지를 설명하지만 계정 전환 격리를 보장하지 않습니다: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
+
+갱신 옵션 사용 시 정규화된 익명 토큰과 사용자 정보가 같으면 native storage 쓰기를 생략합니다. 토스 세션 복원은 원본 키의 값이 같아도 두 저장 키를 동기화합니다. 토큰 갱신 시에는 데이터 조회 전에 이미 두 키가 동기화되므로 정보가 같다면 두 번째 쓰기를 생략합니다. 사용자 정보 변경이나 기존 토큰 형식의 정규화는 저장합니다.
+
+저장소 어댑터는 취소 신호를 받는 `getItemWithSignal(key, signal)`을 선택적으로 구현할 수 있습니다. 기존 `getItem(key)`에는 인자를 하나만 전달합니다. RN 식별 어댑터는 무효화·식별값 쓰기 전에 취소를 확인하고 인증 정보 쓰기와 같은 순서로 실행합니다. 늦은 SDK 결과가 새로 채택된 세션을 지우지 못하도록 합니다. 읽기 중 값을 바꾸는 자체 저장소 어댑터도 이 신호를 처리해야 합니다.
