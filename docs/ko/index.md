@@ -81,3 +81,5 @@ kit의 해석이 아니라 원본 도구의 동작 자체를 확인해야 할 �
 RN adapter와 비공개 웹훅·이용권한 원장은 [IAP 정기구독](iap-subscriptions.md)을 참고하세요.
 
 Sampo 전체 그룹 버전 검증과 산출물 업로드는 [컨슈머 AIT 릴리즈](consumer-releases.md)를 참고하세요.
+
+로컬 target 공유와 BuildKit 캐시 용량 관리는 [Rust 및 Docker 빌드 캐시 공유](build-cache.md)를 참고하세요.
