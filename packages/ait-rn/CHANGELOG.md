@@ -1,5 +1,19 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.8.0 — 2026-09-30
+
+### Minor changes
+
+- [dc79f22](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/dc79f2252fd5b87fdced917d0258759c148ec390) Restore anonymous app sessions through the official TrailBase token refresh endpoint instead of repeating password login. Add optional refresh integration, shared concurrent acquisition, explicit renewal and canonical account adoption while preserving credentials during transient failures. Consumers must supply an authenticated initial-data endpoint and narrowly classify invalid credentials; no SQL migration or server upgrade is required.
+  
+  React Native consumers can enable `revalidateAnonymousHash` on session storage to verify the current SDK identity before restoration and invalidate both credential mirrors when the account changes. SDK or storage failures do not fall back to another identity.
+  
+  Unchanged restored credentials skip native storage writes; refreshed tokens are persisted once before loading current app data. — Thanks @imjlk!
+
+### Patch changes
+
+- Updated dependencies: trailbase-client (npm)@1.3.0
+
 ## 0.7.1 — 2026-09-28
 
 ### Patch changes
