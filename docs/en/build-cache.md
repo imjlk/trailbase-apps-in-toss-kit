@@ -7,10 +7,13 @@ shell profiles, Docker daemon settings, consumer scripts, or existing caches.
 ## Local Cargo builds
 
 For trusted consumer repositories using compatible toolchains, set a common
-absolute target directory in the developer shell or the consumer's local runner:
+absolute target directory in the developer shell or the consumer's local runner.
+Run these commands from the consumer workspace with its intended Rust toolchain;
+install the required WASI target in that active toolchain before checking:
 
 ```sh
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ait-kit/cargo-target/$(uname -s)-$(uname -m)}"
+rustup target add wasm32-wasip2
 cargo check --locked --target wasm32-wasip2
 ```
 

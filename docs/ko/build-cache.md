@@ -7,10 +7,12 @@ Kit 소스는 특정 커밋에 고정된 Git 서브모듈로 유지하고, 다�
 ## 로컬 Cargo 빌드
 
 신뢰할 수 있는 소비자 저장소들이 호환되는 도구 체인을 사용한다면 개발자 셸이나 앱의
-로컬 실행기에 공용 절대 경로를 설정합니다.
+로컬 실행기에 공용 절대 경로를 설정합니다. 소비자 workspace에서 해당 앱이 사용하는 Rust
+도구 체인으로 실행하며, 검사 전에 활성 도구 체인에 필요한 WASI target을 설치합니다.
 
 ```sh
 export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/ait-kit/cargo-target/$(uname -s)-$(uname -m)}"
+rustup target add wasm32-wasip2
 cargo check --locked --target wasm32-wasip2
 ```
 
