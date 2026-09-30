@@ -166,25 +166,24 @@ export function createAppsInTossIdentityStorage(
     return { refreshed: existing !== next, value: next };
   }
 
+  async function read(key: string, signal?: AbortSignal) {
+    await writeTail;
+    checkActive(signal);
+    if (key === anonymousHashStorageKey) {
+      return (await resolveStoredAnonymousHash(signal)).value;
+    }
+    if (production && isAppSessionStorageKey(key, appSessionStorageKey)) {
+      const { refreshed } = await resolveStoredAnonymousHash(signal);
+      if (refreshed) return null;
+    }
+    return storage.getItem(key);
+  }
   return {
-    async getItem(key, options) {
-      await writeTail;
-      checkActive(options?.signal);
-      if (key === anonymousHashStorageKey) {
-        return (await resolveStoredAnonymousHash(options?.signal)).value;
-      }
-
-      if (production && isAppSessionStorageKey(key, appSessionStorageKey)) {
-        const { refreshed } = await resolveStoredAnonymousHash(options?.signal);
-        if (refreshed) {
-          return null;
-        }
-      }
-
-      return storage.getItem(key);
-    },
+    getItem: key => read(key),
+    getItemWithSignal: (key, signal) => read(key, signal),
     setItem: (key, value) => write(key, value),
   };
+
 }
 
 function anonymousHashFromResult(

@@ -225,3 +225,13 @@ test("anonymous identity writes settle before a superseding login reads the iden
   expect(values.get("trailbase.anonymousHash")).toBe(linkedHash);
   expect(nextHash).toBe(1);
 });
+test("legacy storage getItem retains its one-argument calling convention", async () => {
+  const values=new Map<string,string>();
+  const s=setup({storage:{
+    getItem(...args: [string, unknown?]) {expect(args).toHaveLength(1);return values.get(args[0])??null;},
+    setItem(key,value){values.set(key,value);},
+  }});
+  await s.manager.getOrCreateAppSession();
+  await s.manager.getOrCreateAppSession();
+  await s.manager.renewAppSession();
+});

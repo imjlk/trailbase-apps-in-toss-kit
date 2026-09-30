@@ -126,7 +126,9 @@ export function normalizeTrailBaseError(payload: unknown, fallback = "TrailBase 
 }
 
 export interface KeyValueStorage {
-  getItem(key: string, options?: { signal?: AbortSignal }): string | null | Promise<string | null>;
+  getItem(key: string): string | null | Promise<string | null>;
+  /** Optional abort-aware read for adapters whose identity reads can mutate storage. */
+  getItemWithSignal?(key: string, signal: AbortSignal): string | null | Promise<string | null>;
   setItem(key: string, value: string): void | Promise<void>;
 }
 
@@ -373,7 +375,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     if (anonymousHashPromise) return anonymousHashPromise;
     const pending = resolveAnonymousHash({
       storage: {
-        getItem: async (key, options) => { await storageTail; op.check(); return storage.getItem(key, options); },
+        getItem: async key => { await storageTail; op.check(); return readStorageItem(storage, key, op.signal); },
         setItem: (key, value) => persist(op, () => Promise.resolve(storage.setItem(key, value))),
       },
       storageKey: anonymousHashStorageKey, create: createHash, signal: op.signal,
@@ -580,7 +582,7 @@ export async function resolveAnonymousHash({
   storageKey?: string;
   create?: () => string;
 }): Promise<string> {
-  const existing = await storage.getItem(storageKey, { signal });
+  const existing = await readStorageItem(storage, storageKey, signal);
   if (signal?.aborted) throw new StaleAppSessionOperationError();
   if (existing) {
     return existing;
@@ -621,12 +623,19 @@ function withAuthProvider<TUser>(
   };
 }
 
+function readStorageItem(storage: KeyValueStorage, key: string, signal?: AbortSignal) {
+  // Preserve the original one-argument contract (some adapters use argument 2 as a callback).
+  return signal && storage.getItemWithSignal
+    ? storage.getItemWithSignal(key, signal)
+    : storage.getItem(key);
+}
+
 async function readStoredSession<TUser>(
   storage: KeyValueStorage,
   key: string,
   signal?: AbortSignal,
 ): Promise<StoredAppSession<TUser> | null> {
-  const raw = await storage.getItem(key, { signal });
+  const raw = await readStorageItem(storage, key, signal);
   try {
     if (!raw) {
       return null;
