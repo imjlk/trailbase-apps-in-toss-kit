@@ -5,7 +5,7 @@ const tokens = { authToken: "old", refreshToken: "refresh", csrfToken: "csrf" };
 const renewed = { authToken: "new", refreshToken: "rotated", csrfToken: "new-csrf" };
 function setup(options: Partial<AppsInTossSessionManagerOptions<{ id: string }>> = {}) {
   const values = new Map<string, string>();
-  const bootstrap = mock(async () => ({ authTokens: tokens, user: { id: "a" } }));
+  const bootstrap = mock(async () => ({ authTokens: tokens, sessionToken: tokens.authToken, user: { id: "a" } }));
   const refreshAuthTokens = mock(async () => renewed);
   const loadSession = mock(async () => ({ user: { id: "a" }, rewards: { count: 2 } }));
   const writes = mock((key: string, value: string) => { values.set(key, value); });
@@ -159,4 +159,45 @@ test("changed user data is persisted even when credentials are unchanged", async
   await s.manager.getOrCreateAppSession();
   expect(s.writes).toHaveBeenCalledTimes(3);
   expect(JSON.parse(s.values.get("trailbase.appSession")!).user.name).toBe("updated");
+});
+
+test("Toss restore repairs the app mirror after an explicit anonymous bootstrap", async () => {
+  const s = setup();
+  await s.manager.adoptAppSession({authTokens:renewed,sessionToken:renewed.authToken,user:{id:"a"}}, "toss");
+  await s.manager.bootstrapAnonymousSession();
+  expect(JSON.parse(s.values.get("trailbase.appSession")!).authProvider).toBe("anonymous");
+  await s.manager.restoreStoredTossSession();
+  expect(s.values.get("trailbase.appSession")).toBe(s.values.get("trailbase.tossSession"));
+  expect(JSON.parse(s.values.get("trailbase.appSession")!).authTokens).toEqual(renewed);
+});
+test("app restore repairs the Toss mirror after Toss-only rejection cleanup", async () => {
+  let denied = true;
+  const s=setup({loadSession:async()=>{if(denied)throw authError();return {user:{id:"a"}};}});
+  await s.manager.adoptAppSession({authTokens:tokens,sessionToken:tokens.authToken,user:{id:"a"}}, "toss");
+  expect(await s.manager.restoreStoredTossSession()).toBeNull();
+  expect(s.values.get("trailbase.tossSession")).toBe("");
+  denied=false;
+  await s.manager.restoreStoredAppSession();
+  expect(s.values.get("trailbase.tossSession")).toBe(s.values.get("trailbase.appSession"));
+  expect(s.values.get("trailbase.tossSession")).not.toBe("");
+});
+test("legacy credential shapes are normalized once before no-op writes can be skipped", async()=>{
+  for (const sessionToken of [undefined,"legacy-stale"]) {
+    const s=setup();
+    s.values.set("trailbase.appSession", JSON.stringify({authProvider:"anonymous",sessionToken,authTokens:tokens,user:{id:"a"}}));
+    await s.manager.getOrCreateAppSession();
+    expect(JSON.parse(s.values.get("trailbase.appSession")!).sessionToken).toBe(tokens.authToken);
+    expect(s.writes).toHaveBeenCalledTimes(3);
+    s.writes.mockClear();
+    await s.manager.getOrCreateAppSession();
+    expect(s.writes).not.toHaveBeenCalled();
+  }
+});
+test("a Toss refresh synchronizes both mirrors once before loading unchanged user data", async()=>{
+  const s=setup();
+  await s.manager.adoptAppSession({authTokens:tokens,sessionToken:tokens.authToken,user:{id:"a"}}, "toss");
+  s.writes.mockClear();
+  await s.manager.renewAppSession();
+  expect(s.writes).toHaveBeenCalledTimes(4);
+  expect(s.values.get("trailbase.appSession")).toBe(s.values.get("trailbase.tossSession"));
 });

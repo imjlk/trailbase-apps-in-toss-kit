@@ -424,6 +424,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
 
   async function loadStored(op: Operation, stored: StoredAppSession<TUser>, forceRefresh: boolean) {
     let current = stored;
+    let persistedDuringLoad = false;
     const refresh = async () => {
       const tokens = current.authTokens;
       if (!refreshAuthTokens || !tokens?.refreshToken) return false;
@@ -434,6 +435,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
       current = { ...current, sessionToken: next.authToken, authTokens: next };
       // Save rotation before loading app data: a temporary data error must not lose it.
       await save(op, { ...current }, current.authProvider);
+      persistedDuringLoad = true;
       return true;
     };
     const expiry = trailBaseTokenExpiresAt(current.authTokens?.authToken);
@@ -456,10 +458,11 @@ export function createAppsInTossSessionManager<TUser = unknown>({
       ...response,
       ...(tokens ? { authTokens: tokens, sessionToken: tokens.authToken } : {}),
     };
-    const previous = { ...current, sessionToken: current.authTokens?.authToken ?? current.sessionToken };
-    // Fresh domain data is returned but not persisted by this manager. Avoid
-    // bridge writes for unchanged credentials/user, including the post-refresh load.
-    if (serializedSession(previous, current.authProvider) === serializedSession(next, current.authProvider)) {
+    // A Toss restore must repair both keys: public bootstrap/restore flows can
+    // legitimately leave its mirror different. A refresh in this operation has
+    // already synchronized both. Avoid extra identity-aware reads to check mirrors.
+    const mirrorsKnownCurrent = current.authProvider === "anonymous" || persistedDuringLoad;
+    if (mirrorsKnownCurrent && serializedSession({ ...current }, current.authProvider) === serializedSession(next, current.authProvider)) {
       return withAuthProvider(next, current.authProvider);
     }
     return save(op, next, current.authProvider);

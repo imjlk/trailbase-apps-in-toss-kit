@@ -162,4 +162,4 @@ using their existing callbacks.
 
 Enable `revalidateAnonymousHash: true` on `createAppsInTossSessionStorage` for persisted RN authentication. It resolves the current SDK identity before session reads, clears both credential mirrors before storing a changed identity, and propagates SDK/storage failures instead of restoring another account. Development fallbacks should normally leave it off. Official Storage documents persistence across restarts but does not promise account-switch isolation: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
 
-With refresh enabled, unchanged stored credentials/user skip native storage writes. Refreshed tokens are persisted once before loading app data, and changed user metadata is still saved.
+With refresh enabled, unchanged canonical anonymous credentials/user skip native storage writes. Toss restoration synchronizes both credential mirrors even if the source key is unchanged. A refresh already synchronizes the mirrors before loading app data, so unchanged post-refresh state skips a second write. Changed user metadata and legacy credential shapes are still saved.
