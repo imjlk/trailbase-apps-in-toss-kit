@@ -17,6 +17,7 @@ export interface CreateAppsInTossSessionStorageOptions
       CreateAppsInTossKeyValueStorageOptions,
       "allowFallback" | "fallbackStorage" | "productionRequired"
     > {
+  revalidateAnonymousHash?: boolean;
   appKey: string;
   env?: string;
   storage?: AppsInTossStorageBridge | null;
@@ -85,7 +86,7 @@ export function createAppsInTossSessionStorage({
     storage: createAppsInTossIdentityStorage(keyValueStorage, {
       ...resolverOptions,
       anonymousHashStorageKey,
-      appSessionStorageKey,
+      appSessionStorageKey: [appSessionStorageKey, tossSessionStorageKey],
       production,
     }),
     tossSessionStorageKey,

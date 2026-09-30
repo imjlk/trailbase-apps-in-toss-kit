@@ -344,6 +344,8 @@ export async function requestAppsInTossLogin({
   }
 }
 
+const SESSION_REFRESH_SKEW_MS = 60_000;
+
 export function createAppsInTossSessionManager<TUser = unknown>({
   storage,
   appLogin,
@@ -368,9 +370,12 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   }
 
   function anonymousHash() {
-    anonymousHashPromise ??= resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash })
-      .catch(error => { anonymousHashPromise = undefined; throw error; });
-    return anonymousHashPromise;
+    if (anonymousHashPromise) return anonymousHashPromise;
+    const pending = resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash });
+    anonymousHashPromise = pending;
+    const clearPending = () => { if (anonymousHashPromise === pending) anonymousHashPromise = undefined; };
+    pending.then(clearPending, clearPending);
+    return pending;
   }
 
   async function requireCompleteStorage(op: Operation) {
@@ -432,7 +437,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
       return true;
     };
     const expiry = trailBaseTokenExpiresAt(current.authTokens?.authToken);
-    const refreshed = (forceRefresh || (expiry !== null && expiry <= Date.now() + 60_000)) && await refresh();
+    const refreshed = (forceRefresh || (expiry !== null && expiry <= Date.now() + SESSION_REFRESH_SKEW_MS)) && await refresh();
     let response: AppSessionManagerResponse<TUser>;
     try {
       op.check();
@@ -519,11 +524,11 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     pending.then(clearPending, clearPending);
     return pending;
   }
-  function supersede() { generation++; acquisition = undefined; operations.cancel(); }
+  function supersede() { generation++; acquisition = undefined; anonymousHashPromise = undefined; operations.cancel(); }
 
   return {
     /** Persist tokens from an app-owned account-link flow and cancel older work. */
-    adoptAppSession: (response: AppSessionManagerResponse<TUser>, provider: AppAuthProvider = "anonymous") => {
+    adoptAppSession: (response: AppSessionManagerResponse<TUser>, provider: AppAuthProvider) => {
       supersede();
       return operations.run(op => save(op, response, provider));
     },

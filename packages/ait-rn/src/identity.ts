@@ -54,6 +54,8 @@ export interface ResolveAppsInTossAnonymousHashOptions {
 
 export interface CreateAppsInTossIdentityStorageOptions
   extends ResolveAppsInTossAnonymousHashOptions {
+  /** Resolve the SDK identity before restoring credentials; invalidate all session keys on change. */
+  revalidateAnonymousHash?: boolean;
   anonymousHashStorageKey?: string;
   appSessionStorageKey?: string | readonly string[];
 }
@@ -123,6 +125,7 @@ export function createAppsInTossIdentityStorage(
   {
     anonymousHashStorageKey = DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY,
     appSessionStorageKey = DEFAULT_APPS_IN_TOSS_APP_SESSION_STORAGE_KEY,
+    revalidateAnonymousHash = false,
     ...resolverOptions
   }: CreateAppsInTossIdentityStorageOptions = {},
 ): KeyValueStorage {
@@ -130,7 +133,7 @@ export function createAppsInTossIdentityStorage(
 
   async function resolveStoredAnonymousHash() {
     const existing = await storage.getItem(anonymousHashStorageKey);
-    if (existing && (!production || isAppsInTossAnonymousHash(existing))) {
+    if (!revalidateAnonymousHash && existing && (!production || isAppsInTossAnonymousHash(existing))) {
       return { refreshed: false, value: existing };
     }
 
@@ -138,6 +141,12 @@ export function createAppsInTossIdentityStorage(
       ...resolverOptions,
       production,
     });
+    if (revalidateAnonymousHash && existing !== next) {
+      // Clear every credential mirror before publishing the new identity. If a
+      // write fails the old identity remains, so the next attempt repeats cleanup.
+      const keys = typeof appSessionStorageKey === "string" ? [appSessionStorageKey] : appSessionStorageKey;
+      for (const key of keys) await storage.setItem(key, "");
+    }
     await storage.setItem(anonymousHashStorageKey, next);
     return { refreshed: existing !== next, value: next };
   }
@@ -148,7 +157,7 @@ export function createAppsInTossIdentityStorage(
         return (await resolveStoredAnonymousHash()).value;
       }
 
-      if (production && isAppSessionStorageKey(key, appSessionStorageKey)) {
+      if ((production || revalidateAnonymousHash) && isAppSessionStorageKey(key, appSessionStorageKey)) {
         const { refreshed } = await resolveStoredAnonymousHash();
         if (refreshed) {
           return null;

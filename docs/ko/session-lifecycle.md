@@ -151,3 +151,5 @@ namespace마다 매니저 하나를 사용하세요. 갱신 후 쓰기 요청을
 사용하는 앱은 기존 콜백을 유지할 수 있습니다.
 
 `refreshAuthTokens` 옵션을 사용하면 기본 인증 오류 분류는 401만 포함합니다. 기존 옵션 없는 소비 앱의 401/403 분류는 유지합니다.
+
+RN 인증 정보를 유지할 때 `createAppsInTossSessionStorage`의 `revalidateAnonymousHash: true`를 설정하세요. 세션을 읽기 전에 SDK의 현재 식별값을 확인하고, 값이 바뀌면 두 세션 키를 모두 지운 뒤 새 식별값을 저장합니다. SDK/저장소 실패 시 다른 계정을 복원하지 않고 오류를 전달합니다. 개발 fallback에서는 보통 이 옵션을 끕니다. 공식 Storage 문서는 재시작 후 유지를 설명하지만 계정 전환 격리를 보장하지 않습니다: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .

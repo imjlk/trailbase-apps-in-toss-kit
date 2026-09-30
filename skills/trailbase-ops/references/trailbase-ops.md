@@ -93,7 +93,8 @@ surfaces include:
   See `docs/en/session-lifecycle.md` and its Korean counterpart.
 - For persisted anonymous sessions, provide `createTrailBaseTokenRefresher` to the session manager,
   keep `loadSession` authenticated and free of password login, and use `renewAppSession` for
-  expiry/rejection recovery. Adopt canonical account-link tokens with `adoptAppSession`.
+  expiry/rejection recovery. RN consumers should enable `revalidateAnonymousHash` on session
+  storage so SDK account changes invalidate both credential mirrors before restore. Adopt canonical account-link tokens with `adoptAppSession`.
   Classify credential errors narrowly; network, disabled-account and permission errors must not
   erase sessions or trigger anonymous bootstrap. See `docs/en/session-lifecycle.md`.
 - `createAppsInTossSessionManager` for app session restore, anonymous bootstrap, and Toss login

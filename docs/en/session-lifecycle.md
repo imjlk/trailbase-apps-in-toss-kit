@@ -159,3 +159,5 @@ refreshes and mirrors the new credentials to both storage keys. Use
 replay mutations after refreshing; the app owns idempotency and retry decisions.
 The refresh option is additive; applications using custom session tokens can keep
 using their existing callbacks.
+
+Enable `revalidateAnonymousHash: true` on `createAppsInTossSessionStorage` for persisted RN authentication. It resolves the current SDK identity before session reads, clears both credential mirrors before storing a changed identity, and propagates SDK/storage failures instead of restoring another account. Development fallbacks should normally leave it off. Official Storage documents persistence across restarts but does not promise account-switch isolation: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .

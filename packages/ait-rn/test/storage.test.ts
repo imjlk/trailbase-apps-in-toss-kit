@@ -119,3 +119,57 @@ describe("AppsInToss RN storage helpers", () => {
   });
 });
 
+
+test("optional identity revalidation clears both credential mirrors before changing users", async () => {
+  const { createAppsInTossSessionManager } = await import("../../trailbase-client/src/index");
+  const storage = mapStorage();
+  let identity = "a";
+  let unavailable = false;
+  const persistence = createAppsInTossSessionStorage({
+    appKey: "identity-session", production: true, storage,
+    revalidateAnonymousHash: true,
+    getAnonymousKey: async () => {
+      if (unavailable) throw new Error("bridge unavailable");
+      return { type: "HASH", hash: identity };
+    },
+  });
+  const bootstraps: string[] = [];
+  const loads: string[] = [];
+  const manager = createAppsInTossSessionManager({
+    ...persistence,
+    appLogin: async () => ({authorizationCode:"unused",referrer:"DEFAULT"}),
+    completeTossLogin: async () => {throw new Error("unused");},
+    bootstrap: async hash => {bootstraps.push(hash);return {authToken:hash,refreshToken:`refresh-${hash}`,user:{id:hash}};},
+    loadSession: async input => {loads.push(input.authTokens!.authToken);return {authToken:input.authTokens!.authToken,user:{id:input.authTokens!.authToken}};},
+  });
+  await manager.getOrCreateAppSession();
+  await manager.adoptAppSession({authToken:"ait:a",refreshToken:"refresh-a",user:{id:"ait:a"}}, "toss");
+  await manager.getOrCreateAppSession();
+  expect(loads).toEqual(["ait:a"]);
+  unavailable = true;
+  const before = storage.map.get(persistence.appSessionStorageKey);
+  await expect(manager.getOrCreateAppSession()).rejects.toThrow();
+  expect(storage.map.get(persistence.appSessionStorageKey)).toBe(before);
+  unavailable = false;
+  identity = "b";
+  expect((await manager.getOrCreateAppSession()).user.id).toBe("ait:b");
+  expect(bootstraps).toEqual(["ait:a", "ait:b"]);
+  expect(loads).toEqual(["ait:a"]);
+  expect(storage.map.get(persistence.tossSessionStorageKey)).toBe("");
+});
+
+test("failed identity invalidation cannot publish a new identity above old credentials", async () => {
+  const storage = mapStorage([
+    ["change.anonymousHash", "ait:a"], ["change.appSession", "old-a"], ["change.tossSession", "old-a"],
+  ]);
+  const persistence = createAppsInTossSessionStorage({
+    appKey:"change", production:true, revalidateAnonymousHash:true,
+    getAnonymousKey:async()=>({type:"HASH",hash:"b"}),
+    storage: {getItem:storage.getItem,setItem:async(key,value)=>{
+      if(key==="change.tossSession") throw new Error("storage unavailable");
+      return storage.setItem(key,value);
+    }},
+  });
+  await expect(persistence.storage.getItem("change.appSession")).rejects.toThrow("storage unavailable");
+  expect(storage.map.get("change.anonymousHash")).toBe("ait:a");
+});
