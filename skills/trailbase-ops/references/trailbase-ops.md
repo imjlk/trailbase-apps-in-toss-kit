@@ -91,6 +91,11 @@ surfaces include:
   Use one manager per storage namespace; catch `StaleAppSessionOperationError` for
   superseded auth operations. `disconnect()` is local cleanup, not server unlink.
   See `docs/en/session-lifecycle.md` and its Korean counterpart.
+- For persisted anonymous sessions, provide `createTrailBaseTokenRefresher` to the session manager,
+  keep `loadSession` authenticated and free of password login, and use `renewAppSession` for
+  expiry/rejection recovery. Adopt canonical account-link tokens with `adoptAppSession`.
+  Classify credential errors narrowly; network, disabled-account and permission errors must not
+  erase sessions or trigger anonymous bootstrap. See `docs/en/session-lifecycle.md`.
 - `createAppsInTossSessionManager` for app session restore, anonymous bootstrap, and Toss login
   upgrade flows while preserving TrailBase `_user` as the authenticated principal.
 - `createAppsInTossKeyValueStorage`, `createMemoryKeyValueStorage`, and

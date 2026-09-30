@@ -426,3 +426,5 @@ bundle and platform, checking header Back, Android system Back, and supported
 gestures as applicable. Confirm both previous-screen restoration and intended
 root behavior. A local implementation change alone does not establish that the
 reported review issue is resolved.
+
+Session restore/refresh integration, account adoption, and failure handling are described in [session lifecycle](session-lifecycle.md#restore-and-refresh-anonymous-sessions).

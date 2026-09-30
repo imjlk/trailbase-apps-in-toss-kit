@@ -118,3 +118,43 @@ reports cleanup errors separately through the rejected operation.
 No schema migration or proxy deployment is required. Validate canonical-account
 upgrades, delayed A-account requests after switching to B, changed subscription
 rights on foreground, failed cleanup, and reconnect after unlink in the consumer.
+
+## Restore and refresh anonymous sessions
+
+Passwordless UX can still use a service-managed TrailBase password during bootstrap.
+Avoid repeating that login on every launch: provide `refreshAuthTokens` to the existing
+session manager, and make `loadSession` an authenticated app-data endpoint that does
+not issue tokens or invoke bootstrap.
+
+```ts
+import { createTrailBaseTokenRefresher } from "@trailbase-apps-in-toss-kit/trailbase-client";
+// Additional createAppsInTossSessionManager options:
+const sessionOptions = {
+  refreshAuthTokens: createTrailBaseTokenRefresher({ baseUrl }),
+  // Classify only authoritative credential rejection (not a generic 403,
+  // a disabled account, a permissions error, a timeout, or an outage).
+  isInvalidSessionError: error => error instanceof TrailBaseHttpError && error.status === 401,
+};
+```
+
+`getOrCreateAppSession()` coalesces concurrent acquisitions. It loads fresh app data
+using persisted credentials; expiring JWTs (within 60 seconds) refresh first, and
+rejected access tokens get one refresh and data retry. Tokens are only scheduling
+hints on the client; the server must validate authentication and account status.
+`renewAppSession()` forces refresh for expiry timers or rejected requests and recovers
+with bootstrap only after an authoritative invalid-session error or absent storage.
+If refresh is unavailable, the normal load/bootstrap recovery remains available.
+
+The official refresh helper calls `/api/auth/v1/refresh`, retains an omitted refresh
+token, and accepts a rotated one. Refreshed credentials are persisted before the data
+request so an outage cannot discard rotation. Network/storage errors preserve the
+session and propagate; corrupted JSON is treated as absent storage. Keep storage
+namespaces separate per backend/environment. Data responses can omit credentials.
+
+App-owned account-link flows must call `adoptAppSession(response, "toss")` with the
+canonical user's tokens before exposing the new session. This supersedes pending
+refreshes and mirrors the new credentials to both storage keys. Use
+`clearSessions()` on disconnect and one manager per namespace. Do not automatically
+replay mutations after refreshing; the app owns idempotency and retry decisions.
+The refresh option is additive; applications using custom session tokens can keep
+using their existing callbacks.

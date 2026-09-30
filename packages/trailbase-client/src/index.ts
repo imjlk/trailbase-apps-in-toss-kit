@@ -1,4 +1,5 @@
-import { createSessionOperationGuard, type SessionOperation } from "./session-operation";
+import { trailBaseTokenExpiresAt } from "./session-refresh";
+import { createSessionOperationGuard, StaleAppSessionOperationError, type SessionOperation } from "./session-operation";
 export { StaleAppSessionOperationError } from "./session-operation";
 export {
   createAppsInTossSessionLifecycle,
@@ -7,6 +8,7 @@ export {
   type AppSessionLifecycleSnapshot,
   type AppsInTossSessionLifecycleOptions,
 } from "./session-lifecycle";
+export { createTrailBaseTokenRefresher, trailBaseTokenExpiresAt } from "./session-refresh";
 export type JsonValue =
   | null
   | boolean
@@ -165,6 +167,7 @@ export interface AppSessionManagerResponse<TUser = unknown> {
   refresh_token?: string | null;
   csrf_token?: string | null;
   tokens?: unknown;
+  authTokens?: TrailBaseAuthTokens;
   user: TUser;
   [key: string]: unknown;
 }
@@ -179,6 +182,8 @@ export interface AppsInTossSessionManagerOptions<TUser = unknown> {
   appLogin: () => Promise<unknown>;
   getIsTossLoginIntegratedService?: () => Promise<unknown>;
   loadSession: (input: AppSessionLoadInput, options?: { signal: AbortSignal }) => Promise<AppSessionManagerResponse<TUser>>;
+  /** Optional official auth refresh. A rejected refresh must throw an authoritative auth error. */
+  refreshAuthTokens?: (tokens: TrailBaseAuthTokens, options: { signal: AbortSignal }) => Promise<TrailBaseAuthTokens>;
   bootstrap: (anonymousHash: string, options?: { signal: AbortSignal }) => Promise<AppSessionManagerResponse<TUser>>;
   completeTossLogin: (input: {
     anonymousHash: string;
@@ -241,7 +246,7 @@ export function normalizeTrailBaseAuthTokens(value: unknown): TrailBaseAuthToken
     return null;
   }
   const record = value as Record<string, unknown>;
-  const nested = normalizeTrailBaseAuthTokens(record.tokens);
+  const nested = normalizeTrailBaseAuthTokens(record.tokens ?? record.authTokens);
   if (nested) {
     return nested;
   }
@@ -344,6 +349,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   appLogin,
   getIsTossLoginIntegratedService,
   loadSession,
+  refreshAuthTokens,
   bootstrap,
   completeTossLogin,
   createAnonymousHash: createHash = createAnonymousHash,
@@ -411,38 +417,63 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     });
   }
 
-  async function restoreToss(op: Operation) {
-    const stored = await read(op, tossSessionStorageKey);
-    if (!stored) return null;
+  async function loadStored(op: Operation, stored: StoredAppSession<TUser>, forceRefresh: boolean) {
+    let current = stored;
+    const refresh = async () => {
+      const tokens = current.authTokens;
+      if (!refreshAuthTokens || !tokens?.refreshToken) return false;
+      op.check();
+      const next = await refreshAuthTokens(tokens, { signal: op.signal });
+      op.check();
+      if (!next.authToken?.trim()) throw new Error("Refresh response needs an auth token");
+      current = { ...current, sessionToken: next.authToken, authTokens: next };
+      // Save rotation before loading app data: a temporary data error must not lose it.
+      await save(op, { ...current }, current.authProvider);
+      return true;
+    };
+    const expiry = trailBaseTokenExpiresAt(current.authTokens?.authToken);
+    const refreshed = (forceRefresh || (expiry !== null && expiry <= Date.now() + 60_000)) && await refresh();
     let response: AppSessionManagerResponse<TUser>;
     try {
       op.check();
-      response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
+      response = await loadSession(sessionLoadInput(current), { signal: op.signal });
       op.check();
     } catch (error) {
+      op.check();
+      if (refreshed || !refreshAuthTokens || !isInvalidSessionError(error) || !await refresh()) throw error;
+      response = await loadSession(sessionLoadInput(current), { signal: op.signal });
+      op.check();
+    }
+    // Data-only endpoints need not echo credentials. Prefer explicitly returned new tokens.
+    const tokens = normalizeTrailBaseAuthTokens(response) ?? current.authTokens;
+    return save(op, {
+      ...response,
+      ...(tokens ? { authTokens: tokens, ...(refreshAuthTokens ? { sessionToken: tokens.authToken } : {}) } : {}),
+    }, current.authProvider);
+  }
+
+  async function restoreToss(op: Operation, forceRefresh = false) {
+    const stored = await read(op, tossSessionStorageKey);
+    if (!stored) return null;
+    try { return await loadStored(op, stored, forceRefresh); }
+    catch (error) {
       op.check();
       if (isInvalidSessionError(error) !== true) throw error;
       await clear(op, [tossSessionStorageKey]);
       return null;
     }
-    return save(op, response, "toss");
   }
 
-  async function restoreApp(op: Operation) {
+  async function restoreApp(op: Operation, forceRefresh = false) {
     const stored = await read(op, appSessionStorageKey);
-    if (!stored) return restoreToss(op);
-    let response: AppSessionManagerResponse<TUser>;
-    try {
-      op.check();
-      response = await loadSession(sessionLoadInput(stored), { signal: op.signal });
-      op.check();
-    } catch (error) {
+    if (!stored) return restoreToss(op, forceRefresh);
+    try { return await loadStored(op, stored, forceRefresh); }
+    catch (error) {
       op.check();
       if (isInvalidSessionError(error) !== true) throw error;
       await clear(op, stored.authProvider === "toss" ? [appSessionStorageKey, tossSessionStorageKey] : [appSessionStorageKey]);
       return null;
     }
-    return save(op, response, stored.authProvider);
   }
 
   async function bootstrapApp(op: Operation) {
@@ -468,13 +499,41 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     return save(op, response, "toss");
   }
 
+  let acquisition: Promise<ReturnType<typeof withAuthProvider<TUser>>> | undefined;
+  let acquisitionForced = false;
+  let generation = 0;
+  function acquire(forceRefresh = false): Promise<ReturnType<typeof withAuthProvider<TUser>>> {
+    if (acquisition) {
+      if (!forceRefresh || acquisitionForced) return acquisition;
+      const ownGeneration = generation;
+      return acquisition.then(() => {
+        if (generation !== ownGeneration) throw new StaleAppSessionOperationError();
+        return acquire(true);
+      });
+    }
+    const pending = operations.run(async op => (await restoreApp(op, forceRefresh)) ?? bootstrapApp(op));
+    acquisition = pending;
+    acquisitionForced = forceRefresh;
+    const clearPending = () => { if (acquisition === pending) acquisition = undefined; };
+    pending.then(clearPending, clearPending);
+    return pending;
+  }
+  function supersede() { generation++; acquisition = undefined; operations.cancel(); }
+
   return {
-    restoreStoredTossSession: () => operations.run(restoreToss),
-    restoreStoredAppSession: () => operations.run(restoreApp),
-    bootstrapAnonymousSession: () => operations.run(bootstrapApp),
-    getOrCreateAppSession: () => operations.run(async op => (await restoreApp(op)) ?? bootstrapApp(op)),
-    signInWithToss: () => operations.run(signIn),
-    getOrSignInWithToss: () => operations.run(async op => {
+    /** Persist tokens from an app-owned account-link flow and cancel older work. */
+    adoptAppSession: (response: AppSessionManagerResponse<TUser>, provider: AppAuthProvider = "anonymous") => {
+      supersede();
+      return operations.run(op => save(op, response, provider));
+    },
+    /** Force refresh for expiry timers or rejected requests, retaining bootstrap recovery. */
+    renewAppSession: () => acquire(true),
+    restoreStoredTossSession: () => { supersede(); return operations.run(restoreToss); },
+    restoreStoredAppSession: () => { supersede(); return operations.run(restoreApp); },
+    bootstrapAnonymousSession: () => { supersede(); return operations.run(bootstrapApp); },
+    getOrCreateAppSession: () => acquire(),
+    signInWithToss: () => { supersede(); return operations.run(signIn); },
+    getOrSignInWithToss: () => { supersede(); return operations.run(async op => {
       let restored;
       try { restored = await restoreToss(op); }
       catch (error) {
@@ -482,9 +541,9 @@ export function createAppsInTossSessionManager<TUser = unknown>({
         op.check();
       }
       return restored ?? signIn(op);
-    }),
-    clearSessions: () => operations.run(op => clear(op, [tossSessionStorageKey, appSessionStorageKey])),
-    cancelPendingOperations: operations.cancel,
+    }); },
+    clearSessions: () => { supersede(); return operations.run(op => clear(op, [tossSessionStorageKey, appSessionStorageKey])); },
+    cancelPendingOperations: supersede,
   };
 }
 
@@ -541,8 +600,8 @@ async function readStoredSession<TUser>(
   storage: KeyValueStorage,
   key: string,
 ): Promise<StoredAppSession<TUser> | null> {
+  const raw = await storage.getItem(key);
   try {
-    const raw = await storage.getItem(key);
     if (!raw) {
       return null;
     }
