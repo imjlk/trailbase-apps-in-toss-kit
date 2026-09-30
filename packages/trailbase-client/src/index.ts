@@ -452,10 +452,17 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     if (!refreshAuthTokens) return save(op, response, current.authProvider);
     // Data-only endpoints need not echo credentials. Prefer explicitly returned new tokens.
     const tokens = normalizeTrailBaseAuthTokens(response) ?? current.authTokens;
-    return save(op, {
+    const next = {
       ...response,
       ...(tokens ? { authTokens: tokens, sessionToken: tokens.authToken } : {}),
-    }, current.authProvider);
+    };
+    const previous = { ...current, sessionToken: current.authTokens?.authToken ?? current.sessionToken };
+    // Fresh domain data is returned but not persisted by this manager. Avoid
+    // bridge writes for unchanged credentials/user, including the post-refresh load.
+    if (serializedSession(previous, current.authProvider) === serializedSession(next, current.authProvider)) {
+      return withAuthProvider(next, current.authProvider);
+    }
+    return save(op, next, current.authProvider);
   }
 
   async function restoreToss(op: Operation, forceRefresh = false) {
@@ -641,17 +648,18 @@ async function writeSession<TUser>(
   response: AppSessionManagerResponse<TUser>,
   authProvider: AppAuthProvider,
 ) {
+  await storage.setItem(key, serializedSession(response, authProvider));
+}
+
+function serializedSession<TUser>(response: AppSessionManagerResponse<TUser>, authProvider: AppAuthProvider) {
   const sessionToken = stringCandidate(response.sessionToken);
   const authTokens = normalizeTrailBaseAuthTokens(response);
-  await storage.setItem(
-    key,
-    JSON.stringify({
-      authProvider,
-      ...(sessionToken ? { sessionToken } : {}),
-      ...(authTokens ? { authTokens } : {}),
-      user: response.user,
-    }),
-  );
+  return JSON.stringify({
+    authProvider,
+    ...(sessionToken ? { sessionToken } : {}),
+    ...(authTokens ? { authTokens } : {}),
+    user: response.user,
+  });
 }
 
 function sessionLoadInput<TUser>(session: StoredAppSession<TUser>): AppSessionLoadInput {

@@ -8,11 +8,12 @@ function setup(options: Partial<AppsInTossSessionManagerOptions<{ id: string }>>
   const bootstrap = mock(async () => ({ authTokens: tokens, user: { id: "a" } }));
   const refreshAuthTokens = mock(async () => renewed);
   const loadSession = mock(async () => ({ user: { id: "a" }, rewards: { count: 2 } }));
-  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); } };
+  const writes = mock((key: string, value: string) => { values.set(key, value); });
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: writes };
   const manager = createAppsInTossSessionManager({ storage, bootstrap, refreshAuthTokens, loadSession,
     appLogin: async () => ({ authorizationCode: "x", referrer: "DEFAULT" }),
     completeTossLogin: async () => ({ authTokens: renewed, user: { id: "b" } }), ...options });
-  return { manager, values, bootstrap, refreshAuthTokens, loadSession };
+  return { manager, values, bootstrap, refreshAuthTokens, loadSession, writes };
 }
 test("revisit restores tokens and fresh data without password login or refresh", async () => {
   const s = setup();
@@ -139,4 +140,23 @@ test("queued renewal cannot run after disconnect supersedes restoration", async 
   expect(await renewal).toBeInstanceOf(StaleAppSessionOperationError);
   expect(s.refreshAuthTokens).not.toHaveBeenCalled();
   expect(s.values.get("trailbase.appSession")).toBe("");
+});
+
+test("unchanged restored credentials avoid native writes while returning fresh data", async () => {
+  const s = setup();
+  await s.manager.getOrCreateAppSession();
+  s.writes.mockClear();
+  expect((await s.manager.getOrCreateAppSession()).rewards).toEqual({count:2});
+  expect(s.writes).not.toHaveBeenCalled();
+  await s.manager.renewAppSession();
+  // One marker/write/marker sequence for rotation, no duplicate write after state loading.
+  expect(s.writes).toHaveBeenCalledTimes(3);
+});
+test("changed user data is persisted even when credentials are unchanged", async () => {
+  const s = setup({loadSession: async () => ({user:{id:"a",name:"updated"}})});
+  await s.manager.getOrCreateAppSession();
+  s.writes.mockClear();
+  await s.manager.getOrCreateAppSession();
+  expect(s.writes).toHaveBeenCalledTimes(3);
+  expect(JSON.parse(s.values.get("trailbase.appSession")!).user.name).toBe("updated");
 });
