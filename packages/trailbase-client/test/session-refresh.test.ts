@@ -201,3 +201,27 @@ test("a Toss refresh synchronizes both mirrors once before loading unchanged use
   expect(s.writes).toHaveBeenCalledTimes(4);
   expect(s.values.get("trailbase.appSession")).toBe(s.values.get("trailbase.tossSession"));
 });
+test("anonymous identity writes settle before a superseding login reads the identity", async () => {
+  const values = new Map<string,string>();
+  let finish!:()=>void;
+  let paused=false;
+  let nextHash=0;
+  let linkedHash="";
+  const s=setup({
+    storage:{getItem:key=>values.get(key)??null,setItem:async(key,value)=>{
+      if(key==="trailbase.anonymousHash") {paused=true;await new Promise<void>(resolve=>{finish=resolve;});}
+      values.set(key,value);
+    }},
+    createAnonymousHash:()=>`identity-${++nextHash}`,
+    completeTossLogin:async input=>{linkedHash=input.anonymousHash;return {authTokens:renewed,user:{id:"a"}};},
+  });
+  const old=s.manager.getOrCreateAppSession().catch(error=>error);
+  while(!paused)await new Promise(resolve=>setTimeout(resolve,0));
+  const linked=s.manager.signInWithToss();
+  finish();
+  expect(await old).toBeInstanceOf(StaleAppSessionOperationError);
+  await linked;
+  expect(linkedHash).toBe("identity-1");
+  expect(values.get("trailbase.anonymousHash")).toBe(linkedHash);
+  expect(nextHash).toBe(1);
+});

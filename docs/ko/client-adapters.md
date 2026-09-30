@@ -407,4 +407,4 @@ Android 시스템 뒤로가기, 지원 제스처를 확인하세요. 이전 화�
 
 세션 복원·갱신, 계정 연결 반영, 오류 처리는 [세션 수명 관리](session-lifecycle.md#익명-세션-복원과-갱신)를 참고하세요.
 
-RN 인증 정보를 유지할 때 `createAppsInTossSessionStorage`의 `revalidateAnonymousHash: true`를 설정하세요. 세션을 읽기 전에 SDK의 현재 식별값을 확인하고, 값이 바뀌면 두 세션 키를 모두 지운 뒤 새 식별값을 저장합니다. SDK/저장소 실패 시 다른 계정을 복원하지 않고 오류를 전달합니다. 개발 fallback에서는 보통 이 옵션을 끕니다. 공식 Storage 문서는 재시작 후 유지를 설명하지만 계정 전환 격리를 보장하지 않습니다: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
+RN 인증 정보를 유지할 때 `createAppsInTossSessionStorage`의 `revalidateAnonymousHash: true`를 설정하세요. 세션을 읽기 전에 SDK의 현재 식별값을 확인하고, 값이 바뀌면 두 세션 키를 모두 지운 뒤 새 식별값을 저장합니다. SDK/저장소 실패 시 다른 계정을 복원하지 않고 오류를 전달합니다. 이 옵션은 production에서만 동작하며 개발 fallback은 저장된 식별값을 유지합니다. 공식 Storage 문서는 재시작 후 유지를 설명하지만 계정 전환 격리를 보장하지 않습니다: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .

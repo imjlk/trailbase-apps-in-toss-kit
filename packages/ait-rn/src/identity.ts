@@ -1,6 +1,7 @@
 import { createReactNativeIdentity } from "@ait-kit/sdk/rn";
 import {
   createAnonymousHash,
+  StaleAppSessionOperationError,
   type KeyValueStorage,
 } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
@@ -54,7 +55,7 @@ export interface ResolveAppsInTossAnonymousHashOptions {
 
 export interface CreateAppsInTossIdentityStorageOptions
   extends ResolveAppsInTossAnonymousHashOptions {
-  /** Resolve the SDK identity before restoring credentials; invalidate all session keys on change. */
+  /** Production only: resolve the SDK identity before restoring credentials; invalidate all session keys on change. */
   revalidateAnonymousHash?: boolean;
   anonymousHashStorageKey?: string;
   appSessionStorageKey?: string | readonly string[];
@@ -131,9 +132,21 @@ export function createAppsInTossIdentityStorage(
 ): KeyValueStorage {
   const production = resolverOptions.production ?? isProductionRuntime();
 
-  async function resolveStoredAnonymousHash() {
+  const revalidate = production && revalidateAnonymousHash;
+  let writeTail: Promise<void> = Promise.resolve();
+  function checkActive(signal?: AbortSignal) {
+    if (signal?.aborted) throw new StaleAppSessionOperationError();
+  }
+  function write(key: string, value: string, signal?: AbortSignal) {
+    const result = writeTail.then(() => { checkActive(signal); return storage.setItem(key, value); });
+    // Include identity invalidation and normal session writes in the same queue.
+    writeTail = result.catch(() => {});
+    return result;
+  }
+  async function resolveStoredAnonymousHash(signal?: AbortSignal) {
     const existing = await storage.getItem(anonymousHashStorageKey);
-    if (!revalidateAnonymousHash && existing && (!production || isAppsInTossAnonymousHash(existing))) {
+    checkActive(signal);
+    if (!revalidate && existing && (!production || isAppsInTossAnonymousHash(existing))) {
       return { refreshed: false, value: existing };
     }
 
@@ -141,24 +154,28 @@ export function createAppsInTossIdentityStorage(
       ...resolverOptions,
       production,
     });
-    if (revalidateAnonymousHash && existing !== next) {
+    checkActive(signal);
+    if (revalidate && existing !== next) {
       // Clear every credential mirror before publishing the new identity. If a
       // write fails the old identity remains, so the next attempt repeats cleanup.
       const keys = typeof appSessionStorageKey === "string" ? [appSessionStorageKey] : appSessionStorageKey;
-      for (const key of keys) await storage.setItem(key, "");
+      for (const key of keys) await write(key, "", signal);
     }
-    await storage.setItem(anonymousHashStorageKey, next);
+    if (existing !== next) await write(anonymousHashStorageKey, next, signal);
+    checkActive(signal);
     return { refreshed: existing !== next, value: next };
   }
 
   return {
-    async getItem(key) {
+    async getItem(key, options) {
+      await writeTail;
+      checkActive(options?.signal);
       if (key === anonymousHashStorageKey) {
-        return (await resolveStoredAnonymousHash()).value;
+        return (await resolveStoredAnonymousHash(options?.signal)).value;
       }
 
-      if ((production || revalidateAnonymousHash) && isAppSessionStorageKey(key, appSessionStorageKey)) {
-        const { refreshed } = await resolveStoredAnonymousHash();
+      if (production && isAppSessionStorageKey(key, appSessionStorageKey)) {
+        const { refreshed } = await resolveStoredAnonymousHash(options?.signal);
         if (refreshed) {
           return null;
         }
@@ -166,7 +183,7 @@ export function createAppsInTossIdentityStorage(
 
       return storage.getItem(key);
     },
-    setItem: (key, value) => storage.setItem(key, value),
+    setItem: (key, value) => write(key, value),
   };
 }
 

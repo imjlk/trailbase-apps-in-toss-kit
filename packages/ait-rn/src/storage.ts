@@ -8,16 +8,17 @@ import {
 import {
   createAppsInTossIdentityStorage,
   type ResolveAppsInTossAnonymousHashOptions,
+  type CreateAppsInTossIdentityStorageOptions,
 } from "./identity";
 import { isProductionEnv, resolveRuntimeEnv } from "./internal/runtime";
 
 export interface CreateAppsInTossSessionStorageOptions
   extends ResolveAppsInTossAnonymousHashOptions,
+    Pick<CreateAppsInTossIdentityStorageOptions, "revalidateAnonymousHash">,
     Pick<
       CreateAppsInTossKeyValueStorageOptions,
       "allowFallback" | "fallbackStorage" | "productionRequired"
     > {
-  revalidateAnonymousHash?: boolean;
   appKey: string;
   env?: string;
   storage?: AppsInTossStorageBridge | null;

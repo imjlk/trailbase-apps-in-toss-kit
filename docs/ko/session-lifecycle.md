@@ -152,6 +152,8 @@ namespace마다 매니저 하나를 사용하세요. 갱신 후 쓰기 요청을
 
 `refreshAuthTokens` 옵션을 사용하면 기본 인증 오류 분류는 401만 포함합니다. 기존 옵션 없는 소비 앱의 401/403 분류는 유지합니다.
 
-RN 인증 정보를 유지할 때 `createAppsInTossSessionStorage`의 `revalidateAnonymousHash: true`를 설정하세요. 세션을 읽기 전에 SDK의 현재 식별값을 확인하고, 값이 바뀌면 두 세션 키를 모두 지운 뒤 새 식별값을 저장합니다. SDK/저장소 실패 시 다른 계정을 복원하지 않고 오류를 전달합니다. 개발 fallback에서는 보통 이 옵션을 끕니다. 공식 Storage 문서는 재시작 후 유지를 설명하지만 계정 전환 격리를 보장하지 않습니다: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
+RN 인증 정보를 유지할 때 `createAppsInTossSessionStorage`의 `revalidateAnonymousHash: true`를 설정하세요. 세션을 읽기 전에 SDK의 현재 식별값을 확인하고, 값이 바뀌면 두 세션 키를 모두 지운 뒤 새 식별값을 저장합니다. SDK/저장소 실패 시 다른 계정을 복원하지 않고 오류를 전달합니다. 이 옵션은 production에서만 동작하며 개발 fallback은 저장된 식별값을 유지합니다. 공식 Storage 문서는 재시작 후 유지를 설명하지만 계정 전환 격리를 보장하지 않습니다: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
 
 갱신 옵션 사용 시 정규화된 익명 토큰과 사용자 정보가 같으면 native storage 쓰기를 생략합니다. 토스 세션 복원은 원본 키의 값이 같아도 두 저장 키를 동기화합니다. 토큰 갱신 시에는 데이터 조회 전에 이미 두 키가 동기화되므로 정보가 같다면 두 번째 쓰기를 생략합니다. 사용자 정보 변경이나 기존 토큰 형식의 정규화는 저장합니다.
+
+세션 저장소 읽기에는 선택적 AbortSignal이 전달됩니다. RN 식별 어댑터는 무효화·식별값 쓰기 전에 취소를 확인하고 인증 정보 쓰기와 같은 순서로 실행합니다. 늦은 SDK 결과가 새로 채택된 세션을 지우지 못하도록 합니다. 읽기 중 값을 바꾸는 자체 저장소 어댑터도 이 신호를 처리해야 합니다.

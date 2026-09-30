@@ -126,7 +126,7 @@ export function normalizeTrailBaseError(payload: unknown, fallback = "TrailBase 
 }
 
 export interface KeyValueStorage {
-  getItem(key: string): string | null | Promise<string | null>;
+  getItem(key: string, options?: { signal?: AbortSignal }): string | null | Promise<string | null>;
   setItem(key: string, value: string): void | Promise<void>;
 }
 
@@ -369,9 +369,15 @@ export function createAppsInTossSessionManager<TUser = unknown>({
     throw new Error("Session storage keys and the internal write marker must be distinct");
   }
 
-  function anonymousHash() {
+  function anonymousHash(op: Operation) {
     if (anonymousHashPromise) return anonymousHashPromise;
-    const pending = resolveAnonymousHash({ storage, storageKey: anonymousHashStorageKey, create: createHash });
+    const pending = resolveAnonymousHash({
+      storage: {
+        getItem: async (key, options) => { await storageTail; op.check(); return storage.getItem(key, options); },
+        setItem: (key, value) => persist(op, () => Promise.resolve(storage.setItem(key, value))),
+      },
+      storageKey: anonymousHashStorageKey, create: createHash, signal: op.signal,
+    });
     anonymousHashPromise = pending;
     const clearPending = () => { if (anonymousHashPromise === pending) anonymousHashPromise = undefined; };
     pending.then(clearPending, clearPending);
@@ -388,7 +394,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
 
   async function read(op: Operation, key: string) {
     await requireCompleteStorage(op);
-    const session = await readStoredSession<TUser>(storage, key);
+    const session = await readStoredSession<TUser>(storage, key, op.signal);
     op.check();
     return session;
   }
@@ -494,7 +500,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
 
   async function bootstrapApp(op: Operation) {
     await requireCompleteStorage(op);
-    const hash = await anonymousHash();
+    const hash = await anonymousHash(op);
     op.check();
     const response = await bootstrap(hash, { signal: op.signal });
     op.check();
@@ -503,7 +509,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
 
   async function signIn(op: Operation) {
     const [hash, login] = await Promise.all([
-      anonymousHash(), requestAppsInTossLogin({
+      anonymousHash(op), requestAppsInTossLogin({
         appLogin: () => { op.check(); return appLogin(); },
         getIsTossLoginIntegratedService,
       }),
@@ -567,12 +573,15 @@ export async function resolveAnonymousHash({
   storage,
   storageKey = "trailbase.anonymousHash",
   create = createAnonymousHash,
+  signal,
 }: {
+  signal?: AbortSignal;
   storage: KeyValueStorage;
   storageKey?: string;
   create?: () => string;
 }): Promise<string> {
-  const existing = await storage.getItem(storageKey);
+  const existing = await storage.getItem(storageKey, { signal });
+  if (signal?.aborted) throw new StaleAppSessionOperationError();
   if (existing) {
     return existing;
   }
@@ -615,8 +624,9 @@ function withAuthProvider<TUser>(
 async function readStoredSession<TUser>(
   storage: KeyValueStorage,
   key: string,
+  signal?: AbortSignal,
 ): Promise<StoredAppSession<TUser> | null> {
-  const raw = await storage.getItem(key);
+  const raw = await storage.getItem(key, { signal });
   try {
     if (!raw) {
       return null;
