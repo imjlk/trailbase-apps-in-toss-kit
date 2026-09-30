@@ -120,7 +120,7 @@ TrailBase에 로그인할 수 있습니다. 매 실행마다 로그인하지 않
 인증된 앱 데이터를 반환하는 API로 연결하세요.
 
 ```ts
-import { createTrailBaseTokenRefresher } from "@trailbase-apps-in-toss-kit/trailbase-client";
+import { createTrailBaseTokenRefresher, TrailBaseHttpError } from "@trailbase-apps-in-toss-kit/trailbase-client";
 // createAppsInTossSessionManager에 추가할 옵션:
 const sessionOptions = {
   refreshAuthTokens: createTrailBaseTokenRefresher({ baseUrl }),
@@ -149,3 +149,5 @@ JSON은 저장 정보 부재로 처리합니다. 백엔드/환경마다 저장�
 namespace마다 매니저 하나를 사용하세요. 갱신 후 쓰기 요청을 자동 재전송하지 마세요.
 멱등성과 재시도 판단은 앱이 담당합니다. 갱신 옵션은 선택 사항이며 자체 세션 토큰을
 사용하는 앱은 기존 콜백을 유지할 수 있습니다.
+
+`refreshAuthTokens` 옵션을 사용하면 기본 인증 오류 분류는 401만 포함합니다. 기존 옵션 없는 소비 앱의 401/403 분류는 유지합니다.

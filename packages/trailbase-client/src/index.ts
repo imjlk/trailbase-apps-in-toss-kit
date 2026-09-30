@@ -356,7 +356,7 @@ export function createAppsInTossSessionManager<TUser = unknown>({
   anonymousHashStorageKey = "trailbase.anonymousHash",
   tossSessionStorageKey = "trailbase.tossSession",
   appSessionStorageKey = "trailbase.appSession",
-  isInvalidSessionError = (error) => error instanceof TrailBaseHttpError && [401, 403].includes(error.status),
+  isInvalidSessionError = (error) => error instanceof TrailBaseHttpError && (error.status === 401 || (!refreshAuthTokens && error.status === 403)),
 }: AppsInTossSessionManagerOptions<TUser>) {
   const operations = createSessionOperationGuard();
   type Operation = SessionOperation;
@@ -444,11 +444,12 @@ export function createAppsInTossSessionManager<TUser = unknown>({
       response = await loadSession(sessionLoadInput(current), { signal: op.signal });
       op.check();
     }
+    if (!refreshAuthTokens) return save(op, response, current.authProvider);
     // Data-only endpoints need not echo credentials. Prefer explicitly returned new tokens.
     const tokens = normalizeTrailBaseAuthTokens(response) ?? current.authTokens;
     return save(op, {
       ...response,
-      ...(tokens ? { authTokens: tokens, ...(refreshAuthTokens ? { sessionToken: tokens.authToken } : {}) } : {}),
+      ...(tokens ? { authTokens: tokens, sessionToken: tokens.authToken } : {}),
     }, current.authProvider);
   }
 

@@ -110,3 +110,33 @@ test("expired access token refreshes before data request", async () => {
   expect(s.refreshAuthTokens).toHaveBeenCalledTimes(1);
   expect(s.loadSession.mock.calls[0]?.[0]?.authTokens).toEqual(renewed);
 });
+test("default refresh classification preserves a disabled/forbidden account", async () => {
+  const s = setup({loadSession: async () => {throw new TrailBaseHttpError("disabled", {status:403,statusText:"Forbidden",payload:null});}});
+  await s.manager.getOrCreateAppSession();
+  const before=s.values.get("trailbase.appSession");
+  await expect(s.manager.getOrCreateAppSession()).rejects.toThrow("disabled");
+  expect(s.values.get("trailbase.appSession")).toBe(before);
+  expect(s.refreshAuthTokens).not.toHaveBeenCalled();
+  expect(s.bootstrap).toHaveBeenCalledTimes(1);
+});
+test("forced renewal queued behind restoration still refreshes only once", async () => {
+  const s=setup();
+  await s.manager.getOrCreateAppSession();
+  await Promise.all([s.manager.getOrCreateAppSession(), s.manager.renewAppSession(), s.manager.renewAppSession()]);
+  expect(s.refreshAuthTokens).toHaveBeenCalledTimes(1);
+});
+test("queued renewal cannot run after disconnect supersedes restoration", async () => {
+  let finish!: () => void;
+  let started=false;
+  const s=setup({loadSession: async()=>{started=true;await new Promise<void>(resolve=>{finish=resolve;});return {user:{id:"a"}};}});
+  await s.manager.getOrCreateAppSession();
+  const restore=s.manager.getOrCreateAppSession().catch(e=>e);
+  while(!started) await new Promise(resolve=>setTimeout(resolve,0));
+  const renewal=s.manager.renewAppSession().catch(e=>e);
+  await s.manager.clearSessions();
+  finish();
+  expect(await restore).toBeInstanceOf(StaleAppSessionOperationError);
+  expect(await renewal).toBeInstanceOf(StaleAppSessionOperationError);
+  expect(s.refreshAuthTokens).not.toHaveBeenCalled();
+  expect(s.values.get("trailbase.appSession")).toBe("");
+});

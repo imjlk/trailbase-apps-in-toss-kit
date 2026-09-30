@@ -17,7 +17,8 @@ Explicit anonymous bootstrap also refuses an incomplete namespace; clear it or
 perform a fresh Toss sign-in first. Storage key names and the marker must be distinct.
 Restoration preserves credentials on network, timeout and server failures. Only
 `isInvalidSessionError(error) === true` clears rejected credentials; by default this
-recognizes `TrailBaseHttpError` 401/403. Custom backend adapters should supply their
+recognizes `TrailBaseHttpError` 401/403 for legacy consumers and only 401 when
+`refreshAuthTokens` is enabled. Custom backend adapters should supply their
 own authoritative invalid/revoked-session predicate. Other errors remain retryable.
 
 `createAppsInTossSessionLifecycle` adds a single entry point for account transitions
@@ -127,7 +128,7 @@ session manager, and make `loadSession` an authenticated app-data endpoint that 
 not issue tokens or invoke bootstrap.
 
 ```ts
-import { createTrailBaseTokenRefresher } from "@trailbase-apps-in-toss-kit/trailbase-client";
+import { createTrailBaseTokenRefresher, TrailBaseHttpError } from "@trailbase-apps-in-toss-kit/trailbase-client";
 // Additional createAppsInTossSessionManager options:
 const sessionOptions = {
   refreshAuthTokens: createTrailBaseTokenRefresher({ baseUrl }),
