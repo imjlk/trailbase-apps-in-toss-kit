@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-web
 
+## 0.3.3 — 2026-09-30
+
+### Patch changes
+
+- Updated dependencies: trailbase-client (npm)@1.3.0
+
 ## 0.3.2 — 2026-09-28
 
 ### Patch changes
