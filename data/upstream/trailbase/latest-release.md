@@ -1,17 +1,14 @@
-# TrailBase v0.33.22
+# TrailBase v0.34.2
 
-- Published at: 2026-09-23T16:46:17Z
-- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.33.22
+- Published at: 2026-09-30T19:16:18Z
+- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.34.2
 
 ## Release notes
 
-- Fix behavior when a Rust WASM guest panics:
-  - Respond right away with the error w/o relying on a timeout.
-  - Remove trapped component from shared instance pool to avoid poisoning.
-- Add support for SQL `execute_batch` to JS/TS WASM guests.
-- Add integration test coverage for JS/TS WASM components. Still needs to be enabled in CI.
-- Overhaul integration tests.
+- Push expensive password hashing off the async runtime and add an explicit timeout of 5s.
+  - Add test coverage for the flooded logins.
+- Use exponential moving average plus some randomness to better handle the password-hash equivalent wait in the missing-user case.
 - Update dependencies.
 
 
-**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.33.21...v0.33.22
+**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.34.1...v0.34.2
