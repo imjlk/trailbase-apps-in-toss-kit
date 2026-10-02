@@ -3,7 +3,7 @@ import { createAffiliateCache } from '../src/affiliate/cache.mjs';
 import { createAffiliateCatalog, resolveAffiliateCategories } from '../src/affiliate/selection.mjs';
 import { createTossSharelinkProvider } from '../src/affiliate/toss-sharelink.mjs';
 import { createAffiliateService } from '../src/affiliate/service.mjs';
-import { mkdtemp, readdir, stat, rm } from 'node:fs/promises';
+import { chmod, mkdtemp, readdir, stat, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,6 +48,23 @@ test('disk pruning removes expired and excess entries', async () => {
     expect((await readdir(directory)).length).toBeLessThanOrEqual(2);
     expect(await cache.get('four')).toBe('four');
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('corrupt cache files are removed and unreadable directory scans do not fail a successful write', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'affiliate-housekeeping-test-'));
+  try {
+    const corrupt = `${'a'.repeat(64)}.json`;
+    await writeFile(join(directory, corrupt), 'not JSON');
+    const cache = createAffiliateCache({ directory, maxEntries: 1, now: () => NOW });
+    await cache.set('valid', 'retained', NOW + 1000);
+    expect(await readdir(directory)).not.toContain(corrupt);
+    // A writable/searchable directory can still forbid directory enumeration.
+    // This reproduces housekeeping EACCES without mocking provider requests.
+    await chmod(directory, 0o300);
+    if (process.getuid?.() !== 0) await expect(readdir(directory)).rejects.toMatchObject({ code: 'EACCES' });
+    expect(await cache.set('new', 'successful', NOW + 1000)).toBe('successful');
+    expect(await cache.get('new')).toBe('successful');
+  } finally { await chmod(directory, 0o700); await rm(directory, { recursive: true, force: true }); }
 });
 
 test('native timeout/network errors are sanitized and pause direct adapter retries', async () => {

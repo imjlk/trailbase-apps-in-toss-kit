@@ -26,7 +26,11 @@ export function createAffiliateCache({ directory, now = Date.now, maxEntries = 5
         if (!Number.isFinite(entry.expiresAt) || entry.expiresAt <= now()) {
           await unlink(path);
         } else live.push({ path, modified: (await stat(path)).mtimeMs });
-      } catch { /* A concurrent atomic replacement/eviction can remove a cache file. */ }
+      } catch {
+        // Invalid/unreadable cache entries are expendable, including files
+        // concurrently removed by another sweep. Do not retain corrupt files.
+        await unlink(path).catch(() => {});
+      }
     }
     live.sort((a, b) => b.modified - a.modified);
     await Promise.all(live.slice(maxEntries).map(({ path }) => unlink(path).catch(() => {})));
@@ -51,7 +55,7 @@ export function createAffiliateCache({ directory, now = Date.now, maxEntries = 5
         await rename(temporary, target);
       } finally { await unlink(temporary).catch(() => {}); }
       if ((writes++ % Math.min(maxEntries, 64)) === 0 && !pruning) {
-        pruning = prune();
+        pruning = prune().catch(() => { /* Housekeeping must not fail a persisted write. */ });
         try { await pruning; } finally { pruning = undefined; }
       }
     }
