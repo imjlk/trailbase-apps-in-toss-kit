@@ -8,6 +8,28 @@ import {
 
 export type AppsInTossOperationalEnvironment = "sandbox" | "toss" | "unknown";
 export type AppsInTossPlatformOS = "android" | "ios" | "unknown";
+
+/** A missing or stalled optional native probe must not block read refreshes. */
+export async function safeGetAppsInTossNetworkStatus({
+  getNetworkStatus,
+  timeoutMs = 3_000,
+}: {
+  getNetworkStatus?: () => Promise<unknown>;
+  timeoutMs?: number;
+} = {}): Promise<unknown> {
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return "UNKNOWN";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      (async () => {
+        const read = getNetworkStatus ?? await defaultFrameworkFunction("getNetworkStatus");
+        return read ? await read() : "UNKNOWN";
+      })(),
+      new Promise((resolve) => { timer = setTimeout(() => resolve("UNKNOWN"), timeoutMs); }),
+    ]);
+  } catch { return "UNKNOWN"; }
+  finally { if (timer !== undefined) clearTimeout(timer); }
+}
 export type AppsInTossMinVersionRequirement =
   | `${number}.${number}.${number}`
   | "always"

@@ -101,6 +101,11 @@ export function createReviewRequestController({
           return { status: "failed", reason: "storage_unavailable" };
         }
 
+        // Storage can yield while the user changes account, route, or opens an overlay.
+        const finalScreen = await readScreenState();
+        if (!isUsableScreen(finalScreen) || !sameContext(initialScreen, finalScreen)) {
+          return skip("stale_context");
+        }
         sessionAttempted = true;
         safeReport({ type: "review_request_attempted" });
         try {

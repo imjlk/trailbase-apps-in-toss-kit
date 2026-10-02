@@ -251,3 +251,32 @@ test("swallows async telemetry failures while keeping the optional request usabl
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(state.stored.lastAttemptAt, 1_000);
 });
+
+test("rechecks account and overlay after the asynchronous attempt write", async () => {
+  let contextKey = "a";
+  let calls = 0;
+  const controller = createReviewRequestController({
+    review: { isSupported: async () => true, request: async () => { calls++; } },
+    storage: { get: async () => null, set: async () => { contextKey = "b"; } },
+    getScreenState: () => ({ foreground: true, blockingOverlay: false, contextKey }),
+  });
+  assert.deepEqual(await controller.maybeRequest(), { status: "skipped", reason: "stale_context" });
+  assert.equal(calls, 0);
+  for (const change of ["overlay", "background"]) {
+    const events = [];
+    let afterWrite = false;
+    const guarded = createReviewRequestController({
+      review: { isSupported: async () => true, request: async () => { calls++; } },
+      storage: { get: async () => null, set: async () => { afterWrite = true; } },
+      getScreenState: () => ({
+        foreground: !(afterWrite && change === "background"),
+        blockingOverlay: afterWrite && change === "overlay",
+        contextKey: "a",
+      }),
+      report: (event) => events.push(event),
+    });
+    assert.deepEqual(await guarded.maybeRequest(), { status: "skipped", reason: "stale_context" });
+    assert.equal(calls, 0);
+    assert.deepEqual(events, [{ type: "review_request_skipped", reason: "stale_context" }]);
+  }
+});

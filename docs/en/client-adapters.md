@@ -432,3 +432,5 @@ reported review issue is resolved.
 Session restore/refresh integration, account adoption, and failure handling are described in [session lifecycle](session-lifecycle.md#restore-and-refresh-anonymous-sessions).
 
 Enable `revalidateAnonymousHash: true` on `createAppsInTossSessionStorage` for persisted RN authentication. It resolves the current SDK identity before session reads, clears both credential mirrors before storing a changed identity, and propagates SDK/storage failures instead of restoring another account. This option takes effect only in production; development fallbacks retain their stored identity. Official Storage documents persistence across restarts but does not promise account-switch isolation: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/storage/storage.getitem .
+
+For entry attribution, actual viewport exposure, foreground reads, and review integration, see [engagement signals](engagement.md).

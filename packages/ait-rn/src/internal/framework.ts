@@ -59,6 +59,7 @@ export type AppsInTossFrameworkModule = Partial<
     | "Analytics"
     | "appLogin"
     | "getAnonymousKey"
+    | "getNetworkStatus"
     | "getIsTossLoginIntegratedService"
     | "getOperationalEnvironment"
     | "getPlatformOS"
