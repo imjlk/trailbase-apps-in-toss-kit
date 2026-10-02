@@ -72,15 +72,17 @@ SDK 성공 이벤트는 UI 결과이며 결제·권한의 서버 증명이 아�
 
 설정 파일 `apps-in-toss.config.ts`, 빌드 명령, Devtools는
 [공식 SDK 3 전환 가이드](https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x)를
-따릅니다. 현재 가이드는 직접 사용한 localStorage 데이터를 유지해야 한다면 전환을
-보류하도록 안내합니다. Kit은 origin 저장소를 자동 변환하지 않습니다. 가이드에 따르면
-SDK 3 번들 출시 후에는 SDK 2로 롤백할 수 없습니다.
+따릅니다. 현재 가이드는 SDK 2의 localStorage 데이터를 유지하려면 SDK 3.1.1 이상을
+사용하도록 안내합니다. SDK 3.0.0–3.1.0은 다른 origin을 사용했습니다. Kit은 저장소를
+복사하거나 자동 변환하지 않으며, SDK 3 번들 출시 후 SDK 2 롤백은 지원되지 않습니다.
 
-CORS는 실제 콘솔 번들의 origin으로 확인하세요. 2026년 8월 25일 날짜가 있는
-[출시·테스트 안내](https://developers-apps-in-toss.toss.im/guide/operation/toss)는 새 SDK 3 업로드에
-`apps.tossmini.com`/`private-apps.tossmini.com`을 사용하지만 일반 전환 가이드에는 아직
-`web`/`private-web`이 기재돼 있습니다. 현재 콘솔 공지와 앱별 명시적 origin을 적용하고
-와일드카드 허용이나 RN origin 변경을 가정하지 않습니다. Kit은 소비 앱 CORS를 변경하지 않습니다.
+CORS는 실제 콘솔 번들의 origin으로 확인하세요.
+[출시·테스트 안내](https://developers-apps-in-toss.toss.im/guide/operation/toss)는 SDK 3.1.1 이상과
+SDK 1/2에서 `apps.tossmini.com`/`private-apps.tossmini.com`, SDK 3.0.0–3.1.0에서
+`web`/`private-web`을 안내합니다. 일반 전환 가이드의 CORS 절은 여전히 이전 주소를
+기재하므로 버전별 안내와 실제 관측 origin을 우선합니다. 와일드카드 대신 앱의 명시적
+origin을 사용하며 RN에 WebView CORS 검사를 적용하지 않습니다.
+[기기 진단 도구](device-diagnostics.md)를 참고하세요.
 
 `bun test packages/ait-web`, 두 `packages:typecheck` 명령과 브라우저 번들을 실행합니다.
 명시적 SDK fixture로 정리, 미지원 메서드, 지급 실패, sandbox 로그인 유지, 식별자
