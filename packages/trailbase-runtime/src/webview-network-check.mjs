@@ -57,9 +57,12 @@ export function createWebViewNetworkCheck({ name = 'WebView API preflight', requ
           timer = setTimeout(() => { expired = true; controller.abort(); reject(Error()); }, timeout);
         })]);
         const allowedHeaders = tokens(response.headers.get('access-control-allow-headers'));
+        // Fetch permits CORS-safelisted methods even when this header omits them.
+        const methodAllowed = ['GET', 'HEAD', 'POST'].includes(method) ||
+          tokens(response.headers.get('access-control-allow-methods')).includes(method.toLowerCase());
         const ok = response.status >= 200 && response.status < 300 &&
           response.headers.get('access-control-allow-origin') === origin &&
-          tokens(response.headers.get('access-control-allow-methods')).includes(method.toLowerCase()) &&
+          methodAllowed &&
           requestHeaders.every(header => allowedHeaders.includes(header.toLowerCase())) &&
           (!credentials || response.headers.get('access-control-allow-credentials') === 'true');
         if (!ok) failures.push(`Origin ${index + 1}: preflight headers/status did not satisfy the requested contract`);

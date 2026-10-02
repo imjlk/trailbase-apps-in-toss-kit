@@ -30,6 +30,19 @@ test('existing route query parameters obey the same allowlist',()=>{
  const url = new URL(createDeviceTestScheme({scheme:issued,deploymentId:id,allowedQueryKeys:['entry']}));
  expect(JSON.parse(url.searchParams.get('queryParams'))).toEqual({entry:'direct'});
 });
+test('route additions preserve issued query values and explicitly override matching keys',()=>{
+ const issued = `${scheme}&queryParams=${encodeURIComponent(JSON.stringify({entry:'direct',source:'old'}))}`;
+ const url = new URL(createDeviceTestScheme({scheme:issued,deploymentId:id,query:{pollId:'fixture-1',source:'new'},allowedQueryKeys:['entry','source','pollId']}));
+ expect(JSON.parse(url.searchParams.get('queryParams'))).toEqual({entry:'direct',source:'new',pollId:'fixture-1'});
+});
+test('new route values cannot bypass validation or the combined query size limit',()=>{
+ for (const existing of [null, ['entry'], 'direct', {entry:{nested:true}}, {accessToken:'secret'}]) {
+  const issued = `${scheme}&queryParams=${encodeURIComponent(JSON.stringify(existing))}`;
+  expect(()=>createDeviceTestScheme({scheme:issued,deploymentId:id,query:{entry:'direct'},allowedQueryKeys:['entry','accessToken']})).toThrow();
+ }
+ const issued = `${scheme}&queryParams=${encodeURIComponent(JSON.stringify({entry:'a'.repeat(2500)}))}`;
+ expect(()=>createDeviceTestScheme({scheme:issued,deploymentId:id,query:{source:'b'.repeat(2500)},allowedQueryKeys:['entry','source']})).toThrow('Test query exceeds size limit');
+});
 test('plans bind the artifact and leave every actual device check unverified',()=>{
  const artifact={appName:'demo',version:'1.3.0',commit:'a'.repeat(40),sha256:'b'.repeat(64),deploymentId:id};
  const report=createDeviceTestPlan({artifact,scheme,routes:[{name:'result',path:'/result'}]});

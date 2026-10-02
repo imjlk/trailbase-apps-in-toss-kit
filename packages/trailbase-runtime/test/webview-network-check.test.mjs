@@ -29,6 +29,29 @@ test('malformed configuration, RN skip and stalled transport do not contact unre
   const fail=await createWebViewNetworkCheck({...options,fetcher}).run();
   expect(JSON.stringify(fail)).not.toContain('token-secret');
 });
+test('safelisted methods do not require an allow-methods echo but unsafe methods do', async () => {
+  const check = async (method, allowedMethod) => createWebViewNetworkCheck({...options, method, fetcher:async (_,init)=>new Response(null,{status:204,headers:{
+    'Access-Control-Allow-Origin':init.headers.Origin,
+    'Access-Control-Allow-Headers':'Authorization, Content-Type',
+    ...(allowedMethod ? {'Access-Control-Allow-Methods':allowedMethod} : {}),
+  }})}).run();
+  for (const method of ['GET','HEAD','POST']) {
+    expect((await check(method)).ok).toBe(true);
+    expect((await check(method,'PATCH')).ok).toBe(true);
+  }
+  for (const method of ['PUT','PATCH','DELETE']) {
+    expect((await check(method)).ok).toBe(false);
+    expect((await check(method,'POST')).ok).toBe(false);
+    expect((await check(method,method)).ok).toBe(true);
+  }
+});
+test('safelisted methods still require exact origin, requested headers and successful status', async () => {
+  const baseHeaders = {'Access-Control-Allow-Origin':appsInTossWebOrigins(options)[0],'Access-Control-Allow-Headers':'Authorization, Content-Type'};
+  for (const patch of [{status:403},{headers:{...baseHeaders,'Access-Control-Allow-Origin':'*'}},{headers:{...baseHeaders,'Access-Control-Allow-Headers':'Content-Type'}}]) {
+    const result=await createWebViewNetworkCheck({...options,origins:[baseHeaders['Access-Control-Allow-Origin']],fetcher:async()=>new Response(null,{status:204,headers:baseHeaders,...patch})}).run();
+    expect(result.ok).toBe(false);
+  }
+});
 test('Release Doctor accepts the new opt-in check without changing existing configuration', async () => {
   const checks=createReleaseDoctorChecksFromConfig({checks:[{type:'webview-network',runtime:'rn'}]});
   const result=await runReleaseDoctor({checks}); expect(result.skipped).toBe(1);

@@ -30,13 +30,14 @@ export function createDeviceTestScheme({ scheme, deploymentId, path, query = {},
   // Validate an existing query too; accepting an issued scheme must not bypass the allowlist.
   const existingQuery = url.searchParams.get('queryParams');
   if (existingQuery !== null) assert(existingQuery.length <= 4096, 'Test query exceeds size limit');
-  const effectiveQuery = Object.keys(query).length ? query : existingQuery === null ? {} : JSON.parse(existingQuery);
-  assert(effectiveQuery && typeof effectiveQuery === 'object' && !Array.isArray(effectiveQuery), 'Invalid test query');
+  const parsedQuery = existingQuery === null ? {} : JSON.parse(existingQuery);
+  assert(parsedQuery && typeof parsedQuery === 'object' && !Array.isArray(parsedQuery), 'Invalid test query');
   assert(Array.isArray(allowedQueryKeys), 'Invalid query allowlist');
-  for (const [key,value] of Object.entries(effectiveQuery)) {
+  for (const [key,value] of [...Object.entries(parsedQuery), ...Object.entries(query)]) {
     assert(allowedQueryKeys.includes(key) && !/(?:token|secret|password|authorization|userkey|hmac|sealed)/i.test(key), 'Test query key is not allowed');
     assert(['string','boolean','number'].includes(typeof value) && (typeof value !== 'number' || Number.isFinite(value)), 'Invalid test query value');
   }
+  const effectiveQuery = { ...parsedQuery, ...query };
   if (Object.keys(effectiveQuery).length) {
     const json=JSON.stringify(effectiveQuery); assert(json.length <= 4096, 'Test query exceeds size limit');
     url.searchParams.set('queryParams',json);

@@ -27,11 +27,13 @@ Release Doctor supports an opt-in `webview-network` check:
 }
 ```
 
-Run through the existing `trailbase-release-doctor --config <file>`. The checker sends header-only OPTIONS requests, follows no redirects and includes no cookies or authorization values. It requires exact origin and requested methods/headers; it does not broaden CORS. Supply `origins` explicitly when testing observed console origins or unsupported future SDK versions. Default version mapping follows the current [version-specific notice](https://developers-apps-in-toss.toss.im/guide/operation/toss). `runtime: rn` skips the CORS probe; it is not RN connectivity evidence. `allowLocalHttp: true` is loopback-only for fixtures. Each request has a bounded deadline. A pass verifies preflight only, not application auth, actual API behavior or device SDK support.
+Run through the existing `trailbase-release-doctor --config <file>`. The checker sends header-only OPTIONS requests, follows no redirects and includes no cookies or authorization values. It requires exact origin and explicit requested headers; GET/HEAD/POST follow Fetch's CORS-safelisted method rule, while PUT/PATCH/DELETE require an explicit allowed method. It does not broaden CORS. Supply `origins` explicitly when testing observed console origins or unsupported future SDK versions. Default version mapping follows the current [version-specific notice](https://developers-apps-in-toss.toss.im/guide/operation/toss). `runtime: rn` skips the CORS probe; it is not RN connectivity evidence. `allowLocalHttp: true` is loopback-only for fixtures. Each request has a bounded deadline. A pass verifies preflight only, not application auth, actual API behavior or device SDK support.
 
 ## Test schemes and evidence
 
 `release-tools/device-test` exports `inspectAitDeviceMetadata`, `createDeviceTestScheme` and `createDeviceTestPlan`. Inspect actual AIT bytes for app name, deployment ID and SHA256 first. Supply the exact console/CLI-issued private scheme and the deployment ID inspected from the artifact. The scheme host and deployment ID are preserved, routes are bounded, query keys require an explicit allowlist and sensitive key names are rejected. Use synthetic/public fixture values, never credentials. A plan records the app/version/source SHA/bundle hash and starts every check at `not_run`. It does not upload a bundle, open a device or mark checks complete. `intoss://` is not accepted as a pre-release test scheme.
+
+Route query additions preserve the issued scheme's existing `queryParams`; supplied values override matching keys only. Both sets of values must pass validation, and the final merged query must fit the size limit.
 
 ## SDK versions and Sentry
 

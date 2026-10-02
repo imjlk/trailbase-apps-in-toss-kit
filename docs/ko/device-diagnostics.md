@@ -27,11 +27,13 @@ Release Doctor의 선택형 `webview-network` 검사 예시입니다.
 }
 ```
 
-기존 `trailbase-release-doctor --config <file>`로 실행합니다. OPTIONS만 보내고 응답 본문을 읽거나 리다이렉트를 따라가지 않으며 쿠키·인증값도 전송하지 않습니다. 정확한 origin과 요청 메서드·헤더를 검사할 뿐 CORS를 수정하지 않습니다. 실제 콘솔 origin이나 미지원 미래 SDK 버전은 `origins`를 명시하세요. 기본 버전 매핑은 [버전별 공식 안내](https://developers-apps-in-toss.toss.im/guide/operation/toss)를 따릅니다. `runtime: rn`은 CORS 검사를 건너뛰며 RN 통신 성공의 증거가 아닙니다. fixture용 `allowLocalHttp: true`는 loopback만 허용합니다. 각 요청에 시간 제한이 있으며 preflight 성공은 실제 인증/API/실기기 SDK 검증과 구분합니다.
+기존 `trailbase-release-doctor --config <file>`로 실행합니다. OPTIONS만 보내고 응답 본문을 읽거나 리다이렉트를 따라가지 않으며 쿠키·인증값도 전송하지 않습니다. 정확한 origin과 명시적으로 허용된 요청 헤더를 검사합니다. GET/HEAD/POST는 Fetch의 CORS-safelisted 메서드 규칙을 따르며 PUT/PATCH/DELETE는 메서드의 명시적 허용이 필요합니다. CORS 설정 자체는 수정하지 않습니다. 실제 콘솔 origin이나 미지원 미래 SDK 버전은 `origins`를 명시하세요. 기본 버전 매핑은 [버전별 공식 안내](https://developers-apps-in-toss.toss.im/guide/operation/toss)를 따릅니다. `runtime: rn`은 CORS 검사를 건너뛰며 RN 통신 성공의 증거가 아닙니다. fixture용 `allowLocalHttp: true`는 loopback만 허용합니다. 각 요청에 시간 제한이 있으며 preflight 성공은 실제 인증/API/실기기 SDK 검증과 구분합니다.
 
 ## 테스트 스킴과 검증 기록
 
 `release-tools/device-test`의 `createDeviceTestScheme`, `createDeviceTestPlan`에 콘솔/CLI가 발급한 스킴과 실제 번들에서 확인한 deployment ID를 전달합니다. 발급된 host·deployment ID를 유지하며 경로 크기와 query 키를 제한하고 민감한 키 이름은 거부합니다. 합성·공개 fixture 값만 사용하고 인증정보를 넣지 마세요. 계획에는 앱·버전·커밋·번들 해시를 기록하며 모든 항목은 `not_run`으로 시작합니다. 번들 업로드, 기기 실행, 검증 완료 처리는 자동 수행하지 않습니다. 출시 전 테스트에 `intoss://`를 받지 않습니다.
+
+경로별 query를 추가해도 발급된 스킴의 기존 `queryParams`는 유지합니다. 같은 키를 지정했을 때만 새 값으로 덮어씁니다. 기존 값과 새 값 모두 검증하며, 합친 query에 크기 제한을 적용합니다.
 
 ## SDK 버전과 Sentry
 
