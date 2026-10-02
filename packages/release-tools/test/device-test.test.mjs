@@ -21,8 +21,14 @@ test('keeps the issued host/id and encodes nested query exactly once',()=>{
  expect(url.searchParams.get('_deploymentId')).toBe(id);
 });
 test('rejects replaced/duplicate IDs, production schemes, unsafe paths and sensitive query keys',()=>{
- for(const patch of [{deploymentId:'changed'},{scheme:scheme+'&_deploymentId='+id},{scheme:'intoss://app'},{path:'//other'},{path:'/%2e%2e/private'},{query:{accessToken:'secret'},allowedQueryKeys:['accessToken']}])
+ for(const patch of [{deploymentId:'changed'},{scheme:scheme+'&_deploymentId='+id},{scheme:'intoss://app'},{path:'//other'},{path:'/%2e%2e/private'},{path:'/%0a'},{query:{accessToken:'secret'},allowedQueryKeys:['accessToken']},{scheme:scheme+'&token=secret'},{scheme:scheme+'&queryParams='+encodeURIComponent(JSON.stringify({accessToken:'secret'})),allowedQueryKeys:['accessToken']}])
   expect(()=>createDeviceTestScheme({scheme,deploymentId:id,...patch})).toThrow();
+});
+test('existing route query parameters obey the same allowlist',()=>{
+ const issued = `${scheme}&queryParams=${encodeURIComponent(JSON.stringify({entry:'direct'}))}`;
+ expect(()=>createDeviceTestScheme({scheme:issued,deploymentId:id})).toThrow();
+ const url = new URL(createDeviceTestScheme({scheme:issued,deploymentId:id,allowedQueryKeys:['entry']}));
+ expect(JSON.parse(url.searchParams.get('queryParams'))).toEqual({entry:'direct'});
 });
 test('plans bind the artifact and leave every actual device check unverified',()=>{
  const artifact={appName:'demo',version:'1.3.0',commit:'a'.repeat(40),sha256:'b'.repeat(64),deploymentId:id};
