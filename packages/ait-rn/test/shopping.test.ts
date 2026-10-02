@@ -17,10 +17,26 @@ describe("operator-configured shopping links", () => {
       undefined, null, {}, "", "TODO_LINK", "http://toss.shopping/t/x",
       "https://toss.shopping.evil.test/t/x", "https://evil.test/toss.shopping",
       "https://user:secret@toss.shopping/t/x", "https://evil.test@toss.im/_m/x",
-      "https://toss.im:8080/_m/x", "https://toss.im./_m/x",
+      "https://toss.im:8080/_m/x", "https://toss.im:443/_m/x", "https://toss.im./_m/x",
+      "https://toss.im%2eevil.test/_m/x", "https://toss.im@evil.test/_m/x",
       "https://toss.im\\@evil.test", "https://toss.im/\nx", "https:toss.im/x",
       "javascript:alert(1)", "intoss://shopping", `https://toss.im/${"x".repeat(4096)}`,
     ]) expect(normalizeAppsInTossShoppingLink(link)).toBeNull();
+  });
+
+  test("does not require the browser URL API or parse query text as authority", () => {
+    const original = globalThis.URL;
+    try {
+      globalThis.URL = class {
+        get protocol(): string { throw new Error("URL.protocol is not implemented"); }
+      } as unknown as typeof URL;
+      const link = "https://toss.im/_m/example?note=user@host:123#section";
+      expect(normalizeAppsInTossShoppingLink(link)).toBe(link);
+      expect(normalizeAppsInTossShoppingLink("HTTPS://TOSS.SHOPPING/t/example"))
+        .toBe("HTTPS://TOSS.SHOPPING/t/example");
+    } finally {
+      globalThis.URL = original;
+    }
   });
 
   test("does not open anything without a valid link", async () => {

@@ -7,19 +7,12 @@ export function normalizeAppsInTossShoppingLink(value: unknown): string | null {
   if (!link || link.length > 4096 || /[\s\\\u0000-\u001f\u007f]/u.test(link)) {
     return null;
   }
-  try {
-    const url = new URL(link);
-    if (
-      url.protocol !== "https:" ||
-      !/^https:\/\//i.test(link) ||
-      !["toss.shopping", "toss.im"].includes(url.hostname) ||
-      url.username || url.password || url.port
-    ) return null;
-    // Do not reconstruct the URL: affiliate query encoding and order may matter.
-    return link;
-  } catch {
-    return null;
-  }
+  // A literal HTTPS authority plus a URL delimiter leaves no room for userinfo,
+  // ports, encoded hosts or suffix lookalikes. Do not rely on native URL getters:
+  // some supported RN runtimes have incomplete/non-WHATWG implementations.
+  if (!/^https:\/\/(?:toss\.shopping|toss\.im)(?:[/?#]|$)/i.test(link)) return null;
+  // Do not reconstruct the URL: affiliate query encoding and order may matter.
+  return link;
 }
 
 export type AppsInTossShoppingOpenResult =
