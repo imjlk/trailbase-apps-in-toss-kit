@@ -7,12 +7,14 @@ const HOUR = 3_600_000;
 const validId = (value) => Number.isSafeInteger(Number(value)) && Number(value) > 0;
 const linkUrl = (value) => typeof value === 'string' && value.length <= 4096 &&
   !/[\s\\\u0000-\u001f\u007f]/u.test(value) && /^https:\/\/(?:toss\.im|toss\.shopping)(?:[/?#]|$)/i.test(value) ? value : null;
-function failure(code, retryAt = 0) {
-  const error = new Error(`Sharelink ${code}`);
-  error.code = code;
-  error.retryAt = retryAt;
-  return error;
+class SharelinkError extends Error {
+  constructor(code, retryAt = 0) {
+    super(`Sharelink ${code}`);
+    this.code = code;
+    this.retryAt = retryAt;
+  }
 }
+const failure = (code, retryAt = 0) => new SharelinkError(code, retryAt);
 function nextKstDay(now) { return Math.floor((now + 9 * HOUR) / (24 * HOUR) + 1) * 24 * HOUR - 9 * HOUR; }
 
 /** Server-only. Fixed official endpoints, OAuth client_credentials (not mTLS).
@@ -61,7 +63,7 @@ export function createTossSharelinkProvider({ accessKey, secretKey, publisherId,
       }
       return JSON.parse(Buffer.concat(chunks).toString('utf8'));
     } catch (error) {
-      if (error.code) throw error;
+      if (error instanceof SharelinkError) throw error;
       unavailableUntil = now() + 60_000;
       // Do not propagate provider bodies, URLs or native network errors.
       throw failure('transport', unavailableUntil);
@@ -78,7 +80,10 @@ export function createTossSharelinkProvider({ accessKey, secretKey, publisherId,
           client_secret: secretKey, scope: 'sharelink:read sharelink:write' }).toString(),
       });
       if (typeof response.access_token !== 'string' || !response.access_token ||
-        !Number.isFinite(response.expires_in) || response.expires_in <= 60) throw failure('invalid-token');
+        !Number.isFinite(response.expires_in) || response.expires_in <= 60) {
+        unavailableUntil = now() + 60_000;
+        throw failure('invalid-token', unavailableUntil);
+      }
       const expiresAt = now() + (response.expires_in - 60) * 1000;
       await cache.set(key, { value: response.access_token, expiresAt }, expiresAt);
       return response.access_token;

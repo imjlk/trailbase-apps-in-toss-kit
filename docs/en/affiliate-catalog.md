@@ -97,3 +97,10 @@ previews; enable only for local development, disable clicks and analytics for th
 Run `bun test packages/trailbase-runtime/test/affiliate.test.mjs` and
 `bun test packages/ait-rn/test/shopping-offer.test.ts`. These tests inject transport
 and providers. They do not prove live credentials, approval, attribution or payment.
+
+Cache memory is bounded (512 entries by default). Periodic writes prune expired
+files and trim persisted entries to the same bound; up to 63 newer writes can be
+present between sweeps. Use a private directory owned by this cache instance.
+Adapters without a positive source TTL default to one hour. An optional catalog
+`onError` sink receives only `{ code: 'selection-failed', stage, retryAt }`, not
+raw errors, context or credentials; sync/async sink failures are isolated.

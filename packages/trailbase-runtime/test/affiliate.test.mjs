@@ -34,6 +34,45 @@ test('private disk cache survives restart, expires and does not cache failed loa
     expect(await cache.get('failure')).toBeNull();
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
+
+test('disk pruning removes expired and excess entries', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'affiliate-prune-test-'));
+  try {
+    const cache = createAffiliateCache({ directory, maxEntries: 2, now: () => NOW });
+    await cache.set('expired', 'old', NOW - 1);
+    await cache.set('one', 'one', NOW + 1000);
+    await cache.set('two', 'two', NOW + 1000);
+    expect((await readdir(directory)).length).toBeLessThanOrEqual(2);
+    await cache.set('three', 'three', NOW + 1000);
+    await cache.set('four', 'four', NOW + 1000);
+    expect((await readdir(directory)).length).toBeLessThanOrEqual(2);
+    expect(await cache.get('four')).toBe('four');
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('native timeout/network errors are sanitized and pause direct adapter retries', async () => {
+  for (const cause of [new DOMException('private upstream URL', 'TimeoutError'), Object.assign(new Error('secret network detail'), { code: 'ECONNRESET' })]) {
+    let calls = 0;
+    const provider = createTossSharelinkProvider({ accessKey: 'test', secretKey: 'test', publisherId: 'test',
+      now: () => NOW, sleep: async () => {}, fetch: async () => { calls++; throw cause; } });
+    await expect(provider.categories()).rejects.toThrow('Sharelink transport');
+    await expect(provider.categories()).rejects.toThrow('Sharelink cooldown');
+    expect(calls).toBe(1);
+  }
+});
+
+test('invalid OAuth bodies pause direct retries and diagnostics expose only static fields', async () => {
+  let calls = 0;
+  const provider = createTossSharelinkProvider({ accessKey: 'test', secretKey: 'test', publisherId: 'test',
+    now: () => NOW, sleep: async () => {}, fetch: async () => { calls++; return Response.json({ access_token: 'bad', expires_in: 1 }); } });
+  await expect(provider.categories()).rejects.toThrow('invalid-token');
+  await expect(provider.categories()).rejects.toThrow('cooldown');
+  expect(calls).toBe(1);
+  const events = [];
+  const catalog = createAffiliateCatalog({ provider, policy, now: () => NOW, onError: async (event) => { events.push(event); throw new Error('sink failed'); } });
+  expect((await catalog.select()).offer).toBeNull();
+  expect(events).toEqual([{ code: 'selection-failed', stage: 'categories', retryAt: NOW + 60_000 }]);
+});
 function fixture(overrides = {}, customPolicy = policy) {
   const calls = [];
   const provider = { id: 'test-provider', cacheKey: 'account', capabilities: ['category-best', 'today-deals', 'overall-best'],
@@ -144,6 +183,8 @@ test('private service refuses unauthenticated/oversize/arbitrary URL contexts', 
   expect((await handler(new Request('http://internal/select', { method: 'POST' }))).status).toBe(401);
   const send = (body) => handler(new Request('http://internal/select', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: JSON.stringify(body) }));
   expect((await send({ topics: ['http://attacker'], rotationKey: 'visit' })).status).toBe(400);
+  expect((await send(null)).status).toBe(400);
+  expect((await handler(new Request('http://internal/select', { method: 'POST', headers: { authorization: `Bearer ${token}` }, body: '{' }))).status).toBe(400);
   expect((await send({ topics: [], rotationKey: 'x'.repeat(5000) })).status).toBe(413);
   expect((await send({ topics: ['cleaning'], rotationKey: 'visit-1' })).status).toBe(200);
   expect(calls).toBe(1);

@@ -5,7 +5,8 @@ const offer = { provider: 'toss-shopping', productId: '123', title: '물건',
 test('validates provider, URL, expiry and text before rendering a server offer', () => {
   expect(normalizeAppsInTossShoppingOffer(offer, { now: 100 })?.title).toBe('물건');
   for (const patch of [{ provider: 'unknown' }, { url: 'https://toss.im.evil.test/' }, { expiresAt: 99 },
-    { title: 'x'.repeat(181) }, { productId: '../secret' }, { source: 'invented' }]) {
+    { title: 'x'.repeat(181) }, { productId: '../secret' }, { source: 'invented' },
+    { source: ['category-best'] }, { reason: ['related'] }]) {
     expect(normalizeAppsInTossShoppingOffer({ ...offer, ...patch }, { now: 100 })).toBeNull();
   }
 });

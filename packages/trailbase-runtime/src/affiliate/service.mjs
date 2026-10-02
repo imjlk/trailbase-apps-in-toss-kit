@@ -32,8 +32,10 @@ export function createAffiliateService({ catalog, token, enabled = false, maxCon
         if (size > 4096) { await reader.cancel(); return response({ error: 'body-too-large' }, 413); }
         chunks.push(value);
       }
-      const input = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-      if (!Array.isArray(input.topics) || input.topics.length > 6 ||
+      let input;
+      try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+      catch { return response({ error: 'invalid-context' }, 400); }
+      if (!input || typeof input !== 'object' || !Array.isArray(input.topics) || input.topics.length > 6 ||
         !input.topics.every((topic) => typeof topic === 'string' && /^[a-z0-9-]{1,40}$/.test(topic)) ||
         typeof input.rotationKey !== 'string' || !/^[a-zA-Z0-9_:-]{1,96}$/.test(input.rotationKey) ||
         !Array.isArray(input.excludeProductIds ?? []) || (input.excludeProductIds?.length ?? 0) > 30 ||

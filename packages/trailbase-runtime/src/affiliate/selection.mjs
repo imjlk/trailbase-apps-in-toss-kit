@@ -44,7 +44,7 @@ export function resolveAffiliateCategories(tree, groups, groupIds, excludedIds =
   return [...selected];
 }
 
-export function createAffiliateCatalog({ provider, policy, cache = createAffiliateCache(), now = Date.now }) {
+export function createAffiliateCatalog({ provider, policy, cache = createAffiliateCache(), now = Date.now, onError }) {
   if (!provider?.cacheKey || !policy?.groups || !Array.isArray(policy.defaultGroups)) {
     throw new Error('Affiliate provider and category policy are required');
   }
@@ -60,13 +60,16 @@ export function createAffiliateCatalog({ provider, policy, cache = createAffilia
   async function list(source, categoryId) {
     // Source-specific freshness belongs to the adapter. Selection always checks
     // sold-out/endAt again, even when a cached list has not yet expired.
-    return cache.load(`${prefix}${source}:${categoryId ?? ''}`, provider.cacheTtlMs[source],
+    const configuredTtl = provider.cacheTtlMs?.[source];
+    const ttl = Number.isFinite(configuredTtl) && configuredTtl > 0 ? configuredTtl : HOUR;
+    return cache.load(`${prefix}${source}:${categoryId ?? ''}`, ttl,
       () => provider.list({ source, categoryId }));
   }
   async function select({ topics = [], rotationKey = 'default', excludeProductIds = [] } = {}) {
     if (cooldownUntil > now()) return { offer: null, reason: 'provider-unavailable' };
     const seed = String(rotationKey).slice(0, 96);
     const recent = new Set(excludeProductIds.slice(0, 30));
+    let stage = 'categories';
     try {
       const tree = await cache.load(`${prefix}categories`, 24 * HOUR, () => provider.categories());
       const flat = flattenAffiliateCategories(tree);
@@ -95,6 +98,7 @@ export function createAffiliateCatalog({ provider, policy, cache = createAffilia
           seen.add(item.id);
           linkAttempts++;
           let link;
+          stage = 'link';
           try { link = provider.preview === true ? null : await provider.issueLink(item.id); } catch (error) {
             if (error.code === 'item-unavailable') continue;
             throw error;
@@ -112,6 +116,7 @@ export function createAffiliateCatalog({ provider, policy, cache = createAffilia
       for (const group of groups) {
         for (const id of rotate(group.ids, `${seed}:category`).slice(0, 3)) {
           for (const source of ordered) {
+            stage = 'list';
             const items = await list(source, source === 'category-best' ? id : undefined);
             const offer = await offerFrom(items, source, id, group.reason);
             if (offer) return { offer, reason: group.reason };
@@ -119,12 +124,16 @@ export function createAffiliateCatalog({ provider, policy, cache = createAffilia
         }
       }
       if (policy.allowOverallBest === true && provider.capabilities.includes('overall-best')) {
+        stage = 'list';
         const offer = await offerFrom(await list('overall-best'), 'overall-best', null, 'overall-best');
         if (offer) return { offer, reason: 'overall-best' };
       }
       return { offer: null, reason: 'no-eligible-product' };
     } catch (error) {
       cooldownUntil = Math.max(now() + 60_000, Number.isFinite(error?.retryAt) ? error.retryAt : 0);
+      // Static diagnostic only. Never give a logging sink raw provider/network
+      // errors, product IDs, request context, tokens or URLs.
+      try { Promise.resolve(onError?.({ code: 'selection-failed', stage, retryAt: cooldownUntil })).catch(() => {}); } catch { /* logging must not affect delivery */ }
       return { offer: null, reason: 'provider-unavailable' };
     }
   }

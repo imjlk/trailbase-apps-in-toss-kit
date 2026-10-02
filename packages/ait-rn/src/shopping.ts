@@ -44,8 +44,8 @@ export function normalizeAppsInTossShoppingOffer(value: unknown, {
   if (item.provider !== "toss-shopping" || typeof item.productId !== "string" ||
     !/^[a-zA-Z0-9_-]{1,80}$/.test(item.productId) || typeof item.title !== "string" ||
     !item.title.trim() || item.title.length > 180 || /[\u0000-\u001f\u007f]/u.test(item.title) ||
-    !["category-best", "today-deals", "overall-best"].includes(String(item.source)) ||
-    !["related", "default-category", "overall-best"].includes(String(item.reason)) ||
+      typeof item.source !== "string" || !["category-best", "today-deals", "overall-best"].includes(item.source) ||
+      typeof item.reason !== "string" || !["related", "default-category", "overall-best"].includes(item.reason) ||
     typeof item.expiresAt !== "number" || !Number.isFinite(item.expiresAt) || item.expiresAt <= now ||
     (preview ? !allowPreview || item.url !== null : !url)) return null;
   return { provider: "toss-shopping", productId: item.productId, title: item.title,

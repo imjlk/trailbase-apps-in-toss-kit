@@ -87,3 +87,10 @@ credential도 포함합니다. 비공개 영속 디렉터리로 마운트하고 
 `bun test packages/trailbase-runtime/test/affiliate.test.mjs`와
 `bun test packages/ait-rn/test/shopping-offer.test.ts`를 실행합니다. mock 검증이며
 실제 키·서비스 승인·수익 귀속·지급 검증을 뜻하지 않습니다.
+
+메모리 캐시는 기본 512개로 제한됩니다. 쓰기 시 주기적으로 만료 파일을 정리하고
+저장 항목도 같은 한도로 줄이며, 정리 사이에는 최대 63개의 새 쓰기가 추가될 수
+있습니다. 캐시 인스턴스 전용 비공개 디렉터리를 사용하세요. 제공자 TTL이 없거나
+양수가 아니면 기본 1시간을 적용합니다. 선택기의 선택형 `onError`는 오류 원문,
+문맥, 비밀정보 없이 `{ code: 'selection-failed', stage, retryAt }`만 받습니다.
+콜백의 동기/비동기 실패는 선택 응답에 영향을 주지 않습니다.
