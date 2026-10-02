@@ -14,6 +14,7 @@
     "./owned-currency-close-manifest": "./src/owned-currency-close-manifest.mjs",
     "./restore-checkpoint": "./src/restore-checkpoint.mjs",
     "./owned-currency-reconcile": "./src/owned-currency-reconcile.mjs",
+    "./webview-network-check": "./src/webview-network-check.mjs",
     "./affiliate/cache": "./src/affiliate/cache.mjs",
     "./affiliate/selection": "./src/affiliate/selection.mjs",
     "./affiliate/toss-sharelink": "./src/affiliate/toss-sharelink.mjs",

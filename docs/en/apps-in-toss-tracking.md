@@ -70,7 +70,7 @@ only after app-level smoke tests.
 - `ait-kit-sdk`: `0.5.1`
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.10.10`
+- `apps-in-toss-framework`: `2.10.11`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.5`
@@ -98,7 +98,9 @@ not automatically raise the reviewed version or fail a detection-only PR.
 ## Latest Reviewed SDK Delta
 
 The repository reference has been reviewed through `@apps-in-toss/framework`
-`2.10.10`.
+`2.10.11`.
+
+- `2.10.11`: Refreshes the RN reference for runtime diagnostics and validates the full RN adapter tests and current/minimum type fixtures. The minimum remains `2.10.10`; consumers still need their own device checks.
 
 - `@ait-kit/sdk` `0.4.0`: Adds the shared RN and Web review request and direct
   promotion adapter contracts. The kit pins this version exactly; consumer

@@ -8,7 +8,8 @@
     "./ait": "./src/ait.mjs",
     "./sampo": "./src/sampo.mjs",
     "./notes": "./src/notes.mjs",
-    "./dependency-guard": "./src/dependency-guard.mjs"
+    "./dependency-guard": "./src/dependency-guard.mjs",
+    "./device-test": "./src/device-test.mjs"
   },
   "dependencies": {
     "@apps-in-toss/ait-format": "1.0.0"
