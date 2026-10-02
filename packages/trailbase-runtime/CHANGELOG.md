@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.7.0 — 2026-10-02
+
+### Minor changes
+
+- [2d8d92b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2d8d92b313448e876dee46bdb6755a8bb549df25) Add a server-only Toss Shopping Sharelink client and provider-neutral category/deal selection policy. Consumers explicitly configure topic/default category groups, source weights, exclusions, persistent private cache and internal authentication. Overall best is opt-in; unavailable products/providers yield no offer. Live use requires Sharelink approval, OAuth keys, publisher ID and registered server egress IP. No mTLS or schema migration is required. A development preview can return non-navigable offers without credentials. RN validates server offers and refuses previews unless explicitly opted in.
+
+  Includes a read-only affiliate doctor for policy checks, category mapping and product selection previews. It never issues affiliate links or prints credentials and distinguishes access, quota, mapping and inventory failures. — Thanks @imjlk!
+- [da2e62a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/da2e62a0dcf04d6929a53aa48e448e1683c359e5) Add opt-in read-only RN runtime snapshots, WebView OPTIONS preflight checks in Release Doctor, and artifact-bound device test scheme/plan builders. Logs exclude native errors, identity data and tokens. Tests remain explicitly unverified until run on the target device. Validate RN SDK 2.10.11 while retaining the 2.10.10 minimum compatibility fixture. No automatic SDK calls with side effects, CORS rewrites, bundle uploads or production deployment. — Thanks @imjlk!
+
 ## 0.6.0 — 2026-09-29
 
 ### Minor changes
@@ -8,7 +17,7 @@
   private source/balance reconciliation, and snapshot-only close artifact generation.
   Consumers must wire original ledgers and private adapter views. Refunds are adjustments,
   not issuance; only confirmed exchanges are EXCHANGE. No automatic approval or submission.
-  
+
   Validate live policy valuations and full-length source keys, reconcile conversion groups, and publish close manifests atomically only after the period ends. Consumer expected-event views must expose nullable conversion_group_id. — Thanks @imjlk!
 
 ## 0.5.1 — 2026-09-22
@@ -34,7 +43,7 @@
 ### Patch changes
 
 - [1107144](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1107144b94f64ccef1d2a4078dfc4ba359794275) Report promotion v2 execution markers and SUBMITTED outcomes in private ledger diagnostics while retaining read-only, no-retry guidance and compatibility with legacy snapshots. Set the deployment baseline to proxy 0.6.2, including the short-recipient privacy fix, and require the additive v2 ledger migration after legacy reconciliation. End failed migration savepoints before same-connection retries; regression coverage verifies successful retries are committed.
-  
+
   Suppress provider failure text containing short recipient identifiers before returning prepare/execute/status responses, while preserving error codes and correlation keys. Deploy the resulting proxy patch release to obtain this privacy fix. — Thanks @imjlk!
 
 ## 0.4.0 — 2026-09-12
@@ -49,7 +58,7 @@
   KIT_OPERATION_POLICIES_ENABLED=1; inspect operation_policy_integration() at startup.
   Policy expiry uses database time internally. Set KIT_OPERATIONS_HOLD=1 outside
   the backup before starting a restored database; status lookup remains available.
-  
+
   Add a Release Doctor restore checkpoint check and an old-SQLite-backup rehearsal.
   Require an independent durable witness, paused dispatch and reconciled original
   transaction IDs before operator resume. The check never sends, grants or resumes
@@ -59,7 +68,7 @@
   responses. Use the Release Doctor proxy-capabilities check before adopting anonymous
   verification, promotion recovery or other new adapter contracts. Legacy health responses
   without metadata require a proxy upgrade or an explicitly optional transitional check.
-  
+
   Pass the internal URL/token through environment variables. Checks use bounded read-only
   health requests, reject redirects and omit secrets/upstream response bodies from reports.
   Capabilities describe this binary, not upstream reachability, configured campaign access
@@ -81,7 +90,7 @@
   availability, message attempts and agreement metadata without exposing raw identities,
   provider keys, payloads or freeform failures. Recovery output is advisory and requires
   a fresh authorized state read before invoking existing shared transition helpers.
-  
+
   Add matching Rust and JavaScript inquiry fingerprints for order, promotion and outbox
   record IDs. Return them only from ownership-checked endpoints; they are neither
   authorization tokens nor secrets. Diagnostic lookup uses a bounded scan and reports

@@ -1,13 +1,24 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.9.0 — 2026-10-02
+
+### Minor changes
+
+- [2d8d92b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2d8d92b313448e876dee46bdb6755a8bb549df25) Add a server-only Toss Shopping Sharelink client and provider-neutral category/deal selection policy. Consumers explicitly configure topic/default category groups, source weights, exclusions, persistent private cache and internal authentication. Overall best is opt-in; unavailable products/providers yield no offer. Live use requires Sharelink approval, OAuth keys, publisher ID and registered server egress IP. No mTLS or schema migration is required. A development preview can return non-navigable offers without credentials. RN validates server offers and refuses previews unless explicitly opted in.
+
+  Includes a read-only affiliate doctor for policy checks, category mapping and product selection previews. It never issues affiliate links or prints credentials and distinguishes access, quota, mapping and inventory failures. — Thanks @imjlk!
+- [7a4d2e3](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/7a4d2e35b699b133026c74d24f7c291cbe0ab77d) Add optional entry-channel normalization, continuous exposure tracking, and foreground read refresh coordination. Keep app-owned account, screen, and mutation policies explicit; offline/unknown connectivity and native probe failures no longer need consumer-specific handling. Provide typed review-controller copying and recheck the screen after storing a review attempt. No server migration or deployment change is required. — Thanks @imjlk!
+- [da2e62a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/da2e62a0dcf04d6929a53aa48e448e1683c359e5) Add opt-in read-only RN runtime snapshots, WebView OPTIONS preflight checks in Release Doctor, and artifact-bound device test scheme/plan builders. Logs exclude native errors, identity data and tokens. Tests remain explicitly unverified until run on the target device. Validate RN SDK 2.10.11 while retaining the 2.10.10 minimum compatibility fixture. No automatic SDK calls with side effects, CORS rewrites, bundle uploads or production deployment. — Thanks @imjlk!
+- [d910cef](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/d910cefdcb7872b5e7d8e2e5487c7d31b65b5add) Add opt-in Toss Shopping affiliate link validation and an injected URL-opening bridge. Consumers supply their own issued HTTPS link and display a commission disclosure; absent or invalid links stay hidden. The bridge preserves attribution parameters, suppresses concurrent taps, and reports URL dispatch separately from purchases. No proxy, schema, reward, or affiliate enrollment changes are required. — Thanks @imjlk!
+
 ## 0.8.0 — 2026-09-30
 
 ### Minor changes
 
 - [dc79f22](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/dc79f2252fd5b87fdced917d0258759c148ec390) Restore anonymous app sessions through the official TrailBase token refresh endpoint instead of repeating password login. Add optional refresh integration, shared concurrent acquisition, explicit renewal and canonical account adoption while preserving credentials during transient failures. Consumers must supply an authenticated initial-data endpoint and narrowly classify invalid credentials; no SQL migration or server upgrade is required.
-  
+
   React Native consumers can enable `revalidateAnonymousHash` on session storage to verify the current SDK identity before restoration and invalidate both credential mirrors when the account changes. SDK or storage failures do not fall back to another identity.
-  
+
   Unchanged restored credentials skip native storage writes; refreshed tokens are persisted once before loading current app data. — Thanks @imjlk!
 
 ### Patch changes
@@ -19,7 +30,7 @@
 ### Patch changes
 
 - [eb4b23d](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/eb4b23dc3fe6a56016006cf8da5b4c81650af430) Add an optional snapshotMaxRecords guard that rejects oversized collection snapshots before reconciliation. Clarify full replacement versus single-page merging without changing defaults. Add a read-only Bun/Cargo release dependency guard that permits workspace version changes and rejects unrelated lockfile drift before publishing.
-  
+
   Adopt @ait-kit/sdk 0.5.1 with explicit React Native export conditions so consumers can remove their SDK package export patches. — Thanks @imjlk!
 - Updated dependencies: trailbase-client (npm)@1.2.0
 
@@ -42,7 +53,7 @@
 ### Minor changes
 
 - [7d165be](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/7d165be8c96a6d65d9a96ae57d7545adab57528c) Adopt @ait-kit/sdk 0.3.0 (exact pin) and harden local ad-flow settlement.
-  
+
   - `@ait-kit/sdk` moves from `^0.2.0` to `0.3.0` in `ait-rn` and `ait-web`.
     The SDK's peer floor raises the RN minimum to
     `@apps-in-toss/framework@>=2.10.10`: the `ait-rn` peer bound and the exact
@@ -70,7 +81,7 @@
 ### Minor changes
 
 - [4832939](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/483293969ef46bf0d194b8cd16ca6d6c81942d90) Delegate common Apps in Toss SDK operations to @ait-kit/sdk instead of reimplementing module acquisition, event settle-once handling, deadline budgets, and cleanup locally. Public imports and signatures are unchanged.
-  
+
   - `ait-rn` (new dependency `@ait-kit/sdk ^0.2.0`): the default (non-injected) login, anonymous-key lookup, full-screen ad load, IAP purchase, and pending-order paths now run on `@ait-kit/sdk/rn` adapters with TrailBase's error taxonomy mapped on top; injected seams (`appLogin`, `getAnonymousKey`, `loadFullScreenAd`, `IAP`) keep the local synchronous flows. New `createAppsInTossSdkStorageBridge()` provides the sdk-backed native storage bridge.
   - `ait-web` (new dependency `@ait-kit/sdk ^0.2.0`): `anonymousHash()`, `storage.*`, `createShareLink`, and `share` run on `@ait-kit/sdk/web` adapters behind one memoized SDK load; the `ait:` prefix policy, strict result checks, and appKey namespacing stay local.
   - Boundary (documented in `docs/{en,ko}/ait-kit-sdk-delegation.md`): ad show heuristics, IAP product/subscription queries, web login/notification/purchase flows (pinned TrailBase contracts), session bootstrap, legacy-hash migration, and all server callbacks remain TrailBase-owned.
@@ -90,7 +101,7 @@
 - [415decc](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/415decc0e44105d490767017e13137c20efd5a6d) Add RN subscription purchase and status-query bridges with per-API support checks,
   subscription identifiers, renewal cycles and offers, while retaining one-time
   purchase/restore behavior and older injected SDK support for existing methods.
-  
+
   Add a private subscription webhook inbox and per-order entitlement projection.
   Apply iap_subscriptions.sql after the order ledger as a new consumer migration.
   Authenticate webhook ingress in the consumer, map renewal orders authoritatively,
@@ -99,7 +110,7 @@
   Client SDK status never independently authorizes server benefits. Subscription
   sandbox testing is unavailable, so validate the feature in the real Toss app
   before consumer rollout. The proxy remains internal and outbound-only.
-  
+
   Prevent failed or fallback-only lookups from reserving new order IDs, and require
   verified order state when applying or reading subscription entitlements. Handle
   UNVERIFIED_IAP_ORDER for lookups that cannot establish a new owner mapping. Normalize
@@ -112,12 +123,12 @@
   preserving authenticated generic mTLS requests, the documented Smart Message
   recipient header, and legacy partial-delivery failure fields. Anonymous message
   requests use x-anon-key exclusively; consumers still enforce notification agreement.
-  
+
   The Compose template keeps the already released proxy 0.1.12 as a baseline; that
   image does not contain these source changes. After the next Sampo-generated proxy
   image is published, update the consumer-owned image pin before using the new behavior.
   No TrailBase schema migration or minimum supported server change is required.
-  
+
   Forward IAP lookups no longer promote requested SKUs into provider evidence. Paid
   responses without a provider SKU fail with UNVERIFIED_IAP_ORDER; retry verification
   before granting products. Explicit stub mode remains available for local tests. — Thanks @imjlk!
