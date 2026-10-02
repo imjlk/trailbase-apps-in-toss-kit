@@ -45,7 +45,7 @@ export function createWebViewNetworkCheck({ name = 'WebView API preflight', requ
     for (const [index, origin] of expected.entries()) {
       const controller = new AbortController(); let timer; let expired = false;
       const attempt = Promise.resolve().then(() => fetcher(url.href, {
-        method: 'OPTIONS', redirect: 'manual', signal: controller.signal,
+        method: 'OPTIONS', redirect: 'manual', credentials: 'omit', signal: controller.signal,
         headers: { Origin: origin, 'Access-Control-Request-Method': method,
           ...(requestHeaders.length ? { 'Access-Control-Request-Headers': requestHeaders.join(', ') } : {}) },
       })).then(response => {

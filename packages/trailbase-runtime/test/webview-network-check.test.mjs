@@ -14,7 +14,7 @@ test('probes both origins with OPTIONS only and distinguishes missing headers an
     'Access-Control-Allow-Origin':init.headers.Origin,'Access-Control-Allow-Methods':'POST','Access-Control-Allow-Headers':'Authorization, Content-Type'
   }}); };
   expect((await createWebViewNetworkCheck({...options,fetcher}).run()).ok).toBe(true);
-  expect(calls).toHaveLength(2); expect(calls.every(i=>i.method==='OPTIONS' && i.redirect==='manual' && !i.headers.Authorization)).toBe(true);
+  expect(calls).toHaveLength(2); expect(calls.every(i=>i.method==='OPTIONS' && i.redirect==='manual' && i.credentials==='omit' && !i.headers.Authorization)).toBe(true);
   for (const response of [new Response(null,{status:302,headers:{location:'https://other.test'}}),new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':'*'}})]) {
     expect((await createWebViewNetworkCheck({...options,fetcher:async()=>response}).run()).ok).toBe(false);
   }
