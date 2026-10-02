@@ -73,6 +73,7 @@ export function createAffiliateCatalog({ provider, policy, cache = createAffilia
     try {
       const tree = await cache.load(`${prefix}categories`, 24 * HOUR, () => provider.categories());
       const flat = flattenAffiliateCategories(tree);
+      const categoryPaths = new Map(flat.map((category) => [category.id, category.path]));
       const forbiddenIds = new Set([...excludedCategories,
         ...flat.filter((category) => category.path.some((id) => excludedCategories.has(id))).map((category) => category.id)]);
       const related = resolveAffiliateCategories(tree, policy.groups,
@@ -88,7 +89,7 @@ export function createAffiliateCatalog({ provider, policy, cache = createAffilia
         const eligible = items.filter((item) => item && !item.soldOut &&
           !blockedProducts.has(item.id) && !recent.has(item.id) && !seen.has(item.id) &&
           !item.categoryIds.some((id) => forbiddenIds.has(id)) &&
-          (!categoryId || item.categoryIds.includes(categoryId)) &&
+          (!categoryId || item.categoryIds.some((id) => id === categoryId || categoryPaths.get(id)?.includes(categoryId))) &&
           (item.endAt === undefined || (Number.isFinite(item.endAt) && item.endAt > now() + 300_000)) &&
           (source !== 'today-deals' || (Number.isFinite(item.endAt) && item.endAt > now() + 300_000)));
         // Rotate within the top ten eligible candidates, not across an unbounded

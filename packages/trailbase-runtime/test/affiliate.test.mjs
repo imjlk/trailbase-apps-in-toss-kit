@@ -117,6 +117,17 @@ describe('provider-neutral affiliate selection', () => {
     expect((await catalog.select()).offer).toBeNull();
     expect(calls).toEqual([]);
   });
+  test('a chosen parent category accepts a product tagged only with its descendant', async () => {
+    for (const source of ['category-best', 'today-deals']) {
+      const { catalog } = fixture({ list: async () => [product('leaf-only', ['2'], { endAt: NOW + 900_000 })] },
+        { ...policy, groups: { cleaning: { categoryIds: ['1'] } }, defaultGroups: [],
+          sourceWeights: { 'category-best': 0, 'today-deals': 0, [source]: 1 } });
+      const result = await catalog.select({ topics: ['cleaning'] });
+      expect(result.offer.productId).toBe('leaf-only');
+      expect(result.offer.categoryId).toBe('1');
+      expect(result.offer.source).toBe(source);
+    }
+  });
   test('unsupported source is skipped, overall best requires explicit opt-in', async () => {
     const { catalog, calls } = fixture({ capabilities: ['overall-best'], list: async (r) => { calls.push(r); return [product('best')]; } }, { ...policy, allowOverallBest: true });
     expect((await catalog.select()).offer.source).toBe('overall-best');

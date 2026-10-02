@@ -104,3 +104,7 @@ present between sweeps. Use a private directory owned by this cache instance.
 Adapters without a positive source TTL default to one hour. An optional catalog
 `onError` sink receives only `{ code: 'selection-failed', stage, retryAt }`, not
 raw errors, context or credentials; sync/async sink failures are isolated.
+
+A selected parent category includes descendant-tagged products, even if a provider
+omits the parent ID from a product's `categoryIds`. The same tree relationship is
+used when matching today's deals; unrelated categories do not qualify.
