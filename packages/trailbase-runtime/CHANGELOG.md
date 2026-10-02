@@ -1,5 +1,14 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.7.0 — 2026-10-02
+
+### Minor changes
+
+- [2d8d92b](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2d8d92b313448e876dee46bdb6755a8bb549df25) Add a server-only Toss Shopping Sharelink client and provider-neutral category/deal selection policy. Consumers explicitly configure topic/default category groups, source weights, exclusions, persistent private cache and internal authentication. Overall best is opt-in; unavailable products/providers yield no offer. Live use requires Sharelink approval, OAuth keys, publisher ID and registered server egress IP. No mTLS or schema migration is required. A development preview can return non-navigable offers without credentials. RN validates server offers and refuses previews unless explicitly opted in.
+  
+  Includes a read-only affiliate doctor for policy checks, category mapping and product selection previews. It never issues affiliate links or prints credentials and distinguishes access, quota, mapping and inventory failures. — Thanks @imjlk!
+- [da2e62a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/da2e62a0dcf04d6929a53aa48e448e1683c359e5) Add opt-in read-only RN runtime snapshots, WebView OPTIONS preflight checks in Release Doctor, and artifact-bound device test scheme/plan builders. Logs exclude native errors, identity data and tokens. Tests remain explicitly unverified until run on the target device. Validate RN SDK 2.10.11 while retaining the 2.10.10 minimum compatibility fixture. No automatic SDK calls with side effects, CORS rewrites, bundle uploads or production deployment. — Thanks @imjlk!
+
 ## 0.6.0 — 2026-09-29
 
 ### Minor changes

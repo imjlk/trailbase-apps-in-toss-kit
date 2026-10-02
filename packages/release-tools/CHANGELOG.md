@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/release-tools
 
+## 0.3.0 — 2026-10-02
+
+### Minor changes
+
+- [da2e62a](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/da2e62a0dcf04d6929a53aa48e448e1683c359e5) Add opt-in read-only RN runtime snapshots, WebView OPTIONS preflight checks in Release Doctor, and artifact-bound device test scheme/plan builders. Logs exclude native errors, identity data and tokens. Tests remain explicitly unverified until run on the target device. Validate RN SDK 2.10.11 while retaining the 2.10.10 minimum compatibility fixture. No automatic SDK calls with side effects, CORS rewrites, bundle uploads or production deployment. — Thanks @imjlk!
+
 ## 0.2.0 — 2026-09-28
 
 ### Minor changes
