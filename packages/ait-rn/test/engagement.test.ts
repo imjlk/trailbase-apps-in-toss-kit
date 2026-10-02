@@ -102,3 +102,20 @@ test("a failed read refresh is contained and retryable", async () => {
   expect(statuses.at(-1)).toEqual({ network: "online", refreshing: false, failed: false });
   controller.dispose();
 });
+
+test("an account switch while inactive cannot inherit the previous account throttle", async () => {
+  let refreshes = 0;
+  const controller = createForegroundRefreshController({
+    getNetworkStatus: async () => "WIFI",
+    refresh: async () => { refreshes++; },
+    now: () => 1_000,
+  });
+  controller.setActive(true, "a"); await tick();
+  controller.retry(); await tick();
+  expect(refreshes).toBe(1);
+  controller.setActive(false, "a");
+  controller.setActive(false, "b");
+  controller.setActive(true, "b"); await tick();
+  expect(refreshes).toBe(2);
+  controller.dispose();
+});

@@ -129,8 +129,8 @@ export function createForegroundRefreshController({
       context = contextKey;
       revision++;
       active = next;
-      if (!active) { queued = undefined; return; }
       if (changedContext) lastRefreshAt = -Infinity;
+      if (!active) { queued = undefined; return; }
       queued = { refresh: initialized, force: false };
       initialized = true;
       void drain();
