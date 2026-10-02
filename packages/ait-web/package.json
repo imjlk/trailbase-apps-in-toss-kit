@@ -16,6 +16,6 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@ait-kit/sdk": "0.5.1"
+    "@ait-kit/sdk": "0.6.0"
   }
 }
