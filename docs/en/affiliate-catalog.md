@@ -108,3 +108,5 @@ raw errors, context or credentials; sync/async sink failures are isolated.
 A selected parent category includes descendant-tagged products, even if a provider
 omits the parent ID from a product's `categoryIds`. The same tree relationship is
 used when matching today's deals; unrelated categories do not qualify.
+
+For read-only policy and candidate checks, see [affiliate diagnostics](affiliate-diagnostics.md).

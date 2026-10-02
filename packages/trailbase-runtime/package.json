@@ -17,7 +17,8 @@
     "./affiliate/cache": "./src/affiliate/cache.mjs",
     "./affiliate/selection": "./src/affiliate/selection.mjs",
     "./affiliate/toss-sharelink": "./src/affiliate/toss-sharelink.mjs",
-    "./affiliate/service": "./src/affiliate/service.mjs"
+    "./affiliate/service": "./src/affiliate/service.mjs",
+    "./affiliate/diagnostics": "./src/affiliate/diagnostics.mjs"
   },
   "bin": {
     "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",
@@ -26,7 +27,8 @@
     "trailbase-owned-currency-report": "./bin/owned-currency-report.mjs",
     "trailbase-dev-runner": "./bin/dev-with-trailbase.mjs",
     "trailbase-prod-env-validate": "./bin/validate-production-env.mjs",
-    "trailbase-owned-currency-close": "./bin/owned-currency-close.mjs"
+    "trailbase-owned-currency-close": "./bin/owned-currency-close.mjs",
+    "affiliate-doctor": "./bin/affiliate-doctor.mjs"
   },
   "scripts": {
     "test": "bun test"

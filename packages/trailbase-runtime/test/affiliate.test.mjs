@@ -186,7 +186,7 @@ describe('Toss official wire contract', () => {
   });
   test('HTTP 200 FAIL is rejected and quotas pause further provider calls', async () => {
     const { provider, calls } = create(() => ({ resultType: 'FAIL', error: { errorCode: 'SHARELINK_OPENAPI_QUOTA_EXCEEDED' } }));
-    await expect(provider.list({ source: 'today-deals' })).rejects.toThrow('provider-rejected');
+    await expect(provider.list({ source: 'today-deals' })).rejects.toThrow('quota-exceeded');
     await expect(provider.list({ source: 'today-deals' })).rejects.toThrow('cooldown');
     expect(calls).toHaveLength(2);
   });

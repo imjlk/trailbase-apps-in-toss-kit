@@ -100,7 +100,8 @@ export function createTossSharelinkProvider({ accessKey, secretKey, publisherId,
       const code = response.error?.errorCode;
       if (path === '/links' && response.resultType === 'FAIL' && !code) throw failure('item-unavailable');
       unavailableUntil = code === 'SHARELINK_OPENAPI_QUOTA_EXCEEDED' ? nextKstDay(now()) : now() + 60_000;
-      throw failure('provider-rejected', unavailableUntil);
+      throw failure(code === 'SHARELINK_OPENAPI_ACCESS_DENIED' ? 'access-denied' :
+        code === 'SHARELINK_OPENAPI_QUOTA_EXCEEDED' ? 'quota-exceeded' : 'provider-rejected', unavailableUntil);
     }
     return response.success;
   }
