@@ -9,4 +9,5 @@ export * from "./notifications";
 export * from "./promotion";
 export * from "./runtime";
 export * from "./share";
+export * from "./shopping";
 export * from "./storage";

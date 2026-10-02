@@ -297,6 +297,8 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 }
 ```
 
+For optional operator-issued Toss Shopping links, see [shopping affiliate links](shopping-affiliate.md).
+
 For Apps in Toss share links, keep the copy and OG image selection in the app.
 The share bridge only normalizes `intoss://` links, optionally prewarms a valid
 OG image URL, calls `getTossShareLink()`, and passes the final message to

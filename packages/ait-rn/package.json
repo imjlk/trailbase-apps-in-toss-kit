@@ -17,6 +17,7 @@
     "./promotion": "./src/promotion.ts",
     "./runtime": "./src/runtime.ts",
     "./share": "./src/share.ts",
+    "./shopping": "./src/shopping.ts",
     "./storage": "./src/storage.ts",
     "./package.json": "./package.json"
   },

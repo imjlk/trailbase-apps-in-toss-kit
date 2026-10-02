@@ -286,6 +286,8 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 }
 ```
 
+운영자가 발급받은 토스쇼핑 링크를 선택적으로 사용하려면 [쇼핑 제휴 링크](shopping-affiliate.md)를 참고하세요.
+
 Apps in Toss 공유 링크에서는 문구와 OG 이미지 선택을 앱에 남기세요. share bridge는
 `intoss://` 링크를 정규화하고, 유효한 OG 이미지 URL을 선택적으로 prewarm한 뒤,
 `getTossShareLink()`와 `share()`를 호출하는 얇은 adapter입니다.
