@@ -1,3 +1,5 @@
+import { createWebViewNetworkCheck } from "./webview-network-check.mjs";
+export { createWebViewNetworkCheck } from "./webview-network-check.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -236,6 +238,10 @@ export function formatDoctorResultLines(summary) {
 
 function createReleaseDoctorCheckFromConfig(entry, { root, index }) {
   const type = entry?.type;
+  if (type === "webview-network") {
+    const { name, required, runtime, endpoint, appName, sdkVersion, origins, method, requestHeaders, credentials, timeout, allowLocalHttp } = entry;
+    return createWebViewNetworkCheck({ name, required, runtime, endpoint, appName, sdkVersion, origins, method, requestHeaders, credentials, timeout, allowLocalHttp });
+  }
   if (type === "proxy-capabilities") {
     const { name, url, urlEnv, tokenEnv, required, expectedMode, minimumVersion, requiredCapabilities, timeout } = entry;
     return createProxyCapabilitiesCheck({ name, url, urlEnv, tokenEnv, required, expectedMode, minimumVersion, requiredCapabilities, timeout });

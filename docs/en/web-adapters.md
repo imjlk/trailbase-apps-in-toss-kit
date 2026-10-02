@@ -78,17 +78,18 @@ been retired. This adapter does not wrap every SDK feature.
 ## Consumer migration and verification
 
 Follow the official [SDK 3 migration guide](https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x)
-for `apps-in-toss.config.ts`, build scripts and Devtools. It currently asks consumers
-that must preserve direct localStorage data to defer migration; this kit performs
-no implicit origin-storage conversion. Once an SDK 3 bundle is released, the guide
-says it cannot roll back to SDK 2.
+for `apps-in-toss.config.ts`, build scripts and Devtools. The current guide requires
+SDK 3.1.1 or later when retaining SDK 2 browser localStorage data: SDK 3.0.0–3.1.0
+used a different origin. This kit does not migrate or copy storage. After releasing
+an SDK 3 bundle, rollback to SDK 2 is unsupported.
 
-Confirm CORS against the actual console bundle origin. The dated August 25, 2026
+Confirm CORS against the actual console bundle origin. The current
 [release/test notice](https://developers-apps-in-toss.toss.im/guide/operation/toss)
-uses `apps.tossmini.com`/`private-apps.tossmini.com` for new SDK 3 uploads, while the
-generic migration guide still lists `web`/`private-web`. Apply the current console
-notice and explicit app origins; do not allow wildcard origins or assume RN origins
-changed. The kit does not rewrite a consumer's CORS policy.
+uses `apps.tossmini.com`/`private-apps.tossmini.com` for SDK 3.1.1+ and SDK 1/2,
+while SDK 3.0.0–3.1.0 used `web`/`private-web`. The generic migration guide's
+CORS section still lists the older family. Prefer the version-specific notice
+and observed origin, with explicit app origins rather than wildcards. RN is
+not a WebView CORS test target. See [device diagnostics](device-diagnostics.md).
 
 Run `bun test packages/ait-web`, both `packages:typecheck` commands and a browser
 bundle. The tests use explicit SDK fixtures and cover cleanup, unavailable methods,

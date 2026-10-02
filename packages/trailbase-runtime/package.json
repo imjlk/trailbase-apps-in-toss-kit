@@ -13,7 +13,8 @@
     "./owned-currency-report": "./src/owned-currency-report.mjs",
     "./owned-currency-close-manifest": "./src/owned-currency-close-manifest.mjs",
     "./restore-checkpoint": "./src/restore-checkpoint.mjs",
-    "./owned-currency-reconcile": "./src/owned-currency-reconcile.mjs"
+    "./owned-currency-reconcile": "./src/owned-currency-reconcile.mjs",
+    "./webview-network-check": "./src/webview-network-check.mjs"
   },
   "bin": {
     "dev-with-trailbase": "./bin/dev-with-trailbase.mjs",

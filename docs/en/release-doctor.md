@@ -219,3 +219,5 @@ legacy single-call grant consumers to the persisted prepare/execute/status flow
 before upgrading their proxy: the current proxy returns `410 PROMOTION_GRANT_REMOVED`
 on the old grant route. Copying a Compose template or updating a submodule pointer
 does not update an independently deployed proxy instance.
+
+[Read-only device and WebView diagnostics](device-diagnostics.md).

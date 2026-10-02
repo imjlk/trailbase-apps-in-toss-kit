@@ -66,7 +66,7 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 - `ait-kit-sdk`: `0.5.1`
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.10.10`
+- `apps-in-toss-framework`: `2.10.11`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.5`
@@ -91,7 +91,9 @@ root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새
 
 ## 최근 검토한 SDK 변경
 
-저장소 reference는 `@apps-in-toss/framework` `2.10.10`까지 검토했습니다.
+저장소 reference는 `@apps-in-toss/framework` `2.10.11`까지 검토했습니다.
+
+- `2.10.11`: RN reference를 갱신하고 adapter 테스트 및 최신/최소 타입 검사를 실행했습니다. 최소 버전은 `2.10.10`이며 컨슈머 실기기 검증은 별도로 필요합니다.
 
 - `@ait-kit/sdk` `0.4.0`: RN과 Web에서 공통으로 사용하는 리뷰 요청 및 직접
   프로모션 adapter 계약을 추가했습니다. Kit는 이 버전을 정확히 pin하며,

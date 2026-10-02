@@ -208,3 +208,5 @@ health만 호출해 forward 모드, 익명 키 검증, 익명 프로모션 수�
 프록시 업그레이드 전에 저장된 키를 사용하는 prepare/execute/status로 이전해야 합니다.
 현재 프록시는 기존 grant 경로에 `410 PROMOTION_GRANT_REMOVED`를 반환합니다.
 Compose 예제 복사나 서브모듈 포인터 변경만으로 별도 운영 중인 프록시가 갱신되지는 않습니다.
+
+[조회 전용 기기·WebView 진단](device-diagnostics.md).

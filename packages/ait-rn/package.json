@@ -20,7 +20,8 @@
     "./share": "./src/share.ts",
     "./shopping": "./src/shopping.ts",
     "./storage": "./src/storage.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./diagnostics": "./src/diagnostics.ts"
   },
   "peerDependencies": {
     "@apps-in-toss/framework": ">=2.10.10",
