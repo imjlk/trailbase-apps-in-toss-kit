@@ -66,6 +66,11 @@ export async function diagnoseAffiliateCatalog({ policy, provider, topics = [], 
     !Array.isArray(provider.capabilities) || typeof provider.categories !== 'function' || typeof provider.list !== 'function') {
     add('provider', 'fail', 'invalid-adapter'); report.status = 'failed'; return report;
   }
+  const enabledSources = sources.filter((source) => (policy.sourceWeights?.[source] ?? 1) > 0);
+  if (!enabledSources.some((source) => provider.capabilities.includes(source)) &&
+    !(policy.allowOverallBest === true && provider.capabilities.includes('overall-best'))) {
+    add('provider', 'fail', 'source-capability-mismatch'); report.status = 'failed'; return report;
+  }
   let tree;
   try { tree = await provider.categories(); }
   catch (error) { add('categories', 'fail', affiliateDiagnosticFailure(error)); report.status = 'failed'; return report; }

@@ -190,6 +190,10 @@ describe('Toss official wire contract', () => {
     await expect(provider.list({ source: 'today-deals' })).rejects.toThrow('cooldown');
     expect(calls).toHaveLength(2);
   });
+  test('HTTP 200 access-denied has a sanitized diagnostic class', async () => {
+    const { provider } = create(() => ({ resultType: 'FAIL', error: { errorCode: 'SHARELINK_OPENAPI_ACCESS_DENIED' } }));
+    await expect(provider.list({ source: 'today-deals' })).rejects.toThrow('access-denied');
+  });
   test('rejects wrong product/account echo and unsafe link hosts', async () => {
     for (const result of [{ tacaItemId: 999, publisherId: 'publisher', shortUrl: 'https://toss.im/test' },
       { tacaItemId: 123, publisherId: 'another', shortUrl: 'https://toss.im/test' },

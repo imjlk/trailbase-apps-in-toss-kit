@@ -2,6 +2,7 @@ import { test, expect } from 'bun:test';
 import { spawnSync } from 'node:child_process';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
 import { diagnoseAffiliateCatalog, validateAffiliatePolicy, affiliateDiagnosticFailure } from '../src/affiliate/diagnostics.mjs';
 
@@ -51,7 +52,7 @@ test('CLI is offline by default; live mode requires credentials and never prints
   try {
     const path = join(directory, 'policy.json');
     await writeFile(path, JSON.stringify(policy));
-    const executable = new URL('../bin/affiliate-doctor.mjs', import.meta.url).pathname;
+    const executable = fileURLToPath(new URL('../bin/affiliate-doctor.mjs', import.meta.url));
     const env = { ...process.env, TOSS_SHOPPING_ACCESS_KEY: 'sensitive-synthetic-key', TOSS_SHOPPING_SECRET_KEY: '', TOSS_SHOPPING_PUBLISHER_ID: '' };
     const offline = spawnSync('node', [executable, '--policy', path], { env, encoding: 'utf8' });
     expect(offline.status).toBe(0);
@@ -62,4 +63,13 @@ test('CLI is offline by default; live mode requires credentials and never prints
     expect(live.stdout + live.stderr).not.toContain('sensitive-synthetic-key');
     expect(spawnSync('node', [executable, '--arbitrary-url', 'https://invalid.test'], { env }).status).toBe(2);
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test('unsupported enabled sources are a local capability error, not missing inventory', async () => {
+  let reads = 0;
+  const report = await diagnoseAffiliateCatalog({ policy, provider: { ...provider(), capabilities: ['today-deals'],
+    categories: async () => { reads++; return []; } } });
+  expect(report.status).toBe('failed');
+  expect(report.checks).toContainEqual({ id: 'provider', status: 'fail', code: 'source-capability-mismatch' });
+  expect(reads).toBe(0);
 });

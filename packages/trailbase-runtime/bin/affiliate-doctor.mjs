@@ -17,13 +17,15 @@ for (let i = 0; i < args.length; i++) {
   values[arg] = args[++i];
 }
 if (!values['--policy']) { console.error(help); process.exit(2); }
+async function main() {
 try {
   const policy = JSON.parse(await readFile(values['--policy'], 'utf8'));
   const required = ['TOSS_SHOPPING_ACCESS_KEY', 'TOSS_SHOPPING_SECRET_KEY', 'TOSS_SHOPPING_PUBLISHER_ID'];
   if (live && required.some((key) => !process.env[key]?.trim())) {
     console.log(JSON.stringify({ schema: 'affiliate-diagnostics-v1', status: 'failed', code: 'missing-server-credentials',
       missing: required.filter((key) => !process.env[key]?.trim()) }));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const provider = live ? createTossSharelinkProvider({ accessKey: process.env.TOSS_SHOPPING_ACCESS_KEY,
     secretKey: process.env.TOSS_SHOPPING_SECRET_KEY, publisherId: process.env.TOSS_SHOPPING_PUBLISHER_ID,
@@ -36,3 +38,5 @@ try {
   console.error(JSON.stringify({ schema: 'affiliate-diagnostics-v1', status: 'failed', code: 'configuration-or-diagnostic-failed' }));
   process.exitCode = 1;
 }
+}
+await main();
