@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-web
 
+## 0.3.4 — 2026-10-02
+
+### Patch changes
+
+- [318e55f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/318e55fb60c65d9ca4793ea83fda804f9e57a199) Adopt the published @ait-kit/sdk 0.6.0 in both frontend adapters and document explicit, bounded SDK call diagnostics. Consumers with a direct SDK dependency should pin the same version. Diagnostics remain opt-in and do not change login, sharing, rewards, or deployment settings; no schema migration is required. — Thanks @imjlk!
+
 ## 0.3.3 — 2026-09-30
 
 ### Patch changes
