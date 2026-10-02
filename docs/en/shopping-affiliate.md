@@ -52,3 +52,5 @@ Do not invent an `intoss://shopping` route or retry through a different destinat
 For RN, inject Granite's opener as above. A Web consumer can inject its supported
 opener into the pure helper, but must validate package resolution and Web navigation
 separately. This addition does not expand the `ait-web` package contract.
+
+Server-side category/deal selection and Sharelink issuance are available in [affiliate catalog](affiliate-catalog.md).
