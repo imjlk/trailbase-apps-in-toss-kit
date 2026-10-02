@@ -7,6 +7,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./analytics": "./src/analytics.ts",
+    "./engagement": "./src/engagement.ts",
     "./ads": "./src/ads.ts",
     "./haptics": "./src/haptics.ts",
     "./identity": "./src/identity.ts",
