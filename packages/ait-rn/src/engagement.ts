@@ -17,11 +17,12 @@ export function normalizeEntryReferrer(value: unknown): string {
 /** Parse only the outer referrer parameter, without depending on native URL getters. */
 export function entryReferrerFromScheme(scheme: unknown): string {
   if (typeof scheme !== "string" || scheme.length > 16_384) return "unknown";
-  const query = scheme.split("#", 1)[0].split("?").slice(1).join("?");
+  const query = (scheme.split("#", 1)[0] ?? "").split("?").slice(1).join("?");
   const matches = query.split("&").filter((part) => part.startsWith("referrer="));
-  if (matches.length !== 1) return "unknown";
+  const match = matches[0];
+  if (matches.length !== 1 || !match) return "unknown";
   try {
-    return normalizeEntryReferrer(decodeURIComponent(matches[0].slice(9).replace(/\+/g, " ")));
+    return normalizeEntryReferrer(decodeURIComponent(match.slice(9).replace(/\+/g, " ")));
   } catch {
     return "unknown";
   }
