@@ -11,7 +11,16 @@ const report = await collectAppsInTossRuntimeDiagnostics({ enabled: debugEnabled
 
 기본은 꺼짐입니다. 명시적으로 켰을 때만 실행 환경, OS, 토스 버전, 네트워크를 조회하며 각 조회는 3초로 제한합니다. 미확인·실패·시간초과를 구분합니다. 정해진 상태 값과 숫자형 버전만 반환하고 실행 URL, 사용자 식별자, 토큰, 네이티브 오류 원문이나 SDK 인자는 포함하지 않습니다. `deviceFeaturesVerified`는 항상 false입니다. 소비 앱이 디버그 UI나 콘솔 표시를 선택하며 원격 전송은 기본 제공하지 않습니다.
 
-호출별 시간과 SDK 실패 분류는 별도 버전으로 관리되는 AIT Kit의 `createSdkDiagnostics` 릴리즈 후 사용합니다. `run()`은 호출을 재시도하거나 취소하지 않습니다. 이 런타임 정보 수집기는 현재 배포된 `@ait-kit/sdk` 0.5.1과 호환되며 미배포 API를 import하지 않습니다.
+어댑터는 배포된 `@ait-kit/sdk` 0.6.0을 사용합니다. 소비 앱은 런타임 중립 observer를 명시적으로 켜서 호출별 시간과 SDK 실패 분류를 확인할 수 있습니다.
+
+```ts
+import { createSdkDiagnostics } from '@ait-kit/sdk';
+const diagnostics = createSdkDiagnostics({ enabled: debugEnabled, capacity: 50 });
+await diagnostics.run('share.open', () => existingShareAction());
+const recentCalls = diagnostics.snapshot();
+```
+
+소비 앱에 SDK 직접 의존성을 추가한다면 같은 정확한 버전을 사용하세요. observer는 정해진 호출 이름·소요 시간·결과 분류만 제한된 메모리에 보관합니다. 인자·반환값·네이티브 오류 원문을 보관하거나 원격 sink를 설정하지 않으며 호출을 재시도하거나 취소하지 않습니다. `resolved`는 함수가 반환했다는 의미이고 실제 공유·동의·결제·보상 완료의 증거가 아닙니다. 디버그 기록 시작·표시·삭제는 소비 앱이 명시적으로 제어합니다. 런타임 정보 수집은 이 observer와 독립적으로 동작합니다.
 
 ## WebView 통신 사전 검사
 

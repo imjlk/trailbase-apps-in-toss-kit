@@ -11,7 +11,16 @@ const report = await collectAppsInTossRuntimeDiagnostics({ enabled: debugEnabled
 
 Disabled by default. When explicitly enabled, four read-only probes report operational environment, OS, host Toss version and network state. Each probe is bounded to three seconds. Unknown, failed and timed-out probes remain distinct. Only fixed enums and a numeric version are returned; no launch URL, user identifier, token, native error or SDK arguments are logged. `deviceFeaturesVerified` is always false. The consumer decides whether to display this in its debug UI or a console. No remote log sink is configured.
 
-For per-operation timing and coarse SDK failures, use the separately versioned AIT Kit `createSdkDiagnostics` after its release. Its `run()` wrapper does not retry or cancel the supplied operation. Runtime snapshots here work with the currently published `@ait-kit/sdk` 0.5.1; they do not import a not-yet-published API.
+For per-operation timing and coarse SDK failures, the adapters now use the published `@ait-kit/sdk` 0.6.0. Consumers can explicitly enable its runtime-neutral observer:
+
+```ts
+import { createSdkDiagnostics } from '@ait-kit/sdk';
+const diagnostics = createSdkDiagnostics({ enabled: debugEnabled, capacity: 50 });
+await diagnostics.run('share.open', () => existingShareAction());
+const recentCalls = diagnostics.snapshot();
+```
+
+Use the same exact SDK version when declaring a direct consumer dependency. The observer records fixed operation labels, elapsed time and coarse outcomes in bounded memory. It does not retain arguments, results or native errors, configure a remote sink, retry or cancel calls. `resolved` means the supplied call returned; it does not prove sharing, agreement, payment or reward completion. Consumers own the explicit debug opt-in, display and clearing of the history. The runtime snapshot remains independent from this observer.
 
 ## WebView preflight
 

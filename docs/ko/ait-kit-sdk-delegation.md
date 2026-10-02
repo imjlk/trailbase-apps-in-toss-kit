@@ -6,7 +6,7 @@
 TrailBase는 자신이 소유한 부분(공개 API 표면, TrailBase 서버 연동, 세션
 부트스트랩, 저장 키 호환성)을 계속 담당합니다.
 
-두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.5.1`).
+두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.6.0`).
 SDK의 peer 하한이 이 kit의 RN 최소 버전을 정의합니다:
 `@apps-in-toss/framework >=2.10.10`(SDK pin 채택 시 `>=2.5.0`에서 상향).
 WebView 소비자는 `@apps-in-toss/web-framework >=3.4.0 <4`를 유지합니다.
