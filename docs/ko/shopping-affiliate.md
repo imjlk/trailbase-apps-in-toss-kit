@@ -51,3 +51,5 @@ const result = await shopping.open(link);
 RN에서는 위 예시처럼 Granite 함수를 주입합니다. Web 소비자도 순수 함수에
 지원되는 열기 함수를 주입할 수 있지만 패키지 해석과 Web 이동을 별도로 검증해야
 합니다. 이 변경은 `ait-web` 패키지의 계약을 확장하지 않습니다.
+
+서버 카테고리·특가 선택과 쉐어링크 발급은 [제휴 상품 선택](affiliate-catalog.md)을 참고하세요.

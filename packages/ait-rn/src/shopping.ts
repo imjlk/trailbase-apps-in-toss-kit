@@ -21,6 +21,39 @@ export type AppsInTossShoppingOpenResult =
   | { status: "busy" }
   | { status: "failed" };
 
+export type AppsInTossShoppingOffer = {
+  provider: "toss-shopping";
+  productId: string;
+  title: string;
+  url: string | null;
+  preview: boolean;
+  source: "category-best" | "today-deals" | "overall-best";
+  reason: "related" | "default-category" | "overall-best";
+  expiresAt: number;
+};
+
+/** Parse a server offer without broadening the URL allowlist. Preview offers may
+ * only be enabled explicitly by a development consumer; they have no open URL. */
+export function normalizeAppsInTossShoppingOffer(value: unknown, {
+  now = Date.now(), allowPreview = false,
+}: { now?: number; allowPreview?: boolean } = {}): AppsInTossShoppingOffer | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Record<string, unknown>;
+  const preview = item.preview === true;
+  const url = normalizeAppsInTossShoppingLink(item.url);
+  if (item.provider !== "toss-shopping" || typeof item.productId !== "string" ||
+    !/^[a-zA-Z0-9_-]{1,80}$/.test(item.productId) || typeof item.title !== "string" ||
+    !item.title.trim() || item.title.length > 180 || /[\u0000-\u001f\u007f]/u.test(item.title) ||
+    !["category-best", "today-deals", "overall-best"].includes(String(item.source)) ||
+    !["related", "default-category", "overall-best"].includes(String(item.reason)) ||
+    typeof item.expiresAt !== "number" || !Number.isFinite(item.expiresAt) || item.expiresAt <= now ||
+    (preview ? !allowPreview || item.url !== null : !url)) return null;
+  return { provider: "toss-shopping", productId: item.productId, title: item.title,
+    url: preview ? null : url, preview,
+    source: item.source as AppsInTossShoppingOffer["source"],
+    reason: item.reason as AppsInTossShoppingOffer["reason"], expiresAt: item.expiresAt };
+}
+
 /** Share one bridge per app to suppress concurrent opens across placements.
  * Invoke open only from an explicit user gesture. A dispatched URL is not a
  * confirmed landing, purchase, conversion, or reward entitlement.

@@ -287,6 +287,7 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 ```
 
 운영자가 발급받은 토스쇼핑 링크를 선택적으로 사용하려면 [쇼핑 제휴 링크](shopping-affiliate.md)를 참고하세요.
+서버에서 상품 링크를 발급하고 카테고리·특가 선택을 구성하려면 [제휴 상품 카탈로그](affiliate-catalog.md)를 참고하세요.
 
 Apps in Toss 공유 링크에서는 문구와 OG 이미지 선택을 앱에 남기세요. share bridge는
 `intoss://` 링크를 정규화하고, 유효한 OG 이미지 URL을 선택적으로 prewarm한 뒤,
