@@ -119,3 +119,34 @@ test("an account switch while inactive cannot inherit the previous account throt
   expect(refreshes).toBe(2);
   controller.dispose();
 });
+
+for (const phase of [false, true]) {
+  for (const action of ["deactivate", "dispose", "switch"] as const) {
+    test(`onStatus ${action} at refreshing=${phase} cancels the old refresh`, async () => {
+      let armed = false;
+      let probes = 0;
+      const refreshedProbes: number[] = [];
+      const controller = createForegroundRefreshController({
+        getNetworkStatus: async () => { probes++; return "WIFI"; },
+        refresh: async () => { refreshedProbes.push(probes); },
+        now: () => 1_000,
+        onStatus: (state) => {
+          if (!armed || state.refreshing !== phase) return;
+          armed = false;
+          if (action === "dispose") controller.dispose();
+          else controller.setActive(action === "switch", action === "switch" ? "b" : "a");
+        },
+      });
+      controller.setActive(true, "a"); await tick();
+      armed = true;
+      controller.retry(); await tick();
+      expect(refreshedProbes).toEqual(action === "switch" ? [3] : []);
+      if (action === "deactivate") {
+        controller.setActive(true, "a"); await tick();
+        // A canceled request must not consume the current account's throttle.
+        expect(refreshedProbes).toEqual([3]);
+      }
+      controller.dispose();
+    });
+  }
+}

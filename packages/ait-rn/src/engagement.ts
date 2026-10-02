@@ -112,10 +112,12 @@ export function createForegroundRefreshController({
         const previousNetwork = network;
         network = normalizeNetworkAvailability(status);
         report(false, false);
+        if (disposed || !active || startedRevision !== revision) continue;
         if (network === "offline" || !request.refresh) continue;
         if (!request.force && previousNetwork !== "offline" && now() - lastRefreshAt < minimumIntervalMs) continue;
-        lastRefreshAt = now();
         report(true, false);
+        if (disposed || !active || startedRevision !== revision) continue;
+        lastRefreshAt = now();
         let failed = false;
         try { await refresh(); } catch { failed = true; }
         if (!disposed && active && startedRevision === revision) report(false, failed);
