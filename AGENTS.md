@@ -120,12 +120,19 @@ From this repository root:
 
 ```bash
 cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo check --workspace --target wasm32-wasip2
+node scripts/cargo-local.mjs -- clippy --workspace --all-targets -- -D warnings
+node scripts/cargo-local.mjs -- test --locked --workspace
+node scripts/cargo-local.mjs -- check --locked --workspace --target wasm32-wasip2
 bun test services/toss-mtls-client-proxy
 docker build -f services/toss-mtls-client-proxy/Dockerfile -t toss-mtls-client-proxy:local .
 ```
+
+For local Cargo checks/tests/builds, prefer `scripts/cargo-local.mjs` so repeated
+agent runs and temporary checkouts reuse the shared host target. Use `--ephemeral`
+before `--` for one-off verification, and `--full-debug` for detailed debugger work.
+Existing target/profile environment overrides remain authoritative. Resolve artifact
+paths with the runner's `target-dir` command rather than assuming `./target`.
+Never clean the shared target during another build; see `docs/en/build-cache.md`.
 
 Proxy local run:
 

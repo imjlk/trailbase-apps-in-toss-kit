@@ -38,6 +38,43 @@ IDE에 자동 적용되지 않습니다. Cargo의 명시적 `--target-dir`이 �
 
 참고: [Cargo 빌드 캐시](https://doc.rust-lang.org/cargo/reference/build-cache.html).
 
+## Kit 로컬 실행기와 점검 도구
+
+Kit에서는 `node scripts/cargo-local.mjs -- <cargo 명령>`을 사용합니다. 오래된 소비자는
+독립 파일인 `scripts/cargo-local.mjs`와 `scripts/cargo-cache-report.mjs`를 앱 소유 `scripts/`에
+복사할 수 있습니다. 관련 없는 런타임 서브모듈 코드를 올리지 않고 빌드 도구만 채택하기 위한
+방식이며, 도구 업데이트 시 복사본을 대조합니다. 새 소비자는 서브모듈 스크립트를 직접 호출해도
+됩니다. Node와 PATH에 설정된 Cargo/rustup이 필요합니다. 호출한 디렉터리와 도구 체인을 유지하며
+Rust 설치나 전역 mise/rustup 설정 변경은 하지 않습니다. mise shim에 Rust 버전이 없다면 프로젝트
+버전을 먼저 지정하거나 설치된 rustup proxy 디렉터리를 PATH에 넣습니다.
+
+```sh
+node scripts/cargo-local.mjs -- check --locked --workspace --target wasm32-wasip2
+node scripts/cargo-local.mjs --ephemeral -- test --locked --workspace
+node scripts/cargo-local.mjs --full-debug -- test --locked --workspace
+node scripts/cargo-local.mjs -- target-dir --manifest-path apps/trailbase/wasm/Cargo.toml
+node scripts/cargo-cache-report.mjs /absolute/checkouts /absolute/shared-cache
+```
+
+기본 target은 위 OS/아키텍처별 경로와 같습니다. 기존 `CARGO_TARGET_DIR`과 Cargo `--target-dir`이
+우선합니다. dev/test 디버그 정보는 기본 `line-tables-only`로 파일·줄 번호 추적은 남기고 상세 변수
+정보를 줄입니다. `--full-debug`는 workspace/환경의 원래 디버그 설정을 그대로 사용합니다. release
+프로필은 변경하지 않습니다. `--ephemeral`은 일회성 검사에서 incremental을 기본으로 끄며, 기존
+프로필/incremental 환경 설정은 항상 우선합니다. 실행한 프로세스 밖의 환경을 변경하지 않습니다.
+
+`target-dir`은 같은 환경에서 Cargo metadata의 실제 target 경로를 출력합니다. 빌드와 같은
+manifest·옵션으로 경로를 확인하고 성공 직후 필요한 WASM을 staging에 복사합니다. 기존 체크아웃의
+`target/`에서 오래된 파일을 읽거나 공용 최상위 파일을 릴리즈 보관소로 사용하지 않습니다.
+실행기는 직접 `clean` 호출을 거부하며, 의도적인 정리는 별도로 Cargo를 사용합니다.
+
+JSON 점검 도구는 Cargo 마커를 확인하고 하위 심링크·node_modules·로컬 실행 데이터를 제외하며
+`du -sk` 블록 추정치를 합산합니다. 읽기 전용이며 미사용 여부를 증명하지 않고 공유 파일시스템
+블록 때문에 합계가 겹칠 수 있습니다. 지정한 기존 target을 지우기 전 Cargo/rustc 프로세스와
+산출물 사용처를 확인하고 필요한 파일을 보존하며 대체 빌드를 검증합니다. 수정 시각만으로 삭제하거나
+심링크를 따라 정리하거나 TrailBase 볼륨을 포함하지 않습니다.
+
+Docker 기본 주소 풀이 소진된 경우 Kit WASM smoke는 `KIT_SMOKE_SUBNET`으로 충돌 여부를 확인한 미사용 테스트 subnet을 받을 수 있습니다. 자체 네트워크만 생성·정리하며 소비자 네트워크를 재사용하거나 삭제하지 않습니다.
+
 ## Docker 빌드
 
 WASM이라도 빌드 스크립트와 procedural macro는 빌드 호스트에서 실행되므로 Mac의 target과
@@ -79,7 +116,7 @@ docker buildx du --builder YOUR_BUILDER
 ```
 
 로컬 빌드 또는 Coolify가 실제 사용하는 builder를 선택합니다. builder와 서버가 다르면
-캐시도 별개입니다. 예를 들어 20GB부터 시작해 디스크 여유와 재빌드 빈도에 맞춥니다.
+캐시도 별개입니다. 예를 들어 8GB부터 시작해 디스크 여유와 재빌드 빈도에 맞춥니다.
 이 수치는 파일시스템의 강제 용량 할당량이 아닙니다.
 
 - `docker` 드라이버: 기존 daemon 설정에

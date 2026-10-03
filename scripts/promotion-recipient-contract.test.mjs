@@ -21,7 +21,7 @@ async function body(req) {
 }
 
 test("Rust promotion payloads preserve recipient identity through the real proxy and upstream headers", async () => {
-  const child = Bun.spawn(["cargo", "run", "--locked", "--quiet", "-p", "trailbase-guest-common", "--example", "promotion_payloads"], {cwd: root, stdout: "pipe", stderr: "pipe"});
+  const child = Bun.spawn(["node", "scripts/cargo-local.mjs", "--ephemeral", "--", "run", "--locked", "--quiet", "-p", "trailbase-guest-common", "--example", "promotion_payloads"], {cwd: root, stdout: "pipe", stderr: "pipe"});
   const [exitCode, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()]);
   if (exitCode !== 0) throw new Error(`Rust fixture failed: ${stderr}`);
   const cases = JSON.parse(stdout);

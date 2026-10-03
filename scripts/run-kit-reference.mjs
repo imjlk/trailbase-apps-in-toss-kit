@@ -57,7 +57,7 @@ try {
     proxyPackage: json("services/toss-mtls-client-proxy/package.json").version,
     rustPackages: Object.fromEntries(["trailbase-wasm", "trailbase-guest-common", "trailbase-toss-identity"].map(name => [name, lockedRustVersions(name)])) };
   step("Evidence integrity checks", "bun", ["test", "scripts/reference/source-state.test.mjs"]);
-  step("Rust helper tests", "cargo", ["test", "--workspace"]);
+  step("Rust helper tests", "node", ["scripts/cargo-local.mjs", "--ephemeral", "--", "test", "--locked", "--workspace"]);
   step("JavaScript, client and proxy tests", "bun", ["test", "packages", "services/toss-mtls-client-proxy"]);
   step("Current SDK type contracts", "bun", ["run", "packages:typecheck"]);
   step("Minimum RN SDK type contracts", "bun", ["run", "packages:typecheck:minimum"]);
