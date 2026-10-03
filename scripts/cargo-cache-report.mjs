@@ -12,17 +12,18 @@ export function findTargets(roots, { readDirectory = readdirSync } = {}) {
     if (visited.has(directory)) return;
     // Dirent information may be stale. Revalidate each descent and its root boundary.
     let stat;
+    let canonical;
     try {
       stat = lstatSync(directory);
       if (!stat.isDirectory() || stat.isSymbolicLink()) return;
-      const relative = path.relative(boundary, realpathSync(directory));
+      canonical = realpathSync(directory);
+      const relative = path.relative(boundary, canonical);
       if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return;
     } catch (error) {
       if (['ENOENT', 'ENOTDIR', 'ELOOP'].includes(error.code)) return;
       throw error;
     }
     // Compare canonical names separately: /tmp may itself be a platform-managed symlink.
-    const canonical = realpathSync(directory);
     const unchanged = () => {
       try { const current = lstatSync(directory); return current.isDirectory() && current.dev === stat.dev && current.ino === stat.ino && realpathSync(directory) === canonical; }
       catch { return false; }
