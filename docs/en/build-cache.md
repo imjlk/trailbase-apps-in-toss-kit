@@ -43,6 +43,60 @@ Before adopting it:
 
 See [Cargo build cache](https://doc.rust-lang.org/cargo/reference/build-cache.html).
 
+## Kit local runner and report
+
+Use `node scripts/cargo-local.mjs -- <cargo command>` in Kit, or copy the two standalone
+`scripts/cargo-local.mjs` and `scripts/cargo-cache-report.mjs` files into an older consumer's
+owned `scripts/` directory. This lets a consumer adopt build tooling without upgrading unrelated
+runtime submodule code. Reconcile these copies on tool updates. Newer consumers can invoke the
+submodule script directly. Both tools require Node; Cargo/rustup must already be configured on PATH.
+The runner keeps the caller's working directory and its selected toolchain; it does not install Rust
+or change global mise/rustup settings. If a mise shim has no configured Rust version, select the
+project Rust version or put the installed rustup proxy directory on PATH first.
+
+```sh
+node scripts/cargo-local.mjs -- check --locked --workspace --target wasm32-wasip2
+node scripts/cargo-local.mjs --ephemeral -- test --locked --workspace
+node scripts/cargo-local.mjs --full-debug -- test --locked --workspace
+node scripts/cargo-local.mjs -- target-dir --manifest-path apps/trailbase/wasm/Cargo.toml
+node scripts/cargo-cache-report.mjs /absolute/checkouts /absolute/shared-cache
+```
+
+The default target matches the OS/architecture path above. Explicit `CARGO_TARGET_DIR`, `CARGO_BUILD_TARGET_DIR`, and Cargo
+`--target-dir` win (Cargo retains its own precedence between them). The runner defaults dev/test debug info to `line-tables-only`, retaining stack
+trace file/line information but not detailed variable inspection. `--full-debug` leaves the normal
+workspace/environment debug settings alone. Release profile settings never change. `--ephemeral`
+defaults incremental compilation off for one-off checks; existing profile/incremental environment
+settings always win. No environment change escapes the invoked process.
+With an explicit Cargo `--config` (inline TOML or a file), the runner does not inject a default target
+directory: Cargo interprets the configuration itself. This applies even to config containing only other
+settings; set `CARGO_TARGET_DIR` explicitly if you also want a shared cache in that case.
+Arguments after Cargo’s `--` application separator do not count as Cargo configuration.
+
+`target-dir` prints Cargo metadata's effective target directory under the same environment, retaining a leading Rustup selector (for example `+nightly`) and Cargo global options. Resolve
+it with the same manifest, target/config/features and target-dir overrides as the build.
+`--target` becomes metadata `--filter-platform`; release/profile/jobs/package and artifact-selection flags
+are removed. Unsupported flags fail explicitly; stage the required WASM immediately after a successful
+build. Do not silently read an old checkout-local `target/` or treat a shared top-level artifact as a
+release archive. The runner rejects `clean` even after supported Cargo global options; deliberate maintenance uses Cargo separately.
+Only `build`, `check`, `test`, `run`, `bench`, `doc`, `rustc`, `rustdoc`, `metadata`, `fetch`, `tree`,
+`help` and the wrapper’s `target-dir` are supported. Cargo aliases (including `b`/`c`/`t`/`r`) and
+external commands are rejected, because aliases can expand recursively to `clean`.
+For a trusted plugin, invoke Cargo directly, for example:
+`CARGO_TARGET_DIR="$(node scripts/cargo-local.mjs -- target-dir)" cargo clippy --workspace`.
+This is an accidental-clean guard, not a sandbox for build scripts or programs launched by Cargo.
+On Unix, SIGTERM/SIGINT/SIGHUP are forwarded to the Cargo process group, followed by SIGKILL after one second
+so timed-out checks do not leave compiler descendants writing into the cache. Native Windows is rejected before any Cargo process starts; use WSL.
+
+The JSON report recognizes Cargo markers, rechecks directory identities and root boundaries, skips root/child symlinks, node_modules and local runtime data,
+and sums `du -sk` block estimates. A Unix-compatible `du` on PATH is required (use WSL on Windows).
+Concurrent filesystem mutation is checked on a best-effort basis; this is not a security boundary or deletion tool. It is read-only, does not prove inactivity, and shared filesystem
+blocks can make totals overlap. Before deleting an explicit old target, check active Cargo/rustc
+processes and consumers of the output, preserve required artifacts, and verify the replacement build.
+Never delete by age alone, traverse a symlink for cleanup, or include TrailBase volumes in this operation.
+
+The Kit WASM smoke accepts `KIT_SMOKE_SUBNET` for an explicitly checked unused fixture subnet when Docker default address pools are exhausted. It creates and removes its own network; do not reuse or delete a consumer network.
+
 ## Docker builds
 
 Keep host target output separate from Linux builder caches, even for WASM: build
@@ -86,7 +140,7 @@ docker buildx du --builder YOUR_BUILDER
 ```
 
 Select the builder actually used by local builds or Coolify. Different builders
-and remote servers have separate caches. Start with a 20GB cache budget and tune
+and remote servers have separate caches. Start with a 8GB cache budget and tune
 it to the host's disk capacity and rebuild frequency; this is not a disk quota.
 
 - For the `docker` driver, merge the `builder.gc` section from

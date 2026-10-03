@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/consumer-tools.yml"
       - "scripts/*consumer*"
+      - "scripts/cargo-*.mjs"
       - "scripts/lib/consumer-*.mjs"
       - "templates/trailbase/**"
   push:
@@ -12,6 +13,7 @@ on:
     paths:
       - ".github/workflows/consumer-tools.yml"
       - "scripts/*consumer*"
+      - "scripts/cargo-*.mjs"
       - "scripts/lib/consumer-*.mjs"
       - "templates/trailbase/**"
   workflow_dispatch:
@@ -36,3 +38,4 @@ jobs:
         with:
           bun-version: "1.4.2"
       - run: bun test scripts/compare-consumer-templates.test.mjs scripts/consumer-upgrade-plan.test.mjs
+      - run: node --test scripts/cargo-local.test.mjs scripts/cargo-cache-report.test.mjs

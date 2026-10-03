@@ -39,7 +39,9 @@ const docker = (...args) => run("docker", args);
 const checks = [];
 try {
   console.log(`Building smoke component for ${image}`);
-  run("cargo", [
+  const targetDir = run("node", ["scripts/cargo-local.mjs", "--", "target-dir"]);
+  await mkdir(path.join(scratch, "wasm"), { recursive: true });
+  run("node", ["scripts/cargo-local.mjs", "--",
     "build",
     "-p",
     "trailbase-guest-common",
@@ -51,8 +53,15 @@ try {
     "wasm32-wasip2",
     "--release",
   ]);
-  run("cargo", ["build", "-p", "trailbase-toss-identity", "--example", "keyring_smoke",
+  await copyFile(
+    path.join(targetDir, "wasm32-wasip2/release/examples/compat_smoke.wasm"),
+    path.join(scratch, "wasm/compat_smoke.wasm"),
+  );
+  run("node", ["scripts/cargo-local.mjs", "--", "build", "-p", "trailbase-toss-identity", "--example", "keyring_smoke",
     "--features", "compat-smoke", "--target", "wasm32-wasip2", "--release"]);
+  await mkdir(path.join(scratch, "migrations/main"), { recursive: true });
+  await copyFile(path.join(targetDir, "wasm32-wasip2/release/examples/keyring_smoke.wasm"),
+    path.join(scratch, "wasm/keyring_smoke.wasm"));
   docker(
     "build",
     "-f",
@@ -61,14 +70,6 @@ try {
     proxyImage,
     ".",
   );
-  await mkdir(path.join(scratch, "wasm"), { recursive: true });
-  await mkdir(path.join(scratch, "migrations/main"), { recursive: true });
-  await copyFile(
-    path.join(root, "target/wasm32-wasip2/release/examples/compat_smoke.wasm"),
-    path.join(scratch, "wasm/compat_smoke.wasm"),
-  );
-  await copyFile(path.join(root, "target/wasm32-wasip2/release/examples/keyring_smoke.wasm"),
-    path.join(scratch, "wasm/keyring_smoke.wasm"));
   const templates = [
     "operation_policies.sql",
     "app_reward_attempts.sql",
@@ -110,7 +111,8 @@ record_apis: [{
   await writeFile(path.join(runtimeRoot, "settings.json"), JSON.stringify({
     KIT_OPERATION_POLICIES_ENABLED: "1", KIT_OPERATIONS_HOLD: operationsHold ? "1" : "0",
   }));
-  docker("network", "create", network);
+  const subnet = process.env.KIT_SMOKE_SUBNET;
+  docker("network", "create", ...(subnet ? ["--subnet", subnet] : []), network);
   networkCreated = true;
   docker(
     "run",

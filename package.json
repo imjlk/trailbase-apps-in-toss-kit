@@ -8,6 +8,11 @@
     "services/*"
   ],
   "scripts": {
+    "cargo:local": "node scripts/cargo-local.mjs --",
+    "cargo:check": "node scripts/cargo-local.mjs -- check --locked --workspace --target wasm32-wasip2",
+    "cargo:test": "node scripts/cargo-local.mjs -- test --locked --workspace",
+    "cargo:cache:report": "node scripts/cargo-cache-report.mjs",
+    "cargo:cache:test": "node --test scripts/cargo-local.test.mjs scripts/cargo-cache-report.test.mjs",
     "packages:test": "bun install --frozen-lockfile && bun test packages/trailbase-runtime packages/trailbase-client packages/ait-rn packages/ait-web packages/release-tools",
     "runtime:test": "bun test packages/trailbase-runtime",
     "client:test": "bun test packages/trailbase-client",
