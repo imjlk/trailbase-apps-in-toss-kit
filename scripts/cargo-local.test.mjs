@@ -132,3 +132,16 @@ test('explicit Cargo config retains Cargo directory selection without a wrapper 
   assert.equal(configured.env.CARGO_TARGET_DIR, '/environment');
   assert.equal(cargoInvocation(['--', 'run', '--', '--config', 'application.toml'], {}, host).env.CARGO_TARGET_DIR, '/home/test/.cache/ait-kit/cargo-target/Darwin-arm64');
 });
+
+test('rejects custom aliases, built-in alias abbreviations and external plugins before Cargo runs', () => {
+  for (const command of ['wipe', 'b', 'c', 'd', 't', 'r', 'clippy', 'fmt']) {
+    assert.throws(() => cargoInvocation(['--', command], { CARGO_ALIAS_WIPE: 'clean', CARGO_ALIAS_CLIPPY: 'clean' }, host), /Aliases and external/);
+    assert.throws(() => cargoInvocation(['--', '--config', 'aliases.toml', command], {}, host), /Aliases and external/);
+  }
+  assert.equal(cargoInvocation(['--', 'check'], { CARGO_ALIAS_CHECK: 'clean' }, host).args[0], 'check');
+});
+
+test('target-dir pseudo-command cannot be forwarded as a Cargo alias', () => {
+  assert.throws(() => cargoInvocation(['--', '--config', 'alias.target-dir="clean"', 'target-dir'], {}, host), /never forwarded/);
+  assert.throws(() => cargoInvocation(['--', '+nightly', 'target-dir'], {}, host), /never forwarded/);
+});

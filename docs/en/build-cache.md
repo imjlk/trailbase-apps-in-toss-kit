@@ -79,6 +79,12 @@ it with the same manifest, target/config/features and target-dir overrides as th
 are removed. Unsupported flags fail explicitly; stage the required WASM immediately after a successful
 build. Do not silently read an old checkout-local `target/` or treat a shared top-level artifact as a
 release archive. The runner rejects `clean` even after supported Cargo global options; deliberate maintenance uses Cargo separately.
+Only `build`, `check`, `test`, `run`, `bench`, `doc`, `rustc`, `rustdoc`, `metadata`, `fetch`, `tree`,
+`help` and the wrapper’s `target-dir` are supported. Cargo aliases (including `b`/`c`/`t`/`r`) and
+external commands are rejected, because aliases can expand recursively to `clean`.
+For a trusted plugin, invoke Cargo directly, for example:
+`CARGO_TARGET_DIR="$(node scripts/cargo-local.mjs -- target-dir)" cargo clippy --workspace`.
+This is an accidental-clean guard, not a sandbox for build scripts or programs launched by Cargo.
 On Unix, SIGTERM/SIGINT/SIGHUP are forwarded to the Cargo process group, followed by SIGKILL after one second
 so timed-out checks do not leave compiler descendants writing into the cache. Windows forwards to Cargo only.
 

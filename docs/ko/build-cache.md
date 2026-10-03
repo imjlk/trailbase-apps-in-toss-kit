@@ -71,6 +71,11 @@ manifest·target/config/features·target-dir 설정으로 경로를 확인하고
 제거합니다. 지원하지 않는 옵션은 명시적으로 거부합니다. 기존 체크아웃의
 `target/`에서 오래된 파일을 읽거나 공용 최상위 파일을 릴리즈 보관소로 사용하지 않습니다.
 실행기는 Cargo 전역 옵션 뒤의 `clean`도 거부하며, 의도적인 정리는 별도로 Cargo를 사용합니다.
+지원 명령은 `build`, `check`, `test`, `run`, `bench`, `doc`, `rustc`, `rustdoc`, `metadata`,
+`fetch`, `tree`, `help` 및 실행기의 `target-dir`입니다. Cargo 별칭(`b`/`c`/`t`/`r` 포함)과
+외부 명령은 재귀적으로 `clean`에 연결될 수 있어 거부합니다. 신뢰하는 플러그인은 Cargo로 직접 실행합니다.
+예: `CARGO_TARGET_DIR="$(node scripts/cargo-local.mjs -- target-dir)" cargo clippy --workspace`.
+이는 실수로 정리하는 것을 막는 장치이며 빌드 스크립트나 Cargo가 실행하는 프로그램의 샌드박스가 아닙니다.
 Unix에서는 SIGTERM/SIGINT/SIGHUP를 Cargo 프로세스 그룹에 전달하고 1초 뒤 SIGKILL로 남은 컴파일러도
 종료하여 시간 초과 후 캐시 쓰기가 계속되지 않게 합니다. Windows에서는 Cargo 프로세스에만 전달합니다.
 

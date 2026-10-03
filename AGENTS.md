@@ -120,7 +120,7 @@ From this repository root:
 
 ```bash
 cargo fmt --all --check
-node scripts/cargo-local.mjs -- clippy --workspace --all-targets -- -D warnings
+CARGO_TARGET_DIR="$(node scripts/cargo-local.mjs -- target-dir)" cargo clippy --workspace --all-targets -- -D warnings
 node scripts/cargo-local.mjs -- test --locked --workspace
 node scripts/cargo-local.mjs -- check --locked --workspace --target wasm32-wasip2
 bun test services/toss-mtls-client-proxy
@@ -132,6 +132,8 @@ agent runs and temporary checkouts reuse the shared host target. Use `--ephemera
 before `--` for one-off verification, and `--full-debug` for detailed debugger work.
 Existing target/profile environment overrides remain authoritative. Resolve artifact
 paths with the runner's `target-dir` command rather than assuming `./target`.
+The runner accepts built-in build commands only; Cargo aliases and plugins such as
+clippy/fmt must be invoked directly with an explicit target when needed.
 Never clean the shared target during another build; see `docs/en/build-cache.md`.
 
 Proxy local run:

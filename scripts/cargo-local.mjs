@@ -34,7 +34,13 @@ export function cargoInvocation(argv, env = process.env, host = { home: homedir(
     args.shift();
   }
   if (!args.length) throw new Error('Usage: cargo-local.mjs [--ephemeral] [--full-debug] -- <cargo command> [args]');
-  if (cargoCommand(args) === 'clean') throw new Error('Shared caches must be inspected before cleaning. Use cargo clean explicitly outside this wrapper.');
+  const command = cargoCommand(args);
+  if (command === 'clean') throw new Error('Shared caches must be inspected before cleaning. Use cargo clean explicitly outside this wrapper.');
+  // Cargo aliases can recurse or shadow external commands, including installed clippy/fmt.
+  // Built-in command names cannot be overridden by aliases. Keep this runner deliberately narrow.
+  const supported = new Set(['build', 'check', 'test', 'run', 'bench', 'doc', 'rustc', 'rustdoc', 'metadata', 'fetch', 'tree', 'help', 'target-dir']);
+  if (!supported.has(command)) throw new Error(`Unsupported Cargo command: ${command}. Aliases and external commands must be invoked directly with an explicit target directory.`);
+  if (command === 'target-dir' && args[0] !== 'target-dir') throw new Error('The wrapper target-dir command must precede its options; it is never forwarded to Cargo.');
   const next = { ...env };
   // A --config value can be TOML or a file with arbitrary tables/quoted keys.
   // Let Cargo interpret it rather than overriding it or maintaining a partial TOML parser.
