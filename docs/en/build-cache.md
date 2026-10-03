@@ -68,6 +68,10 @@ trace file/line information but not detailed variable inspection. `--full-debug`
 workspace/environment debug settings alone. Release profile settings never change. `--ephemeral`
 defaults incremental compilation off for one-off checks; existing profile/incremental environment
 settings always win. No environment change escapes the invoked process.
+With an explicit Cargo `--config` (inline TOML or a file), the runner does not inject a default target
+directory: Cargo interprets the configuration itself. This applies even to config containing only other
+settings; set `CARGO_TARGET_DIR` explicitly if you also want a shared cache in that case.
+Arguments after Cargo’s `--` application separator do not count as Cargo configuration.
 
 `target-dir` prints Cargo metadata's effective target directory under the same environment. Resolve
 it with the same manifest, target/config/features and target-dir overrides as the build.

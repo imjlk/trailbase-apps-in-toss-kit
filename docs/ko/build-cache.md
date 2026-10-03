@@ -61,6 +61,9 @@ node scripts/cargo-cache-report.mjs /absolute/checkouts /absolute/shared-cache
 정보를 줄입니다. `--full-debug`는 workspace/환경의 원래 디버그 설정을 그대로 사용합니다. release
 프로필은 변경하지 않습니다. `--ephemeral`은 일회성 검사에서 incremental을 기본으로 끄며, 기존
 프로필/incremental 환경 설정은 항상 우선합니다. 실행한 프로세스 밖의 환경을 변경하지 않습니다.
+Cargo `--config`를 명시하면(TOML 문자열 또는 파일) 기본 target 경로를 주입하지 않고 Cargo가 직접
+설정을 해석합니다. 다른 설정만 들어 있어도 동일하므로 이 경우에도 공용 캐시를 쓰려면
+`CARGO_TARGET_DIR`을 명시합니다. Cargo의 `--` 뒤에 전달하는 앱 인수는 Cargo 설정으로 보지 않습니다.
 
 `target-dir`은 같은 환경에서 Cargo metadata의 실제 target 경로를 출력합니다. 빌드와 같은
 manifest·target/config/features·target-dir 설정으로 경로를 확인하고 성공 직후 필요한 WASM을 staging에 복사합니다.

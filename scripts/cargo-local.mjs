@@ -36,7 +36,12 @@ export function cargoInvocation(argv, env = process.env, host = { home: homedir(
   if (!args.length) throw new Error('Usage: cargo-local.mjs [--ephemeral] [--full-debug] -- <cargo command> [args]');
   if (cargoCommand(args) === 'clean') throw new Error('Shared caches must be inspected before cleaning. Use cargo clean explicitly outside this wrapper.');
   const next = { ...env };
-  if (!next.CARGO_TARGET_DIR && !next.CARGO_BUILD_TARGET_DIR) {
+  // A --config value can be TOML or a file with arbitrary tables/quoted keys.
+  // Let Cargo interpret it rather than overriding it or maintaining a partial TOML parser.
+  const separator = args.indexOf('--');
+  const cargoArgs = separator < 0 ? args : args.slice(0, separator);
+  const explicitConfig = cargoArgs.some(arg => arg === '--config' || arg.startsWith('--config='));
+  if (!next.CARGO_TARGET_DIR && !next.CARGO_BUILD_TARGET_DIR && !explicitConfig) {
     const base = next.XDG_CACHE_HOME || path.join(host.home, '.cache');
     if (!path.isAbsolute(base)) throw new Error('XDG_CACHE_HOME must be absolute');
     const architecture = host.arch === 'x64' ? 'x86_64' : host.platform === 'linux' && host.arch === 'arm64' ? 'aarch64' : host.arch;

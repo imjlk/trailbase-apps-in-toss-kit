@@ -119,3 +119,16 @@ test('parent timeout terminates Cargo and a stubborn compiler descendant', { ski
     assert.equal(readFileSync(heartbeat, 'utf8'), stopped);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+test('explicit Cargo config retains Cargo directory selection without a wrapper override', () => {
+  for (const args of [
+    ['--config', 'build.target-dir="/explicit"', 'check'],
+    ['check', '--config=build.target-dir="/explicit"'],
+    ['target-dir', '--config', 'config with spaces.toml'],
+  ]) {
+    assert.equal(cargoInvocation(['--', ...args], {}, host).env.CARGO_TARGET_DIR, undefined);
+  }
+  const configured = cargoInvocation(['--', 'check', '--config', 'file.toml'], { CARGO_TARGET_DIR: '/environment' }, host);
+  assert.equal(configured.env.CARGO_TARGET_DIR, '/environment');
+  assert.equal(cargoInvocation(['--', 'run', '--', '--config', 'application.toml'], {}, host).env.CARGO_TARGET_DIR, '/home/test/.cache/ait-kit/cargo-target/Darwin-arm64');
+});
