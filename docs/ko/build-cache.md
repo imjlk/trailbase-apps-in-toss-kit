@@ -65,7 +65,7 @@ Cargo `--config`를 명시하면(TOML 문자열 또는 파일) 기본 target 경
 설정을 해석합니다. 다른 설정만 들어 있어도 동일하므로 이 경우에도 공용 캐시를 쓰려면
 `CARGO_TARGET_DIR`을 명시합니다. Cargo의 `--` 뒤에 전달하는 앱 인수는 Cargo 설정으로 보지 않습니다.
 
-`target-dir`은 같은 환경에서 Cargo metadata의 실제 target 경로를 출력합니다. 빌드와 같은
+`target-dir`은 앞쪽 Rustup 선택자(예: `+nightly`)와 Cargo 전역 옵션을 유지하여 같은 환경에서 Cargo metadata의 실제 target 경로를 출력합니다. 빌드와 같은
 manifest·target/config/features·target-dir 설정으로 경로를 확인하고 성공 직후 필요한 WASM을 staging에 복사합니다.
 `--target`은 metadata의 `--filter-platform`으로 변환하고 release/profile/jobs/package 및 산출물 선택 옵션은
 제거합니다. 지원하지 않는 옵션은 명시적으로 거부합니다. 기존 체크아웃의
@@ -77,7 +77,7 @@ manifest·target/config/features·target-dir 설정으로 경로를 확인하고
 예: `CARGO_TARGET_DIR="$(node scripts/cargo-local.mjs -- target-dir)" cargo clippy --workspace`.
 이는 실수로 정리하는 것을 막는 장치이며 빌드 스크립트나 Cargo가 실행하는 프로그램의 샌드박스가 아닙니다.
 Unix에서는 SIGTERM/SIGINT/SIGHUP를 Cargo 프로세스 그룹에 전달하고 1초 뒤 SIGKILL로 남은 컴파일러도
-종료하여 시간 초과 후 캐시 쓰기가 계속되지 않게 합니다. Windows에서는 Cargo 프로세스에만 전달합니다.
+종료하여 시간 초과 후 캐시 쓰기가 계속되지 않게 합니다. Windows 네이티브 실행은 Cargo 시작 전에 거부하므로 WSL을 사용합니다.
 
 JSON 점검 도구는 Cargo 마커를 확인하고 디렉터리 동일성과 루트 경계를 재확인하고 루트/하위 심링크·node_modules·로컬 실행 데이터를 제외하며
 `du -sk` 블록 추정치를 합산합니다. PATH의 Unix 호환 `du`가 필요합니다(Windows는 WSL 사용).

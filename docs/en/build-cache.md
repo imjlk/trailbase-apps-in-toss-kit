@@ -73,7 +73,7 @@ directory: Cargo interprets the configuration itself. This applies even to confi
 settings; set `CARGO_TARGET_DIR` explicitly if you also want a shared cache in that case.
 Arguments after Cargo’s `--` application separator do not count as Cargo configuration.
 
-`target-dir` prints Cargo metadata's effective target directory under the same environment. Resolve
+`target-dir` prints Cargo metadata's effective target directory under the same environment, retaining a leading Rustup selector (for example `+nightly`) and Cargo global options. Resolve
 it with the same manifest, target/config/features and target-dir overrides as the build.
 `--target` becomes metadata `--filter-platform`; release/profile/jobs/package and artifact-selection flags
 are removed. Unsupported flags fail explicitly; stage the required WASM immediately after a successful
@@ -86,7 +86,7 @@ For a trusted plugin, invoke Cargo directly, for example:
 `CARGO_TARGET_DIR="$(node scripts/cargo-local.mjs -- target-dir)" cargo clippy --workspace`.
 This is an accidental-clean guard, not a sandbox for build scripts or programs launched by Cargo.
 On Unix, SIGTERM/SIGINT/SIGHUP are forwarded to the Cargo process group, followed by SIGKILL after one second
-so timed-out checks do not leave compiler descendants writing into the cache. Windows forwards to Cargo only.
+so timed-out checks do not leave compiler descendants writing into the cache. Native Windows is rejected before any Cargo process starts; use WSL.
 
 The JSON report recognizes Cargo markers, rechecks directory identities and root boundaries, skips root/child symlinks, node_modules and local runtime data,
 and sums `du -sk` block estimates. A Unix-compatible `du` on PATH is required (use WSL on Windows).

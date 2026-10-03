@@ -96,7 +96,7 @@ test('CLI runs from a checkout path containing spaces and non-ASCII characters',
     assert.match(result.stderr, /inspected/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
-test('parent timeout terminates Cargo and a stubborn compiler descendant', { skip: process.platform === 'win32' }, async () => {
+for (const command of ['check', 'target-dir']) test(`parent timeout terminates ${command} and its stubborn descendant`, { skip: process.platform === 'win32' }, async () => {
   const { mkdtempSync, writeFileSync, readFileSync, chmodSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const path = await import('node:path');
@@ -109,7 +109,7 @@ test('parent timeout terminates Cargo and a stubborn compiler descendant', { ski
     const fake = path.join(root, 'cargo');
     writeFileSync(fake, `#!${process.execPath}\nrequire('node:child_process').spawn(process.execPath,[${JSON.stringify(worker)}],{stdio:'inherit'}); process.on('SIGTERM',()=>{}); setInterval(()=>{},1000);`);
     chmodSync(fake, 0o755);
-    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./cargo-local.mjs', import.meta.url)), '--', 'check'], {
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./cargo-local.mjs', import.meta.url)), '--', command], {
       env: { ...process.env, PATH: root + path.delimiter + process.env.PATH, HEARTBEAT: heartbeat }, timeout: 3000, encoding: 'utf8',
     });
     assert.equal(result.error?.code, 'ETIMEDOUT');
@@ -141,7 +141,44 @@ test('rejects custom aliases, built-in alias abbreviations and external plugins 
   assert.equal(cargoInvocation(['--', 'check'], { CARGO_ALIAS_CHECK: 'clean' }, host).args[0], 'check');
 });
 
-test('target-dir pseudo-command cannot be forwarded as a Cargo alias', () => {
-  assert.throws(() => cargoInvocation(['--', '--config', 'alias.target-dir="clean"', 'target-dir'], {}, host), /never forwarded/);
-  assert.throws(() => cargoInvocation(['--', '+nightly', 'target-dir'], {}, host), /never forwarded/);
+test('native Windows is rejected before starting an unmanaged child tree', () => {
+  assert.throws(() => cargoInvocation(['check'], {}, { ...host, platform: 'win32' }), /inside WSL/);
+});
+
+test('target-dir translates the pseudo-command while retaining toolchain and global config', async () => {
+  const { mkdtempSync, writeFileSync, readFileSync, chmodSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const root = mkdtempSync(path.join(tmpdir(), 'cargo-selector-'));
+  try {
+    const fake = path.join(root, 'cargo');
+    const captured = path.join(root, 'args.json');
+    writeFileSync(fake, `#!${process.execPath}\nrequire('node:fs').writeFileSync(process.env.ARGS_FILE,JSON.stringify(process.argv.slice(2)));console.log(JSON.stringify({target_directory:process.env.CARGO_TARGET_DIR}));`);
+    chmodSync(fake, 0o755);
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./cargo-local.mjs', import.meta.url)), '--', '+fixture', '--config', 'alias.target-dir="clean"', 'target-dir', '--target', 'wasm32-wasip2', '--release'], {
+      env: { ...process.env, PATH: root + path.delimiter + process.env.PATH, ARGS_FILE: captured, CARGO_TARGET_DIR: path.join(root,'target') }, encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(JSON.parse(readFileSync(captured,'utf8')), ['+fixture', '--config', 'alias.target-dir="clean"', 'metadata', '--format-version', '1', '--no-deps', '--filter-platform', 'wasm32-wasip2']);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('metadata capture is bounded and terminates an oversized producer', async () => {
+  const { mkdtempSync, writeFileSync, chmodSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const path = await import('node:path');
+  const { spawnSync } = await import('node:child_process');
+  const root = mkdtempSync(path.join(tmpdir(), 'cargo-metadata-limit-'));
+  try {
+    const fake = path.join(root, 'cargo');
+    writeFileSync(fake, `#!${process.execPath}\nprocess.stdout.write('x'.repeat(17*1024*1024));setInterval(()=>{},1000);`);
+    chmodSync(fake, 0o755);
+    const result = spawnSync(process.execPath, [fileURLToPath(new URL('./cargo-local.mjs', import.meta.url)), '--', 'target-dir'], {
+      env: { ...process.env, PATH: root + path.delimiter + process.env.PATH }, encoding: 'utf8', timeout: 10000,
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /exceeded 16 MiB/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
