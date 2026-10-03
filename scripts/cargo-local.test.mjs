@@ -44,7 +44,7 @@ test('CLI uses consumer cwd, forwards failures and resolves metadata artifact pa
   const runner = new URL('./cargo-local.mjs', import.meta.url);
   try {
     const fake = path.join(root, 'cargo');
-    writeFileSync(fake, `#!/usr/bin/env node\nif(process.argv[2]==='metadata') console.log(JSON.stringify({target_directory:process.env.CARGO_TARGET_DIR})); else { console.log(JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)})); process.exitCode=17; }\n`);
+    writeFileSync(fake, `#!${process.execPath}\nif(process.argv[2]==='metadata') console.log(JSON.stringify({target_directory:process.env.CARGO_TARGET_DIR})); else { console.log(JSON.stringify({cwd:process.cwd(),args:process.argv.slice(2)})); process.exitCode=17; }\n`);
     chmodSync(fake, 0o755);
     const env = { ...process.env, PATH: root + path.delimiter + process.env.PATH, CARGO_TARGET_DIR: path.join(root,'target with spaces') };
     const meta = spawnSync(process.execPath, [fileURLToPath(runner), '--', 'target-dir'], { cwd: root, env, encoding: 'utf8' });
@@ -107,10 +107,10 @@ test('parent timeout terminates Cargo and a stubborn compiler descendant', { ski
     const worker = path.join(root, 'worker.cjs');
     writeFileSync(worker, `const fs=require('node:fs'); process.on('SIGTERM',()=>{}); setInterval(()=>fs.appendFileSync(process.env.HEARTBEAT,'x'),20);`);
     const fake = path.join(root, 'cargo');
-    writeFileSync(fake, `#!/usr/bin/env node\nrequire('node:child_process').spawn(process.execPath,[${JSON.stringify(worker)}],{stdio:'inherit'}); process.on('SIGTERM',()=>{}); setInterval(()=>{},1000);`);
+    writeFileSync(fake, `#!${process.execPath}\nrequire('node:child_process').spawn(process.execPath,[${JSON.stringify(worker)}],{stdio:'inherit'}); process.on('SIGTERM',()=>{}); setInterval(()=>{},1000);`);
     chmodSync(fake, 0o755);
     const result = spawnSync(process.execPath, [fileURLToPath(new URL('./cargo-local.mjs', import.meta.url)), '--', 'check'], {
-      env: { ...process.env, PATH: root + path.delimiter + process.env.PATH, HEARTBEAT: heartbeat }, timeout: 1200, encoding: 'utf8',
+      env: { ...process.env, PATH: root + path.delimiter + process.env.PATH, HEARTBEAT: heartbeat }, timeout: 3000, encoding: 'utf8',
     });
     assert.equal(result.error?.code, 'ETIMEDOUT');
     const stopped = readFileSync(heartbeat, 'utf8');
