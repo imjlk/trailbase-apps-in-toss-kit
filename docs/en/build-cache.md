@@ -62,20 +62,25 @@ node scripts/cargo-local.mjs -- target-dir --manifest-path apps/trailbase/wasm/C
 node scripts/cargo-cache-report.mjs /absolute/checkouts /absolute/shared-cache
 ```
 
-The default target matches the OS/architecture path above. Explicit `CARGO_TARGET_DIR` and Cargo
-`--target-dir` win. The runner defaults dev/test debug info to `line-tables-only`, retaining stack
+The default target matches the OS/architecture path above. Explicit `CARGO_TARGET_DIR`, `CARGO_BUILD_TARGET_DIR`, and Cargo
+`--target-dir` win (Cargo retains its own precedence between them). The runner defaults dev/test debug info to `line-tables-only`, retaining stack
 trace file/line information but not detailed variable inspection. `--full-debug` leaves the normal
 workspace/environment debug settings alone. Release profile settings never change. `--ephemeral`
 defaults incremental compilation off for one-off checks; existing profile/incremental environment
 settings always win. No environment change escapes the invoked process.
 
 `target-dir` prints Cargo metadata's effective target directory under the same environment. Resolve
-it with the same manifest and flags as the build; stage the required WASM immediately after a successful
+it with the same manifest, target/config/features and target-dir overrides as the build.
+`--target` becomes metadata `--filter-platform`; release/profile/jobs/package and artifact-selection flags
+are removed. Unsupported flags fail explicitly; stage the required WASM immediately after a successful
 build. Do not silently read an old checkout-local `target/` or treat a shared top-level artifact as a
-release archive. The runner rejects direct `clean`; deliberate maintenance uses Cargo separately.
+release archive. The runner rejects `clean` even after supported Cargo global options; deliberate maintenance uses Cargo separately.
+On Unix, SIGTERM/SIGINT/SIGHUP are forwarded to the Cargo process group, followed by SIGKILL after one second
+so timed-out checks do not leave compiler descendants writing into the cache. Windows forwards to Cargo only.
 
-The JSON report recognizes Cargo markers, skips symlink children, node_modules and local runtime data,
-and sums `du -sk` block estimates. It is read-only, does not prove inactivity, and shared filesystem
+The JSON report recognizes Cargo markers, rechecks directory identities and root boundaries, skips root/child symlinks, node_modules and local runtime data,
+and sums `du -sk` block estimates. A Unix-compatible `du` on PATH is required (use WSL on Windows).
+Concurrent filesystem mutation is checked on a best-effort basis; this is not a security boundary or deletion tool. It is read-only, does not prove inactivity, and shared filesystem
 blocks can make totals overlap. Before deleting an explicit old target, check active Cargo/rustc
 processes and consumers of the output, preserve required artifacts, and verify the replacement build.
 Never delete by age alone, traverse a symlink for cleanup, or include TrailBase volumes in this operation.

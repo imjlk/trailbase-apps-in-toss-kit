@@ -56,19 +56,24 @@ node scripts/cargo-local.mjs -- target-dir --manifest-path apps/trailbase/wasm/C
 node scripts/cargo-cache-report.mjs /absolute/checkouts /absolute/shared-cache
 ```
 
-기본 target은 위 OS/아키텍처별 경로와 같습니다. 기존 `CARGO_TARGET_DIR`과 Cargo `--target-dir`이
-우선합니다. dev/test 디버그 정보는 기본 `line-tables-only`로 파일·줄 번호 추적은 남기고 상세 변수
+기본 target은 위 OS/아키텍처별 경로와 같습니다. 기존 `CARGO_TARGET_DIR`, `CARGO_BUILD_TARGET_DIR`과 Cargo `--target-dir`이
+우선하며 이들 사이 우선순위는 Cargo를 따릅니다. dev/test 디버그 정보는 기본 `line-tables-only`로 파일·줄 번호 추적은 남기고 상세 변수
 정보를 줄입니다. `--full-debug`는 workspace/환경의 원래 디버그 설정을 그대로 사용합니다. release
 프로필은 변경하지 않습니다. `--ephemeral`은 일회성 검사에서 incremental을 기본으로 끄며, 기존
 프로필/incremental 환경 설정은 항상 우선합니다. 실행한 프로세스 밖의 환경을 변경하지 않습니다.
 
 `target-dir`은 같은 환경에서 Cargo metadata의 실제 target 경로를 출력합니다. 빌드와 같은
-manifest·옵션으로 경로를 확인하고 성공 직후 필요한 WASM을 staging에 복사합니다. 기존 체크아웃의
+manifest·target/config/features·target-dir 설정으로 경로를 확인하고 성공 직후 필요한 WASM을 staging에 복사합니다.
+`--target`은 metadata의 `--filter-platform`으로 변환하고 release/profile/jobs/package 및 산출물 선택 옵션은
+제거합니다. 지원하지 않는 옵션은 명시적으로 거부합니다. 기존 체크아웃의
 `target/`에서 오래된 파일을 읽거나 공용 최상위 파일을 릴리즈 보관소로 사용하지 않습니다.
-실행기는 직접 `clean` 호출을 거부하며, 의도적인 정리는 별도로 Cargo를 사용합니다.
+실행기는 Cargo 전역 옵션 뒤의 `clean`도 거부하며, 의도적인 정리는 별도로 Cargo를 사용합니다.
+Unix에서는 SIGTERM/SIGINT/SIGHUP를 Cargo 프로세스 그룹에 전달하고 1초 뒤 SIGKILL로 남은 컴파일러도
+종료하여 시간 초과 후 캐시 쓰기가 계속되지 않게 합니다. Windows에서는 Cargo 프로세스에만 전달합니다.
 
-JSON 점검 도구는 Cargo 마커를 확인하고 하위 심링크·node_modules·로컬 실행 데이터를 제외하며
-`du -sk` 블록 추정치를 합산합니다. 읽기 전용이며 미사용 여부를 증명하지 않고 공유 파일시스템
+JSON 점검 도구는 Cargo 마커를 확인하고 디렉터리 동일성과 루트 경계를 재확인하고 루트/하위 심링크·node_modules·로컬 실행 데이터를 제외하며
+`du -sk` 블록 추정치를 합산합니다. PATH의 Unix 호환 `du`가 필요합니다(Windows는 WSL 사용).
+동시 파일 변경 확인은 최선 노력 방식이며 보안 경계나 삭제 도구가 아닙니다. 읽기 전용이며 미사용 여부를 증명하지 않고 공유 파일시스템
 블록 때문에 합계가 겹칠 수 있습니다. 지정한 기존 target을 지우기 전 Cargo/rustc 프로세스와
 산출물 사용처를 확인하고 필요한 파일을 보존하며 대체 빌드를 검증합니다. 수정 시각만으로 삭제하거나
 심링크를 따라 정리하거나 TrailBase 볼륨을 포함하지 않습니다.
