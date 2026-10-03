@@ -36,7 +36,7 @@
     },
     "packages/release-tools": {
       "name": "@trailbase-apps-in-toss-kit/release-tools",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "dependencies": {
         "@apps-in-toss/ait-format": "1.0.0",
       },
