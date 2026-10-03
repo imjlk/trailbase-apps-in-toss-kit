@@ -116,6 +116,7 @@ async function runCargo(args, env, capture = false) {
     };
     if (capture) {
       const append = (chunk, isError) => {
+        if (outputError) return;
         bytes += Buffer.byteLength(chunk);
         if (bytes > 16 * 1024 * 1024) {
           outputError ??= new Error('Cargo metadata output exceeded 16 MiB');
