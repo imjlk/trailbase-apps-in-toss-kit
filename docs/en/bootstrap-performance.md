@@ -5,7 +5,9 @@ TrailBase listener share a container. Pass it explicitly in **production** Compo
 as well as local Compose. Keep `APP_BASE_URL` public for client-facing links.
 An explicit existing Coolify value still overrides the Compose default: inspect
 it before rollout. For a different port or topology, set the correct private
-origin; never assume the host's published port is the container's listener port.
+origin. Keep plain HTTP on loopback; require HTTPS or a trusted encrypted tunnel
+for non-loopback auth traffic. Never assume the host's published port is the
+container's listener port.
 
 Preserve official `/api/auth/v1/login` and TrailBase password verification.
 Use `ensure_verified_auth_user_tx` to reuse existing service accounts, then commit

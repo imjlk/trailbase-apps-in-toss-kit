@@ -131,6 +131,22 @@ Do not let this skill replace official Apps in Toss SDK/API documentation. Use o
 for SDK signatures and availability, then apply the kit helper preference only after confirming the
 helper exists in the checked-out package.
 
+## Bootstrap performance diagnostics
+
+Use `trailbase_guest_common::bootstrap_timing::BootstrapTiming` for opt-in,
+identity-free stage timing rather than inventing app-local telemetry. Older pinned
+consumers may copy `templates/trailbase/bootstrap_timing.rs` unchanged into their
+WASM crate; copies are consumer-owned and must be reconciled explicitly. Pass the
+flag through private settings.json and keep it disabled except during bounded
+measurement windows. Instrument all normal/alias branches, commit before HTTP
+login, and preserve `ensure_verified_auth_user_tx` plus previous-secret recovery.
+Use a loopback auth origin for a same-container listener, preserve explicit
+private-origin overrides, and keep APP_BASE_URL public. For non-loopback auth
+traffic require HTTPS or a trusted encrypted tunnel; never send credentials over
+an unprotected network. Update consumer entrypoints, validators and canonical
+runbooks together. See `docs/en/bootstrap-performance.md` and its Korean counterpart;
+stage durations are not pure lock wait/network RTT or proof of production speedup.
+
 ## WASM And Runtime Settings
 
 - Run `cargo check --manifest-path apps/trailbase/wasm/Cargo.toml --workspace --target wasm32-wasip2`

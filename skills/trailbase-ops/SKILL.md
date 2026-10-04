@@ -33,10 +33,11 @@ templates, deployment, or the mTLS proxy boundary.
 6. If React Native client bootstrap changes, inspect existing kit client adapters before writing
    app-local SDK/storage/login wrappers. Prefer exported kit helpers and update this skill/reference
    when new reusable helper APIs are added.
-7. If Rust WASM changes, run the repo's `wasm32-wasip2` check.
-8. If deployment or proxy settings change, verify production env, Compose shape, and mTLS certificate
+7. For bootstrap latency work, use the shared `BootstrapTiming` helper or its dependency-free copy-in template; see the bootstrap performance section in the reference. Keep diagnostics opt-in and propagate settings into WASM.
+8. If Rust WASM changes, run the repo's `wasm32-wasip2` check.
+9. If deployment or proxy settings change, verify production env, Compose shape, and mTLS certificate
    mount boundaries.
-9. If detailed analytics storage changes, keep analytics rows separate from functional ledgers and
+10. If detailed analytics storage changes, keep analytics rows separate from functional ledgers and
    prefer the optional `analytics` TrailBase database template for high-volume event mirrors.
 
 ## TrailBase CLI
