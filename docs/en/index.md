@@ -19,6 +19,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 
 | Goal | Read |
 | --- | --- |
+| Diagnose bootstrap latency without exposing identity | [bootstrap-performance.md](bootstrap-performance.md) |
 | Add the kit to an existing service | [consumer-migration.md](consumer-migration.md) |
 | Understand container startup helpers | [trailbase-runtime.md](trailbase-runtime.md) |
 | Run the Toss mTLS proxy safely | [toss-mtls-client-proxy.md](toss-mtls-client-proxy.md) |

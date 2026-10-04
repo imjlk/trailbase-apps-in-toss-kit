@@ -13,6 +13,7 @@ pub mod app_rewards;
 pub mod apps_in_toss_login;
 pub mod apps_in_toss_messages;
 pub mod apps_in_toss_proxy;
+pub mod bootstrap_timing;
 pub mod db;
 pub mod domain_events;
 pub mod iap_orders;
