@@ -18,6 +18,7 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 
 | 하고 싶은 일 | 읽을 문서 |
 | --- | --- |
+| 식별자 노출 없이 bootstrap 지연 진단 | [bootstrap-performance.md](bootstrap-performance.md) |
 | 기존 서비스에 kit 붙이기 | [consumer-migration.md](consumer-migration.md) |
 | 컨테이너 시작 스크립트 공통화 이해하기 | [trailbase-runtime.md](trailbase-runtime.md) |
 | Toss mTLS 프록시 안전하게 운영하기 | [toss-mtls-client-proxy.md](toss-mtls-client-proxy.md) |
