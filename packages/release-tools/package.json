@@ -1,6 +1,6 @@
 {
   "name": "@trailbase-apps-in-toss-kit/release-tools",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Build-time AIT artifact guards and Sampo lockstep release helpers.",

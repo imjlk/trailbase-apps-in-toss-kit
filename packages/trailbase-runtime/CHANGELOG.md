@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.8.0 — 2026-10-04
+
+### Minor changes
+
+- [2cbedb3](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/2cbedb31d6273f3cfb39b9df99ea979740a6e83c) Add reusable category-and-keyword product matching and bounded affiliate link issuance. Consumers can exclude products, keywords and category subtrees while keeping provider order. Only explicit item unavailability advances to another candidate; authentication, quota and network failures stop issuance. Consumer databases, manual link priority and placement rules remain application-owned; no migration or environment variable is required. — Thanks @imjlk!
+
 ## 0.7.0 — 2026-10-02
 
 ### Minor changes
