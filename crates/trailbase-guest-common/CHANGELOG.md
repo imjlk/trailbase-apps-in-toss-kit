@@ -1,5 +1,11 @@
 # trailbase-guest-common
 
+## 0.14.1 — 2026-10-04
+
+### Patch changes
+
+- [4c09667](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/4c09667f6bebc2e6bcb79df0a8c6b6255572e81f) Add opt-in bootstrap stage diagnostics and a dependency-free copy-in template. Use an internal TrailBase auth origin, preserve official login/password rotation, and compare stage timings before attributing production latency to network or database work. — Thanks @imjlk!
+
 ## 0.14.0 — 2026-09-29
 
 ### Minor changes
