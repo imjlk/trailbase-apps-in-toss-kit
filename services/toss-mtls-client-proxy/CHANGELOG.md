@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.6.8 — 2026-10-04
+
+### Patch changes
+
+- Updated dependencies: trailbase-runtime (npm)@0.8.0
+
 ## 0.6.7 — 2026-10-02
 
 ### Patch changes
