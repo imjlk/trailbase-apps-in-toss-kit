@@ -110,3 +110,5 @@ omits the parent ID from a product's `categoryIds`. The same tree relationship i
 used when matching today's deals; unrelated categories do not qualify.
 
 For read-only policy and candidate checks, see [affiliate diagnostics](affiliate-diagnostics.md).
+
+For consumer-approved word-to-product rules, see [product matching and bounded link issuance](affiliate-product-matching.md).
