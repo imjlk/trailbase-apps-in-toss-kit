@@ -3,7 +3,7 @@ const normalize = (text) => text.normalize('NFKC').toLowerCase().replace(/\s+/gu
 const id = (value) => typeof value === 'string' && /^[a-zA-Z0-9_-]{1,80}$/.test(value);
 const terms = (values, required = false) => {
   if (!Array.isArray(values) || values.length > 8 || (required && !values.length) ||
-      values.some((value) => typeof value !== 'string' || value.trim().length < 2 || value.length > 40 || /[\u0000-\u001f\u007f]/u.test(value))) {
+      values.some((value) => typeof value !== 'string' || value.trim().length < 2 || value.length > 40 || /\p{Cc}/u.test(value))) {
     throw new TypeError('Expected up to eight keywords of 2–40 characters');
   }
   return values.map(normalize);
@@ -14,7 +14,7 @@ const bound = (value, max, name) => {
 };
 const validProduct = (product, now, minValidityMs) => product && id(product.id) &&
   typeof product.title === 'string' && product.title.trim().length > 0 && product.title.length <= 180 &&
-  !/[\u0000-\u001f\u007f]/u.test(product.title) && product.soldOut === false &&
+  !/\p{Cc}/u.test(product.title) && product.soldOut === false &&
   Array.isArray(product.categoryIds) && product.categoryIds.length <= 32 && product.categoryIds.every(id) &&
   (product.endAt === undefined || (Number.isFinite(product.endAt) && product.endAt > now + minValidityMs));
 
@@ -34,7 +34,7 @@ export function matchAffiliateProducts({ products, categories, categoryId, keywo
   const selected = new Set(), forbidden = new Set(excludedCategoryIds), visited = new Set();
   let count = 0;
   function walk(nodes, inside = false, blocked = false, depth = 0) {
-    if (!Array.isArray(nodes) || depth > 8) throw new TypeError('Invalid category tree');
+    if (!Array.isArray(nodes) || (depth > 8 && nodes.length > 0)) throw new TypeError('Invalid category tree');
     for (const node of nodes) {
       if (++count > 1000 || !node || !id(node.id) || visited.has(node.id)) throw new TypeError('Invalid category tree');
       visited.add(node.id);

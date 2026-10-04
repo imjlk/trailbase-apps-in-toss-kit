@@ -58,3 +58,21 @@ describe('bounded affiliate link issuance', () => {
     expect(result.product).toBeNull();expect(result.attempts).toBe(1);
   });
 });
+
+ describe('matching input boundaries', () => {
+  test('accepts depth-eight leaves with empty children but rejects deeper nodes', () => {
+    const tree = (depth, children = []) => [{id:`level${depth}`,children:depth === 8 ? children : tree(depth+1,children)}];
+    expect(match([product('a',{categoryIds:['level8']})],{categories:tree(0),categoryId:'level0'})).toHaveLength(1);
+    expect(()=>match([],{categories:tree(0,[{id:'level9'}]),categoryId:'level0'})).toThrow('Invalid category tree');
+    expect(()=>match([],{categories:tree(0,null),categoryId:'level0'})).toThrow('Invalid category tree');
+  });
+  test.each(['\u0080','\u009b','\u009f'])('rejects C1 control %j in titles and terms', async control => {
+    const invalid=product('a',{title:`베개${control}`});
+    expect(match([invalid])).toEqual([]);
+    expect(()=>match([],{keywords:[`베개${control}`]})).toThrow();
+    expect(()=>match([],{excludedKeywords:[`커버${control}`]})).toThrow();
+    let calls=0;
+    expect((await issue([invalid],async()=>{calls++;return 'https://example.test/issued';})).attempts).toBe(0);
+    expect(calls).toBe(0);
+  });
+ });
