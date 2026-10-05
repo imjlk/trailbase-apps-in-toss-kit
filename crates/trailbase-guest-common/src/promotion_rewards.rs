@@ -594,6 +594,40 @@ pub fn promotion_reward_ledgers_awaiting_recovery_tx(
         .collect()
 }
 
+/// Fail three-step ledger rows created before `created_before` whose
+/// execution was never claimed, so an abandoned intent (prepare failed, or
+/// the caller died before step 4) stops blocking per-user or per-campaign
+/// gating forever. Rows move to `failed` with provider status
+/// `NOT_EXECUTED`; the caller settles its own domain rows from the returned
+/// records in the same transaction.
+///
+/// This is safe without any provider lookup: execute requires a committed
+/// claim, and `begin_promotion_reward_execute_tx` only claims `pending`
+/// rows, so a row failed here can never be executed afterwards. Rows whose
+/// execution started (the recovery set) and legacy rows (`protocol IS
+/// NULL`) are never touched. Pick a `created_before` cutoff well beyond any
+/// in-flight claim; a caller that would rather resume (step 4 with the
+/// stored key) should do that before the cutoff.
+pub fn abandon_unexecuted_promotion_reward_ledgers_tx(
+    tx: &mut Transaction,
+    table: PromotionRewardLedgerTable,
+    created_before: i64,
+    limit: i64,
+    now: i64,
+) -> ApiResult<Vec<PromotionRewardLedgerRecord>> {
+    crate::operation_policy::enforce_configured_operation_tx(
+        tx,
+        crate::operation_policy::OperationFeature::Promotion,
+        crate::operation_policy::OperationPhase::Settlement,
+    )?;
+    let (sql, params) =
+        promotion_reward_ledger_abandon_unexecuted_statement(table, created_before, limit, now)?;
+    let rows = db::tx_query(tx, &sql, &params)?;
+    rows.iter()
+        .map(|row| promotion_reward_ledger_record_from_row(row))
+        .collect()
+}
+
 pub fn promotion_reward_usage_for_campaign_tx(
     tx: &mut Transaction,
     table: PromotionRewardUsageTable,
@@ -947,6 +981,62 @@ fn promotion_reward_ledger_recovery_statement(
             id_column = table.id_column,
         ),
         vec![Value::Integer(started_before), Value::Integer(limit)],
+    ))
+}
+
+/// Pre-execution three-step rows only: a stored key alone is not evidence of
+/// execution (the claim marker is), and legacy rows are never adopted.
+fn promotion_reward_ledger_abandon_unexecuted_statement(
+    table: PromotionRewardLedgerTable,
+    created_before: i64,
+    limit: i64,
+    now: i64,
+) -> ApiResult<(String, Vec<Value>)> {
+    validate_promotion_reward_ledger_table(table)?;
+    if limit <= 0 {
+        return Err(bad_request(
+            "INVALID_PROMOTION_RECOVERY_LIMIT",
+            "promotion recovery limit must be positive",
+        ));
+    }
+    Ok((
+        format!(
+            "UPDATE {table}
+             SET {status_column} = 'failed',
+                 {provider_status_column} = 'NOT_EXECUTED',
+                 {failure_reason_column} = 'execution was never claimed',
+                 {failed_at_column} = ?3,
+                 {updated_at_column} = ?3
+             WHERE {id_column} IN (
+               SELECT {id_column}
+               FROM {table}
+               WHERE {protocol_column} = 'three-step'
+                 AND {status_column} = 'pending'
+                 AND {execution_started_at_column} IS NULL
+                 AND {created_at_column} < ?1
+               ORDER BY {created_at_column} ASC, {id_column} ASC
+               LIMIT ?2
+             )
+               AND {status_column} = 'pending'
+               AND {execution_started_at_column} IS NULL
+             RETURNING {returning_columns}",
+            table = table.table,
+            status_column = table.status_column,
+            provider_status_column = table.provider_status_column,
+            failure_reason_column = table.failure_reason_column,
+            failed_at_column = table.failed_at_column,
+            updated_at_column = table.updated_at_column,
+            id_column = table.id_column,
+            protocol_column = table.protocol_column,
+            execution_started_at_column = table.execution_started_at_column,
+            created_at_column = table.created_at_column,
+            returning_columns = promotion_reward_ledger_returning_columns(table),
+        ),
+        vec![
+            Value::Integer(created_before),
+            Value::Integer(limit),
+            Value::Integer(now),
+        ],
     ))
 }
 
@@ -2027,6 +2117,75 @@ mod sql_tests {
         )
         .unwrap();
         assert!(query(&db, &sql, &params).is_empty());
+    }
+
+    fn abandon_unexecuted(db: &rusqlite::Connection, created_before: i64, now: i64) -> Vec<String> {
+        let (sql, params) = promotion_reward_ledger_abandon_unexecuted_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            created_before,
+            10,
+            now,
+        )
+        .unwrap();
+        query(db, &sql, &params)
+            .iter()
+            .filter_map(|row| sql_text(&row[0]).map(str::to_string))
+            .collect()
+    }
+
+    #[test]
+    fn abandon_fails_only_unclaimed_three_step_rows() {
+        let db = database();
+        insert_three_step_ledger(&db, "keyless");
+        insert_three_step_ledger(&db, "keyed");
+        insert_three_step_ledger(&db, "started");
+        insert_legacy_ledger(&db, "legacy");
+        store_key(&db, "keyed", "key-k", 200);
+        store_key(&db, "started", "key-s", 200);
+        assert_eq!(begin_execute(&db, "started", 300), 1);
+
+        // Rows created at 100 are not yet past a cutoff of 100.
+        assert!(abandon_unexecuted(&db, 100, 400).is_empty());
+
+        let mut abandoned = abandon_unexecuted(&db, 150, 400);
+        abandoned.sort();
+        assert_eq!(abandoned, ["keyed", "keyless"]);
+        for id in ["keyed", "keyless"] {
+            let columns = row_columns(&db, id);
+            assert_eq!(columns.status, "failed");
+            assert_eq!(columns.provider_status.as_deref(), Some("NOT_EXECUTED"));
+            assert_eq!(columns.failed_at, Some(400));
+            assert_eq!(columns.execution_started_at, None);
+        }
+        // The claimed row stays in the recovery set; legacy rows are untouched.
+        assert_eq!(row_columns(&db, "started").status, "pending");
+        assert_eq!(row_columns(&db, "legacy").status, "pending");
+        // Repeating is a no-op.
+        assert!(abandon_unexecuted(&db, 150, 500).is_empty());
+    }
+
+    #[test]
+    fn abandoned_rows_can_never_be_claimed_or_rekeyed() {
+        let db = database();
+        insert_three_step_ledger(&db, "row");
+        store_key(&db, "row", "key-1", 200);
+        assert_eq!(abandon_unexecuted(&db, 150, 400), ["row"]);
+        assert_eq!(begin_execute(&db, "row", 500), 0);
+        assert_eq!(store_key(&db, "row", "key-1", 510), 0);
+        assert_eq!(row_columns(&db, "row").execution_started_at, None);
+    }
+
+    #[test]
+    fn abandon_rejects_non_positive_limits() {
+        assert!(
+            promotion_reward_ledger_abandon_unexecuted_statement(
+                DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+                100,
+                0,
+                100,
+            )
+            .is_err()
+        );
     }
 
     #[test]

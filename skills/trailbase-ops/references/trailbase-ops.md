@@ -193,7 +193,9 @@ stage durations are not pure lock wait/network RTT or proof of production speedu
   in-flight sends are UNKNOWN and must not be automatically resent. Stop legacy workers
   before migration. IAP local grants leave `completed_at` empty until explicit Toss
   completion confirmation through `mark_iap_order_completed_tx`. Promotion recovery
-  uses `apps_in_toss_proxy::promotion_reward_status` with a persisted transaction key.
+  uses `apps_in_toss_proxy::promotion_reward_status` with a persisted transaction key;
+  never-claimed three-step intents are drained with
+  `abandon_unexecuted_promotion_reward_ledgers_tx` instead of staying pending forever.
   Subscription flows use `iap_subscriptions.sql` with `iap_subscriptions` parsing,
   inbox, ordering, and per-order entitlement helpers. Authenticate webhooks at the
   consumer ingress; never use client SDK status to authorize server benefits.

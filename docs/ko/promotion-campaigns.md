@@ -255,6 +255,17 @@ Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 �
 번째 prepare도 중복 지급도 없습니다), 4단계 이후 충돌한 행은 재조회 대상에
 남으므로 운영 판단 전에 status 조회로 마무리하세요.
 
+4단계에 도달하지 못한 의도(prepare 실패, 또는 호출자가 중단되고 사용자가 다시
+시도하지 않은 경우)는 `pending`으로 남고 재조회 대상에도 들어가지 않습니다.
+pending 행이 이후 지급을 막는다면
+`abandon_unexecuted_promotion_reward_ledgers_tx`로 정리하세요. 기준 시각 이전에
+만들어졌고 실행을 claim하지 않은 three-step 행을 제공자 status `NOT_EXECUTED`의
+`failed`로 바꾸고, 호출자가 같은 트랜잭션에서 자체 도메인 행을 정산할 수 있도록
+그 행들을 반환합니다. claim은 `pending` 행만 받으므로 정리된 행은 이후에 절대
+실행될 수 없고, 그래서 제공자 호출이 필요 없습니다. 실행을 시작한 행과 레거시 행은
+건드리지 않습니다. 기준 시각은 진행 중인 claim보다 충분히 뒤(초가 아니라 분
+단위)로 잡고, 저장된 키를 계속 써야 한다면 대신 4단계에서 이어가세요.
+
 기존 단일 호출 grant endpoint와 Rust 헬퍼는 제거되었습니다. 프록시는 옛 라우트에
 업스트림을 건드리지 않고 `410 PROMOTION_GRANT_REMOVED`로 응답합니다. claim
 핸들러를 위 순서로 전환하세요.
