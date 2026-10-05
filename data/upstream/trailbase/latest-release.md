@@ -1,17 +1,16 @@
-# TrailBase v0.33.22
+# TrailBase v0.34.4
 
-- Published at: 2026-09-23T16:46:17Z
-- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.33.22
+- Published at: 2026-10-05T05:02:47Z
+- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.34.4
 
 ## Release notes
 
-- Fix behavior when a Rust WASM guest panics:
-  - Respond right away with the error w/o relying on a timeout.
-  - Remove trapped component from shared instance pool to avoid poisoning.
-- Add support for SQL `execute_batch` to JS/TS WASM guests.
-- Add integration test coverage for JS/TS WASM components. Still needs to be enabled in CI.
-- Overhaul integration tests.
+- Add and enforce uniqueness requirement across `email` and `unverified_email` columns.
+- Add periodic clean-up job for stale users missing email verification.
+- Add missing username uniqueness requirement and fix session cleanup for experimental PG setup.
+- Fix JSON schema construction for nullable `ANY` columns.
+- A more consistent integration test setup across the 8 client environments.
 - Update dependencies.
 
 
-**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.33.21...v0.33.22
+**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.34.3...v0.34.4
