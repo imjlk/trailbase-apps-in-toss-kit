@@ -1,23 +1,23 @@
 {
-  "fetchedAt": "2026-09-28T06:49:20.504Z",
+  "fetchedAt": "2026-10-09T07:20:57.413Z",
   "packages": [
     {
       "packageName": "@ait-kit/sdk",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@ait-kit%2Fsdk/latest"
     },
     {
       "packageName": "@apps-in-toss/web-framework",
-      "version": "3.6.0",
+      "version": "3.8.0",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fweb-framework/latest"
     },
     {
       "packageName": "@apps-in-toss/framework",
-      "version": "2.10.10",
+      "version": "2.10.13",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fframework/latest"
