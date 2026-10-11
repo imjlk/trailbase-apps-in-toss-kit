@@ -171,6 +171,38 @@ TrailBase 컨테이너는 내부 proxy URL을 사용하고, host-side smoke scri
 `TOSS_PROXY_SMOKE_URL`을 사용하도록 이 값은 도입 앱에서 소유하세요.
 Proxy health endpoint가 다르다면 `--mtls-health-path`를 넘기세요.
 
+## TypeScript 프록시 기능 검사
+
+`@trailbase-apps-in-toss-kit/trailbase-runtime/proxy-capabilities` export는
+`Bundler` 또는 `NodeNext` 모듈 해석을 사용하는 엄격한 TypeScript 컨슈머에
+타입 선언을 제공합니다. 앱에서 별도의 ambient module 선언 없이 가져오세요.
+
+```ts
+import {
+  createProxyCapabilitiesCheck,
+  evaluateProxyCapabilities,
+} from '@trailbase-apps-in-toss-kit/trailbase-runtime/proxy-capabilities';
+
+const health: unknown = { ok: false };
+const evaluated = evaluateProxyCapabilities(health, { expectedMode: 'forward' });
+if (!evaluated.ok) console.error(evaluated.failures);
+
+const check = createProxyCapabilitiesCheck({
+  tokenEnv: 'MTLS_PROXY_TOKEN',
+  urlEnv: 'MTLS_PROXY_URL',
+  requiredCapabilities: ['anonymous-key.verify'],
+});
+const result = await check.run();
+if (result.ok) console.log(result.message);
+else console.error(result.failures);
+```
+
+Health 응답은 런타임 검증이 필요하므로 `unknown`으로 받습니다. 결과는 `ok`로
+구분하며 성공이면 `message`, 실패하면 `failures`를 제공합니다. 프로그램 옵션은
+fetch 주입, 비공개 프록시 URL/토큰 또는 환경변수 이름과 밀리초 단위 timeout을
+포함합니다. JSON Release Doctor 설정은 인증정보에 환경변수 이름을 계속 사용해야
+합니다. 다른 runtime 하위 경로는 기존 JavaScript API를 유지합니다.
+
 ## 배포 메모
 
 TrailBase는 SQLite 기반이므로 단일 writer 서비스로 다루는 것이 안전합니다. 운영 TrailBase
