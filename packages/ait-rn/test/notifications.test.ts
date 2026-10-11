@@ -102,6 +102,31 @@ describe("AppsInToss notification helpers", () => {
     });
   });
 
+  test("functional message client works with only the agreement endpoint", async () => {
+    const urls: string[] = [];
+    const client = createAppsInTossFunctionalMessageClient({
+      baseUrl: "https://api.example.test",
+      endpoints: { syncAgreement: "/api/app/v1/notification-agreements" },
+      fetcher: async (url) => {
+        urls.push(url);
+        return Response.json({ ok: true });
+      },
+    });
+
+    await client.syncAgreement({
+      result: "newAgreement",
+      templateCode: "mission-status-agreement",
+    });
+    await expect(
+      client.requestMessage({ templateSetCode: "mission-status-2" }),
+    ).rejects.toMatchObject({
+      code: "FUNCTIONAL_MESSAGE_REQUEST_ENDPOINT_MISSING",
+    });
+    expect(urls).toEqual([
+      "https://api.example.test/api/app/v1/notification-agreements",
+    ]);
+  });
+
   test("posts functional message agreement and request payloads to app backend", async () => {
     const calls: Array<{
       body: unknown;

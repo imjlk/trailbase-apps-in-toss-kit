@@ -50,6 +50,7 @@ export type AppsInTossNotificationAgreementDevFallback = (
     >;
 
 export type AppsInTossNotificationAgreementErrorCode =
+  | "FUNCTIONAL_MESSAGE_REQUEST_ENDPOINT_MISSING"
   | "REQUEST_NOTIFICATION_AGREEMENT_FAILED"
   | "REQUEST_NOTIFICATION_AGREEMENT_INVALID_RESULT"
   | "REQUEST_NOTIFICATION_AGREEMENT_TEMPLATE_CODE_REQUIRED"
@@ -277,7 +278,12 @@ export type AppsInTossFunctionalMessageOperation =
   | "syncAgreement";
 
 export interface AppsInTossFunctionalMessageEndpoints {
-  requestMessage: string;
+  /**
+   * App route that queues a functional message on the caller's behalf. Omit it
+   * when the server queues messages itself; `requestMessage` then rejects
+   * without a network call.
+   */
+  requestMessage?: string;
   syncAgreement: string;
 }
 
@@ -344,6 +350,14 @@ export function createAppsInTossFunctionalMessageClient<
       providerRequestId,
       templateSetCode,
     }) {
+      const path = endpoints.requestMessage;
+      if (!path) {
+        throw new AppsInTossNotificationAgreementError({
+          code: "FUNCTIONAL_MESSAGE_REQUEST_ENDPOINT_MISSING",
+          message:
+            "Apps in Toss functional message requestMessage endpoint is not configured.",
+        });
+      }
       const normalizedAgreementTemplateCode =
         normalizeOptionalCode(agreementTemplateCode);
       const normalizedProviderRequestId =
@@ -366,7 +380,7 @@ export function createAppsInTossFunctionalMessageClient<
         },
         fetcher,
         getAuthHeaders,
-        path: endpoints.requestMessage,
+        path,
       });
       return normalizeFunctionalMessageResponse<TMessageRequestResult>(
         payload,

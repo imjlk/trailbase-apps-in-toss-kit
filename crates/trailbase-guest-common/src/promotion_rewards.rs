@@ -399,9 +399,18 @@ pub fn normalize_promotion_provider_status(ok: Option<bool>, status: Option<&str
     if trimmed.is_some_and(|status| status.eq_ignore_ascii_case("UNKNOWN")) {
         return "UNKNOWN".to_string();
     }
-    // A failure envelope cannot authorize a grant through a contradictory status.
+    // A failure envelope is a definitive rejection only when it names a
+    // provider failure (e.g. budget exhausted). A bare `ok:false` comes from
+    // the transport or proxy layer (timeout, auth, 5xx) and says nothing about
+    // whether the provider granted; a contradictory status must not authorize
+    // a grant either. Both stay UNKNOWN for a status lookup to settle, so a
+    // caller never retries a grant that may already have been paid.
     if ok == Some(false) {
-        return "FAILED".to_string();
+        return match trimmed.map(str::to_ascii_uppercase).as_deref() {
+            Some("FAILED" | "FAIL" | "ERROR") => "FAILED",
+            _ => "UNKNOWN",
+        }
+        .to_string();
     }
     if let Some(status) = trimmed {
         return match status.to_ascii_uppercase().as_str() {
@@ -417,10 +426,7 @@ pub fn normalize_promotion_provider_status(ok: Option<bool>, status: Option<&str
     // ok alone never fabricates a grant: an envelope without an observable
     // status is an unconfirmed outcome (execute SUBMITTED-style responses
     // carry their verdict in `result`, which the status paths above read).
-    match ok {
-        Some(false) => "FAILED".to_string(),
-        Some(true) | None => "PENDING".to_string(),
-    }
+    "PENDING".to_string()
 }
 
 pub fn promotion_ledger_status(provider_status: &str) -> &'static str {
@@ -1349,8 +1355,41 @@ mod tests {
         );
         assert_eq!(
             promotion_provider_status_from_response(&json!({ "ok": false })),
-            "FAILED"
+            "UNKNOWN"
         );
+    }
+
+    #[test]
+    fn transport_failure_envelopes_stay_unknown() {
+        for code in [
+            "UPSTREAM_TIMEOUT",
+            "UPSTREAM_REQUEST_FAILED",
+            "PROXY_ERROR",
+            "UNAUTHORIZED",
+        ] {
+            let normalized = promotion_provider_status_from_response(&json!({
+                "ok": false,
+                "error": code,
+                "message": "Upstream request failed"
+            }));
+            assert_eq!(normalized, "UNKNOWN", "{code}");
+            assert_eq!(promotion_ledger_status(&normalized), "pending", "{code}");
+        }
+        // A contradictory status never authorizes a grant, nor finalizes a failure.
+        assert_eq!(
+            promotion_provider_status_from_response(&json!({ "ok": false, "status": "GRANTED" })),
+            "UNKNOWN"
+        );
+        // An explicit provider rejection stays terminal.
+        for status in ["FAILED", "fail", "ERROR"] {
+            assert_eq!(
+                promotion_provider_status_from_response(
+                    &json!({ "ok": false, "providerStatus": status, "providerErrorCode": "4116" })
+                ),
+                "FAILED",
+                "{status}"
+            );
+        }
     }
 
     #[test]
