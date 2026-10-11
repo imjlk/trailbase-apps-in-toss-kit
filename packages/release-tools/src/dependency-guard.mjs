@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync, realpathSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
@@ -29,7 +29,12 @@ export function releaseDependencyState(path, source) {
 
 export function assertReleaseDependenciesUnchanged({ root, baseRef = 'HEAD' }) {
   const git = args => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  assert.equal(realpathSync(root), realpathSync(git(['rev-parse', '--show-toplevel']).trim()), 'Release root must be the repository root');
+  // Windows Git can expand an 8.3 path that Bun's realpath preserves. Compare
+  // directory identities, retaining the guard against a repository subdirectory.
+  const directory = statSync(root, { bigint: true });
+  const repository = statSync(git(['rev-parse', '--show-toplevel']).trim(), { bigint: true });
+  assert(directory.isDirectory() && repository.isDirectory() && directory.ino !== 0n &&
+    directory.dev === repository.dev && directory.ino === repository.ino, 'Release root must be the repository root');
   const base = git(['rev-parse', '--verify', `${baseRef}^{commit}`]).trim();
   const oldPaths = git(['ls-tree', '-r', '--name-only', '-z', base]).split('\0');
   const newPaths = git(['ls-files', '--cached', '--others', '--exclude-standard', '-z']).split('\0');
