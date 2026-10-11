@@ -14,7 +14,7 @@ machine-wide Node installation:
 ```powershell
 mise trust
 mise install
-mise exec -- bun install --frozen-lockfile
+mise exec -- bun run deps:install
 mise exec -- bun run packages:test
 mise exec -- bun test services/toss-mtls-client-proxy
 mise exec -- bun run packages:typecheck
@@ -27,6 +27,12 @@ mise exec -- cargo check --locked --workspace --target wasm32-wasip2
 mise exec -- bun run trailbase:functional-ledgers:smoke
 mise exec -- bun run trailbase:owned-currency:smoke
 ```
+
+`deps:install` preserves the frozen lockfile and selects Bun's hoisted linker on
+Windows. The default isolated workspace store can produce `ENAMETOOLONG` when
+the kit lives in a consumer's `vendor/trailbase-apps-in-toss-kit` directory.
+For a direct Bun install, use `bun install --frozen-lockfile --linker hoisted`
+on Windows. Unix installs retain Bun's default linker.
 
 `cargo:local`, `cargo:test`, `cargo:check`, and the shared cache process-group
 runner require Unix or WSL. Use the direct Cargo commands above on native

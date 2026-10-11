@@ -62,7 +62,16 @@ jobs:
           install: true
           cache: true
       - name: Install locked JS dependencies
-        run: bun install --frozen-lockfile
+        run: bun run deps:install
+      - name: Install in a nested consumer vendor checkout
+        run: |
+          $nested = Join-Path $env:RUNNER_TEMP 'windows-consumer-development-demo/vendor/trailbase-apps-in-toss-kit'
+          git clone --no-hardlinks --no-checkout $env:GITHUB_WORKSPACE $nested
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          git -C $nested checkout $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          bun (Join-Path $nested 'scripts/install-dependencies.mjs')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Check Rust formatting
         run: cargo fmt --all --check
       - name: Check native Rust
