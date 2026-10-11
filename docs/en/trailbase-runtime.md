@@ -176,6 +176,40 @@ printed plan reflects conflicts with existing local stacks. The runner does not 
 internal proxy URL while host-side smoke scripts use `TOSS_PROXY_SMOKE_URL`.
 If the proxy health endpoint differs, pass `--mtls-health-path`.
 
+## TypeScript Proxy Capability Checks
+
+The `@trailbase-apps-in-toss-kit/trailbase-runtime/proxy-capabilities` export
+includes declarations for strict TypeScript consumers using `Bundler` or
+`NodeNext` module resolution. Import it directly without an app-local ambient
+module declaration:
+
+```ts
+import {
+  createProxyCapabilitiesCheck,
+  evaluateProxyCapabilities,
+} from '@trailbase-apps-in-toss-kit/trailbase-runtime/proxy-capabilities';
+
+const health: unknown = { ok: false };
+const evaluated = evaluateProxyCapabilities(health, { expectedMode: 'forward' });
+if (!evaluated.ok) console.error(evaluated.failures);
+
+const check = createProxyCapabilitiesCheck({
+  tokenEnv: 'MTLS_PROXY_TOKEN',
+  urlEnv: 'MTLS_PROXY_URL',
+  requiredCapabilities: ['anonymous-key.verify'],
+});
+const result = await check.run();
+if (result.ok) console.log(result.message);
+else console.error(result.failures);
+```
+
+Health responses are typed as `unknown` because runtime validation remains
+mandatory. The result discriminates on `ok`: success includes `message`, failure
+includes `failures`. Programmatic options include fetch injection, a private
+proxy URL/token or env names, and the timeout in milliseconds. JSON Release
+Doctor configs must continue using env names for credentials. Other runtime
+subpaths retain their existing JavaScript API.
+
 ## Deployment Notes
 
 TrailBase is SQLite-backed and should be treated as a single-writer service.

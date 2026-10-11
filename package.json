@@ -39,7 +39,8 @@
     "skills:check": "bun scripts/check-agent-skills.mjs --target codex --all",
     "skills:check:agent": "bun scripts/check-agent-skills.mjs",
     "skills:validate": "bun scripts/validate-agent-skills.mjs",
-    "packages:typecheck": "tsc --project tsconfig.json",
+    "packages:typecheck": "tsc --project tsconfig.json && bun run runtime:typecheck",
+    "runtime:typecheck": "tsc --project packages/trailbase-runtime/type-tests/tsconfig.json && tsc --project packages/trailbase-runtime/type-tests/tsconfig.nodenext.json",
     "trailbase:wasm:smoke": "bun scripts/smoke-trailbase-wasm.mjs",
     "packages:typecheck:minimum": "node scripts/check-sdk-minimum.mjs && tsc --project tsconfig.sdk-min.json"
   },
