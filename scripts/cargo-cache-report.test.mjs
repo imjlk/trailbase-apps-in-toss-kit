@@ -4,15 +4,16 @@ import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { findTargets, report } from './cargo-cache-report.mjs';
+const directoryLink = process.platform === 'win32' ? 'junction' : 'dir';
 test('finds Cargo markers once, excludes source directories and symlink traversals', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'cargo-report-'));
   try {
     for (const dir of ['app/target','node_modules/target','ordinary/target']) mkdirSync(path.join(root, dir), { recursive: true });
     writeFileSync(path.join(root,'app/target/.rustc_info.json'), '{}');
     writeFileSync(path.join(root,'node_modules/target/.rustc_info.json'), '{}');
-    symlinkSync(root, path.join(root,'loop'));
+    symlinkSync(root, path.join(root,'loop'), directoryLink);
     assert.deepEqual(findTargets([root, path.join(root,'app')]), [path.join(root,'app/target')]);
-    assert.equal(report([root])[0].path, path.join(root,'app/target'));
+    assert.equal(report([root], () => ({ status: 0, stdout: '1\tfixture\n' }))[0].path, path.join(root,'app/target'));
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -21,7 +22,7 @@ test('root symlinks never cause scanning outside the requested tree', () => {
   try {
     mkdirSync(path.join(root, 'outside'));
     writeFileSync(path.join(root, 'outside', '.rustc_info.json'), '{}');
-    symlinkSync(path.join(root, 'outside'), path.join(root, 'link'));
+    symlinkSync(path.join(root, 'outside'), path.join(root, 'link'), directoryLink);
     assert.deepEqual(findTargets([path.join(root, 'link')]), []);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -47,7 +48,7 @@ test('a child replaced with a symlink after enumeration is not followed', async 
       const entries = readdirSync(directory, options);
       if (directory === scan) {
         renameSync(path.join(scan, 'child'), path.join(root, 'old-child'));
-        symlinkSync(path.join(root, 'outside'), path.join(scan, 'child'));
+        symlinkSync(path.join(root, 'outside'), path.join(scan, 'child'), directoryLink);
       }
       return entries;
     };

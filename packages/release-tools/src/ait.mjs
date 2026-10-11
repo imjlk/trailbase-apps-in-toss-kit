@@ -100,7 +100,8 @@ export async function uploadVerifiedAit({ artifactPath, report, context, policy,
   const expected = `intoss-private://${context.appName}?_deploymentId=${artifact.deploymentId}`;
   let result;
   try {
-    result = execFileSync(cliPath, ['deploy', '--location', artifactPath, '--api-key', apiKey.trim(), '--profile', `release-${randomUUID()}`, '--scheme-only', '--memo', `${context.tag} (${context.commit.slice(0, 12)})`], {
+    const script = /\.(?:mjs|cjs|js)$/i.test(cliPath);
+    result = execFileSync(script ? process.execPath : cliPath, [...(script ? [cliPath] : []), 'deploy', '--location', artifactPath, '--api-key', apiKey.trim(), '--profile', `release-${randomUUID()}`, '--scheme-only', '--memo', `${context.tag} (${context.commit.slice(0, 12)})`], {
       cwd: appRoot, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 360_000,
     });
   } catch (error) {

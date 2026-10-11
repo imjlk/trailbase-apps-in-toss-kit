@@ -4,6 +4,8 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { shellPath, spawnTestShell } from "../../../scripts/lib/test-shell.mjs";
 import {
   buildComposeArgs,
   buildDevRunnerChildEnv,
@@ -541,8 +543,8 @@ describe("dev runner helpers", () => {
   );
 
   test("shell entrypoint helper has valid syntax", () => {
-    const result = spawnSync("sh", ["-n", "packages/trailbase-runtime/entrypoint/lib.sh"], {
-      cwd: new URL("../../..", import.meta.url).pathname,
+    const result = spawnTestShell("sh", ["-n", "packages/trailbase-runtime/entrypoint/lib.sh"], {
+      cwd: fileURLToPath(new URL("../../..", import.meta.url)),
       encoding: "utf8",
     });
     expect(result.status).toBe(0);
@@ -564,7 +566,7 @@ describe("dev runner helpers", () => {
         "trailbase",
       ],
       {
-        cwd: new URL("../../..", import.meta.url).pathname,
+        cwd: fileURLToPath(new URL("../../..", import.meta.url)),
         encoding: "utf8",
       },
     );
@@ -588,7 +590,7 @@ describe("dev runner helpers", () => {
         "not-a-port",
       ],
       {
-        cwd: new URL("../../..", import.meta.url).pathname,
+        cwd: fileURLToPath(new URL("../../..", import.meta.url)),
         encoding: "utf8",
       },
     );
@@ -603,7 +605,7 @@ describe("dev runner helpers", () => {
       process.execPath,
       ["packages/trailbase-runtime/bin/dev-with-trailbase.mjs", "--help"],
       {
-        cwd: new URL("../../..", import.meta.url).pathname,
+        cwd: fileURLToPath(new URL("../../..", import.meta.url)),
         encoding: "utf8",
       },
     );
@@ -614,14 +616,14 @@ describe("dev runner helpers", () => {
   });
 
   test("shell URL normalization preserves explicit ports", () => {
-    const result = spawnSync(
+    const result = spawnTestShell(
       "sh",
       [
         "-c",
         '. packages/trailbase-runtime/entrypoint/lib.sh && trailbase_runtime_normalize_public_url "http://127.0.0.1:4011/path?x=1" development && printf "\\n" && trailbase_runtime_normalize_public_url "http://example.com:4000/path" production',
       ],
       {
-        cwd: new URL("../../..", import.meta.url).pathname,
+        cwd: fileURLToPath(new URL("../../..", import.meta.url)),
         encoding: "utf8",
       },
     );
@@ -646,14 +648,14 @@ describe("dev runner helpers", () => {
       );
       writeFileSync(path.join(template, "migrations", "U0__legacy.sql"), "SELECT 0;");
 
-      const result = spawnSync(
+      const result = spawnTestShell(
         "sh",
         [
           "-c",
           `. packages/trailbase-runtime/entrypoint/lib.sh && trailbase_runtime_copy_template_migrations ${shellQuote(template)} ${shellQuote(depot)}`,
         ],
         {
-          cwd: new URL("../../..", import.meta.url).pathname,
+          cwd: fileURLToPath(new URL("../../..", import.meta.url)),
           encoding: "utf8",
         },
       );
@@ -674,14 +676,14 @@ describe("dev runner helpers", () => {
   test("shell migration copy no-ops when source migration directory is missing", () => {
     const root = mkdtempSync(path.join(tmpdir(), "trailbase-runtime-"));
     try {
-      const result = spawnSync(
+      const result = spawnTestShell(
         "sh",
         [
           "-c",
           `. packages/trailbase-runtime/entrypoint/lib.sh && trailbase_runtime_copy_template_migrations ${shellQuote(path.join(root, "missing-template"))} ${shellQuote(path.join(root, "traildepot"))}`,
         ],
         {
-          cwd: new URL("../../..", import.meta.url).pathname,
+          cwd: fileURLToPath(new URL("../../..", import.meta.url)),
           encoding: "utf8",
         },
       );
@@ -693,8 +695,8 @@ describe("dev runner helpers", () => {
   });
 
   test("shell Toss unlink callback guard validates production settings", () => {
-    const root = new URL("../../..", import.meta.url).pathname;
-    const ok = spawnSync(
+    const root = fileURLToPath(new URL("../../..", import.meta.url));
+    const ok = spawnTestShell(
       "sh",
       [
         "-c",
@@ -704,7 +706,7 @@ describe("dev runner helpers", () => {
     );
     expect(ok.status).toBe(0);
 
-    const bad = spawnSync(
+    const bad = spawnTestShell(
       "sh",
       [
         "-c",
@@ -715,7 +717,7 @@ describe("dev runner helpers", () => {
     expect(bad.status).toBe(1);
     expect(bad.stderr).toContain("TOSS_UNLINK_CALLBACK_METHODS supports only GET and POST");
 
-    const missingHmac = spawnSync(
+    const missingHmac = spawnTestShell(
       "sh",
       [
         "-c",
@@ -726,7 +728,7 @@ describe("dev runner helpers", () => {
     expect(missingHmac.status).toBe(1);
     expect(missingHmac.stderr).toContain("refusing placeholder production environment variable: TOSS_USER_KEY_HMAC_SECRET");
 
-    const localCredential = spawnSync(
+    const localCredential = spawnTestShell(
       "sh",
       [
         "-c",
@@ -740,5 +742,5 @@ describe("dev runner helpers", () => {
 });
 
 function shellQuote(value) {
-  return `'${value.replaceAll("'", "'\\''")}'`;
+  return `'${shellPath(value).replaceAll("'", "'\\''")}'`;
 }

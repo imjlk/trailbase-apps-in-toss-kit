@@ -64,8 +64,8 @@ INLINE=value # ignored
       expect(detectMtlsCertificatePair(dir)).toEqual({
         found: true,
         kind: "toss-console",
-        clientCertPath: path.join(dir, "service_public.crt"),
-        clientKeyPath: path.join(dir, "service_private.key"),
+        clientCertPath: `${dir}/service_public.crt`,
+        clientKeyPath: `${dir}/service_private.key`,
       });
     });
   });
@@ -96,8 +96,8 @@ INLINE=value # ignored
       expect(detectMtlsCertificatePair(dir)).toEqual({
         found: true,
         kind: "generic",
-        clientCertPath: path.join(dir, "client-cert.pem"),
-        clientKeyPath: path.join(dir, "client-key.pem"),
+        clientCertPath: `${dir}/client-cert.pem`,
+        clientKeyPath: `${dir}/client-key.pem`,
       });
     });
   });

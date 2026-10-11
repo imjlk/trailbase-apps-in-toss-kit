@@ -1,6 +1,6 @@
 import { expect, test } from 'bun:test';
 import { releaseDependencyState, assertReleaseDependenciesUnchanged } from '../src/dependency-guard.mjs';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -25,6 +25,27 @@ test('guard compares current checkout to a pinned commit without changing files'
     writeFileSync(join(root,'bun.lock'),bunLock('1.1.0','dep@1.1.0'));
     expect(() => assertReleaseDependenciesUnchanged({root})).toThrow('Dependency drift');
   } finally { rmSync(root,{recursive:true,force:true}); }
+});
+
+test('directory aliases identify the same repository without accepting subdirectories or hiding drift', () => {
+  const parent = mkdtempSync(join(tmpdir(), 'release guard alias '));
+  const root = join(parent, 'repository');
+  mkdirSync(root);
+  const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
+  try {
+    git('init'); git('config', 'user.name', 'test'); git('config', 'user.email', 'test@example.invalid');
+    writeFileSync(join(root, 'bun.lock'), bunLock('1.0.0')); git('add', '.'); git('commit', '-m', 'base');
+    const alias = join(parent, 'alias');
+    const linkType = process.platform === 'win32' ? 'junction' : 'dir';
+    symlinkSync(root, alias, linkType);
+    expect(assertReleaseDependenciesUnchanged({ root: alias }).checked).toEqual(['bun.lock']);
+    mkdirSync(join(root, 'sub'));
+    const subAlias = join(parent, 'sub-alias');
+    symlinkSync(join(root, 'sub'), subAlias, linkType);
+    expect(() => assertReleaseDependenciesUnchanged({ root: subAlias })).toThrow('repository root');
+    writeFileSync(join(root, 'bun.lock'), bunLock('1.0.0', 'dep@1.1.0'));
+    expect(() => assertReleaseDependenciesUnchanged({ root: alias })).toThrow('Dependency drift');
+  } finally { rmSync(parent, { recursive: true, force: true }); }
 });
 
 test('version-qualified local Cargo dependencies normalize without hiding registry changes', () => {

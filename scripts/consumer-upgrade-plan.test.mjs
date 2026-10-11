@@ -1,19 +1,32 @@
 import { describe, expect, test } from 'bun:test';
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { buildUpgradePlan, renderUpgradePlan } from './lib/consumer-upgrade-plan.mjs';
 
 const script = resolve(dirname(fileURLToPath(import.meta.url)), 'plan-consumer-upgrade.mjs');
 const template = 'templates/trailbase/test.txt';
+function fileLink(target, link) {
+  if (process.platform === 'win32') {
+    symlinkSync(dirname(target), link, 'junction');
+    return join(link, basename(target));
+  }
+  symlinkSync(target, link);
+  return link;
+}
+function commitExecutable(root, file) {
+  git(root, 'add', file);
+  git(root, 'update-index', '--chmod=+x', file);
+  git(root, 'commit', '-qm', 'make executable');
+}
 function write(root, path, value) {
   mkdirSync(dirname(join(root, path)), { recursive: true });
   if (value !== null) writeFileSync(join(root, path), value);
 }
 function git(root, ...args) {
-  const result = spawnSync('git', ['-c', 'core.hooksPath=/dev/null', '-c', 'commit.gpgsign=false', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: root, encoding: 'utf8' });
+  const result = spawnSync('git', ['-c', `core.hooksPath=${join(root, '.git', 'disabled-hooks')}`, '-c', 'core.autocrlf=false', '-c', 'core.fsmonitor=false', '-c', 'core.useBuiltinFSMonitor=false', '-c', 'commit.gpgsign=false', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', ...args], { cwd: root, encoding: 'utf8' });
   if (result.status !== 0) throw new Error(result.stderr);
   return result.stdout.trim();
 }
@@ -39,6 +52,17 @@ function plan(options, check = {}) {
 }
 
 describe('three-way consumer upgrade planning', () => {
+  test('CRLF consumer checkouts preserve unchanged and already-applied states', () => {
+    fixture({ [template]: 'base\n' }, { [template]: 'next\n' }, { 'local.txt': 'base\r\n' }, options => {
+      expect(plan(options).files[0].status).toBe('update-required');
+      writeFileSync(join(options.consumerRoot, 'local.txt'), 'next\r\n');
+      expect(plan(options).files[0].status).toBe('already-applied');
+    });
+    fixture({ [template]: 'base\n' }, {}, { 'local.txt': 'base\r\n' }, options => {
+      expect(plan(options).files[0].status).toBe('unchanged');
+      expect(plan(options).requiresReview).toBe(false);
+    });
+  });
   test('keeps consumer-only customization out of the required kit changes', () => {
     fixture({ [template]: 'base\n' }, {}, { 'local.txt': 'custom\n' }, options => {
       const p = plan(options);
@@ -146,7 +170,7 @@ describe('three-way consumer upgrade planning', () => {
     fixture({ [template]: '#!/bin/sh\nexit 0\n' }, {}, { 'local.txt': '#!/bin/sh\nexit 0\n' }, options => {
       chmodSync(join(options.kitRoot, template), 0o755);
       chmodSync(join(options.consumerRoot, 'local.txt'), 0o644);
-      git(options.kitRoot, 'add', '.'); git(options.kitRoot, 'commit', '-qm', 'make executable');
+      commitExecutable(options.kitRoot, template);
       let p = plan(options);
       expect(p.files[0].status).toBe('update-required');
       expect(p.files[0].permissions.newExecutable).toBe(true);
@@ -180,7 +204,7 @@ describe('three-way consumer upgrade planning', () => {
     fixture({ [sql]: 'CREATE TABLE t(id);\n' }, {}, { 'local.sql': 'CREATE TABLE t(id);\n' }, options => {
       chmodSync(join(options.kitRoot, sql), 0o755);
       chmodSync(join(options.consumerRoot, 'local.sql'), 0o644);
-      git(options.kitRoot, 'add', '.'); git(options.kitRoot, 'commit', '-qm', 'permissions only');
+      commitExecutable(options.kitRoot, sql);
       const p = plan(options, { template: sql, consumer: 'local.sql' });
       expect(p.files[0].status).toBe('update-required');
       expect(p.files[0].requiresMigrationReview).toBe(false);
@@ -193,7 +217,7 @@ describe('three-way consumer upgrade planning', () => {
     fixture({ [sql]: 'CREATE TABLE t(id);\n' }, { [sql]: 'CREATE TABLE t(id, name);\n' }, { 'local.sql': 'CREATE TABLE t(id, name);\n' }, options => {
       chmodSync(join(options.kitRoot, sql), 0o755);
       chmodSync(join(options.consumerRoot, 'local.sql'), 0o644);
-      git(options.kitRoot, 'add', '.'); git(options.kitRoot, 'commit', '-qm', 'make executable');
+      commitExecutable(options.kitRoot, sql);
       const p = plan(options, { template: sql, consumer: 'local.sql' });
       expect(p.files[0].status).toBe('update-required');
       expect(p.files[0].requiresMigrationReview).toBe(false);
@@ -209,8 +233,8 @@ describe('three-way consumer upgrade planning', () => {
       writeFileSync(join(options.consumerRoot, 'local.txt'), Buffer.from([0]));
       expect(() => plan(options)).toThrow('Binary');
       rmSync(join(options.consumerRoot, 'local.txt'));
-      symlinkSync(join(options.kitRoot, template), join(options.consumerRoot, 'local.txt'));
-      expect(() => plan(options)).toThrow('escapes');
+      const link = fileLink(join(options.kitRoot, template), join(options.consumerRoot, 'escape'));
+      expect(() => plan(options, { consumer: relative(options.consumerRoot, link).split(sep).join('/') })).toThrow('escapes');
     });
   });
 
@@ -229,8 +253,8 @@ describe('three-way consumer upgrade planning', () => {
       expect(run(['--unknown']).status).toBe(2);
       expect(run(['--mapping', '../outside.json']).status).toBe(2);
       expect(run(['--mapping', join(temp, 'mapping.json')]).status).toBe(2);
-      symlinkSync(join(repoRoot, 'package.json'), join(temp, 'escape.json'));
-      const escaped = run(['--mapping', 'escape.json']);
+      const link = fileLink(join(repoRoot, 'package.json'), join(temp, 'escape'));
+      const escaped = run(['--mapping', relative(temp, link).split(sep).join('/')]);
       expect(escaped.status).toBe(2);
       expect(escaped.stderr).toContain('escapes the consumer root');
       write(temp, 'big.json', ' '.repeat(1024 * 1024 + 1));

@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from 'bun:test';
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AppsInTossBundle } from '@apps-in-toss/ait-format';
@@ -50,22 +50,22 @@ test('evidence rejects replaced bytes, stale source, fixtures, changed settings,
 });
 
 test('uploader uses the verified artifact and never exposes CLI credentials or output on failure', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'kit-ait-')); roots.push(root);
-  const artifactPath = join(root, 'test-app.ait'); const cliPath = join(root, 'fake-ait');
+  const root = mkdtempSync(join(tmpdir(), 'kit ait 한글 & ')); roots.push(root);
+  const artifactPath = join(root, 'test-app.ait'); const cliPath = join(root, 'fake-ait.mjs');
   const bytes = await bundle(); writeFileSync(artifactPath, bytes);
   const artifact = await inspectAitArtifact(bytes, policy); const report = evidence(artifact);
-  const apiKey = 'sensitive-test-token';
+  const apiKey = 'sensitive-test-token & "quoted"';
   const args = { artifactPath, report, context, policy, cliPath, appRoot: root, apiKey };
-  const fake = (text) => { writeFileSync(cliPath, `#!/bin/sh\n${text}\n`); chmodSync(cliPath, 0o755); };
-  fake('echo "$*" >&2; echo "403 Forbidden" >&2; exit 1');
+  const fake = (text) => writeFileSync(cliPath, text);
+  fake('console.error(process.argv.slice(2).join(" ")); console.error("403 Forbidden"); process.exit(1);');
   try { await uploadVerifiedAit(args); throw new Error('expected failure'); } catch (error) {
     expect(error.message).toContain('authentication/permission'); expect(error.message).not.toContain(apiKey); expect(error.message).not.toContain('--api-key');
   }
-  fake('echo "$*"; exit 0');
+  fake('console.log(process.argv.slice(2).join(" "));');
   try { await uploadVerifiedAit(args); throw new Error('expected failure'); } catch (error) {
     expect(String(error)).toContain('unexpected deployment scheme'); expect(String(error)).not.toContain(apiKey);
   }
   const scheme = `intoss-private://test-app?_deploymentId=${artifact.deploymentId}`;
-  fake(`test "$1" = deploy && test "$2" = --location && test "$3" = '${artifactPath}' || exit 1\nprintf '%s\\n' '${scheme}'`);
+  fake(`import assert from 'node:assert/strict'; assert.deepEqual(process.argv.slice(2, 7), ['deploy', '--location', ${JSON.stringify(artifactPath)}, '--api-key', ${JSON.stringify(apiKey)}]); console.log(${JSON.stringify(scheme)});`);
   expect((await uploadVerifiedAit(args)).testScheme).toBe(scheme);
 });
