@@ -16,7 +16,7 @@ test("evidence rejects modified and untracked source while allowing its output a
     const clean = sourceState(root, output);
     expect(() => requireReportDestination(root, join(root, "source.mjs"))).toThrow("tracked source");
     expect(() => requireReportDestination(root, join(root, ".git", "HEAD"))).toThrow("Git metadata");
-    symlinkSync(root, join(root, "alias"), "dir");
+    symlinkSync(root, join(root, "alias"), process.platform === "win32" ? "junction" : "dir");
     expect(() => requireReportDestination(root, join(root, "alias", "source.mjs"))).toThrow("tracked source");
     rmSync(join(root, "alias"));
     requireReportDestination(root, output);

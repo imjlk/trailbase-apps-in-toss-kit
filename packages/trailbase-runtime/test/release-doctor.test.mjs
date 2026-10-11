@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   createCommandCheck,
   createPendingChangesetCheck,
@@ -15,7 +16,7 @@ import {
   runReleaseDoctor,
 } from "../src/release-doctor.mjs";
 
-const repoRoot = new URL("../../..", import.meta.url).pathname;
+const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
 const cliScript = "packages/trailbase-runtime/bin/release-doctor.mjs";
 const releaseDoctorConfigTemplate =
   "templates/trailbase/release/release-doctor.config.example.json";

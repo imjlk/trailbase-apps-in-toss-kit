@@ -1,11 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { cargoInvocation, metadataInvocation } from './cargo-local.mjs';
 const host = { home: '/home/test', platform: 'darwin', arch: 'arm64' };
 test('default cache and lightweight dev profiles; release remains unchanged', () => {
   const result = cargoInvocation(['--', 'build', '--release'], {}, host);
-  assert.equal(result.env.CARGO_TARGET_DIR, '/home/test/.cache/ait-kit/cargo-target/Darwin-arm64');
+  assert.equal(result.env.CARGO_TARGET_DIR, path.join(host.home, '.cache/ait-kit/cargo-target/Darwin-arm64'));
   assert.equal(result.env.CARGO_PROFILE_DEV_DEBUG, 'line-tables-only');
   assert.equal(result.env.CARGO_PROFILE_TEST_DEBUG, 'line-tables-only');
   assert.equal(result.env.CARGO_PROFILE_RELEASE_DEBUG, undefined);
@@ -35,7 +36,7 @@ test('rejects unsafe defaults and ambiguous options', () => {
   assert.throws(() => cargoInvocation([], {}, host), /Usage/);
 });
 
-test('CLI uses consumer cwd, forwards failures and resolves metadata artifact paths', async () => {
+test('CLI uses consumer cwd, forwards failures and resolves metadata artifact paths', { skip: process.platform === 'win32' }, async () => {
   const { mkdtempSync, writeFileSync, chmodSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const path = await import('node:path');
@@ -70,7 +71,7 @@ test('Cargo global options cannot bypass the clean guard', () => {
   assert.throws(() => cargoInvocation(['--', '--unknown', 'value', 'clean'], {}, host), /Unsupported/);
 });
 test('Linux ARM cache matches uname and both Cargo target environment variables are respected', () => {
-  assert.equal(cargoInvocation(['check'], {}, { ...host, platform: 'linux' }).env.CARGO_TARGET_DIR, '/home/test/.cache/ait-kit/cargo-target/Linux-aarch64');
+  assert.equal(cargoInvocation(['check'], {}, { ...host, platform: 'linux' }).env.CARGO_TARGET_DIR, path.join(host.home, '.cache/ait-kit/cargo-target/Linux-aarch64'));
   const env = { CARGO_BUILD_TARGET_DIR: '/alternate' };
   assert.equal(cargoInvocation(['check'], env, host).env.CARGO_TARGET_DIR, undefined);
   assert.equal(cargoInvocation(['check'], env, host).env.CARGO_BUILD_TARGET_DIR, '/alternate');
@@ -78,7 +79,7 @@ test('Linux ARM cache matches uname and both Cargo target environment variables 
 test('artifact lookup accepts build selection and configuration without passing build-only flags to metadata', () => {
   const result = metadataInvocation(['--release', '--target', 'wasm32-wasip2', '--profile=release', '--example', 'smoke', '--jobs', '2', '--manifest-path', 'path with spaces/Cargo.toml', '--config', 'net.offline=true', '--locked', '--target-dir', '/cli'], {});
   assert.deepEqual(result.args, ['metadata', '--format-version', '1', '--no-deps', '--filter-platform', 'wasm32-wasip2', '--manifest-path', 'path with spaces/Cargo.toml', '--config', 'net.offline=true', '--locked']);
-  assert.equal(result.env.CARGO_TARGET_DIR, '/cli');
+  assert.equal(result.env.CARGO_TARGET_DIR, path.resolve('/cli'));
   assert.throws(() => metadataInvocation(['--target-dir'], {}), /requires/);
   assert.throws(() => metadataInvocation(['--surprise'], {}), /Unsupported/);
 });
@@ -93,7 +94,7 @@ test('CLI runs from a checkout path containing spaces and non-ASCII characters',
     copyFileSync(fileURLToPath(new URL('./cargo-local.mjs', import.meta.url)), runner);
     const result = spawnSync(process.execPath, [runner, '--', '--offline', 'clean'], { encoding: 'utf8' });
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /inspected/);
+    assert.match(result.stderr, process.platform === 'win32' ? /inside WSL/ : /inspected/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 for (const command of ['check', 'target-dir']) test(`parent timeout terminates ${command} and its stubborn descendant`, { skip: process.platform === 'win32' }, async () => {
@@ -130,7 +131,7 @@ test('explicit Cargo config retains Cargo directory selection without a wrapper 
   }
   const configured = cargoInvocation(['--', 'check', '--config', 'file.toml'], { CARGO_TARGET_DIR: '/environment' }, host);
   assert.equal(configured.env.CARGO_TARGET_DIR, '/environment');
-  assert.equal(cargoInvocation(['--', 'run', '--', '--config', 'application.toml'], {}, host).env.CARGO_TARGET_DIR, '/home/test/.cache/ait-kit/cargo-target/Darwin-arm64');
+  assert.equal(cargoInvocation(['--', 'run', '--', '--config', 'application.toml'], {}, host).env.CARGO_TARGET_DIR, path.join(host.home, '.cache/ait-kit/cargo-target/Darwin-arm64'));
 });
 
 test('rejects custom aliases, built-in alias abbreviations and external plugins before Cargo runs', () => {
@@ -145,7 +146,7 @@ test('native Windows is rejected before starting an unmanaged child tree', () =>
   assert.throws(() => cargoInvocation(['check'], {}, { ...host, platform: 'win32' }), /inside WSL/);
 });
 
-test('target-dir translates the pseudo-command while retaining toolchain and global config', async () => {
+test('target-dir translates the pseudo-command while retaining toolchain and global config', { skip: process.platform === 'win32' }, async () => {
   const { mkdtempSync, writeFileSync, readFileSync, chmodSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const path = await import('node:path');
@@ -164,7 +165,7 @@ test('target-dir translates the pseudo-command while retaining toolchain and glo
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-test('metadata capture is bounded and terminates an oversized producer', async () => {
+test('metadata capture is bounded and terminates an oversized producer', { skip: process.platform === 'win32' }, async () => {
   const { mkdtempSync, writeFileSync, chmodSync, rmSync } = await import('node:fs');
   const { tmpdir } = await import('node:os');
   const path = await import('node:path');

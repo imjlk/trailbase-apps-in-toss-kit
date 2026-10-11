@@ -1,5 +1,49 @@
 # 기여하기
 
+## Windows 네이티브 개발
+
+Git Bash를 포함한 Git for Windows, rustup, mise를 설치합니다. Rust MSVC
+호스트에는 Visual Studio C++ 빌드 도구와 Windows SDK도 필요합니다.
+기존 Visual Studio Installer에서 **MSVC x64/x86 빌드 도구**와
+**Windows 10/11 SDK**를 추가하세요. `link.exe`나 `dbghelp.lib`를 찾지
+못하면 필수 구성요소가 없거나 설치가 아직 끝나지 않은 상태입니다.
+
+체크아웃의 PowerShell에서 시스템 Node 설치를 바꾸지 않고 지정된 버전을
+사용할 수 있습니다.
+
+```powershell
+mise trust
+mise install
+mise exec -- bun install --frozen-lockfile
+mise exec -- bun run packages:test
+mise exec -- bun test services/toss-mtls-client-proxy
+mise exec -- bun run packages:typecheck
+mise exec -- bun run packages:typecheck:minimum
+mise exec -- bun run skills:validate
+mise exec -- cargo fmt --all --check
+mise exec -- cargo clippy --locked --workspace --all-targets -- -D warnings
+mise exec -- cargo test --locked --workspace
+mise exec -- cargo check --locked --workspace --target wasm32-wasip2
+mise exec -- bun run trailbase:functional-ledgers:smoke
+mise exec -- bun run trailbase:owned-currency:smoke
+```
+
+`cargo:local`, `cargo:test`, `cargo:check` 및 공유 캐시 프로세스 그룹 래퍼는
+Unix 또는 WSL 전용입니다. Windows 네이티브에서는 위의 직접 Cargo 명령을
+사용하세요. `cargo:cache:report`도 Unix 호환 `du`가 필요합니다. POSIX
+시그널 전달과 파일 권한 비트 검증은 Unix에서만 실행하며, Windows 파일
+권한은 ACL로 관리합니다. 셸 템플릿 테스트는 WSL 배포판 없이 Git Bash로
+실행합니다. `.gitattributes`는 `core.autocrlf` 설정과 관계없이 셸 템플릿의
+LF 줄바꿈을 유지합니다.
+
+Docker 이미지 빌드와 TrailBase 서버/WASM 통합 스모크에는 실행 중인 Docker
+Desktop Linux 엔진이 추가로 필요합니다. 단위 테스트와 SQL 템플릿 스모크에는
+Docker나 실제 Toss 인증정보가 필요하지 않습니다. 네이티브 테스트는 키트의
+동작을 검증하며, Toss 앱 안의 실제 SDK 동작을 검증하지는 않습니다.
+
+컨슈머 업그레이드 비교는 CRLF와 LF를 정규화하므로 Windows 체크아웃 자체를
+업그레이드 충돌이나 마이그레이션 검토 사유로 판단하지 않습니다.
+
 ## 문서
 
 문서는 가능하면 영어와 한글을 함께 관리합니다. `docs/` 아래 문서는 병렬 경로를 사용합니다.

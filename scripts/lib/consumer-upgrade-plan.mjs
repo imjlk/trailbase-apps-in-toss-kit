@@ -41,7 +41,7 @@ export function readConsumerMapping(consumerRoot, name) {
 
 function text(bytes) {
   if (bytes.includes(0)) throw new Error('Binary inputs are not supported.');
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); }
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes).replace(/\r\n/g, '\n'); }
   catch { throw new Error('Inputs must contain valid UTF-8 text.'); }
 }
 
