@@ -14,7 +14,7 @@ Git Bash를 포함한 Git for Windows, rustup, mise를 설치합니다. Rust MSV
 ```powershell
 mise trust
 mise install
-mise exec -- bun install --frozen-lockfile
+mise exec -- bun run deps:install
 mise exec -- bun run packages:test
 mise exec -- bun test services/toss-mtls-client-proxy
 mise exec -- bun run packages:typecheck
@@ -27,6 +27,13 @@ mise exec -- cargo check --locked --workspace --target wasm32-wasip2
 mise exec -- bun run trailbase:functional-ledgers:smoke
 mise exec -- bun run trailbase:owned-currency:smoke
 ```
+
+`deps:install`은 frozen lockfile을 유지하며 Windows에서는 Bun의 hoisted
+linker를 선택합니다. 키트가 컨슈머의 `vendor/trailbase-apps-in-toss-kit`
+경로에 있으면 기본 isolated 워크스페이스 저장소가 `ENAMETOOLONG`을
+발생시킬 수 있습니다. Windows에서 Bun을 직접 실행할 때는
+`bun install --frozen-lockfile --linker hoisted`를 사용하세요.
+Unix에서는 Bun의 기본 linker를 유지합니다.
 
 `cargo:local`, `cargo:test`, `cargo:check` 및 공유 캐시 프로세스 그룹 래퍼는
 Unix 또는 WSL 전용입니다. Windows 네이티브에서는 위의 직접 Cargo 명령을
