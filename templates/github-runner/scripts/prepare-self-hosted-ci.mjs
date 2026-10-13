@@ -26,6 +26,17 @@ export function prepareSelfHostedCi(config, env = process.env,
     if (result.error || result.status !== 0) throw new Error(`Docker CI setup failed: ${result.error?.message ?? result.stderr}`);
     return result.stdout.trim();
   };
+  assert.match(config.runnerService, /^[a-z][a-z0-9-]+$/, 'Compose runner service is required');
+  const runnerIds = run(['ps', '-q', '--filter', `label=com.docker.compose.service=${config.runnerService}`]).split(/\s+/).filter(Boolean);
+  assert.equal(runnerIds.length, 1, 'Expected exactly one running container for this Compose runner service');
+  const mounts = JSON.parse(run(['inspect', runnerIds[0], '--format', '{{json .Mounts}}']));
+  assert.ok(mounts.some(mount => mount.Type === 'bind' && mount.Source === config.workdir &&
+    mount.Destination === config.workdir && mount.RW === true),
+    'Runner work directory must use a writable bind mount at the same host/container path');
+  if (config.hostNetwork) {
+    assert.equal(run(['inspect', runnerIds[0], '--format', '{{.HostConfig.NetworkMode}}']), 'host',
+      'Configure network_mode: host on the external runner Compose service for loopback fixtures');
+  }
   const inspect = execute(['buildx', 'inspect', config.builder]);
   if (inspect.status !== 0) {
     assert.match(inspect.stderr ?? '', /no builder|not found|does not exist/i, 'Do not create a builder on an unreachable daemon');

@@ -7,13 +7,18 @@ import { ciDockerArgs, prepareSelfHostedCi } from './prepare-self-hosted-ci.mjs'
 
 function fixture(inspectError = 'no builder found', limits = {}, driverOptions = 'default-load="true"') {
   const dir = mkdtempSync(join(tmpdir(), 'runner-ci-contract-'));
-  const config = { repository: 'owner/example', builder: 'example-ci', workdir: join(dir, 'work') };
+  const config = { repository: 'owner/example', builder: 'example-ci', runnerService: 'runner-example', workdir: join(dir, 'work') };
   mkdirSync(join(config.workdir, '_temp'), { recursive: true });
   const env = { RUNNER_ENVIRONMENT: 'self-hosted', GITHUB_REPOSITORY: config.repository,
     GITHUB_ENV: join(dir, 'env'), RUNNER_TEMP: `${config.workdir}/_temp` };
   const calls = [];
   const execute = (args) => {
     calls.push(args);
+    if (args[0] === 'ps') return { status: 0, stdout: 'fixture-runner-id' };
+    if (args.includes('{{json .Mounts}}')) return { status: 0, stdout: JSON.stringify([
+      { Type: 'bind', Source: config.workdir, Destination: config.workdir, RW: true },
+    ]) };
+    if (args.includes('{{.HostConfig.NetworkMode}}')) return { status: 0, stdout: 'host' };
     if (args.length === 3 && args[0] === 'buildx' && args[1] === 'inspect') {
       return inspectError ? { status: 1, stderr: inspectError } : { status: 0, stdout: `Driver: docker-container\nDriver Options: ${driverOptions}\n` };
     }
@@ -37,7 +42,7 @@ test('reuses a builder only after checking its actual resource limits', () => {
 });
 test('a daemon failure cannot trigger builder creation', () => {
   const f = fixture('Cannot connect to Docker daemon');
-  try { assert.throws(() => prepareSelfHostedCi(f.config, f.env, f.execute)); assert.equal(f.calls.length, 1); } finally { f.close(); }
+  try { assert.throws(() => prepareSelfHostedCi(f.config, f.env, f.execute)); assert.equal(f.calls.filter(args => args[0] === 'buildx').length, 1); } finally { f.close(); }
 });
 test('rejects hosted jobs, another repository, and unshared temporary paths before Docker access', () => {
   const f = fixture();
@@ -71,7 +76,7 @@ test('rejects builders whose images would not load into the Docker daemon', () =
     const f = fixture(null, {}, options);
     try {
       assert.throws(() => prepareSelfHostedCi(f.config, f.env, f.execute), /default-load=true/);
-      assert.equal(f.calls.length, 1);
+      assert.equal(f.calls.filter(args => args[0] === 'buildx').length, 1);
     } finally { f.close(); }
   }
 });
@@ -80,4 +85,27 @@ test('rejects flags that could override fixture resource caps', () => {
     ['--memory=16g'], ['-m', '16g'], ['-m16g'], ['--memory-swap=-1'], ['--pids-limit=-1']]) {
     assert.throws(() => ciDockerArgs(['run', ...flags, 'fixture'], { RUNNER_ENVIRONMENT: 'self-hosted' }), /must not override/);
   }
+});
+
+test('requires an actual host-visible work bind mount before preparing a builder', () => {
+  for (const mount of [{ Type: 'volume' }, { Source: '/different/host/path' }, { RW: false }]) {
+    const f = fixture();
+    try {
+      const execute = args => args.includes('{{json .Mounts}}') ? { status: 0, stdout: JSON.stringify([
+        { Type: 'bind', Source: f.config.workdir, Destination: f.config.workdir, RW: true, ...mount },
+      ]) } : f.execute(args);
+      assert.throws(() => prepareSelfHostedCi(f.config, f.env, execute), /writable bind mount/);
+      assert(!f.calls.some(args => args[0] === 'buildx'));
+    } finally { f.close(); }
+  }
+});
+test('requires external host networking when loopback fixtures need it', () => {
+  const f = fixture();
+  try {
+    const execute = args => args.includes('{{.HostConfig.NetworkMode}}')
+      ? { status: 0, stdout: 'bridge' } : f.execute(args);
+    assert.throws(() => prepareSelfHostedCi({ ...f.config, hostNetwork: true }, f.env, execute), /network_mode: host/);
+    assert(!f.calls.some(args => args[0] === 'buildx'));
+    prepareSelfHostedCi({ ...f.config, hostNetwork: true }, f.env, f.execute);
+  } finally { f.close(); }
 });

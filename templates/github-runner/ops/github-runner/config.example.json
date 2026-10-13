@@ -3,5 +3,6 @@
   "label": "private-app",
   "builder": "ait-private-app-ci",
   "workdir": "/data/github-actions/private-app/work",
-  "hostNetwork": false
+  "hostNetwork": false,
+  "runnerService": "runner-private-app"
 }
