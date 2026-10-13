@@ -8,6 +8,7 @@ on:
       - "scripts/cargo-*.mjs"
       - "scripts/lib/consumer-*.mjs"
       - "templates/trailbase/**"
+      - "templates/github-runner/**"
   push:
     branches: [main]
     paths:
@@ -16,6 +17,7 @@ on:
       - "scripts/cargo-*.mjs"
       - "scripts/lib/consumer-*.mjs"
       - "templates/trailbase/**"
+      - "templates/github-runner/**"
   workflow_dispatch:
 
 permissions:
@@ -39,3 +41,4 @@ jobs:
           bun-version: "1.4.2"
       - run: bun test scripts/compare-consumer-templates.test.mjs scripts/consumer-upgrade-plan.test.mjs
       - run: node --test scripts/cargo-local.test.mjs scripts/cargo-cache-report.test.mjs
+      - run: node --test templates/github-runner/scripts/prepare-self-hosted-ci.test.mjs
