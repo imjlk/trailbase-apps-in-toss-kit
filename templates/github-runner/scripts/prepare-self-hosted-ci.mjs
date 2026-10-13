@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { isAbsolute, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export function ciDockerArgs(args, env = process.env) {
   if (env.RUNNER_ENVIRONMENT !== 'self-hosted' || args[0] !== 'run') return args;
+  assert.ok(!args.slice(1).some(arg => /^--(?:cpus|cpu-period|cpu-quota|memory|memory-swap|pids-limit)(?:=|$)/.test(arg) || /^-m/.test(arg)),
+    'Fixture commands must not override the CI resource limits');
   return ['run', '--cpus', '2', '--memory', '4g', '--memory-swap', '4g', '--pids-limit', '512', ...args.slice(1)];
 }
 
@@ -14,7 +17,10 @@ export function prepareSelfHostedCi(config, env = process.env,
   assert.equal(env.GITHUB_REPOSITORY, config.repository, 'Repository-scoped CI only');
   assert.match(config.builder, /^[a-z][a-z0-9-]+-ci$/);
   assert.ok(env.GITHUB_ENV, 'GitHub environment output is required');
-  assert.ok(env.RUNNER_TEMP?.startsWith(`${config.workdir}/`), 'Temporary files must use the shared host/container work path');
+  assert.ok(env.RUNNER_TEMP && !/[\r\n]/.test(env.RUNNER_TEMP), 'Temporary path must be a single line');
+  const tempRelative = relative(realpathSync(config.workdir), realpathSync(env.RUNNER_TEMP));
+  assert.ok(tempRelative && tempRelative !== '..' && !tempRelative.startsWith(`..${sep}`) && !isAbsolute(tempRelative),
+    'Temporary files must use the shared host/container work path');
   const run = (args) => {
     const result = execute(args);
     if (result.error || result.status !== 0) throw new Error(`Docker CI setup failed: ${result.error?.message ?? result.stderr}`);
@@ -27,6 +33,9 @@ export function prepareSelfHostedCi(config, env = process.env,
       'default-load=true,memory=8g,memory-swap=8g,cpu-quota=400000,cpu-period=100000']);
   } else {
     assert.match(inspect.stdout, /^Driver:\s*docker-container\s*$/m, 'Unexpected builder driver');
+    const options = inspect.stdout.match(/^Driver Options:[^\r\n]*$/gm) ?? [];
+    assert.ok(options.length === 1 && /(?:^|\s)default-load="true"(?:\s|$)/.test(options[0]),
+      'Existing builder must have one node with default-load=true; repair its configuration before retrying');
   }
   run(['buildx', 'inspect', config.builder, '--bootstrap']);
   const limits = JSON.parse(run(['inspect', `buildx_buildkit_${config.builder}0`, '--format', '{{json .HostConfig}}']));
