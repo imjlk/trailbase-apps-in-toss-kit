@@ -1,17 +1,14 @@
-# TrailBase v0.33.22
+# TrailBase v0.34.6
 
-- Published at: 2026-09-23T16:46:17Z
-- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.33.22
+- Published at: 2026-10-14T16:09:29Z
+- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.34.6
 
 ## Release notes
 
-- Fix behavior when a Rust WASM guest panics:
-  - Respond right away with the error w/o relying on a timeout.
-  - Remove trapped component from shared instance pool to avoid poisoning.
-- Add support for SQL `execute_batch` to JS/TS WASM guests.
-- Add integration test coverage for JS/TS WASM components. Still needs to be enabled in CI.
-- Overhaul integration tests.
+- Use `TextArea` inputs for `TEXT` columns in the admin UI row editor to allow for whitespaces. @jessepeterson 🙏
+- Add a new `trail run --runtime-extra-components` flag to allow specifying components beyond `<depot>/wasm/`.
+- Add CI integration tests covering JS/TS wasm guests.
 - Update dependencies.
 
 
-**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.33.21...v0.33.22
+**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.34.5...v0.34.6
