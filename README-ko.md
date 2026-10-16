@@ -116,6 +116,13 @@ package를 runtime dependency로 추가하지 않습니다. 해당 version은 �
 Node, Rust 도구를 설치하세요. 같은 Rust 버전은 Cargo, rustup, editor, CI 호환성을 위해
 `rust-toolchain.toml`에도 함께 반영합니다.
 
+중첩된 컨슈머 checkout에서도 kit의 잠긴 JavaScript 의존성은 `bun run deps:install`로
+설치하세요. Windows 네이티브에서는 격리 저장소의 긴 경로를 피하도록 Bun의 hoisted
+배치를 사용합니다. 설치 전에는 이 kit의 기존 `node_modules/.bun` 저장소를 가리키는
+workspace junction·symlink만 제거하여 오래된 SDK/API 버전이 새 의존성을 가리지 않게
+합니다. 실제 디렉터리, 사용자 링크, 저장소 내용과 lockfile은 보존합니다.
+Unix에서는 기본 배치를 유지합니다.
+
 Kit minimum supported TrailBase server version은 자동으로 올리지 않습니다. 도입 앱 smoke
 test가 통과한 뒤에만 올립니다. 도입 앱은 복사해 간 Compose 파일이나 TrailBase 서버 이미지
 태그에 대해 `scripts/check-trailbase-version-policy.mjs`를 참고 진단으로 사용할 수 있습니다.
