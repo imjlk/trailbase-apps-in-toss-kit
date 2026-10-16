@@ -1,5 +1,17 @@
 # @trailbase-apps-in-toss-kit/release-tools
 
+## 0.4.1 — 2026-10-16
+
+### Patch changes
+
+- [087bc87](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/087bc871094e5cb624923813e966f90f2747666d) Support JavaScript AIT CLI entry files on native Windows without using a shell.
+  Pass the installed CLI's actual .js, .mjs, or .cjs file as cliPath instead of a
+  .cmd shim. Artifact paths and API keys retain their argument boundaries, and
+  upload errors continue to suppress captured credentials and CLI output.
+  
+  Recognize equivalent Windows short and long repository paths in the release
+  dependency guard while continuing to reject subdirectories and dependency drift. — Thanks @imjlk!
+
 ## 0.4.0 — 2026-10-04
 
 ### Minor changes
