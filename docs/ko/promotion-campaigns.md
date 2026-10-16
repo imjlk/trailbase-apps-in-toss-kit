@@ -243,7 +243,8 @@ Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 �
 표시하고(레거시 grant 흐름의 행은 `NULL`로 남습니다), 한 번만 기록되는
 `execution_started_at`은 커밋된 실행 시작을 기록하며, `provider_status`는
 제공자가 관찰한 결과만 담습니다. `SUBMITTED`(execute 접수, 미확정)와
-`UNKNOWN`(결과 확인 불가 — `ok:false` UNKNOWN 봉투 포함)은 둘 다 원장 행을
+`UNKNOWN`(결과 확인 불가 — `ok:false` UNKNOWN 봉투, 그리고 `FAILED`/`ERROR`를
+명시하지 않은 모든 `ok:false` 봉투: 프록시 타임아웃·인증·5xx, 모순된 상태 포함)은 둘 다 원장 행을
 `pending`으로 유지하며 `granted_at`/`failed_at`을 만들지 않습니다. 확정 지급도
 확정 실패도 아니며, `NOT_FOUND` status(해당 키의 지급 기록 없음)는 실패으로
 분류됩니다. 재조회 대상은 `promotion_reward_ledgers_awaiting_recovery_tx`가

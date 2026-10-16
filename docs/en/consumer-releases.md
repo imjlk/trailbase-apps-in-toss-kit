@@ -72,6 +72,13 @@ The consumer owns this sequence:
    `apiKey`. The tag must match the app/version, point at HEAD, and be reachable
    from fetched `origin/main`. Save the returned report after success.
 
+For native Windows, pass the installed CLI's actual JavaScript entry file as
+`cliPath` (for example `node_modules/@apps-in-toss/framework/bin/ait.js`), rather
+than a `.cmd` shim. `.js`, `.mjs`, and `.cjs` entry files run through the current
+Node/Bun executable with an argument array and no shell. Unix executables remain
+supported. Artifact paths and API keys containing spaces or shell characters
+are passed as single arguments.
+
 Inspection rejects unexpected/missing runtimes, missing source maps, packaged
 test ad IDs, wrong settings and bundles exceeding 100 MB expanded size. Upload
 rechecks the actual artifact hash/deployment ID, source commit, version, tag,

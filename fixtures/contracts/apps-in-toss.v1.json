@@ -396,8 +396,18 @@
         "ok": false,
         "providerStatus": "GRANTED"
       },
-      "providerStatus": "FAILED",
-      "ledgerStatus": "failed"
+      "providerStatus": "UNKNOWN",
+      "ledgerStatus": "pending"
+    },
+    {
+      "id": "proxy-transport-failure",
+      "response": {
+        "ok": false,
+        "error": "UPSTREAM_TIMEOUT",
+        "message": "Upstream request timed out"
+      },
+      "providerStatus": "UNKNOWN",
+      "ledgerStatus": "pending"
     },
     {
       "id": "execute-submitted",

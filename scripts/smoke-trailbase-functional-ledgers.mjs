@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
+import { fileURLToPath } from 'node:url';
 
 import assert from "node:assert/strict";
 import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = fileURLToPath(new URL("..", import.meta.url));
 const templateDir = path.join(root, "templates", "trailbase", "sql");
 const templates = [
   "operation_policies.sql",

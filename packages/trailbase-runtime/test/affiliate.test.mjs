@@ -27,7 +27,8 @@ test('private disk cache survives restart, expires and does not cache failed loa
     expect(await restarted.get('oauth')).toEqual({ token: 'synthetic-test' });
     const files = await readdir(directory);
     expect(files).toHaveLength(1);
-    expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600);
+    // Windows uses ACLs rather than POSIX mode bits.
+    if (process.platform !== 'win32') expect((await stat(join(directory, files[0]))).mode & 0o777).toBe(0o600);
     clock += 1001;
     expect(await restarted.get('oauth')).toBeNull();
     await expect(cache.load('failure', 1000, async () => { throw new Error('offline'); })).rejects.toThrow('offline');
@@ -61,7 +62,7 @@ test('corrupt cache files are removed and unreadable directory scans do not fail
     // A writable/searchable directory can still forbid directory enumeration.
     // This reproduces housekeeping EACCES without mocking provider requests.
     await chmod(directory, 0o300);
-    if (process.getuid?.() !== 0) await expect(readdir(directory)).rejects.toMatchObject({ code: 'EACCES' });
+    if (process.platform !== 'win32' && process.getuid?.() !== 0) await expect(readdir(directory)).rejects.toMatchObject({ code: 'EACCES' });
     expect(await cache.set('new', 'successful', NOW + 1000)).toBe('successful');
     expect(await cache.get('new')).toBe('successful');
   } finally { await chmod(directory, 0o700); await rm(directory, { recursive: true, force: true }); }

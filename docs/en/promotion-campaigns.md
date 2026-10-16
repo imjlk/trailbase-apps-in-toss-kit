@@ -325,7 +325,9 @@ marks new-contract rows (legacy grant-flow rows stay `NULL`), the write-once
 `execution_started_at` records the committed execution start, and
 `provider_status` stores provider-observed results only. `SUBMITTED`
 (execute accepted, unconfirmed) and `UNKNOWN` (outcome could not be
-determined — including `ok:false` UNKNOWN envelopes) both keep the ledger
+determined — including `ok:false` UNKNOWN envelopes and every `ok:false`
+envelope that does not name `FAILED`/`ERROR`: proxy timeouts, auth and 5xx
+errors, or a contradictory status) both keep the ledger
 row `pending` with no fabricated `granted_at`/`failed_at`; they are neither
 a confirmed grant nor a confirmed failure, and a `NOT_FOUND` status (no
 grant record for the key) classifies as failed. Recovery targets come from

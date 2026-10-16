@@ -1,11 +1,12 @@
 #!/usr/bin/env bun
+import { fileURLToPath } from 'node:url';
 
 import assert from "node:assert/strict";
 import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = fileURLToPath(new URL("..", import.meta.url));
 const sqlDir = path.join(root, "templates", "trailbase", "sql");
 const editorDir = path.join(root, "templates", "trailbase", "sql-editor");
 const promotionSchema = readFileSync(path.join(sqlDir, "promotion_campaigns.sql"), "utf8");

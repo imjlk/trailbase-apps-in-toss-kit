@@ -2,13 +2,14 @@ import { describe, expect, test } from "bun:test";
 import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildOwnedCurrencyReport,
   formatOwnedCurrencyCsv,
   OwnedCurrencyReportError,
 } from "../src/owned-currency-report.mjs";
 
-const root = path.resolve(new URL("../../..", import.meta.url).pathname);
+const root = fileURLToPath(new URL("../../..", import.meta.url));
 const eventSchema = readFileSync(path.join(root, "templates/trailbase/sql/owned_currency_events.sql"), "utf8");
 const policySchema = readFileSync(path.join(root, "templates/trailbase/sql/owned_currency_policies.sql"), "utf8");
 

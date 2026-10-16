@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+import { fileURLToPath } from 'node:url';
 
 import { Database } from "bun:sqlite";
 import { spawnSync } from "node:child_process";
@@ -6,7 +7,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = fileURLToPath(new URL("..", import.meta.url));
 const image = process.env.TRAILBASE_IMAGE || "trailbase/trailbase:0.31.1";
 const keepDir = process.env.KEEP_TRAILBASE_SMOKE_DIR === "1";
 const port = Number(process.env.TRAILBASE_SMOKE_PORT || "4028");

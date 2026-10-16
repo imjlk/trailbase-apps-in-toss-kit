@@ -1,0 +1,8 @@
+{
+  "repository": "owner/private-app",
+  "label": "private-app",
+  "builder": "ait-private-app-ci",
+  "workdir": "/data/github-actions/private-app/work",
+  "hostNetwork": false,
+  "runnerService": "runner-private-app"
+}

@@ -64,7 +64,7 @@ function delegate<T extends (...args: never[]) => unknown>(
     (...args: Parameters<T>) =>
       (provider.current[key] as T | undefined)!(...args),
     {
-      isSupported: () => provider.current[supportedKey] !== false,
+      isSupported: () => typeof provider.current[key] === "function" && provider.current[supportedKey] !== false,
     },
   ) as T & { isSupported?: () => boolean };
 }

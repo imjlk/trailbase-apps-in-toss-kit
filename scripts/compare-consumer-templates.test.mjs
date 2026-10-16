@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { shellPath, spawnTestShell } from "./lib/test-shell.mjs";
 
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptsDir, "..");
@@ -18,7 +19,7 @@ const compareScript = path.join(scriptsDir, "compare-consumer-templates.mjs");
 const templateMapExample = "templates/trailbase/release/kit-template-map.example.json";
 const proxyImageLine = readFileSync(
   path.join(repoRoot, "templates/trailbase/compose/toss-mtls-client-proxy.yml"), "utf8",
-).split("\n").find(line => /^\s+image:.*\/toss-mtls-client-proxy:/.test(line));
+).split(/\r?\n/).find(line => /^\s+image:.*\/toss-mtls-client-proxy:/.test(line));
 if (!proxyImageLine) throw new Error("Expected the shared proxy image in its Compose template");
 
 describe("compare-consumer-templates", () => {
@@ -79,7 +80,7 @@ describe("compare-consumer-templates", () => {
       expect(result.stdout).toContain(
         "--- templates/trailbase/compose/toss-mtls-client-proxy.yml#toss-mtls-client-proxy",
       );
-      expect(result.stdout).toContain("+++ apps/trailbase/docker-compose.yml");
+      expect(result.stdout).toContain(`+++ ${path.join("apps", "trailbase", "docker-compose.yml")}`);
       expect(result.stdout).not.toContain("compare-consumer-templates-");
       expect(result.stdout).not.toContain("-    profiles:");
       expect(result.stdout).not.toContain("  trailbase:");
@@ -638,7 +639,7 @@ describe("toss-proxy-smoke template script", () => {
   });
 
   function runSmokeScript(binDir, args = [], extraEnv = {}) {
-    return spawnSync("bash", [smokeScript, ...args], {
+    return spawnTestShell("bash", [shellPath(smokeScript), ...args], {
       cwd: repoRoot,
       encoding: "utf8",
       env: {

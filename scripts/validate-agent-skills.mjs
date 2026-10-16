@@ -106,7 +106,7 @@ function validateSkill(skillName) {
     fail(`${skillName}: frontmatter description must be 1-1024 characters`);
   }
 
-  const body = skillSource.replace(/^---\n[\s\S]*?\n---\n?/, "");
+  const body = skillSource.replace(/^---\r?\n[\s\S]*?\r?\n---(?:\r?\n)?/, "");
   const bodyLines = body.split(/\r?\n/).length;
   if (bodyLines > 500) {
     warnings.push(`${skillName}: SKILL.md body is ${bodyLines} lines; prefer references/ for detail`);
@@ -268,7 +268,7 @@ function normalizeMarkdownHref(href) {
 }
 
 function parseFrontmatter(source, label) {
-  const match = source.match(/^---\n([\s\S]*?)\n---/);
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---/);
   if (!match) {
     fail(`${label}: missing YAML frontmatter`);
     return undefined;

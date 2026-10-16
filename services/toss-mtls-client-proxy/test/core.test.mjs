@@ -24,7 +24,8 @@ import {
 const serviceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("toss-mtls-client-proxy", () => {
-  test("server process exits cleanly on SIGTERM", async () => {
+  // Windows forcibly terminates SIGTERM targets; it cannot deliver Unix handlers.
+  (process.platform === 'win32' ? test.skip : test)("server process exits cleanly on SIGTERM", async () => {
     const child = spawn(process.execPath, ["src/server.mjs"], {
       cwd: serviceRoot,
       env: {
@@ -135,8 +136,8 @@ describe("toss-mtls-client-proxy", () => {
         MTLS_CERT_DIR: certDir,
       });
 
-      expect(config.clientCertPath).toBe(path.join(certDir, "sample-service_public.crt"));
-      expect(config.clientKeyPath).toBe(path.join(certDir, "sample-service_private.key"));
+      expect(path.normalize(config.clientCertPath)).toBe(path.join(certDir, "sample-service_public.crt"));
+      expect(path.normalize(config.clientKeyPath)).toBe(path.join(certDir, "sample-service_private.key"));
     } finally {
       rmSync(certDir, { recursive: true, force: true });
     }
@@ -154,8 +155,8 @@ describe("toss-mtls-client-proxy", () => {
         MTLS_CLIENT_KEY_PATH: "/custom/client.key",
       });
 
-      expect(config.clientCertPath).toBe(path.join(certDir, "sample-service_public.crt"));
-      expect(config.clientKeyPath).toBe(path.join(certDir, "sample-service_private.key"));
+      expect(path.normalize(config.clientCertPath)).toBe(path.join(certDir, "sample-service_public.crt"));
+      expect(path.normalize(config.clientKeyPath)).toBe(path.join(certDir, "sample-service_private.key"));
     } finally {
       rmSync(certDir, { recursive: true, force: true });
     }
