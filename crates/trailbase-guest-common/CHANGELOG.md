@@ -1,5 +1,17 @@
 # trailbase-guest-common
 
+## 0.15.0 — 2026-10-16
+
+### Minor changes
+
+- [1d97c6f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1d97c6f93cc8bc6ba9623a64365f7e00917d86cd) Add `abandon_unexecuted_promotion_reward_ledgers_tx` to fail three-step promotion intents whose execution was never claimed and whose latest activity predates a cutoff. Recently resumed intents, started rows, and legacy rows remain untouched. Existing v2 consumers must apply the additive `promotion_reward_ledger.v3.sql` index migration before enabling bounded cleanup; fresh installs include the index. Ledger Doctor recognizes terminal `NOT_EXECUTED` rows without recommending a provider lookup or automatic retry. — Thanks @imjlk!
+- [6fe06ec](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6fe06ec6794fb916e23ed76a29d5ac1e531f4ff9) Adopt published @ait-kit/sdk 0.7.0 and api-core/api-client 0.6.0. WebView consumers on official SDK 3.6+ can request fresh anonymous authentication codes and exchange them once through the private proxy and Rust helper before official TrailBase login. The old key-verification route only checks key validity and must not authenticate an untrusted caller. Require proxy capability anonymous-key.exchange-auth-code before adoption; keep codes and raw keys out of storage, logs and public responses. Existing identity HMAC seeds and account mappings are preserved; no schema migration is required for code exchange. Older SDK peers retain existing APIs but this opt-in method returns unsupported without falling back to a hash or login. — Thanks @imjlk!
+
+### Patch changes
+
+- [1b2ef95](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1b2ef95026bf0843c78c324733b479b2a116d70b) Promotion outcome parsing no longer finalizes a bare `ok:false` envelope as `FAILED`. Proxy timeouts, auth or 5xx errors, and contradictory statuses now normalize to `UNKNOWN` (ledger `pending`) so a status lookup settles them and callers never re-grant a reward that may already be paid; only an explicit `FAILED`/`ERROR` provider status stays terminal. The functional message client's `requestMessage` endpoint is now optional for apps whose server queues messages itself. — Thanks @imjlk!
+- [4c09667](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/4c09667f6bebc2e6bcb79df0a8c6b6255572e81f) Add opt-in bootstrap stage diagnostics and a dependency-free copy-in template. Use an internal TrailBase auth origin, preserve official login/password rotation, and compare stage timings before attributing production latency to network or database work. — Thanks @imjlk!
+
 ## 0.14.0 — 2026-09-29
 
 ### Minor changes

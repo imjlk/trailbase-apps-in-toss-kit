@@ -1,5 +1,12 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.9.2 — 2026-10-16
+
+### Patch changes
+
+- [1b2ef95](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1b2ef95026bf0843c78c324733b479b2a116d70b) Promotion outcome parsing no longer finalizes a bare `ok:false` envelope as `FAILED`. Proxy timeouts, auth or 5xx errors, and contradictory statuses now normalize to `UNKNOWN` (ledger `pending`) so a status lookup settles them and callers never re-grant a reward that may already be paid; only an explicit `FAILED`/`ERROR` provider status stays terminal. The functional message client's `requestMessage` endpoint is now optional for apps whose server queues messages itself. — Thanks @imjlk!
+- [6fe06ec](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6fe06ec6794fb916e23ed76a29d5ac1e531f4ff9) Adopt published @ait-kit/sdk 0.7.0 and api-core/api-client 0.6.0. WebView consumers on official SDK 3.6+ can request fresh anonymous authentication codes and exchange them once through the private proxy and Rust helper before official TrailBase login. The old key-verification route only checks key validity and must not authenticate an untrusted caller. Require proxy capability anonymous-key.exchange-auth-code before adoption; keep codes and raw keys out of storage, logs and public responses. Existing identity HMAC seeds and account mappings are preserved; no schema migration is required for code exchange. Older SDK peers retain existing APIs but this opt-in method returns unsupported without falling back to a hash or login. — Thanks @imjlk!
+
 ## 0.9.1 — 2026-10-02
 
 ### Patch changes

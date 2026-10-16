@@ -1,5 +1,15 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.7.0 — 2026-10-16
+
+### Minor changes
+
+- [6fe06ec](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6fe06ec6794fb916e23ed76a29d5ac1e531f4ff9) Adopt published @ait-kit/sdk 0.7.0 and api-core/api-client 0.6.0. WebView consumers on official SDK 3.6+ can request fresh anonymous authentication codes and exchange them once through the private proxy and Rust helper before official TrailBase login. The old key-verification route only checks key validity and must not authenticate an untrusted caller. Require proxy capability anonymous-key.exchange-auth-code before adoption; keep codes and raw keys out of storage, logs and public responses. Existing identity HMAC seeds and account mappings are preserved; no schema migration is required for code exchange. Older SDK peers retain existing APIs but this opt-in method returns unsupported without falling back to a hash or login. — Thanks @imjlk!
+
+### Patch changes
+
+- Updated dependencies: trailbase-runtime (npm)@0.8.1
+
 ## 0.6.8 — 2026-10-04
 
 ### Patch changes

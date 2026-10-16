@@ -1,5 +1,17 @@
 # @trailbase-apps-in-toss-kit/trailbase-runtime
 
+## 0.8.1 — 2026-10-16
+
+### Patch changes
+
+- [63fca33](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/63fca330173ae73aeafb2f860693e921671fe4c8) Provide TypeScript declarations for the proxy-capabilities package export so
+  strict Bundler and NodeNext consumers no longer need a local ambient module shim.
+  Type both the health evaluator and check factory, including fetch injection and
+  success/failure result narrowing. JavaScript behavior and credential handling are
+  unchanged. — Thanks @imjlk!
+- [1d97c6f](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1d97c6f93cc8bc6ba9623a64365f7e00917d86cd) Add `abandon_unexecuted_promotion_reward_ledgers_tx` to fail three-step promotion intents whose execution was never claimed and whose latest activity predates a cutoff. Recently resumed intents, started rows, and legacy rows remain untouched. Existing v2 consumers must apply the additive `promotion_reward_ledger.v3.sql` index migration before enabling bounded cleanup; fresh installs include the index. Ledger Doctor recognizes terminal `NOT_EXECUTED` rows without recommending a provider lookup or automatic retry. — Thanks @imjlk!
+- [c8bfd76](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/c8bfd765f1de81e6b17947fe6349e9255ad502d7) Provide copy-in private consumer CI runner helpers for bounded Docker builders, shared temporary paths, and resource-limited integration fixtures without changing consumer server or release policies. — Thanks @imjlk!
+
 ## 0.8.0 — 2026-10-04
 
 ### Minor changes
