@@ -15,7 +15,11 @@ function warning(message) {
 }
 
 async function readUtf8(path) {
-  return readFile(path, "utf8");
+  return normalizeLineEndings(await readFile(path, "utf8"));
+}
+
+function normalizeLineEndings(content) {
+  return content.replace(/\r\n/g, "\n");
 }
 
 async function readPolicy() {
@@ -122,12 +126,12 @@ function updateMiseRustToolchain(content, toolchain) {
 async function writeOrCheck(path, nextContent) {
   let current = "";
   try {
-    current = await readUtf8(path);
+    current = await readFile(path, "utf8");
   } catch (err) {
     if (err.code !== "ENOENT") throw err;
   }
 
-  if (current === nextContent) {
+  if (normalizeLineEndings(current) === nextContent) {
     return false;
   }
 
@@ -135,7 +139,8 @@ async function writeOrCheck(path, nextContent) {
     throw new Error(`${path} is not synchronized with ${POLICY_PATH}`);
   }
 
-  await writeFile(path, nextContent);
+  // Keep a Windows checkout's CRLF style when a real policy change is needed.
+  await writeFile(path, current.includes("\r\n") ? nextContent.replace(/\n/g, "\r\n") : nextContent);
   return true;
 }
 

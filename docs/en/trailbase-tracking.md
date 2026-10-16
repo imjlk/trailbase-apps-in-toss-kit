@@ -42,6 +42,10 @@ Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
 while `rust-toolchain.toml` keeps Cargo, rustup, editors, and CI compatible with
 standard Rust project behavior.
 
+`bun run trailbase:rust-policy:check` accepts both LF and Windows CRLF checkouts
+without rewriting files. Synchronization preserves existing CRLF line endings
+when a real policy value changes; version mismatches still fail `--check`.
+
 After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 `mise install` to install the pinned tools.
 

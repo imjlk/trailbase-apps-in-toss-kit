@@ -23,7 +23,7 @@ on:
       - "templates/trailbase/sql/**"
       - "services/toss-mtls-client-proxy/**"
       - "scripts/snapshot-trailbase-release.mjs"
-      - "scripts/sync-trailbase-rust-policy.mjs"
+      - "scripts/sync-trailbase-rust-policy*"
   workflow_dispatch:
 
 permissions:
@@ -95,6 +95,9 @@ jobs:
 
       - name: Check repo Rust policy synchronization
         run: node scripts/sync-trailbase-rust-policy.mjs --check
+
+      - name: Test LF and CRLF Rust policy synchronization
+        run: node --test scripts/sync-trailbase-rust-policy.test.mjs
 
       - name: Check TrailBase server version advisory
         run: |

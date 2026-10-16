@@ -81,7 +81,9 @@ jobs:
       - name: Check WASI target
         run: cargo check --locked --workspace --target wasm32-wasip2
       - name: Run native Node tooling tests
-        run: node --test scripts/cargo-local.test.mjs scripts/cargo-cache-report.test.mjs scripts/validate-agent-skills.test.mjs
+        run: node --test scripts/cargo-local.test.mjs scripts/cargo-cache-report.test.mjs scripts/validate-agent-skills.test.mjs scripts/sync-trailbase-rust-policy.test.mjs
+      - name: Check Rust policy in the Windows checkout
+        run: bun run trailbase:rust-policy:check
       - name: Run packages, proxy and consumer tooling tests
         run: bun test packages services scripts templates/clients/review-request --timeout 120000
       - name: Check installed SDK types
