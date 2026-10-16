@@ -44,7 +44,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.33.14`
+- `trailbase-server-github-release`: `0.34.7`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -136,6 +136,12 @@ CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-versi
 
 ## Guest ABI와 인증 migration
 
+`0.33.14`에서 업그레이드하기 전에 컨슈머의 `UserIdentifier` 정책을 확인하세요.
+`0.33.16`은 미지정 정책의 fallback을 `ONLY_EMAIL`로 변경합니다. 이메일 없는 외부
+사용자는 앱이 `REQUIRE_USERNAME` 같은 적절한 정책을 명시하지 않으면 로그인할 수
+없게 될 수 있습니다. 이전 fallback에 의존하지 말고 의도한 계정 식별자로 제공자
+로그인을 다시 검증하세요.
+
 검증 기준 `0.33.14`는 시간 차이를 이용한 계정 열거 side-channel을 수정한
 `0.33.23`보다 이전 버전입니다. 과거 테스트 결과이며 보안 권장 버전이 아닙니다.
 컨슈머는 노출 여부를 평가하고 이 수정이 포함된 조합의 업그레이드를 검증해야 합니다.
@@ -150,6 +156,16 @@ TrailBase `0.34.0`부터 WASM `ATTACH DATABASE`의 상대 경로 기준은 프�
 보조 DB를 사용하는 컨슈머는 업그레이드 전에 bind할 경로를 수정하거나 DB 파일을 옮긴 뒤
 의도한 기존 DB가 연결되는지 확인하세요. [analytics fallback initializer](analytics.md)에도
 해당합니다. 이 업스트림 변경 추적이 검증 기준 `0.33.14`를 올리는 것은 아닙니다.
+
+중간 버전의 다른 변경도 확인하세요. `0.33.15`는 WASM에서 연결할 수 있는 DB를
+제한하고 guest `execute_batch`를 추가합니다. `0.33.18`은 batch·transaction 오류의
+500 응답을 400으로 바로잡아 재시도 분류에 영향을 줄 수 있습니다. `0.33.22`는 Rust
+guest panic에 즉시 응답하고 실패한 instance를 공유 pool에서 제거하며 JS/TS WASM
+`execute_batch`를 추가합니다. `0.34.3`은
+오래 실행되는 WASM job timeout을 수정합니다. `0.34.5`의 transaction API는 지원하지
+않는 파일 쓰기를 거부하고, `0.34.6`은 `<depot>/wasm/` 외부 component용
+`--runtime-extra-components`를 추가합니다. 인증·보조 DB와 함께 custom job,
+batch 오류 처리, component 경로를 검토하세요.
 
 TrailBase 0.32는 component interface를 변경했습니다. 이 checkout은
 `trailbase-wasm` 0.6.1로 빌드하므로 호환 서버와 함께 배포해야 하며 검증한 조합은

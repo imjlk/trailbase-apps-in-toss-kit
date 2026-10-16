@@ -48,7 +48,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.33.14`
+- `trailbase-server-github-release`: `0.34.7`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -150,6 +150,12 @@ upper bound.
 
 ## Guest ABI and Auth Migration
 
+Before upgrading from `0.33.14`, check the consumer's `UserIdentifier` policy:
+`0.33.16` changes the undefined-policy fallback to `ONLY_EMAIL`. External users
+without email addresses may stop authenticating unless the application explicitly
+chooses a suitable policy such as `REQUIRE_USERNAME`. Re-test provider login with
+the intended account identifiers rather than relying on the old fallback.
+
 The verified `0.33.14` baseline predates the timing-based account-enumeration
 side-channel fix in `0.33.23`. It is a historical test result, not a security
 recommendation. Consumers must assess their exposure and test a coordinated
@@ -166,6 +172,15 @@ references. Before upgrading an auxiliary-database consumer, update its bound
 paths or move its database files, then verify it attaches the intended existing
 database. This also applies to the [analytics fallback initializer](analytics.md).
 Tracking this upstream change does not raise the `0.33.14` verified baseline.
+
+Other intervening changes also need consumer attention: `0.33.15` constrains
+databases attachable by WASM and adds guest `execute_batch`; `0.33.18` corrects
+batch/transaction error propagation from 500 to 400, which can change retry
+classification; `0.33.22` returns Rust guest panics immediately and removes trapped
+instances from the shared pool and adds JS/TS WASM `execute_batch`; `0.34.3` fixes timeouts for long-running WASM jobs.
+The `0.34.5` transaction API rejects unsupported file writes, and `0.34.6` adds
+`--runtime-extra-components` for components outside `<depot>/wasm/`. Review custom
+jobs, batch error handling and component paths alongside auth and auxiliary DBs.
 
 TrailBase 0.32 changed the component interface. This checkout now builds with
 `trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;
