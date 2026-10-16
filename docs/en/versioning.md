@@ -74,13 +74,21 @@ Production deployments should prefer an exact SemVer tag such as `0.1.8`, or a m
 `0.1` when intentional. Use `latest` or `edge` only when a consumer app deliberately wants to track
 moving image builds.
 
-## Bun lockfile after automated release preparation
+## Dependency pins after automated release preparation
 
 After Sampo prepares `release/main`, the workflow checks out that generated branch
-and runs `bun install --lockfile-only --ignore-scripts`. This explicitly synchronizes
-workspace versions with the bumped package manifests, including private packages.
-It commits only `bun.lock` when necessary, refuses unrelated tracked changes and
-uses a normal fast-forward push. A concurrent branch change can reject the push;
+and uses its common ancestor with `origin/main` as the dependency baseline.
+`scripts/sync-release-cargo-locks.mjs --base <commit>` restores every tracked Cargo
+lockfile outside `vendor/` from that baseline, then updates only the Rust fixed
+group's local package versions. It requires a clean checkout and refuses added or
+removed Cargo lockfiles. This preserves registry versions and checksums even when
+Sampo re-resolves dependencies while preparing versions.
+
+The workflow then runs `bun install --lockfile-only --ignore-scripts` to synchronize
+workspace versions, including private packages, and the semantic release dependency
+guard to reject unrelated Bun or Cargo dependency drift. It commits only lockfiles
+when necessary, refuses unrelated tracked changes and uses a normal fast-forward
+push. A concurrent branch change can reject the push;
 rerun the workflow after inspecting it instead of forcing an overwrite.
 
 This step does not publish or merge the release PR. It runs only when Sampo reports

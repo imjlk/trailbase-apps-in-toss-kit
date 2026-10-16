@@ -11,6 +11,8 @@ on:
       - "tsconfig*.json"
       - "scripts/check-sdk-minimum.mjs"
       - "scripts/check-release-dependencies.mjs"
+      - "scripts/sync-release-cargo-locks*"
+      - ".github/workflows/sampo-release.yml"
       - "packages/**"
   push:
     branches:
@@ -24,6 +26,8 @@ on:
       - "tsconfig*.json"
       - "scripts/check-sdk-minimum.mjs"
       - "scripts/check-release-dependencies.mjs"
+      - "scripts/sync-release-cargo-locks*"
+      - ".github/workflows/sampo-release.yml"
       - "packages/**"
   workflow_dispatch:
 
@@ -61,6 +65,9 @@ jobs:
 
       - name: Run package tests
         run: bun run packages:test
+
+      - name: Test release lockfile recovery
+        run: bun test scripts/sync-release-cargo-locks.test.mjs --timeout 60000
 
       - name: Check package sources against installed SDK types
         run: bun run packages:typecheck
