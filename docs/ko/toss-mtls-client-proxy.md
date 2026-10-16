@@ -1,5 +1,13 @@
 # Toss mTLS 클라이언트 프록시
 
+비공개 `POST /internal/apps-in-toss/anonymous-key/exchange`는 백엔드의
+`{ "code": "..." }`를 받아 `@ait-kit/api-core` 0.6.0에 일회용 코드 교환을 위임합니다.
+Forward mode와 내부 bearer token이 필요하며 stub mode는 인증된 식별자를 만들지
+않습니다. Capability는 `anonymous-key.exchange-auth-code`입니다. 성공 시 백엔드용
+원본 `anonKey`를 반환하므로 공개 응답이나 로그에 넣지 마세요. 실패는 고정 오류로
+반환하고 코드를 자동 재시도하지 않습니다. 기존 verify는 키 유효성만 확인하며 호출자
+소유를 증명하지 않습니다. [익명 식별](anonymous-identity.md)을 참고하세요.
+
 `toss-mtls-client-proxy`는 내부 클라이언트 프록시(internal client proxy)입니다. 공개
 콜백(callback) 서버가 아닙니다. TrailBase는 Compose 내부 네트워크에서 프록시를 호출하고,
 프록시는 Toss로 나가는(outbound) mTLS 연결을 엽니다. 응답은 같은 요청에서 돌아오므로
@@ -361,7 +369,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 
 ## API Core 0.4 계약
 
-프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.5.1`으로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.6.0`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를

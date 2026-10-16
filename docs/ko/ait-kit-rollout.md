@@ -14,9 +14,9 @@
 | 구성 요소 | 버전 | 비고 |
 |---|---|---|
 | 프록시 이미지 | `toss-mtls-client-proxy:0.6.4` | 게시된 프로모션 v2 기준선. 아래의 버전 표기된 프로모션 capability 세 가지 필수 |
-| 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.5.1` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패 |
-| RN/Web `@ait-kit/sdk` | `0.3.0` (정확한 고정) | `ait-rn` 0.6.0 / `ait-web` 0.3.0 (비공개, Sampo 버전 관리) |
-| RN 최소 `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.3.0 peer 하한. 최소 fixture도 같은 검토 pin으로 컴파일 |
+| 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.6.0` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패 |
+| RN/Web `@ait-kit/sdk` | `0.7.0` (정확한 고정) | `ait-rn` / `ait-web` (비공개, Sampo 버전 관리) |
+| RN 최소 `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.7.0 peer 하한. 최소 fixture도 같은 검토 pin으로 컴파일 |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | 변경 없음 |
 | Rust guest 크레이트 | `trailbase-guest-common` / `trailbase-toss-identity` 0.13.0 | 고정 묶음. 함께 이동 |
 | SQL 템플릿 | 추가 전용 v2 마이그레이션 필수 | 기존 v1 원장에 `promotion_reward_ledger.v2.sql` 적용. 레거시 행 보존 |
@@ -65,8 +65,8 @@
    다시 작성해야 합니다. guest 배포가 메시지 UNKNOWN의 outbox 원장 격리도
    활성화합니다. 프록시 배포 후 빠르게 이어서 배포하고, guest가 살아날 때까지
    발송 중지를 유지하세요.
-5. **클라이언트 앱 마지막**: `ait-rn` 0.6.0 / `ait-web` 0.3.0
-   (`@ait-kit/sdk` 0.3.0)로 다시 빌드합니다. RN 컨슈머는 이미
+5. **클라이언트 앱 마지막**: `ait-rn` / `ait-web`
+   (`@ait-kit/sdk` 0.7.0)로 다시 빌드합니다. RN 컨슈머는 이미
    `@apps-in-toss/framework >=2.10.10`이어야 합니다.
 6. **재개 및 관찰**: 발송 기능을 다시 켜고 원장 결과를 관찰합니다. 진행
    중이던 프로모션 attempt와 메시지 outbox 행은 그대로 유지됩니다. 격리된

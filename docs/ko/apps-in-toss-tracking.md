@@ -63,7 +63,12 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
 ## Renovate가 추적하는 reference version
 
 <!-- renovate: datasource=npm depName=@ait-kit/sdk versioning=npm -->
-- `ait-kit-sdk`: `0.6.0`
+- `ait-kit-sdk`: `0.7.0`
+
+검토한 SDK 0.7.0은 WebView 익명 인증 코드 발급을 추가합니다. 이 선택적 메서드만
+공식 WebView SDK 3.6+와 지원 runtime이 필요하며 기존 adapter peer 하한은 3.4.0으로
+유지합니다. 비공개 프록시는 일회용 서버 교환을 위해 api-core·api-client 0.6.0을
+채택합니다. 공개 bootstrap을 변경하기 전에 [익명 식별](anonymous-identity.md)을 읽으세요.
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
 - `apps-in-toss-framework`: `2.10.11`

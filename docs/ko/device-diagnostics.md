@@ -11,7 +11,7 @@ const report = await collectAppsInTossRuntimeDiagnostics({ enabled: debugEnabled
 
 기본은 꺼짐입니다. 명시적으로 켰을 때만 실행 환경, OS, 토스 버전, 네트워크를 조회하며 각 조회는 3초로 제한합니다. 미확인·실패·시간초과를 구분합니다. 정해진 상태 값과 숫자형 버전만 반환하고 실행 URL, 사용자 식별자, 토큰, 네이티브 오류 원문이나 SDK 인자는 포함하지 않습니다. `deviceFeaturesVerified`는 항상 false입니다. 소비 앱이 디버그 UI나 콘솔 표시를 선택하며 원격 전송은 기본 제공하지 않습니다.
 
-어댑터는 배포된 `@ait-kit/sdk` 0.6.0을 사용합니다. 소비 앱은 런타임 중립 observer를 명시적으로 켜서 호출별 시간과 SDK 실패 분류를 확인할 수 있습니다.
+어댑터는 배포된 `@ait-kit/sdk` 0.7.0을 사용합니다. 소비 앱은 런타임 중립 observer를 명시적으로 켜서 호출별 시간과 SDK 실패 분류를 확인할 수 있습니다.
 
 ```ts
 import { createSdkDiagnostics } from '@ait-kit/sdk';

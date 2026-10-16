@@ -5,6 +5,12 @@
 검증에만 3.4.0을 설치합니다. RN 소비 앱은 계속 `ait-rn`과
 `@apps-in-toss/framework` 2.x를 사용합니다.
 
+익명 호출자 인증용 `ait.createAnonymousKeyAuthCode()`는 `@ait-kit/sdk` 0.7.0에
+위임하며 runtime의 공식 WebView SDK 3.6+가 필요합니다. 기존 메서드의 peer 하한은
+3.4.0으로 유지합니다. 일회용 코드를 즉시 백엔드에 보내고 저장하거나 인증 실패 시
+`anonymousHash()`로 대체하지 마세요. 프록시·Rust 교환은
+[익명 식별](anonymous-identity.md)을 참고하세요.
+
 ```ts
 import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';
 const ait = createAppsInTossWebAdapter({ appKey: 'my-app' });

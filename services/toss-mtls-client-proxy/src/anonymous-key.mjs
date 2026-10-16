@@ -1,6 +1,7 @@
 import { TOSS_ENDPOINTS, clientError } from "@ait-kit/api-core";
 
 export const ANONYMOUS_KEY_VERIFY_PATH = "/internal/apps-in-toss/anonymous-key/verify";
+export const ANONYMOUS_AUTH_CODE_EXCHANGE_PATH = "/internal/apps-in-toss/anonymous-key/exchange";
 export const TOSS_ANONYMOUS_KEY_VERIFY_PATH = TOSS_ENDPOINTS.anonKeyVerify;
 
 export function requireAnonymousKey(value) {
@@ -22,4 +23,24 @@ export async function verifyAnonymousKey(body, core, mode) {
   // Provider failures (transport, FAIL envelopes, malformed payloads) stay
   // opaque: "no verdict" is never "invalid", and reasons stay internal.
   return { ok: false, valid: false, error: "ANONYMOUS_KEY_VERIFICATION_FAILED", mode };
+}
+
+// Code exchange authenticates the caller; the old verify route only checks key validity.
+export async function exchangeAnonymousAuthCode(body, core, mode) {
+  const code = body?.code;
+  if (typeof code !== "string" || !code.trim() || code.length > 4096 || /[\x00-\x1f\x7f]/.test(code)) {
+    return { ok: false, error: "INVALID_AUTH_CODE", mode };
+  }
+  if (mode !== "forward") return { ok: false, error: "FORWARD_MODE_REQUIRED", mode };
+  const result = await core.exchangeAnonAuthCode({ code });
+  if (result.ok) {
+    const key = result.anonKey;
+    if (typeof key !== "string" || !key || key.trim() !== key || key.length > 4096 || /[\x00-\x1f\x7f]/.test(key)) {
+      return { ok: false, error: "INVALID_RESPONSE", mode };
+    }
+    // Raw identity is returned only over the authenticated private backend boundary.
+    return { ok: true, anonKey: key, mode };
+  }
+  const allowed = ["ABORTED", "INVALID_AUTH_CODE", "FORWARD_MODE_REQUIRED", "UPSTREAM_UNAVAILABLE", "EXCHANGE_REJECTED", "INVALID_RESPONSE"];
+  return { ok: false, error: allowed.includes(result.error) ? result.error : "INVALID_RESPONSE", mode };
 }

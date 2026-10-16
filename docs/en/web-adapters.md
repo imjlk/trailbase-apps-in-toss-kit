@@ -5,6 +5,12 @@
 The kit installs 3.4.0 only for development type/bundle verification. RN consumers
 continue to use `ait-rn` and `@apps-in-toss/framework` 2.x.
 
+For anonymous caller authentication, `ait.createAnonymousKeyAuthCode()` delegates
+to `@ait-kit/sdk` 0.7.0 and requires official WebView SDK 3.6+ at runtime. Existing
+methods retain the 3.4.0 peer floor. Send the single-use code immediately to your
+backend; do not persist it or fall back to `anonymousHash()` for authentication.
+See [anonymous identity](anonymous-identity.md) for the private proxy/Rust exchange.
+
 ```ts
 import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';
 const ait = createAppsInTossWebAdapter({ appKey: 'my-app' });

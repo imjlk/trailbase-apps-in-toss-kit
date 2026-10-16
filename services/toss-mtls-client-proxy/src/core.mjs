@@ -24,4 +24,4 @@ export {
   createTossMtlsCore,
 } from "@ait-kit/api-core";
 
-export { ANONYMOUS_KEY_VERIFY_PATH, TOSS_ANONYMOUS_KEY_VERIFY_PATH } from "./anonymous-key.mjs";
+export { ANONYMOUS_KEY_VERIFY_PATH, ANONYMOUS_AUTH_CODE_EXCHANGE_PATH, TOSS_ANONYMOUS_KEY_VERIFY_PATH } from "./anonymous-key.mjs";

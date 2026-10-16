@@ -16,9 +16,9 @@ the same release train.
 | Component | Version | Notes |
 |---|---|---|
 | Proxy image | `toss-mtls-client-proxy:0.6.4` | Published promotion v2 baseline; require the three versioned promotion capabilities below |
-| Proxy internal `@ait-kit/api-core` / `api-client` | `0.5.1` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
-| RN/Web `@ait-kit/sdk` | `0.3.0` (exact pins) | `ait-rn` 0.6.0 / `ait-web` 0.3.0 (private, Sampo-versioned) |
-| RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.3.0 peer floor; minimum fixture compiles against the same reviewed pin |
+| Proxy internal `@ait-kit/api-core` / `api-client` | `0.6.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
+| RN/Web `@ait-kit/sdk` | `0.7.0` (exact pins) | `ait-rn` / `ait-web` (private, Sampo-versioned) |
+| RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.7.0 peer floor; minimum fixture compiles against the same reviewed pin |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Unchanged |
 | Rust guest crates | `trailbase-guest-common` / `trailbase-toss-identity` 0.13.0 | Fixed pair; moves together |
 | SQL templates | Additive v2 migration required | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers; preserve legacy rows |
@@ -75,8 +75,8 @@ Keep dispatch paused throughout reconciliation, migration and deployment:
    makes message UNKNOWN outcomes quarantine in the outbox ledger. Deploy
    guests soon after the proxy, and keep dispatch paused until they are
    live.
-5. **Client apps last**: rebuild with `ait-rn` 0.6.0 / `ait-web` 0.3.0
-   (`@ait-kit/sdk` 0.3.0). RN consumers must already be on
+5. **Client apps last**: rebuild with `ait-rn` / `ait-web`
+   (`@ait-kit/sdk` 0.7.0). RN consumers must already be on
    `@apps-in-toss/framework >=2.10.10`.
 6. **Resume and watch**: re-enable dispatch features and monitor ledger
    outcomes. In-flight promotion attempts and message outbox rows survive

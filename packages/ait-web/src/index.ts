@@ -1,4 +1,4 @@
-import { SdkError } from "@ait-kit/sdk";
+import { SdkError, type SdkAnonymousAuthCode } from "@ait-kit/sdk";
 import { createWebIdentity, createWebShare, createWebStorage } from "@ait-kit/sdk/web";
 import type { AppsInTossLoginResult, KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import type { IapCreateOneTimePurchaseOrderResult, IapCreateSubscriptionPurchaseOrderResult, NotificationAgreementResult } from "@apps-in-toss/web-framework";
@@ -81,6 +81,15 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
   };
   return {
     storage,
+    /** SDK 3.6+: fresh single-use server authentication code; never a hash fallback. */
+    async createAnonymousKeyAuthCode(): Promise<SdkAnonymousAuthCode> {
+      try { return await sdkIdentity.createAnonymousKeyAuthCode(); }
+      catch (error) {
+        throw error instanceof SdkError && error.code === "INVALID_ANONYMOUS_AUTH_CODE"
+          ? new WebAdapterError("INVALID_RESULT", "anonymous authentication code")
+          : mapSdkError("anonymous authentication code", error);
+      }
+    },
     async login(): Promise<AppsInTossLoginResult> {
       return invoke("login", async api => {
         const result = await required(api.TossAuth?.login, "login")();

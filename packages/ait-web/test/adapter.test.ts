@@ -29,6 +29,26 @@ test("construction is lazy and SDK Storage preserves existing namespaced values"
   expect(loads).toBe(1);
 });
 
+test("anonymous authentication codes are fresh and never fall back to identity lookup", async () => {
+  const f = fixture();
+  let issued = 0;
+  Object.assign(f.api.User, { createAnonymousKeyAuthCode: available(async function(this: typeof f.api.User) {
+    expect(this).toBe(f.api.User);
+    return { code: `one-time-${++issued}`, expiresIn: 300 };
+  }) });
+  const adapter = f.make();
+  expect(await adapter.createAnonymousKeyAuthCode()).toEqual({ code: "one-time-1", expiresIn: 300 });
+  expect(await adapter.createAnonymousKeyAuthCode()).toEqual({ code: "one-time-2", expiresIn: 300 });
+  (f.api.User as any).createAnonymousKeyAuthCode = undefined;
+  f.api.User.getAnonymousKey = available(async () => { throw new Error("hash fallback must not run"); });
+  await expect(adapter.createAnonymousKeyAuthCode()).rejects.toMatchObject({ code: "UNSUPPORTED" });
+  (f.api.User as any).createAnonymousKeyAuthCode = available(async () => ({ code: "private-code", expiresIn: 0 }));
+  try { await adapter.createAnonymousKeyAuthCode(); throw new Error("unexpected success"); }
+  catch (error) { expect(error).toMatchObject({ code: "INVALID_RESULT" }); expect(String(error)).not.toContain("private-code"); }
+  (f.api.User as any).createAnonymousKeyAuthCode = available(async () => { throw new Error("must not run"); }, false);
+  await expect(adapter.createAnonymousKeyAuthCode()).rejects.toMatchObject({ code: "UNSUPPORTED" });
+});
+
 test("real sandbox login is preserved and SDK failures never fabricate identities", async () => {
   const f = fixture(); const adapter = f.make();
   expect(await adapter.login()).toEqual({ authorizationCode: "one-time-code", referrer: "SANDBOX" });
