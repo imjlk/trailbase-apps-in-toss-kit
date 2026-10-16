@@ -5,6 +5,7 @@ use serde_json::{Value as JsonValue, json};
 use trailbase_wasm::db::{Transaction, Value};
 
 pub const ANONYMOUS_KEY_VERIFY_PATH: &str = "/internal/apps-in-toss/anonymous-key/verify";
+pub const ANONYMOUS_AUTH_CODE_EXCHANGE_PATH: &str = "/internal/apps-in-toss/anonymous-key/exchange";
 
 // Intentionally no Debug or Serialize: this is a backend-only raw identity.
 pub struct VerifiedAnonymousKey {
@@ -22,6 +23,8 @@ impl VerifiedAnonymousKey {
     }
 }
 
+/// Checks key validity only; this does not authenticate an untrusted caller.
+/// For public bootstrap use `exchange_anonymous_auth_code` instead.
 pub async fn verify_anonymous_hash(
     proxy_url: &str,
     bearer_token: Option<&str>,
@@ -40,6 +43,44 @@ pub async fn verify_anonymous_hash(
     Ok(VerifiedAnonymousKey {
         anonymous_hash: hash,
     })
+}
+
+/// Exchange a fresh WebView SDK 3.6+ code once through the private forward proxy.
+/// Do not persist/log the code or retry it after an indeterminate response.
+pub async fn exchange_anonymous_auth_code(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    code: &str,
+) -> CommonResult<VerifiedAnonymousKey> {
+    if code.trim().is_empty() || code.len() > 4096 || code.chars().any(char::is_control) {
+        return Err("Invalid anonymous authentication code".into());
+    }
+    let result = post_json_with_optional_bearer(
+        &join_url(proxy_url, ANONYMOUS_AUTH_CODE_EXCHANGE_PATH),
+        json!({"code": code}),
+        bearer_token,
+    )
+    .await
+    .map_err(|_| "Anonymous authentication code exchange failed".to_string())?;
+    authenticated_key_from_response(&result)
+}
+
+fn authenticated_key_from_response(result: &JsonValue) -> CommonResult<VerifiedAnonymousKey> {
+    let invalid = || "Anonymous authentication code exchange failed".to_string();
+    if result.get("ok").and_then(JsonValue::as_bool) != Some(true)
+        || result.get("mode").and_then(JsonValue::as_str) != Some("forward")
+    {
+        return Err(invalid());
+    }
+    let key = result
+        .get("anonKey")
+        .and_then(JsonValue::as_str)
+        .ok_or_else(invalid)?;
+    if key.trim() != key {
+        return Err(invalid());
+    }
+    let anonymous_hash = normalize_anonymous_hash(&format!("ait:{key}")).map_err(|_| invalid())?;
+    Ok(VerifiedAnonymousKey { anonymous_hash })
 }
 
 pub fn anonymous_verification_succeeded(result: &JsonValue) -> bool {
@@ -109,6 +150,29 @@ pub fn store_verified_anonymous_identity_tx(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn auth_code_response_requires_forward_success_and_preserves_existing_seed() {
+        let key = authenticated_key_from_response(
+            &json!({"ok":true,"mode":"forward","anonKey":"same-key"}),
+        )
+        .unwrap();
+        assert_eq!(key.anonymous_hash(), "ait:same-key");
+        assert_eq!(
+            key.hmac("secret").unwrap(),
+            hmac_sha256_hex("secret", "ait:same-key").unwrap()
+        );
+        for response in [
+            json!({"ok":true,"mode":"stub","anonKey":"private-key"}),
+            json!({"ok":false,"mode":"forward","anonKey":"private-key"}),
+            json!({"ok":true,"mode":"forward","anonKey":42}),
+            json!({"ok":true,"mode":"forward","anonKey":" bad-key "}),
+            json!({"ok":true,"mode":"forward","anonKey":""}),
+        ] {
+            let error = authenticated_key_from_response(&response).err().unwrap();
+            assert!(!error.contains("private-key"));
+            assert!(!error.contains("bad-key"));
+        }
+    }
     #[test]
     fn verification_requires_explicit_success_and_true_boolean() {
         for result in [

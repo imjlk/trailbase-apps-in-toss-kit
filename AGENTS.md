@@ -67,6 +67,10 @@ pointer.
 - Application tables should store Toss identity as:
   - deterministic `toss_user_key_hmac` for lookup
   - AES-GCM `toss_user_key_sealed` when reversible access is needed
+- Public WebView anonymous bootstrap must exchange a fresh SDK 3.6+ code with
+  `anonymous_identity::exchange_anonymous_auth_code` through the private forward
+  proxy. Legacy key validity verification does not prove caller ownership.
+  Never fall back to a client hash or retry a consumed code automatically.
 - Never put raw Toss user keys, HMACs, sealed values, or secrets in public
   Record API views, audit metadata, or user-visible responses.
 - The proxy image may be public. The running proxy instance should be private on

@@ -1,10 +1,10 @@
 import http from "node:http";
-import { createTossMtlsCore, clientError, publicError as corePublicError, upstreamError } from "@ait-kit/api-core";
+import { createTossMtlsCore, exchangeAnonAuthCode, clientError, publicError as corePublicError, upstreamError } from "@ait-kit/api-core";
 import { NodeMtlsTransportError } from "@ait-kit/api-client/node";
 import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
-import { ANONYMOUS_KEY_VERIFY_PATH, verifyAnonymousKey } from "./anonymous-key.mjs";
+import { ANONYMOUS_KEY_VERIFY_PATH, ANONYMOUS_AUTH_CODE_EXCHANGE_PATH, verifyAnonymousKey, exchangeAnonymousAuthCode } from "./anonymous-key.mjs";
 import { proxyCapabilityMetadata } from "./capabilities.mjs";
 
 const PAYABLE_IAP_STATUSES = new Set(["PAYMENT_COMPLETED", "PURCHASED"]);
@@ -36,6 +36,11 @@ export async function handleRequest(req, config = createConfig(), core = createC
   if (req.method === "GET" && url.pathname === PROXY_ENDPOINTS.health) {
     const health = await core.health();
     return response(200, { ok: health.ok, mode: health.mode, kit: proxyCapabilityMetadata() });
+  }
+
+  if (req.method === "POST" && url.pathname === ANONYMOUS_AUTH_CODE_EXCHANGE_PATH) {
+    const body = await readJson(req, requestBodyLimitBytes(config));
+    return response(200, await exchangeAnonymousAuthCode(body, core, config.mode));
   }
 
   if (req.method === "POST" && url.pathname === ANONYMOUS_KEY_VERIFY_PATH) {
@@ -116,7 +121,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
 function createCore(config) {
   // api-core 0.4 emits the official recipient headers (x-toss-user-key /
   // x-anon-key) itself, so the transport passes through unmodified.
-  return createTossMtlsCore({
+  const options = {
     // This authenticated internal proxy intentionally exposes the generic relay.
     allowRawMtls: true,
     mode: config.mode,
@@ -128,7 +133,8 @@ function createCore(config) {
     debug: config.debug,
     log: (message, fields) => console.info(`[toss-mtls-client-proxy] ${message}`, fields),
     mtlsClient: createNodeMtlsClient(config),
-  });
+  };
+  return { ...createTossMtlsCore(options), exchangeAnonAuthCode: input => exchangeAnonAuthCode(input, options) };
 }
 
 async function promotionRewardStatus(core, body) {

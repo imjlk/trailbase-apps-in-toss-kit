@@ -64,8 +64,12 @@
   components with guest runtime 0.6.1 when moving to the verified 0.33.14 server.
   New component binaries are not compatible with pre-0.32 hosts.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
-- For verified anonymous bootstrap, use `anonymous_identity::verify_anonymous_hash` before
-  creating/authenticating `_user`; preserve the existing HMAC of `ait:<hash>` and aliases.
+- For public WebView anonymous bootstrap on SDK 3.6+, use a fresh client authentication code
+  and `anonymous_identity::exchange_anonymous_auth_code` through the private forward proxy
+  before creating/authenticating `_user`. Require `anonymous-key.exchange-auth-code`;
+  never retry consumed codes or fall back to a client hash. Legacy `verify_anonymous_hash`
+  checks key validity only and does not authenticate callers. Older runtimes need a separate
+  authenticated flow such as Toss Login. Preserve the existing HMAC of `ait:<hash>` and aliases.
   Apply private `anonymous_identities.sql` and use the verified-key seal/store helpers.
   Anonymous dispatch uses `message_recipients` and the same notification/marketing gate.
   Apply the additive recipient migration once, stop legacy workers, and keep promotion

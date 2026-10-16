@@ -6,10 +6,15 @@
 TrailBase는 자신이 소유한 부분(공개 API 표면, TrailBase 서버 연동, 세션
 부트스트랩, 저장 키 호환성)을 계속 담당합니다.
 
-두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.6.0`).
+두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.7.0`).
 SDK의 peer 하한이 이 kit의 RN 최소 버전을 정의합니다:
 `@apps-in-toss/framework >=2.10.10`(SDK pin 채택 시 `>=2.5.0`에서 상향).
 WebView 소비자는 `@apps-in-toss/web-framework >=3.4.0 <4`를 유지합니다.
+
+SDK 0.7.0의 WebView `createAnonymousKeyAuthCode()`에 발급을 위임합니다. 이 선택적
+메서드는 공식 SDK 3.6+와 지원 runtime이 필요하며 이전 peer에서는 로그인이나 hash로
+대체하지 않고 `UNSUPPORTED`를 반환합니다. 매번 새 코드를
+[익명 식별](anonymous-identity.md)의 비공개 서버 교환 경로에 전달하세요.
 
 ## 위임 대상
 

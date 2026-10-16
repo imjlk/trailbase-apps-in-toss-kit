@@ -11,7 +11,7 @@ const report = await collectAppsInTossRuntimeDiagnostics({ enabled: debugEnabled
 
 Disabled by default. When explicitly enabled, four read-only probes report operational environment, OS, host Toss version and network state. Each probe is bounded to three seconds. Unknown, failed and timed-out probes remain distinct. Only fixed enums and a numeric version are returned; no launch URL, user identifier, token, native error or SDK arguments are logged. `deviceFeaturesVerified` is always false. The consumer decides whether to display this in its debug UI or a console. No remote log sink is configured.
 
-For per-operation timing and coarse SDK failures, the adapters now use the published `@ait-kit/sdk` 0.6.0. Consumers can explicitly enable its runtime-neutral observer:
+For per-operation timing and coarse SDK failures, the adapters now use the published `@ait-kit/sdk` 0.7.0. Consumers can explicitly enable its runtime-neutral observer:
 
 ```ts
 import { createSdkDiagnostics } from '@ait-kit/sdk';

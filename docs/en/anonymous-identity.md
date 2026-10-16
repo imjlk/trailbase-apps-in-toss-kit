@@ -1,4 +1,10 @@
-# Verified Anonymous Identity
+# Authenticated Anonymous Identity
+
+For public WebView bootstrap, require a fresh SDK 3.6+ authentication code and
+exchange it on the server. A client-provided anonymous hash, even when the old
+verification API says it is valid, does not prove the caller owns that identity.
+Older runtimes need an independently authenticated flow such as Toss Login;
+never fall back from code authentication to a hash or fabricate an identity.
 
 Apps in Toss anonymous identities still use the existing `ait:<hash>` bootstrap
 seed. The new server verification helper sends only the unprefixed key through
@@ -7,16 +13,23 @@ Both a SUCCESS envelope and boolean `success: true` are required; HTTP 200 alone
 is insufficient. The proxy exposes `POST /internal/apps-in-toss/anonymous-key/verify`
 with `{ "anonKey": "..." }` and returns only verification status. It never echoes
 the key or upstream error text. Explicit proxy stub mode remains available for
-local tests and must not be used for production verification.
+local tests and must not be used for production verification. This legacy
+validity check remains for compatibility and recipient validation, not caller authentication.
 
 ## Bootstrap Integration
 
-1. Rate-limit the public bootstrap endpoint before verification or account creation.
-   Accept the existing client `anonymousHash` from `getAnonymousKey()`; do not treat
-   local `dev-*` keys or the SANDBOX login referrer as verified anonymous identities.
+1. Rate-limit the public bootstrap endpoint before exchange or account creation.
+   Call `createAppsInTossWebAdapter(...).createAnonymousKeyAuthCode()` on a supported
+   official WebView SDK 3.6+ runtime and send its `code` immediately to the backend.
+   Codes expire after five minutes and are single-use. Do not cache, persist or log them.
 2. Outside a database transaction, call
-   `anonymous_identity::verify_anonymous_hash(proxy_url, token, anonymous_hash)`.
-   A failed verification must not create or authenticate a `_user`.
+   `anonymous_identity::exchange_anonymous_auth_code(proxy_url, token, code)`.
+   Require the running proxy's `anonymous-key.exchange-auth-code` capability and
+   forward mode. Its private `POST /internal/apps-in-toss/anonymous-key/exchange`
+   route delegates to `@ait-kit/api-core` 0.6.0. Only an authoritative successful
+   exchange supplies the server identity. A failed or indeterminate exchange must
+   not authenticate `_user`; never retry the same code automatically. Request a
+   fresh code for a new explicit attempt and do not substitute a client hash.
 3. Use the returned `VerifiedAnonymousKey::hmac` with the consumer's existing
    anonymous HMAC secret. It hashes the same complete `ait:<hash>` string; do not
    change the seed, HMAC key, synthetic email, or existing account mapping.
@@ -33,6 +46,15 @@ local tests and must not be used for production verification.
 Debug or Serialize. Do not return raw anonymous keys, HMACs, or sealed values from
 public APIs or put them in logs. Verification establishes the validity of the
 opaque key, not eligibility for a promotion or permission to send a message.
+
+The returned `anonKey` matches the SDK's existing anonymous hash, preserving the
+`ait:` HMAC seed and account mapping. Return only official TrailBase credentials
+to the client, never the raw exchange result. Consumer-owned bootstrap callbacks
+must send the code and preserve session/account-transition guards; updating the
+submodule does not migrate a consumer's public endpoint automatically.
+
+Official contracts: [code issuance](https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.createanonymouskeyauthcode)
+and [server exchange](https://developers-apps-in-toss.toss.im/api/user-key).
 
 ## Additive Migrations and Message Dispatch
 

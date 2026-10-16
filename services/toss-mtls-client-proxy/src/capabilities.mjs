@@ -10,6 +10,7 @@ export const PROXY_CAPABILITIES = Object.freeze([
   "toss-login.complete",
   "toss-login.remove",
   "anonymous-key.verify",
+  "anonymous-key.exchange-auth-code",
   "iap.order-status",
   "iap.provider-sku-required",
   "promotion.prepare.v2",

@@ -67,7 +67,13 @@ only after app-level smoke tests.
 ## Renovate-Tracked Reference Versions
 
 <!-- renovate: datasource=npm depName=@ait-kit/sdk versioning=npm -->
-- `ait-kit-sdk`: `0.6.0`
+- `ait-kit-sdk`: `0.7.0`
+
+The reviewed SDK 0.7.0 adds fresh WebView anonymous authentication codes. Only
+that opt-in method requires official WebView SDK 3.6+ and runtime support; the
+existing adapter peer floor remains 3.4.0. The private proxy adopts api-core and
+api-client 0.6.0 for single-use server exchange. See
+[anonymous identity](anonymous-identity.md) before changing public bootstrap.
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
 - `apps-in-toss-framework`: `2.10.11`
