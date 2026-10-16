@@ -18,8 +18,8 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.33.14`
-- Upstream latest TrailBase release date: `2026-09-10`
+- Upstream latest TrailBase server: `0.34.7`
+- Upstream latest TrailBase release date: `2026-10-16`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -44,7 +44,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.33.14`
+- `trailbase-server-github-release`: `0.34.7`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -83,6 +83,12 @@ validator를 dependency로 커밋할 필요는 없습니다.
 
 - `data/upstream/trailbase/latest-release.md`
 - `data/upstream/trailbase/version-policy.json`
+
+Release-watch PR을 머지하기 전에 생성된 영어 snapshot에 맞춰
+`data/upstream/trailbase/latest-release-ko.md`를 수동 갱신하고 tag, 게시 시각, 링크를
+대조하세요. 양쪽 추적 문서의 upstream-latest 버전·날짜도 같은 리뷰에서 맞춥니다.
+Workflow PR 체크리스트에서 필수로 확인하며 snapshot script는 노트를 번역하지 않습니다.
+컨슈머 호환성 검증 전에는 수동 last-verified·minimum-server 정책을 유지하세요.
 
 Snapshot script는 먼저 최신 GitHub release를 읽습니다. Release notes에 Rust 정책이 없으면
 TrailBase CHANGELOG에서 Rust MSRV/MVRV 또는 toolchain 변경을 언급한 가장 최신 섹션을
@@ -129,6 +135,37 @@ CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-versi
 - 호환성이 검증된 뒤에만 template을 갱신합니다.
 
 ## Guest ABI와 인증 migration
+
+`0.33.14`에서 업그레이드하기 전에 컨슈머의 `UserIdentifier` 정책을 확인하세요.
+`0.33.16`은 미지정 정책의 fallback을 `ONLY_EMAIL`로 변경합니다. 이메일 없는 외부
+사용자는 앱이 `REQUIRE_USERNAME` 같은 적절한 정책을 명시하지 않으면 로그인할 수
+없게 될 수 있습니다. 이전 fallback에 의존하지 말고 의도한 계정 식별자로 제공자
+로그인을 다시 검증하세요.
+
+검증 기준 `0.33.14`는 시간 차이를 이용한 계정 열거 side-channel을 수정한
+`0.33.23`보다 이전 버전입니다. 과거 테스트 결과이며 보안 권장 버전이 아닙니다.
+컨슈머는 노출 여부를 평가하고 이 수정이 포함된 조합의 업그레이드를 검증해야 합니다.
+이후 추적 버전은 비싼 비밀번호 해시 작업을 async runtime 밖으로 옮기고 5초 timeout을
+추가했으며(`0.34.2`), `email`/`unverified_email` 간 유일성과 오래된 미검증 사용자
+정리를 적용하고(`0.34.4`), 보안 권고에 대응해 Wasmtime을 갱신했습니다(`0.34.7`).
+배포 전 인증 데이터·세션 동작과 앱 smoke test를 확인하세요. 메타데이터만 갱신하는
+이번 변경이 새 버전의 호환성을 보증하지는 않습니다.
+
+TrailBase `0.34.0`부터 WASM `ATTACH DATABASE`의 상대 경로 기준은 프로세스 작업
+디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조는 허용하지 않습니다.
+보조 DB를 사용하는 컨슈머는 업그레이드 전에 bind할 경로를 수정하거나 DB 파일을 옮긴 뒤
+의도한 기존 DB가 연결되는지 확인하세요. [analytics fallback initializer](analytics.md)에도
+해당합니다. 이 업스트림 변경 추적이 검증 기준 `0.33.14`를 올리는 것은 아닙니다.
+
+중간 버전의 다른 변경도 확인하세요. `0.33.15`는 WASM에서 연결할 수 있는 DB를
+제한하고 guest `execute_batch`를 추가합니다. `0.33.18`은 batch·transaction 오류의
+500 응답을 400으로 바로잡아 재시도 분류에 영향을 줄 수 있습니다. `0.33.22`는 Rust
+guest panic에 즉시 응답하고 실패한 instance를 공유 pool에서 제거하며 JS/TS WASM
+`execute_batch`를 추가합니다. `0.34.3`은
+오래 실행되는 WASM job timeout을 수정합니다. `0.34.5`의 transaction API는 지원하지
+않는 파일 쓰기를 거부하고, `0.34.6`은 `<depot>/wasm/` 외부 component용
+`--runtime-extra-components`를 추가합니다. 인증·보조 DB와 함께 custom job,
+batch 오류 처리, component 경로를 검토하세요.
 
 TrailBase 0.32는 component interface를 변경했습니다. 이 checkout은
 `trailbase-wasm` 0.6.1로 빌드하므로 호환 서버와 함께 배포해야 하며 검증한 조합은

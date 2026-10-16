@@ -1,17 +1,13 @@
-# TrailBase v0.33.22
+# TrailBase v0.34.7
 
-- Published at: 2026-09-23T16:46:17Z
-- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.33.22
+- Published at: 2026-10-16T06:15:35Z
+- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.34.7
 
 ## Release notes
 
-- Fix behavior when a Rust WASM guest panics:
-  - Respond right away with the error w/o relying on a timeout.
-  - Remove trapped component from shared instance pool to avoid poisoning.
-- Add support for SQL `execute_batch` to JS/TS WASM guests.
-- Add integration test coverage for JS/TS WASM components. Still needs to be enabled in CI.
-- Overhaul integration tests.
+- Update Wasmtime to address security advisories.
+- Internal: normalize flows between RecordApi read, read with FK expansion and list operations.
 - Update dependencies.
 
 
-**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.33.21...v0.33.22
+**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.34.6...v0.34.7

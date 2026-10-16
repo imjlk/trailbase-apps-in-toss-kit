@@ -19,8 +19,8 @@ These values are policy values for this kit.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.33.14`
-- Upstream latest TrailBase release date: `2026-09-10`
+- Upstream latest TrailBase server: `0.34.7`
+- Upstream latest TrailBase release date: `2026-10-16`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -48,7 +48,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.33.14`
+- `trailbase-server-github-release`: `0.34.7`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -90,6 +90,14 @@ The `TrailBase release watch` workflow writes upstream snapshots to:
 
 - `data/upstream/trailbase/latest-release.md`
 - `data/upstream/trailbase/version-policy.json`
+
+Before merging a release-watch PR, manually refresh
+`data/upstream/trailbase/latest-release-ko.md` for the generated English snapshot
+and verify its tag, publication timestamp, and links. Update upstream-latest
+version/date in both tracking documents in the same review. The workflow PR
+checklist requires these steps; the snapshot script does not translate notes.
+Keep the manual last-verified and minimum-server policy unchanged until consumer
+compatibility testing is complete.
 
 The snapshot script reads the latest GitHub release first. If the release notes
 do not mention Rust policy, it falls back to the newest matching TrailBase
@@ -141,6 +149,38 @@ upper bound.
 - Update templates only after compatibility is verified.
 
 ## Guest ABI and Auth Migration
+
+Before upgrading from `0.33.14`, check the consumer's `UserIdentifier` policy:
+`0.33.16` changes the undefined-policy fallback to `ONLY_EMAIL`. External users
+without email addresses may stop authenticating unless the application explicitly
+chooses a suitable policy such as `REQUIRE_USERNAME`. Re-test provider login with
+the intended account identifiers rather than relying on the old fallback.
+
+The verified `0.33.14` baseline predates the timing-based account-enumeration
+side-channel fix in `0.33.23`. It is a historical test result, not a security
+recommendation. Consumers must assess their exposure and test a coordinated
+upgrade that includes this fix. Later tracked releases also move expensive
+password hashing off the async runtime with a five-second timeout (`0.34.2`),
+enforce uniqueness across `email`/`unverified_email` and clean up stale unverified
+users (`0.34.4`), and update Wasmtime for security advisories (`0.34.7`). Review
+auth data and session behavior and run application smoke tests before rollout;
+this metadata-only update does not certify those newer versions.
+
+TrailBase `0.34.0` changes relative paths in WASM `ATTACH DATABASE` calls from
+the process working directory to `<depot>/data` and disallows parent-directory
+references. Before upgrading an auxiliary-database consumer, update its bound
+paths or move its database files, then verify it attaches the intended existing
+database. This also applies to the [analytics fallback initializer](analytics.md).
+Tracking this upstream change does not raise the `0.33.14` verified baseline.
+
+Other intervening changes also need consumer attention: `0.33.15` constrains
+databases attachable by WASM and adds guest `execute_batch`; `0.33.18` corrects
+batch/transaction error propagation from 500 to 400, which can change retry
+classification; `0.33.22` returns Rust guest panics immediately and removes trapped
+instances from the shared pool and adds JS/TS WASM `execute_batch`; `0.34.3` fixes timeouts for long-running WASM jobs.
+The `0.34.5` transaction API rejects unsupported file writes, and `0.34.6` adds
+`--runtime-extra-components` for components outside `<depot>/wasm/`. Review custom
+jobs, batch error handling and component paths alongside auth and auxiliary DBs.
 
 TrailBase 0.32 changed the component interface. This checkout now builds with
 `trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;

@@ -144,6 +144,13 @@ it into SQL. Then guard fallback DDL with `PRAGMA analytics.user_version`: only 
 mixing that fallback with legacy `analytics.analytics_events` in the same database can collide, so use
 it only for new or reset analytics databases.
 
+When upgrading to TrailBase `0.34.0` or later, WASM `ATTACH DATABASE` relative
+paths resolve under `<depot>/data`, rather than the process working directory;
+parent-directory paths are disallowed. Update the bound fallback path or move
+the existing database before upgrading, and verify the expected database is
+attached so the initializer does not silently create a different one. The kit's
+last-verified server remains `0.33.14`.
+
 To verify the template against the currently verified TrailBase image:
 
 ```bash

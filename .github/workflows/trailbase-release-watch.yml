@@ -58,11 +58,16 @@ jobs:
 
             Review:
             - data/upstream/trailbase/latest-release.md
+            - data/upstream/trailbase/latest-release-ko.md
             - data/upstream/trailbase/version-policy.json
             - docs/en/trailbase-tracking.md
             - docs/ko/trailbase-tracking.md
             - rust-toolchain.toml
             - .mise.toml
+
+            Required before merge:
+            - [ ] Refresh the Korean release notes for the snapshotted tag; verify the tag, publication timestamp, and links match the English snapshot.
+            - [ ] Synchronize upstream-latest version/date in both tracking documents while preserving the manual compatibility baseline.
 
             Pay special attention to:
             - TrailBase server breaking changes
