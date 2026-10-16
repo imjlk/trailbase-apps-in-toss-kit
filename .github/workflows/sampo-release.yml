@@ -15,6 +15,9 @@ on:
       - "packages/**/CHANGELOG.md"
       - "services/**/package.json"
       - "services/**/CHANGELOG.md"
+      - "scripts/sync-release-cargo-locks.mjs"
+      - "scripts/check-release-dependencies.mjs"
+      - "packages/release-tools/src/**"
   workflow_dispatch:
 
 permissions:
@@ -72,21 +75,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.SAMPO_RELEASE_TOKEN || secrets.TRAILBASE_RELEASE_WATCH_TOKEN || github.token }}
 
-      - name: Synchronize Bun workspace versions in the release PR
+      - name: Preserve dependency pins and synchronize release workspace versions
         if: steps.sampo.outputs.released == 'true'
         shell: bash
         run: |
           git diff --exit-code
           git diff --cached --exit-code
-          git fetch origin release/main
+          git fetch origin main release/main
           git checkout --detach origin/release/main
+          release_base="$(git merge-base origin/main HEAD)"
+          bun scripts/sync-release-cargo-locks.mjs --base "$release_base"
           bun install --lockfile-only --ignore-scripts
-          git diff --exit-code -- . ':!bun.lock'
-          if git diff --quiet -- bun.lock; then
-            echo "Bun release lockfile is already synchronized."
+          bun scripts/check-release-dependencies.mjs --base "$release_base"
+          git diff --exit-code -- . ':!bun.lock' ':!Cargo.lock' ':!**/Cargo.lock'
+          if git diff --quiet -- bun.lock Cargo.lock '**/Cargo.lock'; then
+            echo "Release lockfiles are already synchronized."
             exit 0
           fi
-          git add -- bun.lock
+          git add -- bun.lock Cargo.lock '**/Cargo.lock'
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
-            commit -m 'chore(release): synchronize Bun workspace lock versions'
+            commit -m 'chore(release): preserve dependency pins and synchronize workspace versions'
           git push origin HEAD:release/main
