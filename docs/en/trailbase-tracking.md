@@ -91,6 +91,14 @@ The `TrailBase release watch` workflow writes upstream snapshots to:
 - `data/upstream/trailbase/latest-release.md`
 - `data/upstream/trailbase/version-policy.json`
 
+Before merging a release-watch PR, manually refresh
+`data/upstream/trailbase/latest-release-ko.md` for the generated English snapshot
+and verify its tag, publication timestamp, and links. Update upstream-latest
+version/date in both tracking documents in the same review. The workflow PR
+checklist requires these steps; the snapshot script does not translate notes.
+Keep the manual last-verified and minimum-server policy unchanged until consumer
+compatibility testing is complete.
+
 The snapshot script reads the latest GitHub release first. If the release notes
 do not mention Rust policy, it falls back to the newest matching TrailBase
 CHANGELOG section that mentions Rust MSRV/MVRV or toolchain changes.
@@ -141,6 +149,13 @@ upper bound.
 - Update templates only after compatibility is verified.
 
 ## Guest ABI and Auth Migration
+
+TrailBase `0.34.0` changes relative paths in WASM `ATTACH DATABASE` calls from
+the process working directory to `<depot>/data` and disallows parent-directory
+references. Before upgrading an auxiliary-database consumer, update its bound
+paths or move its database files, then verify it attaches the intended existing
+database. This also applies to the [analytics fallback initializer](analytics.md).
+Tracking this upstream change does not raise the `0.33.14` verified baseline.
 
 TrailBase 0.32 changed the component interface. This checkout now builds with
 `trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;

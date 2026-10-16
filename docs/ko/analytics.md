@@ -149,6 +149,12 @@ parameter로 bind합니다. 이후 fallback DDL은 `PRAGMA analytics.user_versio
 `analytics.events` schema 기준입니다. 같은 analytics DB에 legacy `analytics.analytics_events`
 schema와 섞으면 충돌할 수 있으므로 새 analytics DB나 reset된 analytics DB에서만 사용하세요.
 
+TrailBase `0.34.0` 이상으로 업그레이드하면 WASM `ATTACH DATABASE`의 상대 경로는
+프로세스 작업 디렉터리가 아니라 `<depot>/data` 기준이며 상위 디렉터리 경로는 허용하지
+않습니다. 업그레이드 전에 fallback에 bind하는 경로를 수정하거나 기존 DB를 옮기고,
+initializer가 다른 DB를 새로 만들지 않도록 의도한 DB가 연결되는지 확인하세요.
+Kit의 마지막 검증 서버는 계속 `0.33.14`입니다.
+
 현재 검증된 TrailBase image로 템플릿을 확인하려면 다음 smoke를 실행합니다.
 
 ```bash

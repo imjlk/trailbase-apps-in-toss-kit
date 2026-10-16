@@ -84,6 +84,12 @@ validator를 dependency로 커밋할 필요는 없습니다.
 - `data/upstream/trailbase/latest-release.md`
 - `data/upstream/trailbase/version-policy.json`
 
+Release-watch PR을 머지하기 전에 생성된 영어 snapshot에 맞춰
+`data/upstream/trailbase/latest-release-ko.md`를 수동 갱신하고 tag, 게시 시각, 링크를
+대조하세요. 양쪽 추적 문서의 upstream-latest 버전·날짜도 같은 리뷰에서 맞춥니다.
+Workflow PR 체크리스트에서 필수로 확인하며 snapshot script는 노트를 번역하지 않습니다.
+컨슈머 호환성 검증 전에는 수동 last-verified·minimum-server 정책을 유지하세요.
+
 Snapshot script는 먼저 최신 GitHub release를 읽습니다. Release notes에 Rust 정책이 없으면
 TrailBase CHANGELOG에서 Rust MSRV/MVRV 또는 toolchain 변경을 언급한 가장 최신 섹션을
 찾습니다.
@@ -129,6 +135,12 @@ CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-versi
 - 호환성이 검증된 뒤에만 template을 갱신합니다.
 
 ## Guest ABI와 인증 migration
+
+TrailBase `0.34.0`부터 WASM `ATTACH DATABASE`의 상대 경로 기준은 프로세스 작업
+디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조는 허용하지 않습니다.
+보조 DB를 사용하는 컨슈머는 업그레이드 전에 bind할 경로를 수정하거나 DB 파일을 옮긴 뒤
+의도한 기존 DB가 연결되는지 확인하세요. [analytics fallback initializer](analytics.md)에도
+해당합니다. 이 업스트림 변경 추적이 검증 기준 `0.33.14`를 올리는 것은 아닙니다.
 
 TrailBase 0.32는 component interface를 변경했습니다. 이 checkout은
 `trailbase-wasm` 0.6.1로 빌드하므로 호환 서버와 함께 배포해야 하며 검증한 조합은
