@@ -15,13 +15,19 @@ the same release train.
 
 | Component | Version | Notes |
 |---|---|---|
-| Proxy image | `toss-mtls-client-proxy:0.6.4` | Published promotion v2 baseline; require the three versioned promotion capabilities below |
+| Proxy image | Exact published version matching `services/toss-mtls-client-proxy/package.json` | Require the three promotion v2 capabilities below, plus `anonymous-key.exchange-auth-code` before adopting code authentication |
 | Proxy internal `@ait-kit/api-core` / `api-client` | `0.6.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
 | RN/Web `@ait-kit/sdk` | `0.7.0` (exact pins) | `ait-rn` / `ait-web` (private, Sampo-versioned) |
 | RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.7.0 peer floor; minimum fixture compiles against the same reviewed pin |
-| WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Unchanged |
-| Rust guest crates | `trailbase-guest-common` / `trailbase-toss-identity` 0.13.0 | Fixed pair; moves together |
-| SQL templates | Additive v2 migration required | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers; preserve legacy rows |
+| WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Existing methods unchanged; code authentication requires 3.6+ and runtime support |
+| Rust guest crates | See both crate `Cargo.toml` files | Fixed pair; moves together with the code-exchange helper |
+| SQL templates | Additive v2 migration; v3 index before idle cleanup | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers and `promotion_reward_ledger.v3.sql` before idle cleanup; preserve legacy rows |
+
+The published 0.6.4 image is the historical promotion v2 baseline, not a claim
+that it supports the new code-exchange route. Publish the matching new image,
+check capabilities, then migrate consumer-owned public bootstrap callbacks as
+described in [anonymous identity](anonymous-identity.md). Code exchange proves
+caller identity; the legacy key verification route checks validity only.
 
 ## Rollout Order
 

@@ -13,13 +13,18 @@
 
 | 구성 요소 | 버전 | 비고 |
 |---|---|---|
-| 프록시 이미지 | `toss-mtls-client-proxy:0.6.4` | 게시된 프로모션 v2 기준선. 아래의 버전 표기된 프로모션 capability 세 가지 필수 |
+| 프록시 이미지 | `services/toss-mtls-client-proxy/package.json`과 일치하는 게시된 정확한 버전 | 아래 프로모션 v2 capability 세 가지와 코드 인증 도입 전 `anonymous-key.exchange-auth-code` 필수 |
 | 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.6.0` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패 |
 | RN/Web `@ait-kit/sdk` | `0.7.0` (정확한 고정) | `ait-rn` / `ait-web` (비공개, Sampo 버전 관리) |
 | RN 최소 `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.7.0 peer 하한. 최소 fixture도 같은 검토 pin으로 컴파일 |
-| WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | 변경 없음 |
-| Rust guest 크레이트 | `trailbase-guest-common` / `trailbase-toss-identity` 0.13.0 | 고정 묶음. 함께 이동 |
-| SQL 템플릿 | 추가 전용 v2 마이그레이션 필수 | 기존 v1 원장에 `promotion_reward_ledger.v2.sql` 적용. 레거시 행 보존 |
+| WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | 기존 메서드는 유지. 코드 인증은 3.6+와 runtime 지원 필요 |
+| Rust guest 크레이트 | 두 크레이트의 `Cargo.toml` 참고 | 코드 교환 헬퍼와 함께 이동하는 고정 묶음 |
+| SQL 템플릿 | 추가 전용 v2와 미실행 정리 전 v3 인덱스 | 기존 v1 원장에 `promotion_reward_ledger.v2.sql`, 정리 활성화 전 `promotion_reward_ledger.v3.sql` 적용. 레거시 행 보존 |
+
+게시된 0.6.4 이미지는 과거 프로모션 v2 기준선이며 새 코드 교환 경로를 지원한다는
+뜻이 아닙니다. 해당 새 이미지를 게시하고 capability를 확인한 뒤
+[익명 식별](anonymous-identity.md)에 따라 컨슈머 소유 공개 bootstrap callback을
+전환하세요. 코드 교환은 호출자를 인증하며 기존 키 verify는 유효성만 확인합니다.
 
 ## 롤아웃 순서
 
