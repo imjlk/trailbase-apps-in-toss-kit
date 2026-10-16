@@ -1,8 +1,8 @@
 {
-  "latestTrailbaseVersion": "0.34.6",
-  "latestReleaseTag": "v0.34.6",
-  "latestReleasePublishedAt": "2026-10-14T16:09:29Z",
-  "latestReleaseUrl": "https://github.com/trailbaseio/trailbase/releases/tag/v0.34.6",
+  "latestTrailbaseVersion": "0.34.7",
+  "latestReleaseTag": "v0.34.7",
+  "latestReleasePublishedAt": "2026-10-16T06:15:35Z",
+  "latestReleaseUrl": "https://github.com/trailbaseio/trailbase/releases/tag/v0.34.7",
   "rustPolicySource": "CHANGELOG.md",
   "rustPolicySourceVersion": "0.27.0",
   "upstreamMinimumRustVersion": "1.93",
