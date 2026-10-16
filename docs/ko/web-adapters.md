@@ -23,7 +23,82 @@ Factory는 현재 `TossAuth`, `User`, `Storage`, `Notification`, `IAP`, `Share` 
 필요할 때 로드합니다. Import나 객체 생성만으로 SDK를 로드하지 않습니다. `isSupported()`가
 있는 메서드는 네이티브 호출 전에 검사하며 누락·미지원은 `WebAdapterError`로 거절합니다.
 SDK 오류는 원본 응답·오류 데이터 없는 제어된 코드로 전달합니다. 브라우저 자동 mock이나
-운영 fallback은 없으며 테스트에서만 명시적으로 `loadSdk`를 주입할 수 있습니다.
+운영 fallback은 없습니다. 소비 앱은 자체 실제 SDK loader를 주입할 수 있고,
+테스트에서는 명시적인 fixture loader를 주입할 수 있습니다.
+
+## 서브모듈 설치와 SDK 소유권
+
+소비 앱 의존성을 설치하기 전에 고정된 서브모듈을 초기화하세요.
+
+```sh
+git submodule update --init --recursive
+```
+
+Bun으로 소스 패키지를 소비할 때는 사용할 패키지를 소비 앱의 workspace 설정에
+추가하세요. `ait-web`의 내부 `workspace:*` peer를 로컬에서 해결하기 위한 설정이며,
+`file:` 의존성만으로는 해당 peer가 workspace로 등록되지 않습니다.
+예시는 다음과 같습니다. 기존 의존성과 다른 workspace 항목은 유지하세요.
+
+```json
+{
+  "private": true,
+  "workspaces": [
+    "vendor/trailbase-apps-in-toss-kit/packages/ait-web",
+    "vendor/trailbase-apps-in-toss-kit/packages/trailbase-client"
+  ],
+  "dependencies": {
+    "@apps-in-toss/web-framework": "3.6.0",
+    "@trailbase-apps-in-toss-kit/ait-web": "workspace:*",
+    "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
+  }
+}
+```
+
+소비 앱 lockfile을 생성·커밋한 뒤에는 frozen install을 사용하세요. Windows 네이티브
+소비 앱은 `bun install --linker hoisted`로 격리 저장소의 긴 경로 문제를 피할 수 있습니다.
+Kit 자체 의존성은 kit checkout에서 `bun run deps:install`로 설치합니다. 새 checkout마다
+검토한 mise 설정을 trust하고 도구를 설치한 뒤 검증하세요.
+
+서브모듈 안에 kit 개발 의존성이 설치돼 있으면 기본 loader가 소비 앱의 새 SDK 대신
+kit의 SDK 3.4.0을 찾을 수 있습니다. 코드 인증에 소비 앱 소유 SDK 3.6+를 사용하려면
+loader를 소비 앱의 모듈에 두세요.
+
+```ts
+import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';
+const ait = createAppsInTossWebAdapter({
+  appKey: 'my-app',
+  loadSdk: () => import('@apps-in-toss/web-framework'),
+});
+```
+
+기존 API용 peer 하한은 3.4.0으로 유지합니다. Loader가 구버전 토스 앱에 런타임 지원을
+추가하는 것은 아닙니다. 코드 발급이 지원되지 않으면 클라이언트 hash나 가짜 코드로
+대체하지 마세요.
+
+## 압축된 소비 앱 흐름 실행
+
+새 Windows 소비 앱에서 Bun 1.4.2의 압축 오류를 재현했습니다. Fixture loader가
+`const sdk = await import(...)` 이후 외부 `...sdk`와 내부 `...sdk.User` spread를
+함께 쓰면 생성 코드가 정의되지 않은 변수를 참조했고, 어댑터는 제어된 `UNSUPPORTED`
+오류를 반환했습니다. 명시적인 SDK 테스트 override에서는 먼저 구조 분해하세요.
+
+```ts
+const { User, ...sdk } = await import('@apps-in-toss/web-framework');
+return { ...sdk, User: { ...User, createAnonymousKeyAuthCode: issueFixtureCode } };
+```
+
+`issueFixtureCode`는 명시적인 합성 테스트 전용입니다. 운영에서는 위의 실제 소비 앱
+SDK loader를 사용하세요. 번들 오류를 진단하려고 코드·원본 식별자를 로그에 남기거나
+어댑터의 오류 정제 정책을 완화하지 마세요.
+
+`bun test packages/ait-web`은 chunk splitting 유무별로 브라우저용 압축 소비 앱을
+빌드하고 생성된 ESM을 실행합니다. 지연 로딩, 매번 새 코드 발급, 공통 namespace 로드,
+실패 시 재시도·hash fallback 부재와 제어된 오류를 검증합니다. 이 검사는 실패하는
+spread 형태를 잡았지만 컴파일 성공이나 소스 수준 검사만으로는 잡지 못했습니다.
+각 소비 앱에서도 세션이 없는 상태의 실제 압축 entrypoint로 첫 로그인을 실행하고,
+계정 전환·새로고침·서버 재시작을 검사하세요. 기존 토큰이 bootstrap 오류를 가릴 수
+있습니다. 합성 fixture 실행은 네이티브 WebView·실기기 지원이나 실제 인증서·제공자
+준비 상태를 증명하지 않습니다.
 
 ## 세션과 SDK Storage
 
@@ -35,8 +110,9 @@ SDK 오류는 원본 응답·오류 데이터 없는 제어된 코드로 전달�
 인증합니다. 어댑터 생성 자체가 이전 세션 검증·계정 연결·재할당을 수행하지 않습니다.
 
 `anonymousHash()`는 `User.getAnonymousKey`를 사용하며 `ait:` namespace를 유지하거나
-추가합니다. 백엔드는 기존 익명 식별 프록시 경계로 값을 검증해야 합니다. 개발 식별자를
-만들어 대체하지 않습니다. `login()`은 서버의 실제 교환에 필요한 SDK 일회성 결과를 유지합니다.
+추가합니다. 기존 프록시 검증은 키의 유효성만 검사하며 호출자의 소유권을 증명하지 않습니다.
+공개 인증에는 위의 새 코드 교환이 필요합니다. 개발 식별자를 만들어 대체하지 않습니다.
+`login()`은 서버의 실제 교환에 필요한 SDK 일회성 결과를 유지합니다.
 
 ## 동의와 결제
 

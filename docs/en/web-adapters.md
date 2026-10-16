@@ -24,7 +24,85 @@ The factory lazily loads current `TossAuth`, `User`, `Storage`, `Notification`,
 Methods with `isSupported()` are checked before native invocation; missing or
 unsupported methods reject with `WebAdapterError`. SDK failures produce controlled
 codes without raw response/error data. There is no automatic browser mock or
-production fallback. Tests may supply an explicit `loadSdk` implementation.
+production fallback. Consumers may supply their own real SDK loader; tests may
+supply an explicit fixture loader.
+
+## Submodule installation and SDK ownership
+
+Initialize the pinned submodule before installing the consumer's dependencies:
+
+```sh
+git submodule update --init --recursive
+```
+
+When consuming these source packages with Bun, merge the selected packages into
+the consumer's workspace configuration. This resolves `ait-web`'s internal
+`workspace:*` peer locally; a `file:` dependency alone does not register that peer.
+For example (keep the consumer's other dependencies and workspace entries):
+
+```json
+{
+  "private": true,
+  "workspaces": [
+    "vendor/trailbase-apps-in-toss-kit/packages/ait-web",
+    "vendor/trailbase-apps-in-toss-kit/packages/trailbase-client"
+  ],
+  "dependencies": {
+    "@apps-in-toss/web-framework": "3.6.0",
+    "@trailbase-apps-in-toss-kit/ait-web": "workspace:*",
+    "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
+  }
+}
+```
+
+Install and commit the consumer lockfile, then use frozen installs. Native Windows
+consumers can use `bun install --linker hoisted` to avoid isolated-store path limits.
+The kit's own dependencies use `bun run deps:install` from the kit checkout. Trust
+each new checkout's reviewed mise config and install its tools before validation.
+
+If kit development dependencies are installed inside the submodule, its default
+loader can resolve the kit's SDK 3.4.0 rather than the consumer's newer SDK. Put
+the loader in the consumer's module so the code-authentication flow selects the
+consumer-owned SDK 3.6+:
+
+```ts
+import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';
+const ait = createAppsInTossWebAdapter({
+  appKey: 'my-app',
+  loadSdk: () => import('@apps-in-toss/web-framework'),
+});
+```
+
+The 3.4.0 peer floor remains for existing APIs. This loader does not add runtime
+support to an older Toss app, and unavailable code issuance must not fall back
+to a client hash or fabricated code.
+
+## Execute the minified consumer flow
+
+A clean Windows consumer exposed a Bun 1.4.2 minification error in a fixture
+loader that used `const sdk = await import(...)` followed by both `...sdk` and
+nested `...sdk.User` spreads. The emitted code referenced an undefined variable,
+and the adapter correctly reported a controlled `UNSUPPORTED` error. For explicit
+SDK test overrides, destructure before spreading instead:
+
+```ts
+const { User, ...sdk } = await import('@apps-in-toss/web-framework');
+return { ...sdk, User: { ...User, createAnonymousKeyAuthCode: issueFixtureCode } };
+```
+
+`issueFixtureCode` belongs only to an explicit synthetic test. Production uses
+the real consumer-owned SDK loader shown above. Do not log codes/raw identities
+or weaken the adapter's sanitized errors to diagnose a bundling failure.
+
+`bun test packages/ait-web` now compiles a consumer with browser minification,
+with and without chunk splitting, and executes its generated ESM. It verifies
+lazy loading, fresh code issuance, shared namespace loading, no retries/hash
+fallback on failure and controlled errors. This caught the failing spread form;
+successful compilation or source-level tests alone did not. In each consumer,
+also exercise its actual minified entrypoint's first login from a clean session,
+then test account switching, reload and server restart. Existing tokens can hide
+a broken bootstrap path. Synthetic fixture execution does not establish native
+WebView/device support or real certificate/provider readiness.
 
 ## Sessions and SDK Storage
 
@@ -38,8 +116,9 @@ identity before reusing a stored session. Creating an adapter does not validate 
 old session or automatically link/reassign accounts.
 
 `anonymousHash()` uses `User.getAnonymousKey` and preserves/adds the `ait:` namespace.
-The backend must verify that value through the existing anonymous identity proxy
-boundary. It never invents a dev identity. `login()` preserves the one-time SDK
+Legacy proxy verification checks that key's validity only, not caller ownership;
+public authentication requires the fresh code exchange described above. It never
+invents a dev identity. `login()` preserves the one-time SDK
 result so the backend can complete the real login exchange.
 
 ## Agreements and purchases
