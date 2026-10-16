@@ -38,6 +38,10 @@ Rust 도구 버전은 `.mise.toml`과 `rust-toolchain.toml`에 함께 노출합�
 toolchain을 설치할 때는 `mise`를 기본 진입점으로 사용하고, `rust-toolchain.toml`은 Cargo,
 rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유지합니다.
 
+`bun run trailbase:rust-policy:check`는 LF와 Windows CRLF checkout을 모두 허용하며
+파일을 다시 쓰지 않습니다. 실제 정책 값 변경을 동기화할 때는 기존 CRLF 줄바꿈을
+보존합니다. 버전 값이 다르면 `--check`는 계속 실패합니다.
+
 새 `.mise.toml`을 받은 뒤에는 이 checkout에서 `mise trust`를 한 번 실행하고,
 `mise install`로 고정된 tool을 설치하세요.
 
