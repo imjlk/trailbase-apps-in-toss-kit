@@ -18,8 +18,8 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.33.14`
-- Upstream latest TrailBase release date: `2026-09-10`
+- Upstream latest TrailBase server: `0.34.6`
+- Upstream latest TrailBase release date: `2026-10-14`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
