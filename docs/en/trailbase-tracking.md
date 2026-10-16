@@ -150,6 +150,16 @@ upper bound.
 
 ## Guest ABI and Auth Migration
 
+The verified `0.33.14` baseline predates the timing-based account-enumeration
+side-channel fix in `0.33.23`. It is a historical test result, not a security
+recommendation. Consumers must assess their exposure and test a coordinated
+upgrade that includes this fix. Later tracked releases also move expensive
+password hashing off the async runtime with a five-second timeout (`0.34.2`),
+enforce uniqueness across `email`/`unverified_email` and clean up stale unverified
+users (`0.34.4`), and update Wasmtime for security advisories (`0.34.7`). Review
+auth data and session behavior and run application smoke tests before rollout;
+this metadata-only update does not certify those newer versions.
+
 TrailBase `0.34.0` changes relative paths in WASM `ATTACH DATABASE` calls from
 the process working directory to `<depot>/data` and disallows parent-directory
 references. Before upgrading an auxiliary-database consumer, update its bound

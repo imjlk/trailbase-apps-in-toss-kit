@@ -136,6 +136,15 @@ CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-versi
 
 ## Guest ABI와 인증 migration
 
+검증 기준 `0.33.14`는 시간 차이를 이용한 계정 열거 side-channel을 수정한
+`0.33.23`보다 이전 버전입니다. 과거 테스트 결과이며 보안 권장 버전이 아닙니다.
+컨슈머는 노출 여부를 평가하고 이 수정이 포함된 조합의 업그레이드를 검증해야 합니다.
+이후 추적 버전은 비싼 비밀번호 해시 작업을 async runtime 밖으로 옮기고 5초 timeout을
+추가했으며(`0.34.2`), `email`/`unverified_email` 간 유일성과 오래된 미검증 사용자
+정리를 적용하고(`0.34.4`), 보안 권고에 대응해 Wasmtime을 갱신했습니다(`0.34.7`).
+배포 전 인증 데이터·세션 동작과 앱 smoke test를 확인하세요. 메타데이터만 갱신하는
+이번 변경이 새 버전의 호환성을 보증하지는 않습니다.
+
 TrailBase `0.34.0`부터 WASM `ATTACH DATABASE`의 상대 경로 기준은 프로세스 작업
 디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조는 허용하지 않습니다.
 보조 DB를 사용하는 컨슈머는 업그레이드 전에 bind할 경로를 수정하거나 DB 파일을 옮긴 뒤
