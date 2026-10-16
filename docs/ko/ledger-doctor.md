@@ -96,3 +96,7 @@ fingerprint만 남깁니다. 예상 밖의 provider 상태는 `UNRECOGNIZED`로 
 재채택하지 않으며 키가 없으면 새 키 발급 없이 수동 정산합니다. v2 이전
 스냅샷도 `schemaAvailable: false`로 읽습니다. 이 필드는 실행이나 자동 재시도를
 허가하지 않습니다.
+
+`NOT_EXECUTED` 로컬 표식의 failed three-step 행에 실행 표식과 지급 기록이 없으면
+종료된 미실행 의도입니다. prepare 키 유무와 관계없이 복구 action은 `none`이며 제공자
+조회가 필요 없습니다. 실행 사실이 모순되거나 레거시 행이면 여전히 정산 검토가 필요합니다.

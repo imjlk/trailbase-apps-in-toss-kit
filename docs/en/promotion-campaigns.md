@@ -341,6 +341,25 @@ resumes at step 4 with the same stored key (no second prepare, no duplicate
 grant). A crash after step 4 leaves the row in the recovery set — resolve
 it with the status lookup before any operator decision.
 
+An intent that never reaches step 4 (prepare failed, or the caller died and
+the user never retried) stays `pending` and is not in the recovery set. When
+pending rows gate further claims, drain them with
+`abandon_unexecuted_promotion_reward_ledgers_tx`: it moves three-step rows
+last updated before a cutoff whose execution was never claimed to `failed` with
+provider status `NOT_EXECUTED` and returns them so the caller can settle its
+own domain rows in the same transaction. No provider call is needed: the
+claim only accepts `pending` rows, so an abandoned row can never execute
+later. Rows whose execution started and legacy rows are never touched. Choose
+a cutoff several minutes before now so recently resumed rows remain active; resume at
+step 4 instead if the stored key should still be used.
+
+Before enabling cleanup on an existing v2 ledger, copy
+`templates/trailbase/sql/promotion_reward_ledger.v3.sql` into a new consumer-owned
+forward migration. It adds the partial `(updated_at, id)` index for unclaimed
+pending three-step rows without changing data. Fresh installs include the index;
+custom table/column mappings need an equivalent index. The helper is guarded by
+`Promotion/Settlement` and reported by `operation_policy_integration()`.
+
 The legacy single-call grant endpoint and Rust helper are removed. The
 proxy answers `410 PROMOTION_GRANT_REMOVED` on the old route without
 touching the upstream; switch claim handlers to the sequence above.

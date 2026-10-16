@@ -136,6 +136,7 @@ pub fn operation_policy_integration() -> OperationPolicyIntegration {
             "claim_ready_message_outbox_tx",
             "begin_message_outbox_dispatch_tx",
             "insert_promotion_reward_ledger_tx",
+            "abandon_unexecuted_promotion_reward_ledgers_tx",
             "issue_app_reward_attempt_tx",
             "claim_app_reward_attempt_tx",
         ],

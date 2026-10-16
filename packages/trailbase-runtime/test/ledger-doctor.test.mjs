@@ -257,12 +257,31 @@ test('promotion v2 diagnostics separate unstarted attempts from status-only reco
     expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['query-original-promotion-transaction']);
     db.exec('UPDATE promotion_reward_ledger SET provider_transaction_key=NULL');
     expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
-    db.exec('DROP INDEX idx_promotion_reward_ledger_recovery; ALTER TABLE promotion_reward_ledger DROP COLUMN protocol; ALTER TABLE promotion_reward_ledger DROP COLUMN execution_started_at;');
+    db.exec('DROP INDEX idx_promotion_reward_ledger_recovery; DROP INDEX idx_promotion_reward_ledger_unexecuted; ALTER TABLE promotion_reward_ledger DROP COLUMN protocol; ALTER TABLE promotion_reward_ledger DROP COLUMN execution_started_at;');
     report = inspect(db, 'promotion', 'promotion-1');
     expect(report.record.execution.schemaAvailable).toBe(false);
     expect(report.record.execution.started).toBeNull();
     expect(report.recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
     db.exec('ALTER TABLE promotion_reward_ledger ADD COLUMN protocol TEXT');
     expect(() => inspect(db, 'promotion', 'promotion-1')).toThrow('LEDGER_SCHEMA_UNAVAILABLE');
+  } finally { db.close(); }
+});
+
+test('abandoned unclaimed promotions need no provider lookup but inconsistent rows still do', () => {
+  const db = database();
+  try {
+    promotion(db);
+    db.exec("UPDATE promotion_reward_ledger SET protocol='three-step',status='failed',provider_status='NOT_EXECUTED'");
+    for (const key of [secret, null]) {
+      db.query('UPDATE promotion_reward_ledger SET provider_transaction_key=?').run(key);
+      const report = inspect(db, 'promotion', 'promotion-1');
+      expect(report.record.providerStatus).toBe('NOT_EXECUTED');
+      expect(report.recoveryPlan.actions).toEqual(['none']);
+      expect(report.recoveryPlan.allowsAutomaticRetry).toBe(false);
+    }
+    db.exec('UPDATE promotion_reward_ledger SET execution_started_at=15');
+    expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
+    db.exec('UPDATE promotion_reward_ledger SET execution_started_at=NULL,protocol=NULL');
+    expect(inspect(db, 'promotion', 'promotion-1').recoveryPlan.actions).toEqual(['manual-reconciliation-without-new-key']);
   } finally { db.close(); }
 });

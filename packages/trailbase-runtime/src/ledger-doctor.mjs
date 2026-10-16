@@ -31,7 +31,7 @@ function normalizedProvider(value) {
   return known(typeof value === 'string' ? value.trim().toUpperCase() : '', [
     'PAYMENT_COMPLETED', 'PURCHASED', 'REFUNDED', 'PENDING', 'NOT_FOUND', 'FAILED', 'ERROR', 'UNKNOWN',
     'PREPARED', 'EXECUTING', 'SUBMITTED', 'SUCCESS', 'GRANTED', 'SENT', 'CANCELLED', 'SKIPPED', 'READY', 'PROCESSING',
-    'ORDER_IN_PROGRESS', 'PAYMENT_PENDING', 'PENDING_GRANT', 'ALREADY_GRANTED', 'COMPLETED', 'MINIAPP_MISMATCH',
+    'ORDER_IN_PROGRESS', 'PAYMENT_PENDING', 'PENDING_GRANT', 'ALREADY_GRANTED', 'COMPLETED', 'MINIAPP_MISMATCH', 'NOT_EXECUTED',
   ]);
 }
 
@@ -118,6 +118,8 @@ function inspectPromotion(db, id, now, unit) {
   };
   let actions;
   if (row.status === 'success' || row.status === 'cancelled') actions = ['none'];
+  else if (row.status === 'failed' && record.providerStatus === 'NOT_EXECUTED'
+    && record.execution.protocol === 'three-step' && record.execution.started === false && !record.granted) actions = ['none'];
   else if (row.status === 'pending' && record.execution.protocol === 'three-step' && !record.execution.started) {
     actions = ['review-unstarted-three-step-attempt'];
   } else {

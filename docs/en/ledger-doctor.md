@@ -105,3 +105,8 @@ execution marker require review of the unstarted attempt; started rows require
 status lookup only. Legacy rows are never adopted, and missing keys require manual
 reconciliation without issuing a new key. Pre-v2 snapshots remain readable with
 `schemaAvailable: false`. These fields never authorize execution or automatic retry.
+
+Failed three-step rows with local marker `NOT_EXECUTED`, no execution marker,
+and no recorded grant are terminal abandoned intents. Their recovery action is
+`none` whether or not a prepared key exists; no provider lookup is needed.
+Contradictory execution facts and legacy rows still require reconciliation.
