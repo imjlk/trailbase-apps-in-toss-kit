@@ -119,6 +119,13 @@ Local development should use `mise trust` once per checkout and `mise install`
 to install the pinned Bun, Node, and Rust tools. The same Rust version is also
 mirrored in `rust-toolchain.toml` for Cargo, rustup, editors, and CI.
 
+Run `bun run deps:install` for the kit's locked JavaScript dependencies, including
+from a nested consumer checkout. Native Windows uses Bun's hoisted layout to avoid
+long isolated-store paths. Before installing, it removes only workspace junctions
+or symlinks pointing into this kit's old `node_modules/.bun` store so stale SDK/API
+versions cannot shadow the new hoisted dependencies. Real directories, custom links,
+the store contents and lockfile are preserved. Unix keeps the default layout.
+
 Do not automatically raise the kit's minimum supported TrailBase server version.
 Raise it only after consumer-app smoke tests pass. Consumer apps can use
 `scripts/check-trailbase-version-policy.mjs` as an advisory check for their

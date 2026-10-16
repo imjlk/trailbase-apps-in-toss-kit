@@ -12,6 +12,8 @@ on:
       - "scripts/check-sdk-minimum.mjs"
       - "scripts/check-release-dependencies.mjs"
       - "scripts/sync-release-cargo-locks*"
+      - "scripts/install-dependencies*"
+      - "scripts/lib/workspace-install-links.mjs"
       - ".github/workflows/sampo-release.yml"
       - "packages/**"
   push:
@@ -27,6 +29,8 @@ on:
       - "scripts/check-sdk-minimum.mjs"
       - "scripts/check-release-dependencies.mjs"
       - "scripts/sync-release-cargo-locks*"
+      - "scripts/install-dependencies*"
+      - "scripts/lib/workspace-install-links.mjs"
       - ".github/workflows/sampo-release.yml"
       - "packages/**"
   workflow_dispatch:
@@ -68,6 +72,9 @@ jobs:
 
       - name: Test release lockfile recovery
         run: bun test scripts/sync-release-cargo-locks.test.mjs --timeout 60000
+
+      - name: Test workspace installation link migration
+        run: bun test scripts/install-dependencies.test.mjs
 
       - name: Check package sources against installed SDK types
         run: bun run packages:typecheck
