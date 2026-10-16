@@ -13,6 +13,7 @@ describe("web consumer fixture", () => {
     const adapter = createAppsInTossWebAdapter({ appKey: "sample" });
     expect(typeof adapter.login).toBe("function");
     expect(typeof adapter.anonymousHash).toBe("function");
+    expect(typeof adapter.createAnonymousKeyAuthCode).toBe("function");
     expect(typeof adapter.storage.getItem).toBe("function");
     expect(typeof adapter.requestNotificationAgreement).toBe("function");
     expect(typeof adapter.purchase).toBe("function");
