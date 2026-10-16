@@ -196,6 +196,8 @@ stage durations are not pure lock wait/network RTT or proof of production speedu
   uses `apps_in_toss_proxy::promotion_reward_status` with a persisted transaction key;
   never-claimed three-step intents are drained with
   `abandon_unexecuted_promotion_reward_ledgers_tx` instead of staying pending forever.
+  Use a last-activity cutoff to protect resumed intents; existing v2 consumers apply
+  the additive `promotion_reward_ledger.v3.sql` index migration before cleanup.
   Subscription flows use `iap_subscriptions.sql` with `iap_subscriptions` parsing,
   inbox, ordering, and per-order entitlement helpers. Authenticate webhooks at the
   consumer ingress; never use client SDK status to authorize server benefits.

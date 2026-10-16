@@ -600,7 +600,7 @@ pub fn promotion_reward_ledgers_awaiting_recovery_tx(
         .collect()
 }
 
-/// Fail three-step ledger rows created before `created_before` whose
+/// Fail three-step ledger rows last updated before `updated_before` whose
 /// execution was never claimed, so an abandoned intent (prepare failed, or
 /// the caller died before step 4) stops blocking per-user or per-campaign
 /// gating forever. Rows move to `failed` with provider status
@@ -611,13 +611,13 @@ pub fn promotion_reward_ledgers_awaiting_recovery_tx(
 /// claim, and `begin_promotion_reward_execute_tx` only claims `pending`
 /// rows, so a row failed here can never be executed afterwards. Rows whose
 /// execution started (the recovery set) and legacy rows (`protocol IS
-/// NULL`) are never touched. Pick a `created_before` cutoff well beyond any
-/// in-flight claim; a caller that would rather resume (step 4 with the
-/// stored key) should do that before the cutoff.
+/// NULL`) are never touched. Pick an `updated_before` cutoff several minutes
+/// before now so a recently stored retry key remains active; a caller that would
+/// rather resume (step 4 with the stored key) should do that before the cutoff.
 pub fn abandon_unexecuted_promotion_reward_ledgers_tx(
     tx: &mut Transaction,
     table: PromotionRewardLedgerTable,
-    created_before: i64,
+    updated_before: i64,
     limit: i64,
     now: i64,
 ) -> ApiResult<Vec<PromotionRewardLedgerRecord>> {
@@ -627,7 +627,7 @@ pub fn abandon_unexecuted_promotion_reward_ledgers_tx(
         crate::operation_policy::OperationPhase::Settlement,
     )?;
     let (sql, params) =
-        promotion_reward_ledger_abandon_unexecuted_statement(table, created_before, limit, now)?;
+        promotion_reward_ledger_abandon_unexecuted_statement(table, updated_before, limit, now)?;
     let rows = db::tx_query(tx, &sql, &params)?;
     rows.iter()
         .map(|row| promotion_reward_ledger_record_from_row(row))
@@ -994,7 +994,7 @@ fn promotion_reward_ledger_recovery_statement(
 /// execution (the claim marker is), and legacy rows are never adopted.
 fn promotion_reward_ledger_abandon_unexecuted_statement(
     table: PromotionRewardLedgerTable,
-    created_before: i64,
+    updated_before: i64,
     limit: i64,
     now: i64,
 ) -> ApiResult<(String, Vec<Value>)> {
@@ -1019,8 +1019,8 @@ fn promotion_reward_ledger_abandon_unexecuted_statement(
                WHERE {protocol_column} = 'three-step'
                  AND {status_column} = 'pending'
                  AND {execution_started_at_column} IS NULL
-                 AND {created_at_column} < ?1
-               ORDER BY {created_at_column} ASC, {id_column} ASC
+                 AND {updated_at_column} < ?1
+               ORDER BY {updated_at_column} ASC, {id_column} ASC
                LIMIT ?2
              )
                AND {status_column} = 'pending'
@@ -1035,11 +1035,10 @@ fn promotion_reward_ledger_abandon_unexecuted_statement(
             id_column = table.id_column,
             protocol_column = table.protocol_column,
             execution_started_at_column = table.execution_started_at_column,
-            created_at_column = table.created_at_column,
             returning_columns = promotion_reward_ledger_returning_columns(table),
         ),
         vec![
-            Value::Integer(created_before),
+            Value::Integer(updated_before),
             Value::Integer(limit),
             Value::Integer(now),
         ],
@@ -2158,10 +2157,10 @@ mod sql_tests {
         assert!(query(&db, &sql, &params).is_empty());
     }
 
-    fn abandon_unexecuted(db: &rusqlite::Connection, created_before: i64, now: i64) -> Vec<String> {
+    fn abandon_unexecuted(db: &rusqlite::Connection, updated_before: i64, now: i64) -> Vec<String> {
         let (sql, params) = promotion_reward_ledger_abandon_unexecuted_statement(
             DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
-            created_before,
+            updated_before,
             10,
             now,
         )
@@ -2183,10 +2182,10 @@ mod sql_tests {
         store_key(&db, "started", "key-s", 200);
         assert_eq!(begin_execute(&db, "started", 300), 1);
 
-        // Rows created at 100 are not yet past a cutoff of 100.
+        // Rows last updated at 100 are not yet past a cutoff of 100.
         assert!(abandon_unexecuted(&db, 100, 400).is_empty());
 
-        let mut abandoned = abandon_unexecuted(&db, 150, 400);
+        let mut abandoned = abandon_unexecuted(&db, 250, 400);
         abandoned.sort();
         assert_eq!(abandoned, ["keyed", "keyless"]);
         for id in ["keyed", "keyless"] {
@@ -2200,7 +2199,7 @@ mod sql_tests {
         assert_eq!(row_columns(&db, "started").status, "pending");
         assert_eq!(row_columns(&db, "legacy").status, "pending");
         // Repeating is a no-op.
-        assert!(abandon_unexecuted(&db, 150, 500).is_empty());
+        assert!(abandon_unexecuted(&db, 250, 500).is_empty());
     }
 
     #[test]
@@ -2208,10 +2207,48 @@ mod sql_tests {
         let db = database();
         insert_three_step_ledger(&db, "row");
         store_key(&db, "row", "key-1", 200);
-        assert_eq!(abandon_unexecuted(&db, 150, 400), ["row"]);
+        assert_eq!(abandon_unexecuted(&db, 250, 400), ["row"]);
         assert_eq!(begin_execute(&db, "row", 500), 0);
         assert_eq!(store_key(&db, "row", "key-1", 510), 0);
         assert_eq!(row_columns(&db, "row").execution_started_at, None);
+    }
+
+    #[test]
+    fn recently_resumed_old_intent_is_not_abandoned() {
+        let db = database();
+        insert_three_step_ledger(&db, "resumed");
+        store_key(&db, "resumed", "retry-key", 900);
+        assert!(abandon_unexecuted(&db, 800, 1000).is_empty());
+        assert_eq!(begin_execute(&db, "resumed", 1001), 1);
+    }
+
+    #[test]
+    fn abandonment_migration_preserves_rows_and_indexes_bounded_batches() {
+        let db = database();
+        insert_three_step_ledger(&db, "old");
+        insert_three_step_ledger(&db, "recent");
+        store_key(&db, "recent", "recent-key", 900);
+        // Simulate an existing v2 install, then apply the additive index twice.
+        db.execute_batch("DROP INDEX idx_promotion_reward_ledger_unexecuted;")
+            .unwrap();
+        let migration =
+            include_str!("../../../templates/trailbase/sql/promotion_reward_ledger.v3.sql");
+        db.execute_batch(migration).unwrap();
+        db.execute_batch(migration).unwrap();
+        let (sql, params) = promotion_reward_ledger_abandon_unexecuted_statement(
+            DEFAULT_PROMOTION_REWARD_LEDGER_TABLE,
+            1000,
+            1,
+            1100,
+        )
+        .unwrap();
+        let plan = query(&db, &format!("EXPLAIN QUERY PLAN {sql}"), &params);
+        let details = format!("{plan:?}");
+        assert!(details.contains("idx_promotion_reward_ledger_unexecuted"));
+        assert!(!details.contains("USE TEMP B-TREE FOR ORDER BY"));
+        assert_eq!(query(&db, &sql, &params).len(), 1);
+        assert_eq!(row_columns(&db, "old").status, "failed");
+        assert_eq!(row_columns(&db, "recent").status, "pending");
     }
 
     #[test]

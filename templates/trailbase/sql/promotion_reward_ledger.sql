@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS promotion_reward_ledger (
   provider_request_id TEXT NOT NULL UNIQUE CHECK (length(trim(provider_request_id)) > 0),
   -- Provider-observed outcomes only (PREPARED/EXECUTING phases never live
   -- here): GRANTED/PENDING/SUBMITTED/UNKNOWN/FAILED/NOT_FOUND or NULL.
+  -- NOT_EXECUTED is a local terminal marker for abandoned unclaimed intents.
   provider_status TEXT,
   provider_error_code TEXT,
   provider_transaction_key TEXT,
@@ -51,3 +52,9 @@ CREATE INDEX IF NOT EXISTS idx_promotion_reward_ledger_recovery
   WHERE protocol = 'three-step'
     AND status = 'pending'
     AND provider_transaction_key IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_promotion_reward_ledger_unexecuted
+  ON promotion_reward_ledger(updated_at, id)
+  WHERE protocol = 'three-step'
+    AND status = 'pending'
+    AND execution_started_at IS NULL;

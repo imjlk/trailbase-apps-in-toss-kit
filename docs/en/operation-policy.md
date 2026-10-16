@@ -33,10 +33,11 @@ Use `Iap/Settlement` immediately before the existing idempotent inventory grant,
 Set `KIT_OPERATION_POLICIES_ENABLED=1` after applying the migration to enable the
 built-in guards in `mark_iap_order_granted_tx`, `enqueue_message_outbox_tx`,
 `claim_ready_message_outbox_tx`, `begin_message_outbox_dispatch_tx` and
-`insert_promotion_reward_ledger_tx`, `issue_app_reward_attempt_tx` and
+`insert_promotion_reward_ledger_tx`, `abandon_unexecuted_promotion_reward_ledgers_tx`, `issue_app_reward_attempt_tx` and
 `claim_app_reward_attempt_tx`. Existing reward receipts skip the settlement gate on replay. `operation_policy_integration()` reports this
 configured state and the exact guarded helpers for a private startup diagnostic.
 The external hold overrides those boundaries even without that opt-in flag.
+Abandoning unclaimed promotion intents uses the `Promotion/Settlement` phase.
 Consumer-owned SDK entry points, direct promotion sends and custom inventory paths
 still need an explicit guard. The SQL alone does not intercept existing apps.
 `require_operation_tx` reads authoritative database time internally; callers cannot

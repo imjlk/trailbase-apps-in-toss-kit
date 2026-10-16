@@ -260,12 +260,19 @@ Toss가 상위 오류 코드(upstream error code)를 반환하면 프록시는 �
 시도하지 않은 경우)는 `pending`으로 남고 재조회 대상에도 들어가지 않습니다.
 pending 행이 이후 지급을 막는다면
 `abandon_unexecuted_promotion_reward_ledgers_tx`로 정리하세요. 기준 시각 이전에
-만들어졌고 실행을 claim하지 않은 three-step 행을 제공자 status `NOT_EXECUTED`의
+마지막으로 갱신됐고 실행을 claim하지 않은 three-step 행을 제공자 status `NOT_EXECUTED`의
 `failed`로 바꾸고, 호출자가 같은 트랜잭션에서 자체 도메인 행을 정산할 수 있도록
 그 행들을 반환합니다. claim은 `pending` 행만 받으므로 정리된 행은 이후에 절대
 실행될 수 없고, 그래서 제공자 호출이 필요 없습니다. 실행을 시작한 행과 레거시 행은
-건드리지 않습니다. 기준 시각은 진행 중인 claim보다 충분히 뒤(초가 아니라 분
-단위)로 잡고, 저장된 키를 계속 써야 한다면 대신 4단계에서 이어가세요.
+건드리지 않습니다. 최근 재시도한 행을 보호하도록 기준 시각은 현재보다 몇 분 이전으로
+잡고, 저장된 키를 계속 써야 한다면 대신 4단계에서 이어가세요.
+
+기존 v2 원장에서 정리를 활성화하기 전에
+`templates/trailbase/sql/promotion_reward_ledger.v3.sql`을 새 컨슈머 소유 forward
+migration으로 복사하세요. 데이터 변경 없이 미실행 pending three-step 행의
+`(updated_at, id)` 부분 인덱스를 추가합니다. 새 설치에는 이미 포함되며 사용자 정의
+테이블·열 이름에는 같은 구조의 인덱스가 필요합니다. 헬퍼는 `Promotion/Settlement`
+검사를 적용하며 `operation_policy_integration()` 진단에 표시됩니다.
 
 기존 단일 호출 grant endpoint와 Rust 헬퍼는 제거되었습니다. 프록시는 옛 라우트에
 업스트림을 건드리지 않고 `410 PROMOTION_GRANT_REMOVED`로 응답합니다. claim

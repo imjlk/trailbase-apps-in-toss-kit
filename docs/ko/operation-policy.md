@@ -32,9 +32,11 @@ require_operation_tx(&mut tx, OperationFeature::SmartMessage, OperationPhase::Di
 `KIT_OPERATION_POLICIES_ENABLED=1`로 `mark_iap_order_granted_tx`,
 `enqueue_message_outbox_tx`, `claim_ready_message_outbox_tx`,
 `begin_message_outbox_dispatch_tx`, `insert_promotion_reward_ledger_tx`,
+`abandon_unexecuted_promotion_reward_ledgers_tx`,
 `issue_app_reward_attempt_tx`, `claim_app_reward_attempt_tx`의 내장 검사를
 활성화합니다. 이미 지급한 보상의 영수증 재조회는 정산 검사를 건너뜁니다. `operation_policy_integration()`은 설정 상태와 실제 검사되는 헬퍼 목록을
 비공개 시작 진단에 제공합니다. 외부 전체 중단은 opt-in flag가 없어도 이 경계에 적용됩니다.
+미실행 프로모션 의도 정리에는 `Promotion/Settlement` 단계를 적용합니다.
 소비 앱이 소유한 SDK 진입·프로모션 직접 발송·사용자 정의 재화 경로에는 명시적 검사가
 여전히 필요하며 SQL만으로 모든 경로를 가로채지는 않습니다. `require_operation_tx`는
 DB 시각을 내부에서 읽어 오래된 호출자 시각으로 정책을 연장할 수 없습니다.

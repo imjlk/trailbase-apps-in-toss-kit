@@ -63,6 +63,7 @@ try {
           "idx_promotion_campaigns_active_feature",
           "idx_promotion_campaigns_active_feature_window",
           "idx_promotion_reward_ledger_campaign_status",
+          "idx_promotion_reward_ledger_unexecuted",
           "idx_iap_orders_product_status",
           "idx_app_reward_attempts_owner_placement",
         ],
@@ -118,6 +119,7 @@ function verifySchema() {
   assertIndex("promotion_campaigns", "idx_promotion_campaigns_active_feature");
   assertIndex("promotion_campaigns", "idx_promotion_campaigns_active_feature_window");
   assertIndex("promotion_reward_ledger", "idx_promotion_reward_ledger_campaign_status");
+  assertIndex("promotion_reward_ledger", "idx_promotion_reward_ledger_unexecuted");
   assertIndex("iap_orders", "idx_iap_orders_product_status");
 
   const analyticsTables = db
