@@ -19,8 +19,8 @@ These values are policy values for this kit.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.34.7`
-- Upstream latest TrailBase release date: `2026-10-16`
+- Upstream latest TrailBase server: `0.35.2`
+- Upstream latest TrailBase release date: `2026-10-21`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -52,7 +52,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.34.7`
+- `trailbase-server-github-release`: `0.35.2`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -185,6 +185,16 @@ instances from the shared pool and adds JS/TS WASM `execute_batch`; `0.34.3` fix
 The `0.34.5` transaction API rejects unsupported file writes, and `0.34.6` adds
 `--runtime-extra-components` for components outside `<depot>/wasm/`. Review custom
 jobs, batch error handling and component paths alongside auth and auxiliary DBs.
+
+`0.35.0` allows file writes inside transactions and batch operations, and batch
+insertions now return a placeholder "skipped" id for conflicts ignored by the
+API's conflict policy instead of omitting them. Consumers that pair batch insert
+results with request positions, or that treat every returned id as a created
+record, must update that parsing. Kit packages do not issue batch insertions.
+`0.35.2` fixes graceful DB shutdown under busy backlogs, adds `trail migration`
+for applying migrations without starting the server, and updates Wasmtime for
+security advisories. Fresh-start and migration runbooks can adopt that command
+only after the consumer's pinned server includes it.
 
 TrailBase 0.32 changed the component interface. This checkout now builds with
 `trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;

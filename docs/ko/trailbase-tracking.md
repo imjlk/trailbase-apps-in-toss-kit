@@ -18,8 +18,8 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.34.7`
-- Upstream latest TrailBase release date: `2026-10-16`
+- Upstream latest TrailBase server: `0.35.2`
+- Upstream latest TrailBase release date: `2026-10-21`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -48,7 +48,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.34.7`
+- `trailbase-server-github-release`: `0.35.2`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -170,6 +170,15 @@ guest panic에 즉시 응답하고 실패한 instance를 공유 pool에서 제�
 않는 파일 쓰기를 거부하고, `0.34.6`은 `<depot>/wasm/` 외부 component용
 `--runtime-extra-components`를 추가합니다. 인증·보조 DB와 함께 custom job,
 batch 오류 처리, component 경로를 검토하세요.
+
+`0.35.0`은 transaction과 batch 작업 안에서 파일 쓰기를 허용하며, API 충돌 정책에
+따라 무시된 batch insertion을 응답에서 빼지 않고 "skipped" 자리표시 id로 반환합니다.
+batch insert 결과를 요청 순서와 짝지어 처리하거나 반환된 id를 모두 생성된 레코드로
+취급하는 컨슈머는 응답 파싱을 수정해야 합니다. kit 패키지는 batch insertion을 보내지
+않습니다. `0.35.2`는 처리 대기 작업이 많을 때의 DB 정상 종료를 수정하고, 서버를
+시작하지 않고 migration을 적용하는 `trail migration`을 추가하며, 보안 권고에 대응해
+Wasmtime을 갱신했습니다. fresh-start·migration runbook은 컨슈머가 고정한 서버에 이
+명령이 포함된 뒤에만 사용하세요.
 
 TrailBase 0.32는 component interface를 변경했습니다. 이 checkout은
 `trailbase-wasm` 0.6.1로 빌드하므로 호환 서버와 함께 배포해야 하며 검증한 조합은
