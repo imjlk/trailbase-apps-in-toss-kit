@@ -4,7 +4,7 @@ import { NodeMtlsTransportError } from "@ait-kit/api-client/node";
 import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
 import { createNodeMtlsClient } from "./node-mtls-client.mjs";
-import { ANONYMOUS_KEY_VERIFY_PATH, ANONYMOUS_AUTH_CODE_EXCHANGE_PATH, verifyAnonymousKey, exchangeAnonymousAuthCode } from "./anonymous-key.mjs";
+import { ANONYMOUS_KEY_VERIFY_PATH, ANONYMOUS_KEY_VERIFY_ALIAS_PATH, ANONYMOUS_AUTH_CODE_EXCHANGE_PATH, verifyAnonymousKey, exchangeAnonymousAuthCode } from "./anonymous-key.mjs";
 import { proxyCapabilityMetadata } from "./capabilities.mjs";
 
 const PAYABLE_IAP_STATUSES = new Set(["PAYMENT_COMPLETED", "PURCHASED"]);
@@ -43,7 +43,7 @@ export async function handleRequest(req, config = createConfig(), core = createC
     return response(200, await exchangeAnonymousAuthCode(body, core, config.mode));
   }
 
-  if (req.method === "POST" && url.pathname === ANONYMOUS_KEY_VERIFY_PATH) {
+  if (req.method === "POST" && (url.pathname === ANONYMOUS_KEY_VERIFY_PATH || url.pathname === ANONYMOUS_KEY_VERIFY_ALIAS_PATH)) {
     const body = await readJson(req, requestBodyLimitBytes(config));
     return response(200, await verifyAnonymousKey(body, core, config.mode));
   }

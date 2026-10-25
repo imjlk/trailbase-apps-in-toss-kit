@@ -93,15 +93,27 @@ It also has AppsInToss adapter endpoints:
 
 - `GET /internal/apps-in-toss/health`
 - `POST /internal/apps-in-toss/toss-login/complete`
+- `POST /internal/apps-in-toss/toss-login/remove-by-user-key`
 - `POST /internal/apps-in-toss/iap/order/status`
+- `POST /internal/apps-in-toss/anonymous-key/verify`
+  (alias: `POST /internal/apps-in-toss/users/anon-key/verify`, the
+  `@ait-kit/api-client` `PROXY_ENDPOINTS.anonKeyVerify` path)
+- `POST /internal/apps-in-toss/anonymous-key/exchange`
 - `POST /internal/apps-in-toss/promotion/reward/prepare`
 - `POST /internal/apps-in-toss/promotion/reward/execute`
 - `POST /internal/apps-in-toss/promotion/reward/status`
 - `POST /internal/apps-in-toss/smart-message/send`
+- `POST /internal/apps-in-toss/smart-message/send-bulk`
 
-Current implemented areas are Toss Login, in-app purchase order status,
-persisted promotion prepare/execute/status, and smart message send. Toss Pay can be added as another
-adapter on top of the generic mTLS relay when the app needs it.
+Current implemented areas are Toss Login and unlink, in-app purchase order
+status, anonymous-key verify and auth-code exchange, persisted promotion
+prepare/execute/status, and smart message send and bulk send. Toss Pay can be
+added as another adapter on top of the generic mTLS relay when the app needs it.
+
+Internal route paths are pinned in the `routes` section of
+`fixtures/contracts/apps-in-toss.v1.json`. The Rust guest constants, the proxy,
+and `@ait-kit/api-client` `PROXY_ENDPOINTS` are each tested against it; add or
+rename a route there first, then update every consumer together.
 
 The old single-call grant route returns `410 PROMOTION_GRANT_REMOVED`. Use the
 explicit `PromotionRecipient` payload builders for new Rust promotion callers;

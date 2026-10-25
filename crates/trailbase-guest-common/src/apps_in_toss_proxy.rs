@@ -320,42 +320,6 @@ mod tests {
     }
 
     #[test]
-    fn adapter_paths_use_internal_apps_in_toss_routes() {
-        assert_eq!(
-            TOSS_LOGIN_COMPLETE_PATH,
-            "/internal/apps-in-toss/toss-login/complete"
-        );
-        assert_eq!(
-            TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH,
-            "/internal/apps-in-toss/toss-login/remove-by-user-key"
-        );
-        assert_eq!(
-            IAP_ORDER_STATUS_PATH,
-            "/internal/apps-in-toss/iap/order/status"
-        );
-        assert_eq!(
-            PROMOTION_REWARD_PREPARE_PATH,
-            "/internal/apps-in-toss/promotion/reward/prepare"
-        );
-        assert_eq!(
-            PROMOTION_REWARD_EXECUTE_PATH,
-            "/internal/apps-in-toss/promotion/reward/execute"
-        );
-        assert_eq!(
-            PROMOTION_REWARD_STATUS_PATH,
-            "/internal/apps-in-toss/promotion/reward/status"
-        );
-        assert_eq!(
-            SMART_MESSAGE_SEND_PATH,
-            "/internal/apps-in-toss/smart-message/send"
-        );
-        assert_eq!(
-            SMART_MESSAGE_BULK_SEND_PATH,
-            "/internal/apps-in-toss/smart-message/send-bulk"
-        );
-    }
-
-    #[test]
     fn execute_and_status_payloads_require_a_transaction_key() {
         let cases = [
             json!({ "promotionCode": "promo", "tossUserKey": "user" }),

@@ -10,6 +10,12 @@ SKU. Message cases preserve partial channel delivery and classify an empty respo
 as UNKNOWN. Promotion cases prohibit a failure envelope from becoming a grant even
 when a contradictory success status is present.
 
+The `routes` rows pin every internal proxy path. Rust guest constants
+(`rustConst`), the proxy server, and `@ait-kit/api-client` `PROXY_ENDPOINTS`
+(`aitKitEndpoint`) are each tested against them. `aliasOf` marks a second path
+served by the same handler, and `removed` records the status and error a retired
+route must keep returning.
+
 Keep response expectations independent from implementation. When a contract changes,
 update the fixture and every relevant consumer together. Fixture edits trigger Rust,
 JS and proxy workflows. Runtime/API tests must not grant based solely on these status

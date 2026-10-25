@@ -116,12 +116,21 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/toss-login/complete`: Toss Login adapter.
 - `POST /internal/apps-in-toss/toss-login/remove-by-user-key`: Toss Login unlink adapter.
 - `POST /internal/apps-in-toss/iap/order/status`: in-app purchase order status adapter.
+- `POST /internal/apps-in-toss/anonymous-key/verify`: anonymous key validity check (not caller ownership).
+- `POST /internal/apps-in-toss/users/anon-key/verify`: alias of the verify route for the
+  `@ait-kit/api-client` `PROXY_ENDPOINTS.anonKeyVerify` path; same handler and response.
+- `POST /internal/apps-in-toss/anonymous-key/exchange`: forward-mode anonymous auth-code exchange.
+- `POST /internal/apps-in-toss/promotion/reward/grant`: removed; returns `410 PROMOTION_GRANT_REMOVED`.
 - `POST /internal/apps-in-toss/promotion/reward/prepare`: recipient-bound promotion key issuance.
 - `POST /internal/apps-in-toss/promotion/reward/execute`: promotion execution with a persisted key.
 - `POST /internal/apps-in-toss/promotion/reward/status`: promotion result lookup with the persisted key.
 - `POST /internal/apps-in-toss/smart-message/send`: smart message adapter.
 - `POST /internal/apps-in-toss/smart-message/send-bulk`: functional smart-message bulk adapter.
 - `GET /internal/apps-in-toss/health`: local health/mode check.
+
+The `routes` section of `fixtures/contracts/apps-in-toss.v1.json` pins these paths. Proxy tests
+check it against the server routes and every `@ait-kit/api-client` `createTossMtlsHttpClient`
+method in stub mode; Rust tests check it against the `trailbase-guest-common` path constants.
 
 ## Backend Integration Contract
 
