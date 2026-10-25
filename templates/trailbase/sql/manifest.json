@@ -1,0 +1,31 @@
+{
+  "description": "Apply order for the copy-in TrailBase SQL templates in this directory. Every .sql file here is listed exactly once. Baseline entries build a fresh database in order; upgrade entries migrate installs that copied an older version of the template named by upgrades and must not run on a fresh baseline. requires names templates whose objects the file references; TrailBase provides _user. Kit Rust SQL tests and scripts/smoke-trailbase-wasm.mjs read this file.",
+  "templates": [
+    { "file": "operation_policies.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "toss_identities.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "anonymous_identities.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "anonymous_user_links.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "anonymous_bootstrap_attempts.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "profiles.minimal.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "app_reward_attempts.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "message_templates.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "notification_template_agreements.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "message_outbox.core.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "message_outbox_attempts.sql", "database": "main", "kind": "baseline", "requires": ["message_outbox.core.sql"] },
+    { "file": "message_outbox_recipients.migration.sql", "database": "main", "kind": "baseline", "requires": ["message_outbox.core.sql", "anonymous_identities.sql"] },
+    { "file": "iap_orders.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "iap_subscriptions.sql", "database": "main", "kind": "baseline", "requires": ["iap_orders.sql"] },
+    { "file": "promotion_campaigns.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "promotion_campaign_approvals.sql", "database": "main", "kind": "baseline", "requires": ["promotion_campaigns.sql"] },
+    { "file": "promotion_reward_ledger.sql", "database": "main", "kind": "baseline", "requires": ["promotion_campaigns.sql"] },
+    { "file": "promotion_reward_recipients.sql", "database": "main", "kind": "baseline", "requires": ["promotion_reward_ledger.sql", "anonymous_identities.sql"] },
+    { "file": "owned_currency_events.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "owned_currency_policies.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "domain_events.sql", "database": "main", "kind": "baseline", "requires": [] },
+    { "file": "events.sql", "database": "analytics", "kind": "baseline", "requires": [] },
+    { "file": "analytics_events.sql", "database": "analytics", "kind": "baseline", "requires": [] },
+    { "file": "promotion_reward_ledger.v2.sql", "database": "main", "kind": "upgrade", "upgrades": "promotion_reward_ledger.sql", "requires": [] },
+    { "file": "promotion_reward_ledger.v3.sql", "database": "main", "kind": "upgrade", "upgrades": "promotion_reward_ledger.sql", "requires": ["promotion_reward_ledger.v2.sql"] },
+    { "file": "promotion_campaign_approvals.v2.sql", "database": "main", "kind": "upgrade", "upgrades": "promotion_campaign_approvals.sql", "requires": ["promotion_campaigns.sql"] }
+  ]
+}

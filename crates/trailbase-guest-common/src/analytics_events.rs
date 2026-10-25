@@ -520,3 +520,153 @@ mod tests {
         assert_eq!(error.code, "INTERNAL");
     }
 }
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_tests {
+    use super::*;
+    use crate::sql_test_support::{
+        apply_templates, attach_analytics_baseline, execute, query, try_query,
+    };
+    use rusqlite::{Connection, types::Value as SqlValue};
+    use serde_json::json;
+
+    fn analytics_database() -> Connection {
+        let db = Connection::open_in_memory().unwrap();
+        attach_analytics_baseline(&db);
+        db
+    }
+
+    fn insert(db: &Connection, table: AnalyticsEventTable, input: AnalyticsEventInput<'_>) {
+        let record = normalize_analytics_event_input(table, input).unwrap();
+        let (sql, params) = analytics_event_insert_statement(table, &record).unwrap();
+        assert_eq!(execute(db, &sql, &params), 1);
+    }
+
+    fn stored_rows(db: &Connection, table: AnalyticsEventTable) -> Vec<Vec<SqlValue>> {
+        let columns = [
+            Some(table.event_name_column),
+            table.screen_column,
+            table.source_column,
+            Some(table.payload_json_column),
+            table.user_id_column,
+            Some(table.client_created_at_column),
+            Some(table.server_received_at_column),
+            table.request_id_column,
+            table.batch_id_column,
+        ]
+        .into_iter()
+        .flatten()
+        .collect::<Vec<_>>()
+        .join(", ");
+        query(
+            db,
+            &format!(
+                "SELECT {columns} FROM {} ORDER BY {}",
+                qualified_table_name(table).unwrap(),
+                table.server_received_at_column
+            ),
+            &[],
+        )
+    }
+
+    fn text(value: &str) -> SqlValue {
+        SqlValue::Text(value.into())
+    }
+
+    #[test]
+    fn inserts_into_both_analytics_templates() {
+        let db = analytics_database();
+        for table in [DEFAULT_ANALYTICS_EVENTS_TABLE, ANALYTICS_EVENTS_TABLE] {
+            insert(
+                &db,
+                table,
+                AnalyticsEventInput {
+                    event_name: " screen_view ",
+                    screen: Some(" main "),
+                    source: Some("rn"),
+                    payload: Some(json!({ "roundNo": 3 })),
+                    user_id: Some(&[1, 2, 3]),
+                    client_created_at: 1000,
+                    server_received_at: 1005,
+                    request_id: Some(" request-1 "),
+                    batch_id: Some(" batch-1 "),
+                },
+            );
+            insert(&db, table, AnalyticsEventInput::new("app_open", 2000, 2005));
+            assert_eq!(
+                stored_rows(&db, table),
+                vec![
+                    vec![
+                        text("screen_view"),
+                        text("main"),
+                        text("rn"),
+                        text(r#"{"roundNo":3}"#),
+                        SqlValue::Blob(vec![1, 2, 3]),
+                        SqlValue::Integer(1000),
+                        SqlValue::Integer(1005),
+                        text("request-1"),
+                        text("batch-1"),
+                    ],
+                    vec![
+                        text("app_open"),
+                        SqlValue::Null,
+                        SqlValue::Null,
+                        text("{}"),
+                        SqlValue::Null,
+                        SqlValue::Integer(2000),
+                        SqlValue::Integer(2005),
+                        SqlValue::Null,
+                        SqlValue::Null,
+                    ],
+                ]
+            );
+        }
+    }
+
+    #[test]
+    fn analytics_templates_also_reject_non_object_payloads() {
+        let db = analytics_database();
+        for table in [DEFAULT_ANALYTICS_EVENTS_TABLE, ANALYTICS_EVENTS_TABLE] {
+            let record = normalize_analytics_event_input(
+                table,
+                AnalyticsEventInput::new("screen_view", 1, 2),
+            )
+            .unwrap();
+            let (sql, mut params) = analytics_event_insert_statement(table, &record).unwrap();
+            params[3] = Value::Text("[]".into());
+            let error = try_query(&db, &sql, &params).unwrap_err().to_string();
+            assert!(error.contains("CHECK constraint failed"), "{error}");
+        }
+    }
+
+    #[test]
+    fn unqualified_table_without_optional_columns_fits_the_template() {
+        let db = Connection::open_in_memory().unwrap();
+        apply_templates(&db, &["events.sql"]);
+        let table = AnalyticsEventTable {
+            database: None,
+            screen_column: None,
+            source_column: None,
+            user_id_column: None,
+            request_id_column: None,
+            batch_id_column: None,
+            ..ANALYTICS_EVENTS_TABLE
+        };
+        insert(&db, table, AnalyticsEventInput::new("app_open", 10, 11));
+        assert_eq!(
+            query(
+                &db,
+                "SELECT name, screen, props_json, user_id, client_at, server_at FROM events",
+                &[]
+            ),
+            vec![vec![
+                text("app_open"),
+                SqlValue::Null,
+                text("{}"),
+                SqlValue::Null,
+                SqlValue::Integer(10),
+                SqlValue::Integer(11),
+            ]]
+        );
+    }
+}

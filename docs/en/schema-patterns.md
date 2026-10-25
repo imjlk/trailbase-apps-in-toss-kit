@@ -26,6 +26,18 @@ clear data compatibility decision.
 Before editing an existing baseline, ask whether any environment has data that
 must survive. If the answer is yes or unknown, create a new additive migration.
 
+## Template Apply Order
+
+`templates/trailbase/sql/manifest.json` lists every copy-in SQL template with
+its target database (`main` or `analytics`), its `requires` prerequisites, and
+whether it is a fresh-install `baseline` or an `upgrade` for installs that
+copied an older version of the template named by `upgrades`. Baseline entries
+are listed in a working apply order. Never run an `upgrade` entry on a fresh
+baseline. The kit's Rust SQL tests and the TrailBase WASM smoke build their
+databases from this manifest, and a test fails when a template is added without
+an entry. Use it to order the migrations you copy, but your app still owns those
+migrations.
+
 ## Record API ACL
 
 When a migration changes public tables, views, or subscription surfaces, update

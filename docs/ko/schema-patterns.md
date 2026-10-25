@@ -26,6 +26,16 @@ SQL)을 다시 쓰지 마세요. 대신 앞으로만 진행되는 새 마이그�
 기존 baseline을 수정하기 전에, 어떤 환경이라도 보존해야 하는 데이터를 가지고 있는지
 확인하세요. 답이 yes이거나 확실하지 않다면 새 추가 마이그레이션을 만드세요.
 
+## 템플릿 적용 순서
+
+`templates/trailbase/sql/manifest.json`은 복사해서 쓰는 모든 SQL 템플릿을 나열하고, 각
+템플릿의 대상 데이터베이스(`main` 또는 `analytics`), 선행 조건인 `requires`, 그리고 새 설치용
+`baseline`인지 `upgrades`에 적힌 템플릿의 예전 버전을 복사한 설치를 위한 `upgrade`인지
+기록합니다. baseline 항목은 실제로 적용 가능한 순서대로 나열되어 있습니다. `upgrade` 항목은
+새 baseline에서 실행하지 마세요. kit의 Rust SQL 테스트와 TrailBase WASM smoke는 이 manifest로
+데이터베이스를 만들며, 항목 없이 템플릿을 추가하면 테스트가 실패합니다. 복사하는 마이그레이션의
+순서를 정할 때 참고하되, 그 마이그레이션은 여전히 앱이 소유합니다.
+
 ## Record API 접근 제어
 
 마이그레이션이 공개 테이블, 뷰, 구독 대상을 바꾸면 같은 변경에서 `config.textproto`도 함께
