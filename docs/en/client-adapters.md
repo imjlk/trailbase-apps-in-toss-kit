@@ -67,7 +67,7 @@ const messages = createAppsInTossFunctionalMessageClient({
 });
 
 const agreement = await notifications.requestAgreement({
-  templateCode: "ORDER_READY_AGREEMENT",
+  templateCode: "my-app-order-ready",
 });
 
 await messages.syncAgreement({
@@ -77,20 +77,22 @@ await messages.syncAgreement({
 
 if (agreement.status === "OPTED_IN") {
   await messages.requestMessage({
-    agreementTemplateCode: "ORDER_READY_AGREEMENT",
+    agreementTemplateCode: "my-app-order-ready",
     context: { orderName: "Sample order" },
     providerRequestId: "order-ready:order-123",
-    templateSetCode: "ORDER_READY",
+    templateSetCode: "my-app-order-ready",
   });
 }
 ```
 
 The bridge maps `newAgreement` and `alreadyAgreed` to `OPTED_IN`,
 `agreementRejected` to `OPTED_OUT`, calls the SDK cleanup once, and fails closed
-in production when the SDK bridge is unavailable. `templateCode` is the
-notification agreement code passed to the SDK. `templateSetCode` is the
-functional message send code used by the backend/proxy. They may be the same in
-simple one-to-one flows, but shared agreement prompts should keep them separate.
+in production when the SDK bridge is unavailable. `templateCode` is the code
+passed to the SDK: Apps in Toss defines it as the send code of the functional
+message linked to the notification agreement, starting with `{appName}-`.
+`templateSetCode` is the functional message send code used by the
+backend/proxy, so the two are normally the same string. `agreementTemplateCode`
+records which SDK code the consent was requested with.
 Only enqueue or request the functional message when the synced agreement is
 `OPTED_IN`; an `OPTED_OUT` result should be persisted without dispatch.
 

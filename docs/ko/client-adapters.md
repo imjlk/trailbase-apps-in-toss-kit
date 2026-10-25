@@ -63,7 +63,7 @@ const messages = createAppsInTossFunctionalMessageClient({
 });
 
 const agreement = await notifications.requestAgreement({
-  templateCode: "ORDER_READY_AGREEMENT",
+  templateCode: "my-app-order-ready",
 });
 
 await messages.syncAgreement({
@@ -73,20 +73,21 @@ await messages.syncAgreement({
 
 if (agreement.status === "OPTED_IN") {
   await messages.requestMessage({
-    agreementTemplateCode: "ORDER_READY_AGREEMENT",
+    agreementTemplateCode: "my-app-order-ready",
     context: { orderName: "Sample order" },
     providerRequestId: "order-ready:order-123",
-    templateSetCode: "ORDER_READY",
+    templateSetCode: "my-app-order-ready",
   });
 }
 ```
 
 bridge는 `newAgreement`, `alreadyAgreed`를 `OPTED_IN`으로,
 `agreementRejected`를 `OPTED_OUT`으로 바꾸고 SDK cleanup을 한 번만 호출합니다. 운영 환경에서
-SDK bridge가 없으면 fail-closed로 실패합니다. `templateCode`는 SDK에 전달하는 알림 동의문
-코드입니다. `templateSetCode`는 백엔드/proxy가 사용하는 기능성 메시지 발송 코드입니다.
-단순한 1:1 흐름에서는 두 코드가 같을 수 있지만, 여러 발송 템플릿이 하나의 동의문을 공유하는
-경우에는 분리해서 관리하세요.
+SDK bridge가 없으면 fail-closed로 실패합니다. `templateCode`는 SDK에 전달하는 코드이며,
+Apps in Toss는 이를 알림 동의문이 연결된 기능성 메시지의 발송 코드(`{appName}-`으로 시작)로
+정의합니다. `templateSetCode`는 백엔드/proxy가 사용하는 기능성 메시지 발송 코드이므로 두 값은
+보통 같은 문자열입니다. `agreementTemplateCode`는 어떤 SDK 코드로 동의를 요청했는지
+기록합니다.
 동기화한 동의 상태가 `OPTED_IN`일 때만 기능성 메시지를 enqueue/request하세요.
 `OPTED_OUT` 결과는 저장하되 발송하지 않는 것이 맞습니다.
 
