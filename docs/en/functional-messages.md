@@ -21,15 +21,18 @@ migrations, copy, admin workflow, and dispatch jobs.
 2. Create functional notification templates in the smart-message console and
    complete Toss copy review before enabling app dispatch. Store the console
    send code (`templateSetCode`) as `message_templates.template_code`.
-3. For templates that require prior notification agreement, register the
-   agreement copy in the smart-message notification agreement tab. Pass the
-   notification agreement code (`templateCode`), not the send-template code
-   (`templateSetCode`), to
-   `requestNotificationAgreement({ options: { templateCode } })`. Simple apps
-   with a one-to-one send-template/agreement relationship may store the same
-   string in `template_code` and `agreement_template_code`. Apps where multiple
-   send templates share one agreement should store the shared agreement code in
-   `agreement_template_code` so dispatch codes and agreement codes stay distinct.
+3. For templates that require prior notification agreement, create the
+   notification agreement first and link it to the functional message before
+   copy review. Apps in Toss documents the SDK `templateCode` passed to
+   `requestNotificationAgreement({ options: { templateCode } })` as the send
+   code of the functional message that the agreement is linked to (console →
+   Smart Message → Functional tab), not a separate agreement identifier. It
+   starts with `{appName}-`; other values fail with
+   `NOTIFICATION_AGREEMENT_FAILED`. Store that code in
+   `agreement_template_code`; for most rows it equals `template_code`. When one
+   agreement is linked to several functional messages, store the send code the
+   app actually passes to the SDK in each linked row, and verify in sandbox that
+   the recorded consent covers every linked message before relying on it.
 4. Prepare test `userKey` values and API scopes for sandbox QA. The proxy sends
    the user key through the `x-toss-user-key` header.
 
@@ -63,7 +66,8 @@ existing row has `requires_agreement = 1`, backfill
 gate. The template constraint expects agreement-required rows to have a
 non-null agreement code.
 
-For simple one-to-one setups, the backfill can copy the send-template code:
+Because the SDK `templateCode` is the linked functional message's send code,
+the backfill can usually copy the send-template code:
 
 ```sql
 UPDATE message_templates
@@ -72,8 +76,9 @@ WHERE requires_agreement = 1
   AND agreement_template_code IS NULL;
 ```
 
-If several send templates share one notification agreement, map each row to the
-shared agreement `templateCode` instead of blindly copying `template_code`.
+If an earlier setup stored a separate agreement identifier, or several send
+templates share one notification agreement, map each row to the send code the
+app passes to the SDK instead of blindly copying `template_code`.
 
 Manage Apps in Toss console codes by their role in the app DB:
 
@@ -84,19 +89,19 @@ Manage Apps in Toss console codes by their role in the app DB:
   `/api-partner/v1/apps-in-toss/messenger/send-bulk-message`; each request can
   include up to 2,500 recipients in `contextList`.
 - `templateCode`: the SDK option name passed to
-  `requestNotificationAgreement`. This value is the notification agreement code
-  registered in the console. The shared SQL template includes
+  `requestNotificationAgreement`. This value is the send code of the functional
+  message linked to the notification agreement, so it is normally the same
+  string as `templateSetCode`. The shared SQL template includes
   `message_templates.agreement_template_code`; fill it for templates where
-  `requires_agreement = 1` and persist/verify consent by that notification
-  agreement code. In simple one-to-one setups this can be the same string as
-  `message_templates.template_code`.
+  `requires_agreement = 1` and persist/verify consent by the code passed to the
+  SDK.
 
 ## Runtime Flow
 
 1. RN or WebView calls
    `requestNotificationAgreement({ options: { templateCode } })` when a template
-   requires prior agreement. Here `templateCode` is the notification agreement
-   code, not the send-template code. React Native apps can use
+   requires prior agreement. Here `templateCode` is the send code of the
+   functional message linked to the agreement. React Native apps can use
    `@trailbase-apps-in-toss-kit/ait-rn/notifications` to wrap the SDK cleanup
    and normalize the result.
 2. The app stores `newAgreement` and `alreadyAgreed` as `OPTED_IN`, and
@@ -154,9 +159,9 @@ manual re-enqueue decision.
 
 - Approved template exists in `message_templates`.
 - Functional templates that require agreement persist and verify consent by the
-  notification agreement `templateCode` passed to the SDK. Store that value in
-  `message_templates.agreement_template_code`, even when it is the same string
-  as the send `templateSetCode`.
+  `templateCode` passed to the SDK, which is the linked functional message's
+  send code. Store that value in `message_templates.agreement_template_code`,
+  even when it is the same string as the send `templateSetCode`.
 - Functional templates that require agreement are blocked until the matching
   agreement row is `OPTED_IN`.
 - Marketing or re-engagement templates are blocked without marketing consent.

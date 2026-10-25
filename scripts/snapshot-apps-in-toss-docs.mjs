@@ -96,7 +96,7 @@ const DOC_SOURCES = [
     key: "smart-message-guide",
     title: "Smart Message overview and notification agreement policy",
     url: "https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md",
-    expectedText: "# 스마트 발송"
+    expectedText: "# 푸시알림"
   },
   {
     key: "review-guide",
