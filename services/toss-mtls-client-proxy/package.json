@@ -1,6 +1,6 @@
 {
   "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "private": true,
   "type": "module",
   "dependencies": {
