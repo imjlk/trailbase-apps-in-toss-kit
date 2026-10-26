@@ -336,27 +336,10 @@ pub fn anonymous_user_link_tx(
     tx: &mut Transaction,
     anonymous_hash_hmac: &str,
 ) -> ApiResult<Option<AnonymousUserLink>> {
-    let rows = db::tx_query(
-        tx,
-        "SELECT anonymous_hash_hmac, canonical_user, canonical_anonymous_hash_hmac,
-                previous_user, link_reason, linked_at, updated_at
-         FROM anonymous_user_links
-         WHERE anonymous_hash_hmac = ?1
-         LIMIT 1",
-        &[Value::Text(anonymous_hash_hmac.to_string())],
-    )?;
+    let (sql, params) = anonymous_user_link_statement(anonymous_hash_hmac);
+    let rows = db::tx_query(tx, sql, &params)?;
     rows.first()
-        .map(|row| {
-            Ok(AnonymousUserLink {
-                anonymous_hash_hmac: db::text(&row[0], "anonymous_hash_hmac")?,
-                canonical_user: db::blob(&row[1], "canonical_user")?,
-                canonical_anonymous_hash_hmac: db::text(&row[2], "canonical_anonymous_hash_hmac")?,
-                previous_user: nullable_blob(&row[3])?,
-                link_reason: db::text(&row[4], "link_reason")?,
-                linked_at: db::integer(&row[5], "linked_at")?,
-                updated_at: db::integer(&row[6], "updated_at")?,
-            })
-        })
+        .map(|row| anonymous_user_link_from_row(row))
         .transpose()
 }
 
@@ -369,9 +352,51 @@ pub fn upsert_anonymous_user_link_tx(
     link_reason: &str,
     now: i64,
 ) -> ApiResult<()> {
+    let (sql, params) = upsert_anonymous_user_link_statement(
+        anonymous_hash_hmac,
+        canonical_user,
+        canonical_anonymous_hash_hmac,
+        previous_user,
+        link_reason,
+        now,
+    )?;
+    db::tx_execute(tx, sql, &params)?;
+    Ok(())
+}
+
+fn anonymous_user_link_statement(anonymous_hash_hmac: &str) -> (&'static str, Vec<Value>) {
+    (
+        "SELECT anonymous_hash_hmac, canonical_user, canonical_anonymous_hash_hmac,
+                previous_user, link_reason, linked_at, updated_at
+         FROM anonymous_user_links
+         WHERE anonymous_hash_hmac = ?1
+         LIMIT 1",
+        vec![Value::Text(anonymous_hash_hmac.to_string())],
+    )
+}
+
+fn anonymous_user_link_from_row(row: &[Value]) -> ApiResult<AnonymousUserLink> {
+    Ok(AnonymousUserLink {
+        anonymous_hash_hmac: db::text(&row[0], "anonymous_hash_hmac")?,
+        canonical_user: db::blob(&row[1], "canonical_user")?,
+        canonical_anonymous_hash_hmac: db::text(&row[2], "canonical_anonymous_hash_hmac")?,
+        previous_user: nullable_blob(&row[3])?,
+        link_reason: db::text(&row[4], "link_reason")?,
+        linked_at: db::integer(&row[5], "linked_at")?,
+        updated_at: db::integer(&row[6], "updated_at")?,
+    })
+}
+
+fn upsert_anonymous_user_link_statement(
+    anonymous_hash_hmac: &str,
+    canonical_user: &[u8],
+    canonical_anonymous_hash_hmac: &str,
+    previous_user: Option<&[u8]>,
+    link_reason: &str,
+    now: i64,
+) -> ApiResult<(&'static str, Vec<Value>)> {
     let reason = normalize_link_reason(link_reason)?;
-    db::tx_execute(
-        tx,
+    Ok((
         "INSERT INTO anonymous_user_links (
            anonymous_hash_hmac, canonical_user, canonical_anonymous_hash_hmac,
            previous_user, link_reason, linked_at, updated_at
@@ -383,7 +408,7 @@ pub fn upsert_anonymous_user_link_tx(
            previous_user = excluded.previous_user,
            link_reason = excluded.link_reason,
            updated_at = excluded.updated_at",
-        &[
+        vec![
             Value::Text(anonymous_hash_hmac.to_string()),
             Value::Blob(canonical_user.to_vec()),
             Value::Text(canonical_anonymous_hash_hmac.to_string()),
@@ -393,8 +418,7 @@ pub fn upsert_anonymous_user_link_tx(
             Value::Text(reason.to_string()),
             Value::Integer(now),
         ],
-    )?;
-    Ok(())
+    ))
 }
 
 pub fn enforce_anonymous_bootstrap_attempt_limit_tx(
@@ -407,9 +431,25 @@ pub fn enforce_anonymous_bootstrap_attempt_limit_tx(
     if max_attempts <= 0 || window_ms <= 0 {
         return Ok(());
     }
+    let (sql, params) = anonymous_bootstrap_attempt_statement(bucket_key, now, window_ms)?;
+    let rows = db::tx_query(tx, sql, &params)?;
+    let attempt_count = db::integer(&rows[0][0], "attempt_count")?;
+    if attempt_count > max_attempts {
+        return Err(too_many_requests(
+            "TOO_MANY_BOOTSTRAPS",
+            "Too many anonymous bootstrap attempts. Please retry later.",
+        ));
+    }
+    Ok(())
+}
+
+fn anonymous_bootstrap_attempt_statement(
+    bucket_key: &str,
+    now: i64,
+    window_ms: i64,
+) -> ApiResult<(&'static str, Vec<Value>)> {
     let bucket_key = normalize_bootstrap_bucket_key(bucket_key)?;
-    let rows = db::tx_query(
-        tx,
+    Ok((
         "INSERT INTO anonymous_bootstrap_attempts (
            bucket_key, attempt_count, window_started_at, last_attempt_at
          )
@@ -425,20 +465,12 @@ pub fn enforce_anonymous_bootstrap_attempt_limit_tx(
            END,
            last_attempt_at = ?2
          RETURNING attempt_count",
-        &[
+        vec![
             Value::Text(bucket_key),
             Value::Integer(now),
             Value::Integer(window_ms),
         ],
-    )?;
-    let attempt_count = db::integer(&rows[0][0], "attempt_count")?;
-    if attempt_count > max_attempts {
-        return Err(too_many_requests(
-            "TOO_MANY_BOOTSTRAPS",
-            "Too many anonymous bootstrap attempts. Please retry later.",
-        ));
-    }
-    Ok(())
+    ))
 }
 
 pub fn anonymous_bootstrap_bucket_key(
@@ -475,16 +507,16 @@ fn nullable_blob(value: &Value) -> ApiResult<Option<Vec<u8>>> {
     }
 }
 
+// Mirrors the anonymous_user_links.link_reason CHECK in the SQL template.
+const ANONYMOUS_USER_LINK_REASONS: [&str; 3] =
+    ["toss_identity_collision", "manual_merge", "migration"];
+
 fn normalize_link_reason(value: &str) -> ApiResult<&'static str> {
-    match value.trim() {
-        "toss_identity_collision" => Ok("toss_identity_collision"),
-        "manual_merge" => Ok("manual_merge"),
-        "migration" => Ok("migration"),
-        _ => Err(bad_request(
-            "INVALID_LINK_REASON",
-            "Invalid anonymous user link reason",
-        )),
-    }
+    let value = value.trim();
+    ANONYMOUS_USER_LINK_REASONS
+        .into_iter()
+        .find(|reason| *reason == value)
+        .ok_or_else(|| bad_request("INVALID_LINK_REASON", "Invalid anonymous user link reason"))
 }
 
 fn normalize_bootstrap_bucket_key(value: &str) -> ApiResult<String> {
@@ -697,8 +729,9 @@ mod tests {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod sql_tests {
     use super::*;
-    use crate::sql_test_support::query;
+    use crate::sql_test_support::{database_with, query, query_values, template_sql, try_query};
     use rusqlite::{Connection, functions::FunctionFlags};
+    use std::collections::BTreeSet;
 
     fn database(schema: AuthUserSchema) -> Connection {
         let db = Connection::open_in_memory().unwrap();
@@ -778,5 +811,164 @@ mod sql_tests {
             .unwrap(),
             0
         );
+    }
+
+    fn anonymous_database() -> Connection {
+        let db = database_with(&[
+            "anonymous_user_links.sql",
+            "anonymous_bootstrap_attempts.sql",
+        ]);
+        db.execute_batch("INSERT INTO _user VALUES (X'02'), (X'03')")
+            .unwrap();
+        db
+    }
+
+    fn upsert_link(
+        db: &Connection,
+        anonymous_hash_hmac: &str,
+        canonical_user: &[u8],
+        previous_user: Option<&[u8]>,
+        link_reason: &str,
+        now: i64,
+    ) -> rusqlite::Result<Vec<Vec<rusqlite::types::Value>>> {
+        let (sql, params) = upsert_anonymous_user_link_statement(
+            anonymous_hash_hmac,
+            canonical_user,
+            "canonical-hmac",
+            previous_user,
+            link_reason,
+            now,
+        )
+        .unwrap();
+        try_query(db, sql, &params)
+    }
+
+    fn load_link(db: &Connection, anonymous_hash_hmac: &str) -> Option<AnonymousUserLink> {
+        let (sql, params) = anonymous_user_link_statement(anonymous_hash_hmac);
+        query_values(db, sql, &params)
+            .first()
+            .map(|row| anonymous_user_link_from_row(row).unwrap())
+    }
+
+    fn template_link_reasons() -> BTreeSet<String> {
+        let sql = template_sql("anonymous_user_links.sql");
+        let marker = "link_reason IN (";
+        let start = sql.find(marker).expect("link_reason CHECK") + marker.len();
+        let end = start + sql[start..].find(')').unwrap();
+        sql[start..end]
+            .split(',')
+            .map(|reason| reason.trim().trim_matches('\'').to_string())
+            .collect()
+    }
+
+    #[test]
+    fn link_reasons_mirror_the_template_check() {
+        assert_eq!(
+            template_link_reasons(),
+            ANONYMOUS_USER_LINK_REASONS
+                .iter()
+                .map(|reason| reason.to_string())
+                .collect()
+        );
+        let db = anonymous_database();
+        for (index, reason) in ANONYMOUS_USER_LINK_REASONS.iter().enumerate() {
+            let hmac = format!("anon-{index}");
+            upsert_link(&db, &hmac, &[1], None, &format!(" {reason} "), 10).unwrap();
+            assert_eq!(load_link(&db, &hmac).unwrap().link_reason, *reason);
+        }
+        let (sql, mut params) = upsert_anonymous_user_link_statement(
+            "anon-x",
+            &[1],
+            "canonical-hmac",
+            None,
+            "migration",
+            10,
+        )
+        .unwrap();
+        params[4] = Value::Text("unknown".into());
+        let error = try_query(&db, sql, &params).unwrap_err().to_string();
+        assert!(error.contains("CHECK constraint failed"), "{error}");
+    }
+
+    #[test]
+    fn anonymous_user_links_relink_and_follow_user_lifecycle() {
+        let db = anonymous_database();
+        upsert_link(
+            &db,
+            "anon-1",
+            &[2],
+            Some(&[1]),
+            "toss_identity_collision",
+            10,
+        )
+        .unwrap();
+        assert_eq!(
+            load_link(&db, "anon-1").unwrap(),
+            AnonymousUserLink {
+                anonymous_hash_hmac: "anon-1".into(),
+                canonical_user: vec![2],
+                canonical_anonymous_hash_hmac: "canonical-hmac".into(),
+                previous_user: Some(vec![1]),
+                link_reason: "toss_identity_collision".into(),
+                linked_at: 10,
+                updated_at: 10,
+            }
+        );
+
+        upsert_link(&db, "anon-1", &[3], None, "manual_merge", 20).unwrap();
+        let relinked = load_link(&db, "anon-1").unwrap();
+        assert_eq!(
+            (
+                relinked.canonical_user,
+                relinked.previous_user,
+                relinked.link_reason.as_str(),
+                relinked.linked_at,
+                relinked.updated_at,
+            ),
+            (vec![3], None, "manual_merge", 10, 20)
+        );
+        assert!(load_link(&db, "missing").is_none());
+
+        upsert_link(&db, "anon-2", &[3], Some(&[2]), "migration", 30).unwrap();
+        db.execute("DELETE FROM _user WHERE id = X'02'", [])
+            .unwrap();
+        assert_eq!(load_link(&db, "anon-2").unwrap().previous_user, None);
+        db.execute("DELETE FROM _user WHERE id = X'03'", [])
+            .unwrap();
+        assert!(load_link(&db, "anon-1").is_none());
+        assert!(load_link(&db, "anon-2").is_none());
+
+        let error = upsert_link(&db, "anon-3", &[9], None, "migration", 40)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("FOREIGN KEY constraint failed"), "{error}");
+    }
+
+    #[test]
+    fn bootstrap_attempts_count_within_the_window_and_reset_after_it() {
+        let db = anonymous_database();
+        let attempt = |now| {
+            let (sql, params) =
+                anonymous_bootstrap_attempt_statement(" bucket ", now, 100).unwrap();
+            db::integer(&query_values(&db, sql, &params)[0][0], "attempt_count").unwrap()
+        };
+        assert_eq!(attempt(1000), 1);
+        assert_eq!(attempt(1050), 2);
+        assert_eq!(attempt(1099), 3);
+        assert_eq!(attempt(1100), 1);
+        assert_eq!(attempt(1150), 2);
+        assert_eq!(
+            query(
+                &db,
+                "SELECT bucket_key, window_started_at, last_attempt_at FROM anonymous_bootstrap_attempts",
+                &[]
+            ),
+            vec![vec![
+                rusqlite::types::Value::Text("bucket".into()),
+                rusqlite::types::Value::Integer(1100),
+                rusqlite::types::Value::Integer(1150),
+            ]]
+        );
+        assert!(anonymous_bootstrap_attempt_statement(" ", 1, 100).is_err());
     }
 }

@@ -70,26 +70,17 @@ try {
     proxyImage,
     ".",
   );
-  const templates = [
-    "operation_policies.sql",
-    "app_reward_attempts.sql",
-    "toss_identities.sql",
-    "message_templates.sql",
-    "notification_template_agreements.sql",
-    "message_outbox.core.sql",
-    "message_outbox_attempts.sql",
-    "promotion_campaigns.sql",
-    "promotion_reward_ledger.sql",
-    "iap_orders.sql",
-    "iap_subscriptions.sql",
-    "anonymous_identities.sql",
-    "message_outbox_recipients.migration.sql",
-    "promotion_reward_recipients.sql",
-  ];
+  const templateDir = path.join(root, "templates/trailbase/sql");
+  const manifest = JSON.parse(
+    await readFile(path.join(templateDir, "manifest.json"), "utf8"),
+  );
+  const templates = manifest.templates
+    .filter((entry) => entry.kind === "baseline" && entry.database === "main")
+    .map((entry) => entry.file);
   const sql = (
     await Promise.all(
       templates.map((file) =>
-        readFile(path.join(root, "templates/trailbase/sql", file), "utf8"),
+        readFile(path.join(templateDir, file), "utf8"),
       ),
     )
   ).join("\n");

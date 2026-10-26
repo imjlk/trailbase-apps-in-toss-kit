@@ -656,3 +656,131 @@ mod tests {
         assert_eq!(error.code, "INTERNAL");
     }
 }
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod sql_tests {
+    use super::*;
+    use crate::sql_test_support::{database_with, execute, query_values, try_query};
+    use rusqlite::Connection;
+    use serde_json::json;
+
+    const TEMPLATE_TABLE: DomainEventTable = DomainEventTable {
+        table: "app_events",
+        user_id_column: Some("user_id"),
+        event_name_column: "event_name",
+        metadata_json_column: "metadata_json",
+        source_type_column: Some("source_type"),
+        source_id_json_column: Some("source_id_json"),
+        request_id_column: Some("request_id"),
+        created_at_column: "created_at",
+    };
+
+    const HISTORY_TABLE: DomainEventTable = DomainEventTable::user_history(
+        "app_events",
+        "user_id",
+        "event_name",
+        "metadata_json",
+        "created_at",
+    );
+
+    fn insert(
+        db: &Connection,
+        table: DomainEventTable,
+        input: DomainEventInput<'_>,
+    ) -> DomainEventRecord {
+        let record = normalize_domain_event_input(table, input).unwrap();
+        let (sql, params) = domain_event_insert_statement(table, &record).unwrap();
+        assert_eq!(execute(db, &sql, &params), 1);
+        record
+    }
+
+    fn list(
+        db: &Connection,
+        table: DomainEventTable,
+        query: DomainEventListQuery<'_>,
+    ) -> Vec<DomainEventRecord> {
+        let (sql, params) = domain_event_select_statement(table, query).unwrap();
+        query_values(db, &sql, &params)
+            .iter()
+            .map(|row| domain_event_record_from_row(table, row).unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn template_round_trips_full_and_user_history_tables() {
+        let db = database_with(&["domain_events.sql"]);
+        let full = insert(
+            &db,
+            TEMPLATE_TABLE,
+            DomainEventInput {
+                user_id: Some(" user-1 "),
+                event_name: " mission_claim ",
+                metadata: Some(json!({ "amount": 1 })),
+                source_type: Some("mission"),
+                source_id: Some(json!({ "day": "2026-10-25" })),
+                request_id: Some("request-1"),
+                created_at: 10,
+            },
+        );
+        let history = insert(
+            &db,
+            HISTORY_TABLE,
+            DomainEventInput {
+                user_id: Some("user-1"),
+                ..DomainEventInput::new("furnace_save", 20)
+            },
+        );
+        let other = insert(
+            &db,
+            TEMPLATE_TABLE,
+            DomainEventInput {
+                user_id: Some("user-2"),
+                ..DomainEventInput::new("other_user", 30)
+            },
+        );
+
+        assert_eq!(
+            list(
+                &db,
+                TEMPLATE_TABLE,
+                DomainEventListQuery::for_user("user-1")
+            ),
+            vec![history.clone(), full.clone()]
+        );
+        assert_eq!(
+            list(&db, HISTORY_TABLE, DomainEventListQuery::for_user("user-1")),
+            vec![
+                history.clone(),
+                DomainEventRecord {
+                    source_type: None,
+                    source_id: None,
+                    request_id: None,
+                    ..full
+                },
+            ]
+        );
+        assert_eq!(
+            list(
+                &db,
+                TEMPLATE_TABLE,
+                DomainEventListQuery {
+                    user_id: None,
+                    limit: 2,
+                },
+            ),
+            vec![other, history]
+        );
+    }
+
+    #[test]
+    fn template_rejects_metadata_that_is_not_json() {
+        let db = database_with(&["domain_events.sql"]);
+        let record =
+            normalize_domain_event_input(TEMPLATE_TABLE, DomainEventInput::new("event", 1))
+                .unwrap();
+        let (sql, mut params) = domain_event_insert_statement(TEMPLATE_TABLE, &record).unwrap();
+        params[2] = Value::Text("{".into());
+        let error = try_query(&db, &sql, &params).unwrap_err().to_string();
+        assert!(error.contains("CHECK constraint failed"), "{error}");
+    }
+}
