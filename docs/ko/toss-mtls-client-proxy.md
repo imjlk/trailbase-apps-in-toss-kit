@@ -116,12 +116,21 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 - `POST /internal/apps-in-toss/toss-login/complete`: Toss Login 어댑터.
 - `POST /internal/apps-in-toss/toss-login/remove-by-user-key`: Toss Login 연결 해제 어댑터.
 - `POST /internal/apps-in-toss/iap/order/status`: 인앱 결제 주문 상태 어댑터.
+- `POST /internal/apps-in-toss/anonymous-key/verify`: 익명 키 유효성 확인(호출자 소유 증명은 아님).
+- `POST /internal/apps-in-toss/users/anon-key/verify`: `@ait-kit/api-client`
+  `PROXY_ENDPOINTS.anonKeyVerify` 경로를 위한 verify 라우트 별칭. 핸들러와 응답이 같습니다.
+- `POST /internal/apps-in-toss/anonymous-key/exchange`: forward 모드 익명 auth code 교환.
+- `POST /internal/apps-in-toss/promotion/reward/grant`: 제거됨. `410 PROMOTION_GRANT_REMOVED`를 반환합니다.
 - `POST /internal/apps-in-toss/promotion/reward/prepare`: 수신자에 바인딩된 프로모션 키 발급.
 - `POST /internal/apps-in-toss/promotion/reward/execute`: 저장된 키로 프로모션 실행.
 - `POST /internal/apps-in-toss/promotion/reward/status`: 저장된 키로 프로모션 결과 조회.
 - `POST /internal/apps-in-toss/smart-message/send`: 스마트 메시지 어댑터.
 - `POST /internal/apps-in-toss/smart-message/send-bulk`: 기능성 스마트 메시지 대량 발송 어댑터.
 - `GET /internal/apps-in-toss/health`: 로컬 health/mode 확인.
+
+이 경로들은 `fixtures/contracts/apps-in-toss.v1.json`의 `routes` 섹션에 고정되어 있습니다. 프록시
+테스트는 이 목록을 서버 라우트와 stub 모드의 모든 `@ait-kit/api-client` `createTossMtlsHttpClient`
+메서드에 대조하고, Rust 테스트는 `trailbase-guest-common` 경로 상수에 대조합니다.
 
 ## 백엔드 연동 계약
 

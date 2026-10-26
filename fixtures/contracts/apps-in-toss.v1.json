@@ -554,5 +554,104 @@
       "providerStatus": "UNKNOWN",
       "isSent": false
     }
+  ],
+  "routes": [
+    {
+      "id": "health",
+      "method": "GET",
+      "path": "/internal/apps-in-toss/health",
+      "aitKitEndpoint": "health"
+    },
+    {
+      "id": "mtls.request",
+      "method": "POST",
+      "path": "/internal/mtls/request",
+      "aitKitEndpoint": "genericMtlsRequest"
+    },
+    {
+      "id": "toss-login.complete",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/toss-login/complete",
+      "aitKitEndpoint": "tossLoginComplete",
+      "rustConst": "TOSS_LOGIN_COMPLETE_PATH"
+    },
+    {
+      "id": "toss-login.remove-by-user-key",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/toss-login/remove-by-user-key",
+      "aitKitEndpoint": "tossLoginRemoveByUserKey",
+      "rustConst": "TOSS_LOGIN_REMOVE_BY_USER_KEY_PATH"
+    },
+    {
+      "id": "iap.order-status",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/iap/order/status",
+      "aitKitEndpoint": "iapOrderStatus",
+      "rustConst": "IAP_ORDER_STATUS_PATH"
+    },
+    {
+      "id": "anonymous-key.verify",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/anonymous-key/verify",
+      "rustConst": "ANONYMOUS_KEY_VERIFY_PATH"
+    },
+    {
+      "id": "anonymous-key.verify.ait-kit",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/users/anon-key/verify",
+      "aitKitEndpoint": "anonKeyVerify",
+      "aliasOf": "anonymous-key.verify"
+    },
+    {
+      "id": "anonymous-key.exchange",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/anonymous-key/exchange",
+      "rustConst": "ANONYMOUS_AUTH_CODE_EXCHANGE_PATH"
+    },
+    {
+      "id": "promotion.reward.grant",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/promotion/reward/grant",
+      "aitKitEndpoint": "promotionRewardGrant",
+      "removed": {
+        "status": 410,
+        "error": "PROMOTION_GRANT_REMOVED"
+      }
+    },
+    {
+      "id": "promotion.reward.prepare",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/promotion/reward/prepare",
+      "aitKitEndpoint": "promotionPrepareReward",
+      "rustConst": "PROMOTION_REWARD_PREPARE_PATH"
+    },
+    {
+      "id": "promotion.reward.execute",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/promotion/reward/execute",
+      "aitKitEndpoint": "promotionExecuteReward",
+      "rustConst": "PROMOTION_REWARD_EXECUTE_PATH"
+    },
+    {
+      "id": "promotion.reward.status",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/promotion/reward/status",
+      "aitKitEndpoint": "promotionRewardStatus",
+      "rustConst": "PROMOTION_REWARD_STATUS_PATH"
+    },
+    {
+      "id": "smart-message.send",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/smart-message/send",
+      "aitKitEndpoint": "smartMessageSend",
+      "rustConst": "SMART_MESSAGE_SEND_PATH"
+    },
+    {
+      "id": "smart-message.send-bulk",
+      "method": "POST",
+      "path": "/internal/apps-in-toss/smart-message/send-bulk",
+      "aitKitEndpoint": "smartMessageBulkSend",
+      "rustConst": "SMART_MESSAGE_BULK_SEND_PATH"
+    }
   ]
 }

@@ -118,6 +118,15 @@
       "automerge": false
     },
     {
+      "description": "ait-kit packages move together so api-core/api-client and the ait-rn/ait-web sdk pins cannot drift into duplicate api-core installs",
+      "matchPackageNames": ["/^@ait-kit\\//"],
+      "groupName": "ait-kit packages",
+      "labels": ["dependencies", "ait-kit"],
+      "prPriority": 15,
+      "minimumReleaseAge": "2 days",
+      "automerge": false
+    },
+    {
       "description": "Keep the declared minimum RN SDK fixture fixed; update it only with the support policy",
       "matchDepNames": ["@apps-in-toss/framework-min-supported"],
       "enabled": false
