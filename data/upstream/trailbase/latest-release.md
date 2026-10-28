@@ -1,14 +1,15 @@
-# TrailBase v0.35.2
+# TrailBase v0.35.6
 
-- Published at: 2026-10-21T17:02:14Z
-- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.35.2
+- Published at: 2026-10-27T18:08:08Z
+- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.35.6
 
 ## Release notes
 
-- Fix graceful DB shutdown for busy backlogs and extend wait time to allow logs to be written safely. This came to light as a result of increased throughput.
-- Tidy up `User` and `DbUser` memory representations resulting in ~5% throughput increases. As we keep pushing, even small optimizations start to matter.
-- Expand `trail migration` CLI command allowing to apply migrations w/o starting the server.
-- Update dependencies. Address Wasmtime's security advisories.
+- Add `X-Accel-Buffering=no` header to SSE connections to simplify reverse-proxy configuration and accidental buffering, which may delay events. @rb365 🙏
+- Avoid truncating SQLite WALs on implicit connection closure. In multi-DBs setups, we don't want to interfere with other connections when a cached connection is evicted.
+- Add explicit DB shutdown order to avoid an issues w/o implicit destruction even though it was working just fine.
+- Internal: remove PGLite in favor of `testcontainers`.
+- Update dependencies.
 
 
-**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.35.1...v0.35.2
+**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.35.5...v0.35.6
