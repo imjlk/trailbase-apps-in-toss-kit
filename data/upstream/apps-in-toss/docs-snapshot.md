@@ -1,101 +1,101 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-09-28T06:49:28.591Z
+- Fetched at: 2026-10-28T06:49:55.800Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
 - Apps in Toss release notes
   - URL: https://developers-apps-in-toss.toss.im/release-note/release-note.md
-  - SHA-256: `a344c96fd8634b92ae241cdd43186ad2056a6e8c9d3c4aae935e86091638988e`
-  - Bytes: 22712
+  - SHA-256: `1f3ed9413c7b47da2e94248e5569f2d64f6119a058394598959a80e9c42ef14b`
+  - Bytes: 23674
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `5914106117456898c975b02ae7749355f76a4bf0b9e56209c116031af5bd3722`
-  - Bytes: 33184
+  - SHA-256: `4c3d25dbe8503c078d9a9976ecfca70db7d46fa6e593a8900710ae03f0b6c2a0`
+  - Bytes: 34487
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
-  - SHA-256: `5e1de62ddaec01667f094e0f90eee5151b598aacd7971117180dfb9c42660f3c`
-  - Bytes: 14850
+  - SHA-256: `27fbb317bd2c72acab5231b0121cd2ba0b3c31aaf837ef66ca90f42cf9c04a48`
+  - Bytes: 15049
 - React Native reference
   - URL: https://developers-apps-in-toss.toss.im/documentation/react-native.md
-  - SHA-256: `38878875b2f2cc428b1f5918227181c1b39a58270aa50550c3f4c5413dd45552`
-  - Bytes: 2461
+  - SHA-256: `10ef3f046c5c5e7d974cf55af6cf7c5c4779c07bb2124b548556413c9eaa876f`
+  - Bytes: 2641
 - WebView Client SDK overview
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk.md
-  - SHA-256: `f4f1187f86a003cd5340132264149aa0fd7d50dc44246bdeab9fc0460cddc1bc`
-  - Bytes: 2590
+  - SHA-256: `a5f4bcee02cae696b04e93ad82a39db232dbbdf0fed1a9f98d82c32b06fd1355`
+  - Bytes: 2558
 - WebView SDK 3.x migration
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x.md
-  - SHA-256: `f6818d9bd22cc09a4e02e803126a227ff390a95d6fae51398e4ec4afe1de3e84`
-  - Bytes: 11748
+  - SHA-256: `8bbc76f1e537e4450e0f20ae460af317834228b62606bb053d19f7f78eae4644`
+  - Bytes: 12711
 - API overview
   - URL: https://developers-apps-in-toss.toss.im/documentation/overview.md
-  - SHA-256: `c6c36034b740d6daa2d544478e9247b6d9f1743af13090224cab042fe1a7c2aa`
-  - Bytes: 8096
+  - SHA-256: `b7c70b441aa6add00329c146ce50a759eac3a58cfd5772e774bb6217ceb44032`
+  - Bytes: 8276
 - Apps in Toss integration getting started
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md
-  - SHA-256: `d38e7f2efed77ed9e782db69b179b06d70a23d20f1c5b273a52701f423825d2e`
-  - Bytes: 8536
+  - SHA-256: `821933a67c970889dc2308beef2592a8432a42d25b3004dd3c5c04b9b22fb4d8`
+  - Bytes: 9213
 - Server API integration
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md
-  - SHA-256: `5ce5e7ca330f16a24ab1b12126350002754e77ef4b3537f169bdbc7460277601`
-  - Bytes: 7359
+  - SHA-256: `0f6da5cb97545d05ba39260eb3871875f73ba6b65c88f419e38b92331fb2f9bc`
+  - Bytes: 8919
 - API authentication and mTLS
   - URL: https://developers-apps-in-toss.toss.im/api/auth.md
-  - SHA-256: `3f822422597d72e981cf4dac6e22e0edef2ecd2f4c3ad8cc5db4e879fc6fcf98`
-  - Bytes: 2671
+  - SHA-256: `0e694f09b3d68db0ca1ad9ce646d950ab58d06ba6ca70cbfac7021a46bffcd32`
+  - Bytes: 2851
 - Toss Login API
   - URL: https://developers-apps-in-toss.toss.im/api/toss-login.md
-  - SHA-256: `0700f18934994797bf55f9604d65264cb1b3a2eb2d83954b6aa64c4f7632e8dd`
-  - Bytes: 42073
+  - SHA-256: `b369e9b7576a80094a4e9c1263a67dbd14133f9391c3700fbccc56b71b6fc363`
+  - Bytes: 42253
 - In-app purchase API
   - URL: https://developers-apps-in-toss.toss.im/api/iap.md
-  - SHA-256: `e22a60bc368838260d7949dc67d33ee272d89355eb8bf59bfe655282a46db5f5`
-  - Bytes: 9706
+  - SHA-256: `cfbfdf3ae478cc5272c182428e66fb3b009da5e2aa3706c63198067c253702e1`
+  - Bytes: 9886
 - Promotion API
   - URL: https://developers-apps-in-toss.toss.im/api/promotion.md
-  - SHA-256: `e4883dcc328b0258ec7c6bb3d05abd64a5779fc09596b5813a409a09b29f818d`
-  - Bytes: 25380
+  - SHA-256: `1482a0536a58f58df4c0adda9e922c56e5c8f3f9e7b4f11c1b5962d4c5410864`
+  - Bytes: 25560
 - Push and Smart Message API
   - URL: https://developers-apps-in-toss.toss.im/api/push.md
-  - SHA-256: `99ffe8f49b157bee3d3c2a229920892eac4f868bc6fdd70adf590cdc556bb08e`
-  - Bytes: 36390
+  - SHA-256: `e9723bfc2e88637b50c1f425de5d57de77b1bf9cda81182c4ec61ef9da05b750`
+  - Bytes: 36570
 - Smart Message overview and notification agreement policy
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
-  - SHA-256: `ec62e1d1080b533994d7e6966af20e13ad9046cd3ac0c0ece41fc0deb514ce93`
-  - Bytes: 27287
+  - SHA-256: `09ef030e8681466068c13104579fe88549095a5076801419768bbf84fffd5843`
+  - Bytes: 27633
 - Review request guide
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md
-  - SHA-256: `64df571bddfaf38a12b9cb7b047642089f583c422b7a8b941bd0efb83745575d`
-  - Bytes: 6945
+  - SHA-256: `99a208dd8452d88e3fc7eb5f422d1979ec7a3c06f63346fb95b5c32a9997a1ee`
+  - Bytes: 7354
 - Review.request SDK
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md
-  - SHA-256: `1e28fede1df895e6fcb704ede81f67011a0d6cee014402335617870255a38573`
-  - Bytes: 2977
+  - SHA-256: `a05d3fdaf96bb2609573c8aaeeb4359ef8b691838f51d7bf251e38ee218a11df`
+  - Bytes: 3160
 - Promotion.grantReward SDK
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md
-  - SHA-256: `e7327e3314893745fe91e4746eb8686f0b5d3a3572df52e9e108d2d36df8f9b8`
-  - Bytes: 6347
+  - SHA-256: `fcc38d96c558f8aed58d2aefb7299c53f397035f501c418d7f1b95b71e5b6c5e`
+  - Bytes: 6530
 - Promotion operations guide
   - URL: https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md
-  - SHA-256: `ec9ab470e57b7f7e2bb9f5acff68deac748e7f2c0ea5e9a7274ca3f1258582aa`
-  - Bytes: 30001
+  - SHA-256: `0ed4db2fec090688c043b3c94c35f55792fe3c267bad7159c1c43c5914e417c9`
+  - Bytes: 31619
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
-  - SHA-256: `f986e7667ec1807d04ae7d7f9402b1b7f46978be57722e58f42b06beb6619159`
-  - Bytes: 4317
+  - SHA-256: `7148c6e8b1e763f4aedc9b5388376f5568c5e3534403d0fcf5e0c2144cf6f9b7`
+  - Bytes: 4480
 - Anonymous user key SDK getAnonymousKey
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md
-  - SHA-256: `58866b1422c4d17925fae8b5beafdb56e85c362194fd565fe8f76e7a79b296cb`
-  - Bytes: 2493
+  - SHA-256: `d45d858e1ca0d4e2efae7bf9e0522d452c492d6b254dbc9536c203e3399ab622`
+  - Bytes: 2670
 - Anonymous user key verification API
   - URL: https://developers-apps-in-toss.toss.im/api/user-key.md
-  - SHA-256: `9eb1cd2b264d8725c4b42eae866a2d1dc0c2ac88e944898b5c7a54f55a0773bc`
-  - Bytes: 8251
+  - SHA-256: `83aa38c2e33405368cf8d091bc41295c663888209ff04808c8aeb24d6d3746d4`
+  - Bytes: 16549
 - In-app subscription guide
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/monetization/iap/in-app-subscription.md
-  - SHA-256: `16bab4994f053451b661c5afa67e9597db7c3b4e109f473b2160db8e0fcbd961`
-  - Bytes: 20348
+  - SHA-256: `01d303810f3c2fe0a57ebb3310ab5b7f7f18ae3a50dac9ecfe34e9271048340c`
+  - Bytes: 20593
 - TDS React Native docs
   - URL: https://tossmini-docs.toss.im/tds-react-native/
   - SHA-256: `26f03bab074aecf12d69d2fe80f7e79b073a18fc90af511106f2db22771bbafb`
