@@ -19,8 +19,8 @@ These values are policy values for this kit.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.35.2`
-- Upstream latest TrailBase release date: `2026-10-21`
+- Upstream latest TrailBase server: `0.35.7`
+- Upstream latest TrailBase release date: `2026-10-28`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -52,7 +52,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.2`
+- `trailbase-server-github-release`: `0.35.7`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -226,3 +226,5 @@ port, applies the functional-ledger templates, checks auth/ACL/SSE, and removes 
 containers/network/depot afterward. Never install this fixture in a real service.
 It does not validate actual Toss certificates, purchases, auth-ui UX, or a
 consumer's full application migrations.
+
+`0.35.6` adds an SSE anti-buffering header and improves SQLite WAL and shutdown handling. `0.35.7` enables HTTP/2 negotiation for multiplexed SSE streams, separates the WASM SQLite extension runtime from HTTP handlers, and refines shutdown order. These upstream changes do not raise the manually verified server baseline or minimum policy.

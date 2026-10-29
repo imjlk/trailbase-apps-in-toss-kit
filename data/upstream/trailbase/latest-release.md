@@ -1,15 +1,14 @@
-# TrailBase v0.35.6
+# TrailBase v0.35.7
 
-- Published at: 2026-10-27T18:08:08Z
-- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.35.6
+- Published at: 2026-10-28T20:26:24Z
+- Release URL: https://github.com/trailbaseio/trailbase/releases/tag/v0.35.7
 
 ## Release notes
 
-- Add `X-Accel-Buffering=no` header to SSE connections to simplify reverse-proxy configuration and accidental buffering, which may delay events. @rb365 🙏
-- Avoid truncating SQLite WALs on implicit connection closure. In multi-DBs setups, we don't want to interfere with other connections when a cached connection is evicted.
-- Add explicit DB shutdown order to avoid an issues w/o implicit destruction even though it was working just fine.
-- Internal: remove PGLite in favor of `testcontainers`.
+- Enable HTTP2 negotiation to allow Browsers to multiplex more SSE streams.
+- Untangle WASM SQLite extension function runtime from WASM HTTP handlers and tidy up implementation. Properly wire binary version to SQLite function initialization.
+- Refine shutdown order: drop more sooner.
 - Update dependencies.
 
 
-**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.35.5...v0.35.6
+**Full Changelog**: https://github.com/trailbaseio/trailbase/compare/v0.35.6...v0.35.7
