@@ -18,8 +18,8 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.33.14`
 - Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.35.2`
-- Upstream latest TrailBase release date: `2026-10-21`
+- Upstream latest TrailBase server: `0.35.7`
+- Upstream latest TrailBase release date: `2026-10-28`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -48,7 +48,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.2`
+- `trailbase-server-github-release`: `0.35.7`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -205,3 +205,5 @@ CI smoke는 명시적인 `compat-smoke` feature로만 fixture를 빌드하고, �
 loopback host port에서 일회용 컨테이너를 실행합니다. 기능성 원장 template과 auth/ACL/SSE를
 검증한 뒤 컨테이너·network·depot을 제거합니다. 실제 서비스에 이 fixture를 설치하지 마세요.
 실제 Toss 인증서·구매, auth-ui UX, 컨슈머 전체 migration을 검증하는 테스트는 아닙니다.
+
+`0.35.6`은 SSE 버퍼링 방지 헤더를 추가하고 SQLite WAL 및 종료 처리를 개선합니다. `0.35.7`은 SSE 스트림 다중화를 위한 HTTP/2 협상을 활성화하고 WASM SQLite 확장 런타임을 HTTP handler와 분리하며 종료 순서를 개선합니다. 이 업스트림 변경으로 수동 검증 서버 기준이나 최소 버전 정책을 올리지는 않습니다.
