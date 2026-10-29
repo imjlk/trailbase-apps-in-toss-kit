@@ -48,7 +48,7 @@ only after app-level smoke tests.
 - New React Native mini-apps should use Granite terminology and framework 1.0 or
   newer.
 - Apps in Toss SDK 3.x currently applies to WebView projects through
-  `@apps-in-toss/web-framework@3.4.0`; it is not an upgrade target for this
+  `@apps-in-toss/web-framework@3.9.0`; it is not an upgrade target for this
   repository's React Native `@apps-in-toss/framework` reference.
 - Framework 1.0 and newer should use `@toss/tds-react-native`; legacy framework
   versions used `@toss-design-system/react-native`.
@@ -76,16 +76,16 @@ api-client 0.6.0 for single-use server exchange. See
 [anonymous identity](anonymous-identity.md) before changing public bootstrap.
 
 <!-- renovate: datasource=npm depName=@apps-in-toss/framework versioning=npm -->
-- `apps-in-toss-framework`: `2.10.11`
+- `apps-in-toss-framework`: `2.10.13`
 
 <!-- renovate: datasource=npm depName=@toss/tds-react-native versioning=npm -->
 - `tds-react-native`: `2.0.5`
 
 <!-- renovate: datasource=npm depName=create-granite-app versioning=npm -->
-- `create-granite-app`: `1.0.43`
+- `create-granite-app`: `1.0.45`
 
 <!-- renovate: datasource=npm depName=@granite-js/react-native versioning=npm -->
-- `granite-js-react-native`: `1.0.43`
+- `granite-js-react-native`: `1.0.45`
 
 - `@toss-design-system/react-native`: legacy package name for pre-1.0 framework
   projects. No public npm `latest` metadata was available during the initial
@@ -103,13 +103,23 @@ not automatically raise the reviewed version or fail a detection-only PR.
 
 ## Latest Reviewed SDK Delta
 
+Reviewed on 2026-10-29: RN `2.10.13`, WebView `3.9.0`, and Granite reference
+packages `1.0.45`. Root development dependencies and the lockfile use the
+reviewed SDKs; RN minimum `2.10.10` and WebView peer floor `3.4.0` are unchanged.
+WebView 3.9.0 fixes completed/refunded order pagination and reports rejected
+product-grant callbacks as failures with a single `onError` notification.
+The 3.6+ anonymous auth-code API remains opt-in and needs runtime support.
+Consumer apps must test pagination, purchase restoration, grant failures, and
+anonymous bootstrap on devices before adopting these versions.
+
 The repository reference has been reviewed through `@apps-in-toss/framework`
-`2.10.11`.
+`2.10.13`.
 
 - `2.10.11`: Refreshes the RN reference for runtime diagnostics and validates the full RN adapter tests and current/minimum type fixtures. The minimum remains `2.10.10`; consumers still need their own device checks.
 
 - `@ait-kit/sdk` `0.4.0`: Adds the shared RN and Web review request and direct
-  promotion adapter contracts. The kit pins this version exactly; consumer
+  promotion adapter contracts. This is the historical 0.4.0 adoption; the current
+  pin is 0.7.0. Consumer
   Apps in Toss SDK versions remain app-owned and require their own smoke tests.
 
 - `2.8.0`: Added non-game navigation bar theme settings.
