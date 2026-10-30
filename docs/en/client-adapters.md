@@ -299,6 +299,14 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 }
 ```
 
+`showTimeoutMs` (default 60 seconds) limits the wait for an ad to start, not the
+time spent watching it. `show`, `impression`, `clicked`, or `userEarnedReward`
+disarms that deadline; `requested` alone does not. Long videos, interactive ads,
+and delayed returns therefore retain their SDK callbacks instead of failing with
+`AD_SHOW_TIMEOUT`. Existing completion fallbacks and explicit SDK failures still
+apply. Rewarded ads still require `userEarnedReward`; elapsed time never earns a
+reward. Apps should not wrap this flow in another wall-clock viewing deadline.
+
 For optional operator-issued Toss Shopping links, see [shopping affiliate links](shopping-affiliate.md).
 For server-issued product links with configurable category/deal selection, see [affiliate catalog](affiliate-catalog.md).
 

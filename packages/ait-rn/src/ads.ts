@@ -112,6 +112,7 @@ export interface CreateAppsInTossFullScreenAdBridgeOptions {
   loadTimeoutMs?: number;
   rewardFallbackMs?: number;
   showFullScreenAd?: AppsInTossShowFullScreenAd;
+  /** Deadline for the ad to start. Visible ads may stay open until SDK completion. */
   showTimeoutMs?: number;
 }
 
@@ -592,6 +593,18 @@ async function showFullScreenAdAsync({
           }
           const type = normalizeAdEventType(event);
           events.push(type);
+          // A show deadline detects a stuck opening request, not a maximum
+          // viewing duration. Interactive ads and external click-throughs can
+          // stay open much longer. Keep their listener alive for the SDK result.
+          // Some adapters omit `show`, so later visibility/reward events count too.
+          if (
+            type === "show" ||
+            type === "impression" ||
+            type === "clicked" ||
+            type === "userEarnedReward"
+          ) {
+            clearShowTimeout();
+          }
           if (type === "requested") {
             requestedAt = Date.now();
             return;

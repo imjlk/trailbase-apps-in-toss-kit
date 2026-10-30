@@ -397,6 +397,7 @@ describe("AppsInToss full-screen ad bridge", () => {
       adFormat: "rewarded",
       adGroupId: "rewarded",
     });
+    showCalls[0].onEvent({ type: "show" });
     showCalls[0].onEvent({ type: "failedToShow" });
     await expect(failedShow).rejects.toMatchObject({
       code: "AD_SHOW_FAILED",
@@ -411,6 +412,123 @@ describe("AppsInToss full-screen ad bridge", () => {
       timeoutBridge.show({ adFormat: "rewarded", adGroupId: "rewarded" }),
     ).rejects.toMatchObject({ code: "AD_SHOW_TIMEOUT" });
     expect(cleanupCalls).toBe(2);
+  });
+
+  for (const visibleEvent of ["show", "impression", "clicked"] as const) {
+    test(`keeps long rewarded ads active after ${visibleEvent} until SDK completion`, async () => {
+      const callbacks: Array<{
+        onEvent: (event: AppsInTossShowFullScreenAdEvent) => void;
+      }> = [];
+      let cleanupCalls = 0;
+      const showFullScreenAd = Object.assign(
+        ({ onEvent }) => {
+          callbacks.push({ onEvent });
+          return () => { cleanupCalls += 1; };
+        },
+        { isSupported: () => true },
+      ) as AppsInTossShowFullScreenAd;
+      const bridge = createAppsInTossFullScreenAdBridge({
+        showFullScreenAd,
+        showTimeoutMs: 5,
+      });
+      let outcome = "pending";
+      const shown = bridge.show({ adFormat: "rewarded", adGroupId: "long-ad" });
+      void shown.then(() => { outcome = "resolved"; }, () => { outcome = "rejected"; });
+      callbacks[0].onEvent({ type: "requested" });
+      callbacks[0].onEvent({ type: visibleEvent });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      const overlapping = bridge.show({ adFormat: "rewarded", adGroupId: "long-ad" });
+      const callCountWhileVisible = callbacks.length;
+      const outcomeWhileVisible = outcome;
+      const cleanupWhileVisible = cleanupCalls;
+      callbacks[0].onEvent({ type: "userEarnedReward", data: { unitAmount: 1, unitType: "coin" } });
+      callbacks[0].onEvent({ type: "dismissed" });
+      await expect(Promise.all([shown, overlapping])).resolves.toEqual([
+        expect.objectContaining({ earned: true, completed: true }),
+        expect.objectContaining({ earned: true, completed: true }),
+      ]);
+      expect(outcomeWhileVisible).toBe("pending");
+      expect(cleanupWhileVisible).toBe(0);
+      expect(callCountWhileVisible).toBe(1);
+      expect(cleanupCalls).toBe(1);
+    });
+  }
+
+  test("does not time out an earned reward while waiting for its completion fallback", async () => {
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        onEvent({ type: "userEarnedReward", data: { unitAmount: 1 } });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd,
+      showTimeoutMs: 1,
+      rewardFallbackMs: 10,
+    });
+    await expect(bridge.show({ adFormat: "rewarded", adGroupId: "rewarded" }))
+      .resolves.toMatchObject({ earned: true, completed: true });
+  });
+
+  test("keeps an interstitial open beyond its startup deadline", async () => {
+    let onEvent!: (event: AppsInTossShowFullScreenAdEvent) => void;
+    const showFullScreenAd = Object.assign(
+      (params) => {
+        onEvent = params.onEvent;
+        onEvent({ type: "show" });
+        onEvent({ type: "impression" });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({ showFullScreenAd, showTimeoutMs: 5 });
+    const shown = bridge.show({
+      adFormat: "interstitial",
+      adGroupId: "long-interstitial",
+      interstitialCompletionFallbackMs: 1_000,
+    });
+    void shown.catch(() => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    onEvent({ type: "clicked" });
+    await expect(shown).resolves.toMatchObject({
+      earned: false,
+      completed: true,
+      events: ["show", "impression", "clicked"],
+    });
+  });
+
+  test("a requested event alone still times out and cleans up", async () => {
+    let cleanupCalls = 0;
+    const showFullScreenAd = Object.assign(
+      ({ onEvent }) => {
+        onEvent({ type: "requested" });
+        return () => { cleanupCalls += 1; };
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({ showFullScreenAd, showTimeoutMs: 1 });
+    await expect(bridge.show({ adFormat: "rewarded", adGroupId: "never-visible" }))
+      .rejects.toMatchObject({ code: "AD_SHOW_TIMEOUT" });
+    expect(cleanupCalls).toBe(1);
+  });
+
+  test("a late dismissal without a reward never grants one", async () => {
+    let onEvent!: (event: AppsInTossShowFullScreenAdEvent) => void;
+    const showFullScreenAd = Object.assign(
+      (params) => {
+        onEvent = params.onEvent;
+        onEvent({ type: "show" });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({ showFullScreenAd, showTimeoutMs: 5 });
+    const shown = bridge.show({ adFormat: "rewarded", adGroupId: "dismissed" });
+    void shown.catch(() => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    onEvent({ type: "dismissed" });
+    await expect(shown).resolves.toMatchObject({ earned: false, completed: false });
   });
 
   test("preloadAndShow enforces load-show order and can schedule the next preload", async () => {
