@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.9.3 — 2026-10-30
+
+### 패치 변경
+
+- [71f191c](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/71f191cd4b47ccae186c481aa2bb7c9fec0c9eec) 긴 광고 시청과 늦은 앱 복귀 중에도 전면 광고 콜백을 유지합니다. 표시 제한 시간은 광고가 시작될 때까지만 적용하며, 별도의 10분 무응답 보호장치가 종료 콜백 누락을 복구하고 SDK 진행 이벤트가 오면 대기 시간을 갱신합니다. 보상 완료는 여전히 SDK 보상 이벤트를 받아야 인정합니다. — @imjlk의 기여입니다.
+
 ## 0.9.2 — 2026-10-16
 
 ### 패치 변경
