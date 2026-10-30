@@ -531,6 +531,60 @@ describe("AppsInToss full-screen ad bridge", () => {
     await expect(shown).resolves.toMatchObject({ earned: false, completed: false });
   });
 
+  for (const adFormat of ["rewarded", "interstitial"] as const) {
+    test(`recovers ${adFormat} groups when terminal callbacks never arrive`, async () => {
+      const callbacks: Array<{ onEvent: (event: AppsInTossShowFullScreenAdEvent) => void }> = [];
+      let cleanupCalls = 0;
+      const showFullScreenAd = Object.assign(
+        (params) => {
+          callbacks.push(params);
+          params.onEvent({ type: "show" });
+          return () => { cleanupCalls += 1; };
+        },
+        { isSupported: () => true },
+      ) as AppsInTossShowFullScreenAd;
+      const bridge = createAppsInTossFullScreenAdBridge({
+        showFullScreenAd,
+        showTimeoutMs: 1,
+        showCompletionTimeoutMs: 10,
+      });
+      await expect(bridge.show({ adFormat, adGroupId: "lost-terminal" }))
+        .rejects.toMatchObject({ code: "AD_SHOW_TIMEOUT", message: expect.stringContaining("completion") });
+      expect(cleanupCalls).toBe(1);
+      const retry = bridge.show({ adFormat, adGroupId: "lost-terminal" });
+      expect(callbacks).toHaveLength(2);
+      callbacks[0].onEvent({ type: "userEarnedReward" });
+      callbacks[1].onEvent({ type: "dismissed" });
+      await expect(retry).resolves.toMatchObject({ earned: false, completed: false });
+      expect(cleanupCalls).toBe(2);
+    });
+  }
+
+  test("SDK progress renews completion recovery while an ad remains active", async () => {
+    let onEvent!: (event: AppsInTossShowFullScreenAdEvent) => void;
+    const showFullScreenAd = Object.assign(
+      (params) => {
+        onEvent = params.onEvent;
+        onEvent({ type: "show" });
+        return () => undefined;
+      },
+      { isSupported: () => true },
+    ) as AppsInTossShowFullScreenAd;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd,
+      showTimeoutMs: 1,
+      showCompletionTimeoutMs: 30,
+    });
+    const shown = bridge.show({ adFormat: "rewarded", adGroupId: "active" });
+    void shown.catch(() => undefined);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    onEvent({ type: "clicked" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    onEvent({ type: "userEarnedReward" });
+    onEvent({ type: "dismissed" });
+    await expect(shown).resolves.toMatchObject({ earned: true, completed: true });
+  });
+
   test("preloadAndShow enforces load-show order and can schedule the next preload", async () => {
     const loadCalls: Array<{
       onEvent: (event: AppsInTossLoadFullScreenAdEvent) => void;
