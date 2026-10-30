@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-10-28T06:49:55.800Z
+- Fetched at: 2026-10-30T07:03:29.185Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
@@ -10,8 +10,8 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 23674
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `4c3d25dbe8503c078d9a9976ecfca70db7d46fa6e593a8900710ae03f0b6c2a0`
-  - Bytes: 34487
+  - SHA-256: `28479baa1bcd107336dc48a2e9a68a19ee34c9a009019b4bf460040f01c4fbd2`
+  - Bytes: 34467
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
   - SHA-256: `27fbb317bd2c72acab5231b0121cd2ba0b3c31aaf837ef66ca90f42cf9c04a48`
@@ -78,8 +78,8 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 6530
 - Promotion operations guide
   - URL: https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md
-  - SHA-256: `0ed4db2fec090688c043b3c94c35f55792fe3c267bad7159c1c43c5914e417c9`
-  - Bytes: 31619
+  - SHA-256: `7dcef0a010375299458e3c89c1904002566184b32c7b2c49e705183158178ea7`
+  - Bytes: 32017
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
   - SHA-256: `7148c6e8b1e763f4aedc9b5388376f5568c5e3534403d0fcf5e0c2144cf6f9b7`

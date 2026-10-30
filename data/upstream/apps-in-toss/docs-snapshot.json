@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-10-28T06:49:55.800Z",
+  "fetchedAt": "2026-10-30T07:03:29.185Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,8 +12,8 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "4c3d25dbe8503c078d9a9976ecfca70db7d46fa6e593a8900710ae03f0b6c2a0",
-      "bytes": 34487
+      "sha256": "28479baa1bcd107336dc48a2e9a68a19ee34c9a009019b4bf460040f01c4fbd2",
+      "bytes": 34467
     },
     {
       "key": "react-native-tutorial",
@@ -131,8 +131,8 @@
       "key": "promotion-guide",
       "title": "Promotion operations guide",
       "url": "https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md",
-      "sha256": "0ed4db2fec090688c043b3c94c35f55792fe3c267bad7159c1c43c5914e417c9",
-      "bytes": 31619
+      "sha256": "7dcef0a010375299458e3c89c1904002566184b32c7b2c49e705183158178ea7",
+      "bytes": 32017
     },
     {
       "key": "notification-agreement-sdk",
