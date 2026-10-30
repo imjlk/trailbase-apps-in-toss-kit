@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.9.3 — 2026-10-30
+
+### Patch changes
+
+- [71f191c](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/71f191cd4b47ccae186c481aa2bb7c9fec0c9eec) Keep full-screen ad callbacks active during long viewing and delayed returns. The show deadline now covers opening the ad; a separate 10-minute inactivity guard recovers missing terminal callbacks and renews on SDK progress. Reward completion still requires the SDK reward event. — Thanks @imjlk!
+
 ## 0.9.2 — 2026-10-16
 
 ### Patch changes
