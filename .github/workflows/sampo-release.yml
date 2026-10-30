@@ -92,7 +92,7 @@ jobs:
             echo "Release lockfiles are already synchronized."
             exit 0
           fi
-          git add -- bun.lock Cargo.lock '**/Cargo.lock'
+          git ls-files -z -- bun.lock Cargo.lock '**/Cargo.lock' | xargs -0 git add --
           git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
             commit -m 'chore(release): preserve dependency pins and synchronize workspace versions'
           git push origin HEAD:release/main
