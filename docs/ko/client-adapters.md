@@ -287,6 +287,18 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 }
 ```
 
+`showTimeoutMs`(기본 60초)는 광고가 시작될 때까지 기다리는 시간만 제한하며,
+시청 시간을 제한하지 않습니다. `show`, `impression`, `clicked`, `userEarnedReward`
+중 하나가 오면 시작 제한을 해제하고, `requested`만 온 경우에는 유지합니다. 긴 영상,
+인터랙티브 광고, 늦은 앱 복귀에서도 SDK 콜백을 유지합니다. 별도의
+`showCompletionTimeoutMs`(기본 10분)는 그동안 SDK 이벤트가 전혀 없을 때 종료 콜백
+누락을 복구하며, 표시·클릭 이벤트가 오면 다시 시작합니다. 복구 시 `AD_SHOW_TIMEOUT`
+으로 거절하고 한 번만 정리하여 같은 광고 그룹으로 재시도할 수 있게 합니다.
+기존 완료 fallback과 명시적인 SDK 오류 처리는 그대로 적용합니다. 보상 이벤트를 받으면
+무응답 제한 대신 기존 완료 fallback을 사용합니다. 보상형 광고는 여전히
+`userEarnedReward`가 필요하며 시간 경과만으로 보상을 인정하지 않습니다.
+앱에서 이 흐름 전체에 짧은 시청 제한 타이머를 추가하지 마세요.
+
 운영자가 발급받은 토스쇼핑 링크를 선택적으로 사용하려면 [쇼핑 제휴 링크](shopping-affiliate.md)를 참고하세요.
 서버에서 상품 링크를 발급하고 카테고리·특가 선택을 구성하려면 [제휴 상품 카탈로그](affiliate-catalog.md)를 참고하세요.
 

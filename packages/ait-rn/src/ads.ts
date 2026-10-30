@@ -112,6 +112,9 @@ export interface CreateAppsInTossFullScreenAdBridgeOptions {
   loadTimeoutMs?: number;
   rewardFallbackMs?: number;
   showFullScreenAd?: AppsInTossShowFullScreenAd;
+  /** Inactivity recovery after visibility; SDK progress restarts it. Defaults to 10 minutes. */
+  showCompletionTimeoutMs?: number;
+  /** Deadline for the ad to start, separate from viewing/completion recovery. */
   showTimeoutMs?: number;
 }
 
@@ -196,6 +199,7 @@ export function createAppsInTossFullScreenAdBridge({
   loadTimeoutMs = 15_000,
   rewardFallbackMs = 1_500,
   showFullScreenAd,
+  showCompletionTimeoutMs = 600_000,
   showTimeoutMs = 60_000,
 }: CreateAppsInTossFullScreenAdBridgeOptions = {}): AppsInTossFullScreenAdBridge {
   const preloadedAds = new Map<
@@ -278,6 +282,7 @@ export function createAppsInTossFullScreenAdBridge({
         adGroupId,
         rewardFallbackMs,
         showFullScreenAd,
+        completionTimeoutMs: showCompletionTimeoutMs,
         timeoutMs: showTimeoutMs,
       }).finally(() => {
         clear(adGroupId);
@@ -531,11 +536,13 @@ function adsLoadBridgeError(error: unknown): unknown {
 async function showFullScreenAdAsync({
   adFormat,
   adGroupId,
+  completionTimeoutMs,
   interstitialCompletionFallbackMs = 4_500,
   rewardFallbackMs,
   showFullScreenAd,
   timeoutMs,
 }: AppsInTossShowFullScreenAdOptions & {
+  completionTimeoutMs: number;
   rewardFallbackMs: number;
   showFullScreenAd?: AppsInTossShowFullScreenAd;
   timeoutMs: number;
@@ -564,6 +571,7 @@ async function showFullScreenAdAsync({
     let unitAmount: number | undefined;
     let unitType: string | undefined;
     const events: string[] = [];
+    let clearCompletionTimeout = () => {};
     const clearShowTimeout = withBridgeTimeout({
       timeoutMs,
       onTimeout: () => {
@@ -592,6 +600,29 @@ async function showFullScreenAdAsync({
           }
           const type = normalizeAdEventType(event);
           events.push(type);
+          // Separate opening failure from much longer viewing/return delays.
+          // Progress renews the recovery deadline for missing terminal callbacks.
+          // Some adapters omit `show`, so later visibility/reward events count too.
+          if (
+            type === "show" ||
+            type === "impression" ||
+            type === "clicked" ||
+            type === "userEarnedReward"
+          ) {
+            clearShowTimeout();
+            clearCompletionTimeout();
+            if (type !== "userEarnedReward" && !events.includes("userEarnedReward")) {
+              clearCompletionTimeout = withBridgeTimeout({
+                timeoutMs: completionTimeoutMs,
+                onTimeout: () => settleReject(
+                  new AppsInTossAdBridgeError({
+                    code: "AD_SHOW_TIMEOUT",
+                    message: "Apps in Toss full-screen ad completion timed out.",
+                  }),
+                ),
+              });
+            }
+          }
           if (type === "requested") {
             requestedAt = Date.now();
             return;
@@ -674,6 +705,7 @@ async function showFullScreenAdAsync({
             });
       settled = true;
       clearShowTimeout();
+      clearCompletionTimeout();
       if (interstitialFallbackTimeout != null) {
         clearTimeout(interstitialFallbackTimeout);
       }
@@ -701,6 +733,7 @@ async function showFullScreenAdAsync({
       }
       settled = true;
       clearShowTimeout();
+      clearCompletionTimeout();
       if (interstitialFallbackTimeout != null) {
         clearTimeout(interstitialFallbackTimeout);
       }
