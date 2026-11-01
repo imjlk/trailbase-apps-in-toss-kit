@@ -187,6 +187,27 @@ pub fn execute(db: &Connection, sql: &str, params: &[Value]) -> usize {
         .unwrap()
 }
 
+impl crate::db::SqlStore for Connection {
+    fn query_rows(
+        &mut self,
+        sql: &str,
+        params: &[Value],
+    ) -> crate::responses::ApiResult<Vec<Vec<Value>>> {
+        try_query(self, sql, params)
+            .map(|rows| {
+                rows.into_iter()
+                    .map(|row| row.into_iter().map(from_rusqlite_value).collect())
+                    .collect()
+            })
+            .map_err(|err| crate::responses::internal(format!("SQLite query failed: {err}")))
+    }
+    fn execute_rows(&mut self, sql: &str, params: &[Value]) -> crate::responses::ApiResult<u64> {
+        self.execute(sql, params_from_iter(to_rusqlite_params(params)))
+            .map(|n| n as u64)
+            .map_err(|err| crate::responses::internal(format!("SQLite write failed: {err}")))
+    }
+}
+
 pub fn insert_outbox(db: &Connection, id: &str, status: &str, attempts: i64) {
     db.execute(
         "INSERT INTO message_outbox

@@ -244,7 +244,7 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 ```
 
 `ait-rn` 패키지는 작은 import를 원하는 앱을 위해 `./identity`, `./storage`, `./login`,
-`./haptics`, `./ads`, `./share`, `./notifications`, `./promotion` 하위 경로도 노출합니다.
+`./haptics`, `./ads`, `./ad-skip`, `./share`, `./notifications`, `./promotion` 하위 경로도 노출합니다.
 기존 root import는 같은 public API를 계속 reexport합니다.
 
 Apps in Toss 전면형/보상형 광고에서는 placement 이름, env 변수, 리워드 지급, 서버
@@ -298,6 +298,10 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 무응답 제한 대신 기존 완료 fallback을 사용합니다. 보상형 광고는 여전히
 `userEarnedReward`가 필요하며 시간 경과만으로 보상을 인정하지 않습니다.
 앱에서 이 흐름 전체에 짧은 시청 제한 타이머를 추가하지 마세요.
+
+앱 자체 스킵권으로 광고를 건너뛰게 하려면 사용자가 명시적으로 선택하게 하고, 스킵권
+경로에서는 광고 SDK를 호출하지 마세요. `ait-rn/ad-skip`과 서버 사용 계약은
+[광고 스킵권](ad-skip-tickets.md)을 참고하세요.
 
 운영자가 발급받은 토스쇼핑 링크를 선택적으로 사용하려면 [쇼핑 제휴 링크](shopping-affiliate.md)를 참고하세요.
 서버에서 상품 링크를 발급하고 카테고리·특가 선택을 구성하려면 [제휴 상품 카탈로그](affiliate-catalog.md)를 참고하세요.

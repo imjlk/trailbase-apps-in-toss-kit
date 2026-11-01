@@ -255,7 +255,7 @@ export const introSeenAtom = createPersistentJsonAtom<boolean>({
 
 The `ait-rn` package also exposes focused subpaths for apps that want smaller
 imports: `./identity`, `./storage`, `./login`, `./haptics`, `./ads`,
-`./share`, `./notifications`, and `./promotion`. The root import continues to
+`./ad-skip`, `./share`, `./notifications`, and `./promotion`. The root import continues to
 reexport the same public APIs.
 
 For full-screen Apps in Toss ads, keep placement names, env variables, reward
@@ -310,6 +310,10 @@ Existing completion fallbacks and explicit SDK failures still apply. An earned
 reward uses its completion fallback instead of the inactivity deadline. Rewarded
 ads still require `userEarnedReward`; elapsed time never earns a reward. Apps
 should not add a short wall-clock viewing deadline around this flow.
+
+To let users skip an ad with an app-owned ticket instead, keep the choice explicit
+and never call the ad SDK for a ticket. See [ad skip tickets](ad-skip-tickets.md)
+for `ait-rn/ad-skip` and the server redemption contract.
 
 For optional operator-issued Toss Shopping links, see [shopping affiliate links](shopping-affiliate.md).
 For server-issued product links with configurable category/deal selection, see [affiliate catalog](affiliate-catalog.md).

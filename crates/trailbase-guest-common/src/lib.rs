@@ -7,6 +7,7 @@ use sha2::Sha256;
 use trailbase_wasm::fetch;
 use trailbase_wasm::http::IntoBody;
 
+pub mod ad_skip_tickets;
 pub mod analytics_events;
 pub mod anonymous_identity;
 pub mod app_rewards;
@@ -25,6 +26,7 @@ pub mod operation_policy;
 pub mod promotion_campaigns;
 pub mod promotion_rewards;
 pub mod responses;
+pub mod reward_cohorts;
 pub mod session;
 pub mod settings;
 pub mod toss_identity_store;

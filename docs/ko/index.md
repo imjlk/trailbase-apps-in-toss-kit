@@ -31,6 +31,8 @@ AI 코딩 에이전트는 이 문서보다 먼저 `AGENTS.md`를 읽어야 합�
 | Toss 프로모션 리워드 캠페인 설계하기 | [promotion-campaigns.md](promotion-campaigns.md) |
 | 안전한 리뷰 요청 흐름 추가하기 | [review-request.md](review-request.md) |
 | 앱 자체 광고·공유 보상을 한 번만 지급하기 | [app-rewards.md](app-rewards.md) |
+| 광고 스킵권 지급하고 사용하기 | [ad-skip-tickets.md](ad-skip-tickets.md) |
+| 대상별 포인트 보상 기간 제한과 자격 스냅샷 | [reward-cohorts.md](reward-cohorts.md) |
 | 자체재화 보고 준비하기 | [owned-currency-reporting.md](owned-currency-reporting.md) |
 | 인앱 결제 주문/지급 상태 저장하기 | [iap-orders.md](iap-orders.md) |
 | 기능성 푸시/알림 메시지 붙이기 | [functional-messages.md](functional-messages.md) |

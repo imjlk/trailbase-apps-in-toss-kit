@@ -118,3 +118,18 @@ fn is_transient_db_error(err: &impl ToString) -> bool {
     let message = err.to_string();
     message.contains("ConnectionReadTimeout") || message.contains("ConnectionReset")
 }
+
+// Keep public helpers tied to TrailBase transactions; this crate-private executor
+// lets tests run the same orchestration and SQL on SQLite.
+pub(crate) trait SqlStore {
+    fn query_rows(&mut self, sql: &str, params: &[Value]) -> ApiResult<Vec<Vec<Value>>>;
+    fn execute_rows(&mut self, sql: &str, params: &[Value]) -> ApiResult<u64>;
+}
+impl SqlStore for Transaction {
+    fn query_rows(&mut self, sql: &str, params: &[Value]) -> ApiResult<Vec<Vec<Value>>> {
+        tx_query(self, sql, params)
+    }
+    fn execute_rows(&mut self, sql: &str, params: &[Value]) -> ApiResult<u64> {
+        tx_execute(self, sql, params)
+    }
+}

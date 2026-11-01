@@ -192,6 +192,16 @@ stage durations are not pure lock wait/network RTT or proof of production speedu
     offer/eligibility/transactional quota policies; client SDK events and attempt IDs are not
     proof of viewing or sharing. The grant row is the credit, not a trigger for another payment.
     Keep receipt lookup during pauses. See `docs/en/app-rewards.md` and `docs/ko/app-rewards.md`.
+  - `ad_skip_tickets.sql` with `trailbase_guest_common::ad_skip_tickets` for app-owned ad skip
+    tickets: grant in the qualifying event's transaction, keyed by a stable subject and cause
+    period; redeem once per request and ad opportunity behind a server placement allowlist that
+    excludes attendance restores. Never fake SDK ad events or mix tickets into promotion ledgers.
+    Use `ait-rn/ad-skip` to keep request IDs across retries/restarts. See `ad-skip-tickets.md`.
+  - `reward_subject_cohorts.sql` and `promotion_reward_eligibilities.sql` with
+    `trailbase_guest_common::reward_cohorts` for legacy-grace/welcome point windows decided on
+    server time and point eligibility snapshots taken when the condition is met. The first
+    registration wins and survives re-joins; snapshots keep campaign amount/code and first-claim
+    deadlines. See `reward-cohorts.md`.
   For recoverable message workers, apply `message_outbox_attempts.sql` and use
   `message_outbox_recovery` leases. Commit the dispatch permit before sending; expired
   in-flight sends are UNKNOWN and must not be automatically resent. Stop legacy workers

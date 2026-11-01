@@ -32,6 +32,8 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Model Toss promotion reward campaigns | [promotion-campaigns.md](promotion-campaigns.md) |
 | Add a safe review request flow | [review-request.md](review-request.md) |
 | Issue app-owned ad/share credits once | [app-rewards.md](app-rewards.md) |
+| Grant and redeem ad skip tickets | [ad-skip-tickets.md](ad-skip-tickets.md) |
+| Limit point rewards by user cohort and snapshot eligibility | [reward-cohorts.md](reward-cohorts.md) |
 | Prepare reports for self-issued currency | [owned-currency-reporting.md](owned-currency-reporting.md) |
 | Persist in-app purchase order/grant state | [iap-orders.md](iap-orders.md) |
 | Add functional push/inbox messages | [functional-messages.md](functional-messages.md) |
