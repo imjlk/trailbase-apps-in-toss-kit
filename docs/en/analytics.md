@@ -149,7 +149,7 @@ paths resolve under `<depot>/data`, rather than the process working directory;
 parent-directory paths are disallowed. Update the bound fallback path or move
 the existing database before upgrading, and verify the expected database is
 attached so the initializer does not silently create a different one. The kit's
-last-verified server remains `0.33.14`.
+last-verified server is `0.35.9`; its smokes do not attach a database from WASM.
 
 To verify the template against the currently verified TrailBase image:
 

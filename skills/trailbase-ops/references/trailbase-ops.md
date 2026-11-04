@@ -61,7 +61,7 @@
   the password hash for callers that have not moved rotation to the login helper.
 - TrailBase 0.31.2 removed `_user.verified` in favor of `unverified_email`. Use the
   kit auth helpers, which detect both schemas, instead of app-local inserts. Rebuild
-  components with guest runtime 0.6.1 when moving to the verified 0.33.14 server.
+  components with guest runtime 0.6.1 when moving to the verified 0.35.9 server.
   New component binaries are not compatible with pre-0.32 hosts.
 - Add coarse anonymous bootstrap rate limits before `_user` creation or login attempts.
 - For public WebView anonymous bootstrap on SDK 3.6+, use a fresh client authentication code

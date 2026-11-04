@@ -16,10 +16,10 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 아래 값은 이 kit의 정책 값입니다.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.33.14`
-- Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.35.7`
-- Upstream latest TrailBase release date: `2026-10-28`
+- Last verified TrailBase server: `0.35.9`
+- Last verified TrailBase release date: `2026-11-03`
+- Upstream latest TrailBase server: `0.35.9`
+- Upstream latest TrailBase release date: `2026-11-03`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -29,8 +29,9 @@ test가 통과한 뒤에만 사람이 올립니다.
 수동 서버 호환성 값은 `data/trailbase-compat-policy.json`에도 기록합니다. 이 파일은
 업스트림 최신 릴리스에서 자동 생성하지 않습니다. 업스트림 최신 버전과 이 kit가 지원한다고
 선언한 버전은 서로 다른 신호이기 때문입니다.
-TrailBase `0.33.14`는 일회용 kit WASM/auth/Record API/SSE fixture를 통과한 마지막
-검증 버전입니다. Docker와 `bun run trailbase:wasm:smoke`로 재현할 수 있습니다.
+TrailBase `0.35.9`는 일회용 kit WASM/auth/Record API/SSE fixture와 analytics 다중 DB
+smoke를 통과한 마지막 검증 버전입니다. Docker와 `bun run trailbase:wasm:smoke`,
+`bun scripts/smoke-trailbase-analytics-multidb.mjs`로 재현할 수 있습니다.
 Smoke는 명시적인 proxy stub mode를 쓰며 컨슈머 checkout이나 배포를 변경하지 않습니다.
 컨슈머 실기기·production 검증은 앱이 소유하며 kit minimum은 TBD로 유지합니다.
 
@@ -48,7 +49,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.7`
+- `trailbase-server-github-release`: `0.35.9`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -118,10 +119,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbase/trailbase:0.33.14
+  --image trailbase/trailbase:0.35.9
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.33.14
+  --version 0.35.9
 ```
 
 일반 모드에서는 경고를 출력하되 성공으로 종료합니다. Strict 모드에서는 선언된 kit minimum보다
@@ -140,26 +141,27 @@ CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-versi
 
 ## Guest ABI와 인증 migration
 
-`0.33.14`에서 업그레이드하기 전에 컨슈머의 `UserIdentifier` 정책을 확인하세요.
+컨슈머를 `0.33.14`에서 업그레이드하기 전에 `UserIdentifier` 정책을 확인하세요.
 `0.33.16`은 미지정 정책의 fallback을 `ONLY_EMAIL`로 변경합니다. 이메일 없는 외부
 사용자는 앱이 `REQUIRE_USERNAME` 같은 적절한 정책을 명시하지 않으면 로그인할 수
 없게 될 수 있습니다. 이전 fallback에 의존하지 말고 의도한 계정 식별자로 제공자
 로그인을 다시 검증하세요.
 
-검증 기준 `0.33.14`는 시간 차이를 이용한 계정 열거 side-channel을 수정한
-`0.33.23`보다 이전 버전입니다. 과거 테스트 결과이며 보안 권장 버전이 아닙니다.
-컨슈머는 노출 여부를 평가하고 이 수정이 포함된 조합의 업그레이드를 검증해야 합니다.
-이후 추적 버전은 비싼 비밀번호 해시 작업을 async runtime 밖으로 옮기고 5초 timeout을
-추가했으며(`0.34.2`), `email`/`unverified_email` 간 유일성과 오래된 미검증 사용자
-정리를 적용하고(`0.34.4`), 보안 권고에 대응해 Wasmtime을 갱신했습니다(`0.34.7`).
-배포 전 인증 데이터·세션 동작과 앱 smoke test를 확인하세요. 메타데이터만 갱신하는
-이번 변경이 새 버전의 호환성을 보증하지는 않습니다.
+검증 기준은 2026-11-03에 `0.33.14`에서 `0.35.9`로 올라갔습니다. `0.35.9`에는 시간
+차이를 이용한 계정 열거 side-channel 수정(`0.33.23`), 비싼 비밀번호 해시 작업을 async
+runtime 밖으로 옮기고 5초 timeout을 둔 변경(`0.34.2`), `email`/`unverified_email` 간
+유일성과 이메일 미검증 사용자의 주기적 정리(`0.34.4`), Wasmtime 보안 갱신(`0.34.7`,
+`0.35.2`, `0.35.8`)이 포함됩니다. 정리 작업은 검증된 이메일이 없는 사용자만 지웁니다.
+Kit의 새 스키마용 helper는 검증된 service email을 직접 저장하므로 익명 service
+principal은 정리 대상이 아닙니다. 아직 `0.33.14`를 쓰는 컨슈머는 새 조합으로 옮기고,
+배포 전 인증 데이터·세션 동작과 앱 자체 smoke test를 확인하세요.
 
 TrailBase `0.34.0`부터 WASM `ATTACH DATABASE`의 상대 경로 기준은 프로세스 작업
 디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조는 허용하지 않습니다.
 보조 DB를 사용하는 컨슈머는 업그레이드 전에 bind할 경로를 수정하거나 DB 파일을 옮긴 뒤
 의도한 기존 DB가 연결되는지 확인하세요. [analytics fallback initializer](analytics.md)에도
-해당합니다. 이 업스트림 변경 추적이 검증 기준 `0.33.14`를 올리는 것은 아닙니다.
+해당합니다. Kit smoke는 WASM에서 DB를 연결하지 않으므로, fallback 경로를 bind하는
+컨슈머는 의도한 파일에 행이 기록되는지 직접 확인해야 합니다.
 
 중간 버전의 다른 변경도 확인하세요. `0.33.15`는 WASM에서 연결할 수 있는 DB를
 제한하고 guest `execute_batch`를 추가합니다. `0.33.18`은 batch·transaction 오류의
@@ -182,7 +184,7 @@ Wasmtime을 갱신했습니다. fresh-start·migration runbook은 컨슈머가 �
 
 TrailBase 0.32는 component interface를 변경했습니다. 이 checkout은
 `trailbase-wasm` 0.6.1로 빌드하므로 호환 서버와 함께 배포해야 하며 검증한 조합은
-0.33.14입니다. 컨슈머 Rust component를 모두 다시 빌드하고 upstream 안내에 따라
+0.35.9입니다. 컨슈머 Rust component를 모두 다시 빌드하고 upstream 안내에 따라
 first-party auth-ui component도 갱신하세요. 조합 migration을 준비하기 전에는 기존
 kit/server pair를 유지하세요. 최소 버전 정책을 TBD로 유지한다는 것이 새 component가
 0.32 이전 서버에서 실행된다는 뜻은 아닙니다.
@@ -196,8 +198,9 @@ service identity 중 하나를 임의로 선택하지 않습니다. Token 발급
 비밀번호 회전 경로를 유지합니다.
 
 검토 범위에는 0.31.3의 중첩 JSON 구독 수정, 0.32의 Rust guest 재사용·auth-ui metadata,
-0.33의 refresh token 엔트로피·OAuth cookie 수정, 0.33.14까지의 admin UI·SQL 도구 변경이
-포함됩니다. Postgres 호환성은 선언하지 않으며 kit SQL·통합 smoke는 SQLite 기준입니다.
+0.33의 refresh token 엔트로피·OAuth cookie 수정, 0.33.14까지의 admin UI·SQL 도구 변경,
+위에 정리한 0.33.15–0.35.9 변경이 포함됩니다. Postgres 호환성은 선언하지 않으며
+kit SQL·통합 smoke는 SQLite 기준입니다.
 Guest instance가 여러 요청에 재사용될 수 있으므로 사용자·요청 상태를 Rust 전역 cache에
 보관하지 마세요.
 
@@ -206,4 +209,6 @@ loopback host port에서 일회용 컨테이너를 실행합니다. 기능성 �
 검증한 뒤 컨테이너·network·depot을 제거합니다. 실제 서비스에 이 fixture를 설치하지 마세요.
 실제 Toss 인증서·구매, auth-ui UX, 컨슈머 전체 migration을 검증하는 테스트는 아닙니다.
 
-`0.35.6`은 SSE 버퍼링 방지 헤더를 추가하고 SQLite WAL 및 종료 처리를 개선합니다. `0.35.7`은 SSE 스트림 다중화를 위한 HTTP/2 협상을 활성화하고 WASM SQLite 확장 런타임을 HTTP handler와 분리하며 종료 순서를 개선합니다. 이 업스트림 변경으로 수동 검증 서버 기준이나 최소 버전 정책을 올리지는 않습니다.
+`0.35.6`은 SSE 버퍼링 방지 헤더를 추가하고 SQLite WAL 및 종료 처리를 개선합니다. `0.35.7`은 SSE 스트림 다중화를 위한 HTTP/2 협상을 활성화하고 WASM SQLite 확장 런타임을 HTTP handler와 분리하며 종료 순서를 개선합니다.
+
+`0.35.8`은 주로 Wasmtime 보안 권고에 대응하며, 다중 DB SQLite 연결을 in-memory `main`으로 열고 기본값이 아닌 `main` DB에도 base·user migration을 적용합니다. `0.35.9`는 로그인하지 않은 `/api/auth/v1/logout` 요청에 401을 반환하고 JSON 요청을 리다이렉트하지 않으며, 보안 권고에 대응해 의존성을 갱신합니다. 두 버전 모두 `0.35.9` 검증 기준에 포함됩니다.

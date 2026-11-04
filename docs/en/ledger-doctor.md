@@ -9,7 +9,7 @@ with a read-only connection, query-only mode, and a consistent read transaction.
 ```bash
 bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/ledger-doctor.mjs \
   --db /private/backups/main.sqlite --kind iap --record-id "$ORDER_ID" \
-  --timestamp-unit milliseconds --server-version 0.33.14 --json
+  --timestamp-unit milliseconds --server-version 0.35.9 --json
 ```
 
 Use a consistent SQLite backup produced by the database/consumer backup procedure.

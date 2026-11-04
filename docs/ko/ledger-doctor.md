@@ -9,7 +9,7 @@ Ledger doctor는 SQLite 스냅샷을 읽고 Toss 호출이나 데이터 쓰기 �
 ```bash
 bun vendor/trailbase-apps-in-toss-kit/packages/trailbase-runtime/bin/ledger-doctor.mjs \
   --db /private/backups/main.sqlite --kind iap --record-id "$ORDER_ID" \
-  --timestamp-unit milliseconds --server-version 0.33.14 --json
+  --timestamp-unit milliseconds --server-version 0.35.9 --json
 ```
 
 DB·소비 앱의 백업 절차로 생성한 일관된 SQLite 백업을 사용하세요. 실행 중인 WAL DB에서

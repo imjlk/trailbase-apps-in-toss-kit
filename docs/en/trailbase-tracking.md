@@ -17,10 +17,10 @@ inputs.
 These values are policy values for this kit.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.33.14`
-- Last verified TrailBase release date: `2026-09-10`
-- Upstream latest TrailBase server: `0.35.7`
-- Upstream latest TrailBase release date: `2026-10-28`
+- Last verified TrailBase server: `0.35.9`
+- Last verified TrailBase release date: `2026-11-03`
+- Upstream latest TrailBase server: `0.35.9`
+- Upstream latest TrailBase release date: `2026-11-03`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -31,10 +31,12 @@ The manual server compatibility values are mirrored in
 `data/trailbase-compat-policy.json`. That file is intentionally not generated
 from the upstream latest release, because latest upstream and supported-by-this-kit
 are different signals.
-TrailBase `0.33.14` is now the last version verified with the disposable kit
-WASM/auth/Record API/SSE fixture. Run `bun run trailbase:wasm:smoke` to reproduce
-it with Docker. The smoke uses explicit proxy stub mode and never touches a
-consumer checkout or deployment. Consumer device and production checks remain
+TrailBase `0.35.9` is now the last version verified with the disposable kit
+WASM/auth/Record API/SSE fixture and the analytics multi-database smoke. Run
+`bun run trailbase:wasm:smoke` and
+`bun scripts/smoke-trailbase-analytics-multidb.mjs` to reproduce it with Docker.
+The smoke uses explicit proxy stub mode and never touches a consumer checkout or
+deployment. Consumer device and production checks remain
 app-owned; the kit minimum stays TBD.
 
 Rust tool versions are surfaced in both `.mise.toml` and `rust-toolchain.toml`.
@@ -52,7 +54,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.7`
+- `trailbase-server-github-release`: `0.35.9`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -130,10 +132,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbase/trailbase:0.33.14
+  --image trailbase/trailbase:0.35.9
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.33.14
+  --version 0.35.9
 ```
 
 In non-strict mode the script warns and exits successfully. In strict mode it
@@ -154,28 +156,30 @@ upper bound.
 
 ## Guest ABI and Auth Migration
 
-Before upgrading from `0.33.14`, check the consumer's `UserIdentifier` policy:
+Before upgrading a consumer from `0.33.14`, check its `UserIdentifier` policy:
 `0.33.16` changes the undefined-policy fallback to `ONLY_EMAIL`. External users
 without email addresses may stop authenticating unless the application explicitly
 chooses a suitable policy such as `REQUIRE_USERNAME`. Re-test provider login with
 the intended account identifiers rather than relying on the old fallback.
 
-The verified `0.33.14` baseline predates the timing-based account-enumeration
-side-channel fix in `0.33.23`. It is a historical test result, not a security
-recommendation. Consumers must assess their exposure and test a coordinated
-upgrade that includes this fix. Later tracked releases also move expensive
+The verified baseline moved from `0.33.14` to `0.35.9` on 2026-11-03. `0.35.9`
+includes the timing-based account-enumeration side-channel fix (`0.33.23`),
 password hashing off the async runtime with a five-second timeout (`0.34.2`),
-enforce uniqueness across `email`/`unverified_email` and clean up stale unverified
-users (`0.34.4`), and update Wasmtime for security advisories (`0.34.7`). Review
-auth data and session behavior and run application smoke tests before rollout;
-this metadata-only update does not certify those newer versions.
+uniqueness across `email`/`unverified_email` with a periodic clean-up of stale
+users missing email verification (`0.34.4`), and the Wasmtime security updates
+(`0.34.7`, `0.35.2`, `0.35.8`). The clean-up only removes users without a
+verified email. The kit's modern helpers write the verified service email
+directly, so anonymous service principals are not cleaned up. Consumers still on
+`0.33.14` should move to the new pair; review auth data and session behavior and
+run the application's own smoke tests before rollout.
 
 TrailBase `0.34.0` changes relative paths in WASM `ATTACH DATABASE` calls from
 the process working directory to `<depot>/data` and disallows parent-directory
 references. Before upgrading an auxiliary-database consumer, update its bound
 paths or move its database files, then verify it attaches the intended existing
 database. This also applies to the [analytics fallback initializer](analytics.md).
-Tracking this upstream change does not raise the `0.33.14` verified baseline.
+The kit's smokes do not attach a database from WASM, so a consumer that binds a
+fallback path must still check that the expected file receives its rows.
 
 Other intervening changes also need consumer attention: `0.33.15` constrains
 databases attachable by WASM and adds guest `execute_batch`; `0.33.18` corrects
@@ -198,7 +202,7 @@ only after the consumer's pinned server includes it.
 
 TrailBase 0.32 changed the component interface. This checkout now builds with
 `trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;
-0.33.14 is the verified pairing. Rebuild all consumer Rust components and update
+0.35.9 is the verified pairing. Rebuild all consumer Rust components and update
 the first-party auth-ui component following the upstream component instructions.
 Keep a consumer on its previous kit/server pair until that coordinated migration
 is ready. The unchanged TBD minimum policy is not a claim that new components run
@@ -215,10 +219,11 @@ remain the token authority.
 
 The reviewed upstream delta also includes nested JSON subscription fixes in
 0.31.3, recycled Rust guest state and auth-ui metadata changes in 0.32, stronger
-refresh-token entropy and OAuth/cookie fixes in 0.33, and admin UI/SQL tooling
-changes through 0.33.14. No Postgres compatibility claim is added; this kit's SQL
-and integration smoke remain SQLite-based. Keep request/user state out of global
-Rust guest caches because guest instances may serve multiple requests.
+refresh-token entropy and OAuth/cookie fixes in 0.33, admin UI/SQL tooling
+changes through 0.33.14, and the 0.33.15–0.35.9 changes above. No Postgres
+compatibility claim is added; this kit's SQL and integration smoke remain
+SQLite-based. Keep request/user state out of global Rust guest caches because
+guest instances may serve multiple requests.
 
 The CI smoke compiles `compat_smoke` only with the explicit `compat-smoke` feature,
 starts disposable Docker containers on a private network with a loopback host
@@ -227,4 +232,6 @@ containers/network/depot afterward. Never install this fixture in a real service
 It does not validate actual Toss certificates, purchases, auth-ui UX, or a
 consumer's full application migrations.
 
-`0.35.6` adds an SSE anti-buffering header and improves SQLite WAL and shutdown handling. `0.35.7` enables HTTP/2 negotiation for multiplexed SSE streams, separates the WASM SQLite extension runtime from HTTP handlers, and refines shutdown order. These upstream changes do not raise the manually verified server baseline or minimum policy.
+`0.35.6` adds an SSE anti-buffering header and improves SQLite WAL and shutdown handling. `0.35.7` enables HTTP/2 negotiation for multiplexed SSE streams, separates the WASM SQLite extension runtime from HTTP handlers, and refines shutdown order.
+
+`0.35.8` mostly addresses Wasmtime security advisories, opens multi-database SQLite connections with an in-memory `main`, and applies base and user migrations on non-default `main` databases. `0.35.9` returns 401 from `/api/auth/v1/logout` when not signed in, stops redirecting JSON requests there, and updates dependencies for security advisories. Both are covered by the `0.35.9` verified baseline.

@@ -1,7 +1,7 @@
 {
   "kitMinimumSupportedTrailbaseServer": null,
-  "lastVerifiedTrailbaseServer": "0.33.14",
-  "lastVerifiedTrailbaseReleaseDate": "2026-09-10",
+  "lastVerifiedTrailbaseServer": "0.35.9",
+  "lastVerifiedTrailbaseReleaseDate": "2026-11-03",
   "description": "Manual TrailBase server compatibility policy for this kit. null means TBD and must not be auto-promoted from upstream latest.",
   "strictMode": {
     "failWhenBelowMinimum": true,
@@ -14,6 +14,7 @@
     "Raise kitMinimumSupportedTrailbaseServer only after consumer smoke tests pass.",
     "Raise lastVerifiedTrailbaseServer only after this kit has been checked against that server version.",
     "TrailBase 0.31.1 passed the kit analytics multi-database migration, healthcheck, and SQLite verification smoke test.",
-    "TrailBase 0.33.14 passed the disposable kit WASM component, anonymous proxy-stub bootstrap, official auth login/refresh, authenticated WASM, Record API ownership/ACL, SSE, and combined functional-ledger migration smoke. This is not consumer device or production validation."
+    "TrailBase 0.33.14 passed the disposable kit WASM component, anonymous proxy-stub bootstrap, official auth login/refresh, authenticated WASM, Record API ownership/ACL, SSE, and combined functional-ledger migration smoke. This is not consumer device or production validation.",
+    "TrailBase 0.35.9 passed the same disposable WASM smoke (with and without the operations hold) and the analytics multi-database smoke on 2026-11-03. It includes the 0.33.23 account-enumeration timing fix and the Wasmtime security updates in 0.34.7, 0.35.2 and 0.35.8. This is not consumer device or production validation."
   ]
 }
