@@ -376,7 +376,8 @@ export function createAdSkipRedemptionController({
     for (let attempt = 1; attempt <= attempts; attempt += 1) {
       try {
         const receipt = normalizeAdSkipRedemptionReceipt(
-          await withTimeout(redeem({ ...request }), timeoutMs),
+          // Persisted recovery metadata is not part of the server request contract.
+          await withTimeout(redeem(normalizeAdSkipRedemptionRequest(request)), timeoutMs),
           request,
         );
         await removePending(key);
