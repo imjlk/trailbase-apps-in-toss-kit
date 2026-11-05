@@ -1,5 +1,30 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.10.0 — 2026-11-05
+
+### Minor changes
+
+- [0b59b73](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/0b59b7373d411c9cb78117d51f1a4a06d6251c6d) Add app-owned ad skip ticket and reward cohort helpers with the `ait-rn/ad-skip` client. Adopting them requires copying the new `ad_skip_tickets.sql`, `reward_subject_cohorts.sql` and `promotion_reward_eligibilities.sql` templates into consumer migrations; existing consumers need no change. — Thanks @imjlk!
+- [d970562](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/d970562e4a1f243cc8154ebf76ed903c04644218) Share full-screen ad lifecycle, ad skip reconciliation, persisted JSON state,
+  analytics and engagement helpers between RN and WebView adapters. WebView adds
+  SDK 3 ad loading, DOM banner delegation, verbatim-key Storage and Analytics.log
+  integration. Existing RN entry points and long-ad completion behavior remain.
+  
+  Consumers updating either adapter must register
+  `vendor/trailbase-apps-in-toss-kit/packages/ait-core` alongside their adapter and
+  `trailbase-client` in Bun workspaces, then regenerate their lockfile. The kit does
+  not migrate screens or release consumer bundles. Validate fresh-code authentication,
+  storage continuity, ads and skip receipts on devices before an SDK 3 rollout;
+  SDK 3 releases cannot roll back to SDK 2.
+  
+  Include the shared client workspace manifest in filtered proxy image builds.
+  Proxy runtime routes and certificate mounts are unchanged. — Thanks @imjlk!
+
+### Patch changes
+
+- [244c9c7](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/244c9c7d2e25754f28b12dd914f4d1b9754d6172) Keep local recovery metadata out of ad skip redemption requests, including retries after an app restart, so strict server request validators accept the documented payload. — Thanks @imjlk!
+- Updated dependencies: ait-core (npm)@0.2.0
+
 ## 0.9.3 — 2026-10-30
 
 ### Patch changes

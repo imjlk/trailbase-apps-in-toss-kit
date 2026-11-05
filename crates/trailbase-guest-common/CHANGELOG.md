@@ -1,5 +1,11 @@
 # trailbase-guest-common
 
+## 0.16.0 — 2026-11-05
+
+### Minor changes
+
+- [0b59b73](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/0b59b7373d411c9cb78117d51f1a4a06d6251c6d) Add app-owned ad skip ticket and reward cohort helpers with the `ait-rn/ad-skip` client. Adopting them requires copying the new `ad_skip_tickets.sql`, `reward_subject_cohorts.sql` and `promotion_reward_eligibilities.sql` templates into consumer migrations; existing consumers need no change. — Thanks @imjlk!
+
 ## 0.15.0 — 2026-10-16
 
 ### Minor changes
