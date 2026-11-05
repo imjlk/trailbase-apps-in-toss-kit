@@ -1,6 +1,6 @@
 import { createReactNativeAds } from "@ait-kit/sdk/rn";
-import { defaultFrameworkFunction } from "./internal/framework";
-import { createFullScreenAdBridge, type CreateAppsInTossFullScreenAdBridgeOptions } from "@trailbase-apps-in-toss-kit/ait-core/ads";
+import { defaultFrameworkFunction, type AppsInTossLoadFullScreenAd, type AppsInTossShowFullScreenAd } from "./internal/framework";
+import { createFullScreenAdBridge, type CreateAppsInTossFullScreenAdBridgeOptions as CoreAdBridgeOptions } from "@trailbase-apps-in-toss-kit/ait-core/ads";
 export * from "@trailbase-apps-in-toss-kit/ait-core/ads";
 export {
   isAppsInTossProductionRuntime,
@@ -20,6 +20,11 @@ export type {
   SafeGetAppsInTossPlatformOSOptions,
 } from "./runtime";
 
+// Keep the native SDK's required support members on the existing options type.
+export interface CreateAppsInTossFullScreenAdBridgeOptions extends Omit<CoreAdBridgeOptions, "loadFullScreenAd" | "showFullScreenAd"> {
+  loadFullScreenAd?: AppsInTossLoadFullScreenAd;
+  showFullScreenAd?: AppsInTossShowFullScreenAd;
+}
 
 export function createAppsInTossFullScreenAdBridge(options: CreateAppsInTossFullScreenAdBridgeOptions = {}) {
   return createFullScreenAdBridge(options, {

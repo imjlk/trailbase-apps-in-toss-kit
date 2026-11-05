@@ -8,3 +8,9 @@ const compatibleFramework: AppsInTossFrameworkModule = framework;
 const compatibleIap: AppsInTossIapSdk = framework.IAP;
 void compatibleFramework;
 void compatibleIap;
+
+import type { CreateAppsInTossFullScreenAdBridgeOptions } from "../src/ads";
+declare const adOptions: CreateAppsInTossFullScreenAdBridgeOptions;
+// Existing RN callers can invoke the native support member after checking the function.
+if (adOptions.loadFullScreenAd) adOptions.loadFullScreenAd.isSupported();
+if (adOptions.showFullScreenAd) adOptions.showFullScreenAd.isSupported();
