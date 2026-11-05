@@ -2,7 +2,7 @@
 
 `@trailbase-apps-in-toss-kit/ait-web` is a source-consumed WebView adapter for
 `@apps-in-toss/web-framework >=3.4.0 <4`. The consumer owns that SDK dependency.
-The kit installs 3.4.0 only for development type/bundle verification. RN consumers
+The kit installs 3.9.0 only for development type/bundle verification. RN consumers
 continue to use `ait-rn` and `@apps-in-toss/framework` 2.x.
 
 For anonymous caller authentication, `ait.createAnonymousKeyAuthCode()` delegates
@@ -45,10 +45,11 @@ For example (keep the consumer's other dependencies and workspace entries):
   "private": true,
   "workspaces": [
     "vendor/trailbase-apps-in-toss-kit/packages/ait-web",
+    "vendor/trailbase-apps-in-toss-kit/packages/ait-core",
     "vendor/trailbase-apps-in-toss-kit/packages/trailbase-client"
   ],
   "dependencies": {
-    "@apps-in-toss/web-framework": "3.6.0",
+    "@apps-in-toss/web-framework": "3.9.0",
     "@trailbase-apps-in-toss-kit/ait-web": "workspace:*",
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
   }
@@ -61,7 +62,7 @@ The kit's own dependencies use `bun run deps:install` from the kit checkout. Tru
 each new checkout's reviewed mise config and install its tools before validation.
 
 If kit development dependencies are installed inside the submodule, its default
-loader can resolve the kit's SDK 3.4.0 rather than the consumer's newer SDK. Put
+loader can resolve the kit's SDK version rather than the consumer's selected SDK. Put
 the loader in the consumer's module so the code-authentication flow selects the
 consumer-owned SDK 3.6+:
 
@@ -154,8 +155,7 @@ contracts to reconcile unknown/pending orders; never infer entitlement from a
 subscription query alone. A lost response must not allocate a new transaction identity.
 
 `createShareLink` accepts an `intoss://` path and `share` opens a share sheet. A
-resolved share sheet is not evidence of sharing and does not issue a reward. For
-other supported SDK surfaces such as ads, use their official SDK 3 APIs and
+resolved share sheet is not evidence of sharing and does not issue a reward. For ads, use the full-screen and DOM banner adapters below and
 connect only app-owned credits to [server reward attempts](app-rewards.md), with
 explicit server policies. The legacy `contactsViral` reward integration has
 been retired. This adapter does not wrap every SDK feature.
@@ -186,3 +186,74 @@ console QR/device checks before a consumer rollout.
 Login preserves future string referrers as well as DEFAULT/SANDBOX. Purchase results require a usable original order ID (including an order_id compatibility alias); other native result metadata is preserved. A missing SDK disposer is tolerated, and supplied disposers are called once.
 
 Purchase/subscription completion waits for both a valid success event and literal-true backend grant for the same order, in either arrival order. Repeated native grant callbacks for that order share one in-flight result. A timeout prevents new late grant callbacks from starting; already-running backend work still requires reconciliation.
+
+## Shared helpers for RN-to-WebView migration
+
+Register `packages/ait-core` in the consumer's Bun workspaces when updating to
+this kit revision, including consumers that keep using `ait-rn`. Both adapters
+now depend on that source workspace. Keep `trailbase-client` registered too and
+regenerate the consumer lockfile. Existing RN imports and runtime behavior remain
+supported; a submodule pointer update alone does not add the new workspace.
+
+`ait-core` contains the platform-neutral full-screen lifecycle, ad skip receipt
+controller, JSON atom, analytics router/queue and engagement helpers. Consumers
+should import through `ait-rn` or `ait-web`; neither runtime loads the other SDK.
+These WebView subpaths are now available:
+
+| Import | Purpose |
+| --- | --- |
+| `ait-web/ads` | Full-screen lifecycle and `createWebViewBannerAds` DOM adapter |
+| `ait-web/ad-skip` | Persistent request IDs, receipt reconciliation and once-only local effects |
+| `ait-web/storage` | JSON atoms and verbatim-key SDK Storage bridge |
+| `ait-web/analytics` | TrailBase sink/router plus SDK 3 `Analytics.log` dispatch |
+| `ait-web/engagement` | Referrer normalization, visibility-based exposure and shared engagement helpers |
+
+```ts
+import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';
+import { createAppsInTossSdkStorageBridge, createPersistentJsonAtom } from '@trailbase-apps-in-toss-kit/ait-web/storage';
+
+const ads = createAppsInTossFullScreenAdBridge({
+  loadSdk: () => import('@apps-in-toss/web-framework'),
+  showTimeoutMs: 120_000,
+});
+const storage = createAppsInTossSdkStorageBridge({
+  framework: async () => ({ available: true, module: await import('@apps-in-toss/web-framework') }),
+});
+const saved = createPersistentJsonAtom({ storage, key: 'my-app.saved', fallback: [] });
+```
+
+The raw bridge uses the key exactly as passed. By contrast, `ait.storage` prefixes
+`${appKey}.`; use one convention consistently to avoid double-prefixing existing
+keys. Native-to-WebView access to historical SDK Storage still needs device
+verification; this helper does not copy browser localStorage or authenticate a
+stored account.
+
+The full-screen bridge preserves the existing opening/completion distinction:
+visibility ends the opening timeout; progress renews the separate completion
+recovery deadline (10 minutes by default). Rewarded completion requires the SDK
+reward event. A dismissal or a skip ticket never creates an impression/reward.
+For interstitials, the existing impression/duration fallback is unchanged.
+
+`createWebViewBannerAds` delegates to `@ait-kit/sdk`'s DOM adapter. Share an adapter
+instance, attach only when the consumer's slot is visible, and destroy its handle
+on unmount. The kit does not mount a UI component or automatically refresh banners.
+
+SDK 3 has no RN `Analytics.init` logger hook. The WebView config dispatches mapped
+events through `Analytics.log`: `press` becomes `click`, `custom`/`area` become
+`event`, and screen/impression keep their type. Only sanitized scalar params are
+sent to the SDK; nested payloads remain available to the TrailBase detail sink.
+Supply an explicit `mapEvent`; an unmapped event is not sent. Bootstrap allowlists
+and the collection-off switch apply to both sinks. Direct SDK logging outside the
+router is not mirrored. Runtime telemetry does not report monetary ad revenue;
+consumer revenue reports must join console revenue by date/ad group and preserve
+missing reports as missing values.
+
+Kit validation executes minified browser output with and without splitting. It
+covers fresh-code auth, legacy storage keys, rewarded callbacks, lost skip-ticket
+responses/restart reconciliation and experiment dimensions in analytics, while
+rejecting transitive RN SDK/Granite imports. RN regression and minimum-SDK type
+checks run alongside these tests. Consumer migration still owns React DOM screens,
+routing, safe areas, visibility/back handlers, SDK 3 config/build and explicit CORS.
+After rollout, verify arm assignment, ad completion and skip use in the consumer's
+SQL reports, then reconcile each arm's console revenue report. No experiment or
+attendance policy changes are made by these helpers.

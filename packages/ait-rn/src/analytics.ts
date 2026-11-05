@@ -1,13 +1,13 @@
 import {
-  configureAnalyticsRouterFromBootstrap,
-  type AnalyticsEvent,
+  createAppsInTossAnalyticsConfig as createCoreConfig,
+  configureAppsInTossAnalyticsRouterFromBootstrap as configureCoreRouter,
   type AnalyticsPayload,
   type AnalyticsRouter,
   type AppsInTossAnalyticsConfig as TrailBaseAppsInTossAnalyticsConfig,
-  type AppsInTossAnalyticsModule as TrailBaseAppsInTossAnalyticsModule,
+  type AppsInTossAnalytics as TrailBaseAppsInTossAnalyticsModule,
   type ConfigureAnalyticsRouterFromBootstrapOptions,
   type NormalizedAnalyticsBootstrapPolicy,
-} from "./internal/analytics-core";
+} from "@trailbase-apps-in-toss-kit/ait-core/analytics";
 import type { AppsInTossAnalytics } from "./internal/framework";
 
 export {
@@ -95,12 +95,11 @@ export function createAppsInTossAnalyticsConfig<
   analyticsModule,
   ...options
 }: CreateAppsInTossAnalyticsConfigOptions<TEventName, TPayload> = {}): TrailBaseAppsInTossAnalyticsConfig<TEventName, TPayload> {
-  return {
+  return createCoreConfig({
     ...options,
     analyticsModule:
       analyticsModule as unknown as TrailBaseAppsInTossAnalyticsModule,
-    enabled: true,
-  };
+  });
 }
 
 export function configureAppsInTossAnalyticsRouterFromBootstrap<
@@ -110,40 +109,6 @@ export function configureAppsInTossAnalyticsRouterFromBootstrap<
   appsInToss,
   ...options
 }: ConfigureAppsInTossAnalyticsRouterFromBootstrapOptions<TEventName, TPayload>): NormalizedAnalyticsBootstrapPolicy {
-  const policy = configureAnalyticsRouterFromBootstrap(options);
-
-  if (!policy.enabled || !policy.appsInToss.enabled) {
-    return policy;
-  }
-
-  const allowedEvents = toAllowedEventsSet(policy.appsInToss.allowedEvents);
-  const mapEvent = appsInToss?.mapEvent;
-  options.router.configure({
-    appsInToss: createAppsInTossAnalyticsConfig({
-      ...appsInToss,
-      mapEvent: mapEvent
-        ? (event) => {
-            if (!isAllowedEvent(event, allowedEvents)) {
-              return false;
-            }
-            return mapEvent(event);
-          }
-        : undefined,
-    }),
-  });
-  return policy;
-}
-
-function toAllowedEventsSet(value: readonly string[] | undefined): Set<string> | null {
-  if (value === undefined) {
-    return null;
-  }
-  return new Set(value);
-}
-
-function isAllowedEvent(
-  event: AnalyticsEvent<string, AnalyticsPayload>,
-  allowedEvents: Set<string> | null,
-): boolean {
-  return allowedEvents === null || allowedEvents.has(event.eventName);
+  const config = appsInToss ? createAppsInTossAnalyticsConfig(appsInToss) : undefined;
+  return configureCoreRouter({ ...options, appsInToss: config || undefined });
 }

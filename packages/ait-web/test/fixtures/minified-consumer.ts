@@ -29,3 +29,64 @@ export function createConsumer(scenario = "success") {
   });
   return { adapter, calls };
 }
+
+import {
+  createAppsInTossFullScreenAdBridge, createAdSkipRedemptionController,
+  createPersistentJsonAtom, createAppsInTossSdkStorageBridge,
+  createAnalyticsRouter, createAppsInTossAnalyticsConfig,
+  type AdSkipRedemptionReceipt, type AdSkipRedemptionRequest,
+  type AppsInTossLoadFullScreenAdParams, type AppsInTossShowFullScreenAdParams,
+} from "../../src/index";
+
+/** Synthetic migration smoke executed from the emitted browser chunks. */
+export async function exerciseSharedFlow() {
+  const values = new Map([["fixture.saved", "[1,2,3]"]]);
+  const storage = createAppsInTossSdkStorageBridge({ framework: { Storage: {
+    getItem: async key => values.get(key) ?? null,
+    setItem: async (key, value) => { values.set(key, value); },
+    removeItem: async key => { values.delete(key); },
+  } } });
+  const atom = createPersistentJsonAtom({ storage, key: "fixture.saved", fallback: [] as number[] });
+  const saved = await atom.read();
+  const wire: AdSkipRedemptionRequest[] = [];
+  let lost = true;
+  let effects = 0;
+  const controller = () => createAdSkipRedemptionController({
+    storage, storageKey: "fixture.adSkips", maxAttempts: 1,
+    createRequestId: () => "request-000000001",
+    redeem: async request => {
+      wire.push(request);
+      if (lost) { lost = false; throw new TypeError("fixture lost response"); }
+      return { ...request, context: request.context ?? "", balance: 1, consumed: 1,
+        createdAt: 10, opportunity: null, receiptId: "a".repeat(48), replayed: true,
+        resolution: "TICKET" } satisfies AdSkipRedemptionReceipt;
+    },
+  });
+  const initial = await controller().redeem({ placement: "generation_continue", opportunityKey: "cycle:1", context: "generation:req-1" });
+  const restarted = controller();
+  const replay = await restarted.retryPending();
+  const result = replay[0];
+  if (result?.status !== "resolved") throw new Error("expected reconciled receipt");
+  await restarted.applyEffectOnce(result.receipt, () => { effects++; });
+  await controller().applyEffectOnce(result.receipt, () => { effects++; });
+  let cleanups = 0;
+  const ads = createAppsInTossFullScreenAdBridge({
+    loadSdk: async () => ({
+      loadFullScreenAd: Object.assign(({ onEvent }: AppsInTossLoadFullScreenAdParams) => { onEvent({ type: "loaded" }); return () => { cleanups++; }; }, { isSupported: () => true }),
+      showFullScreenAd: Object.assign(({ onEvent }: AppsInTossShowFullScreenAdParams) => {
+        onEvent({ type: "show" }); onEvent({ type: "impression" });
+        onEvent({ type: "userEarnedReward", data: { unitType: "chance", unitAmount: 1 } });
+        onEvent({ type: "dismissed" }); return () => { cleanups++; };
+      }, { isSupported: () => true }),
+    }),
+  });
+  const shown = await ads.preloadAndShow({ adFormat: "rewarded", adGroupId: "fixture", preloadNext: false });
+  const logs: unknown[] = [];
+  const router = createAnalyticsRouter({ appsInToss: createAppsInTossAnalyticsConfig({
+    analyticsModule: { log: async event => { logs.push(event); } },
+    mapEvent: event => ({ name: event.eventName, type: "custom", params: event.eventPayload }),
+  }) });
+  router.track("ad_skip_used", { experiment_id: "fixture-experiment", variant: "control", nested: { omitted: true } });
+  await router.flush();
+  return { saved, initial: initial.status, replayed: result.receipt.replayed, effects, wire, shown, cleanups, logs };
+}

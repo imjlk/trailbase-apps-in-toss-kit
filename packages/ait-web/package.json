@@ -6,7 +6,12 @@
   "description": "WebView SDK 3 adapters for TrailBase Apps in Toss consumers.",
   "exports": {
     ".": "./src/index.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./ads": "./src/ads.ts",
+    "./ad-skip": "./src/ad-skip.ts",
+    "./analytics": "./src/analytics.ts",
+    "./engagement": "./src/engagement.ts",
+    "./storage": "./src/storage.ts"
   },
   "peerDependencies": {
     "@apps-in-toss/web-framework": ">=3.4.0 <4",
@@ -16,6 +21,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@ait-kit/sdk": "0.7.0"
+    "@ait-kit/sdk": "0.7.0",
+    "@trailbase-apps-in-toss-kit/ait-core": "workspace:*"
   }
 }

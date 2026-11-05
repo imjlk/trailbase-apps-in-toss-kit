@@ -2,7 +2,7 @@
 
 `@trailbase-apps-in-toss-kit/ait-web`은 `@apps-in-toss/web-framework >=3.4.0 <4`용
 소스 소비형 WebView 어댑터입니다. SDK 의존성은 소비 앱이 소유하고 kit은 개발용 타입·번들
-검증에만 3.4.0을 설치합니다. RN 소비 앱은 계속 `ait-rn`과
+검증에만 3.9.0을 설치합니다. RN 소비 앱은 계속 `ait-rn`과
 `@apps-in-toss/framework` 2.x를 사용합니다.
 
 익명 호출자 인증용 `ait.createAnonymousKeyAuthCode()`는 `@ait-kit/sdk` 0.7.0에
@@ -44,10 +44,11 @@ Bun으로 소스 패키지를 소비할 때는 사용할 패키지를 소비 앱
   "private": true,
   "workspaces": [
     "vendor/trailbase-apps-in-toss-kit/packages/ait-web",
+    "vendor/trailbase-apps-in-toss-kit/packages/ait-core",
     "vendor/trailbase-apps-in-toss-kit/packages/trailbase-client"
   ],
   "dependencies": {
-    "@apps-in-toss/web-framework": "3.6.0",
+    "@apps-in-toss/web-framework": "3.9.0",
     "@trailbase-apps-in-toss-kit/ait-web": "workspace:*",
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
   }
@@ -60,7 +61,7 @@ Kit 자체 의존성은 kit checkout에서 `bun run deps:install`로 설치합�
 검토한 mise 설정을 trust하고 도구를 설치한 뒤 검증하세요.
 
 서브모듈 안에 kit 개발 의존성이 설치돼 있으면 기본 loader가 소비 앱의 새 SDK 대신
-kit의 SDK 3.4.0을 찾을 수 있습니다. 코드 인증에 소비 앱 소유 SDK 3.6+를 사용하려면
+kit에 설치된 SDK 버전을 찾을 수 있습니다. 코드 인증에 소비 앱 소유 SDK 3.6+를 사용하려면
 loader를 소비 앱의 모듈에 두세요.
 
 ```ts
@@ -145,8 +146,7 @@ SDK 성공 이벤트는 UI 결과이며 결제·권한의 서버 증명이 아�
 지급하지 않습니다. 응답을 잃었다고 새 거래 식별자를 발급하지 않습니다.
 
 `createShareLink`는 `intoss://` 경로를 받고 `share`는 공유 시트를 엽니다. 공유 시트가
-종료된 것은 공유 증거가 아니며 보상을 지급하지 않습니다. 광고 등 지원되는 다른
-기능은 공식 SDK 3 API를 사용하고, 앱 자체 재화만 명시적 서버 정책과 함께
+종료된 것은 공유 증거가 아니며 보상을 지급하지 않습니다. 광고는 아래의 전면 광고·DOM 배너 어댑터를 사용하고, 앱 자체 재화만 명시적 서버 정책과 함께
 [서버 보상 시도](app-rewards.md)에 연결하세요. 기존 `contactsViral` 리워드 연동은
 종료됐습니다. 이 어댑터가 모든 SDK 기능을 감싸지는 않습니다.
 
@@ -175,3 +175,68 @@ QR·기기 검사를 진행하세요.
 로그인은 DEFAULT/SANDBOX 외의 미래 문자열 referrer도 유지합니다. 결제 결과는 유효한 원래 주문 ID를 요구하며 order_id 호환 별칭과 다른 네이티브 메타데이터도 유지합니다. SDK 정리 함수가 없으면 이를 허용하고, 제공된 함수는 한 번만 호출합니다.
 
 결제·구독 완료는 도착 순서와 무관하게 같은 주문의 유효한 성공 이벤트와 서버 지급 true를 모두 기다립니다. 같은 주문의 중복 네이티브 지급 callback은 진행 중 결과를 공유합니다. Timeout 후 새로 도착한 지급 callback은 실행하지 않으며 이미 시작한 서버 작업은 대사가 필요합니다.
+
+## RN에서 WebView로 전환할 때 사용하는 공통 헬퍼
+
+이 kit 리비전으로 갱신할 때 소비 앱의 Bun workspaces에 `packages/ait-core`를
+추가하세요. RN을 유지하는 앱도 해당합니다. 두 어댑터가 이 소스 workspace를
+사용하므로 `trailbase-client`와 함께 등록하고 소비 앱 lockfile을 다시 생성해야
+합니다. 기존 RN import와 런타임 동작은 유지되지만 서브모듈 포인터만 갱신하면
+새 workspace가 자동 등록되지는 않습니다.
+
+`ait-core`는 플랫폼에 독립적인 전면 광고 생명주기, 스킵권 영수증 컨트롤러,
+JSON atom, 분석 라우터·큐, 참여도 헬퍼를 담습니다. 소비 앱은 `ait-rn` 또는
+`ait-web`에서 가져오며 각 런타임은 상대 SDK를 로드하지 않습니다.
+
+| import | 용도 |
+| --- | --- |
+| `ait-web/ads` | 전면 광고 생명주기와 `createWebViewBannerAds` DOM 어댑터 |
+| `ait-web/ad-skip` | 요청 ID 저장, 영수증 재조회, 로컬 효과 1회 적용 |
+| `ait-web/storage` | JSON atom과 키를 그대로 쓰는 SDK Storage 브리지 |
+| `ait-web/analytics` | TrailBase 수집·라우터와 SDK 3 `Analytics.log` 연결 |
+| `ait-web/engagement` | 유입 경로 정규화, 실제 가시성 기반 노출 및 참여도 헬퍼 |
+
+```ts
+import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';
+import { createAppsInTossSdkStorageBridge, createPersistentJsonAtom } from '@trailbase-apps-in-toss-kit/ait-web/storage';
+
+const ads = createAppsInTossFullScreenAdBridge({
+  loadSdk: () => import('@apps-in-toss/web-framework'),
+  showTimeoutMs: 120_000,
+});
+const storage = createAppsInTossSdkStorageBridge({
+  framework: async () => ({ available: true, module: await import('@apps-in-toss/web-framework') }),
+});
+const saved = createPersistentJsonAtom({ storage, key: 'my-app.saved', fallback: [] });
+```
+
+이 raw 브리지는 전달한 키를 그대로 사용합니다. `ait.storage`는 `${appKey}.`를
+앞에 붙이므로 기존 키에 접두사가 중복되지 않게 한 방식을 선택하세요. Native에서
+WebView로 전환했을 때 과거 SDK Storage가 실제 기기에서도 읽히는지는 별도
+검증해야 합니다. 이 헬퍼는 browser localStorage를 복사하거나 저장 계정을
+인증하지 않습니다.
+
+전면 광고는 기존의 시작·완료 시간 제한을 구분합니다. 광고가 보이면 시작 제한을
+해제하고 진행 이벤트가 별도 완료 복구 제한을 갱신합니다(기본 10분). 리워드 완료는
+SDK의 보상 이벤트가 있어야 합니다. 닫기나 스킵권 사용으로 광고 노출·보상 이벤트를
+만들지 않습니다. 전면형의 기존 노출·시간 기반 완료 fallback은 유지합니다.
+
+`createWebViewBannerAds`는 `@ait-kit/sdk`의 DOM 어댑터에 위임합니다. 어댑터
+인스턴스를 공유하고 소비 앱의 슬롯이 보일 때 붙이며 unmount 시 handle을
+파괴하세요. kit은 UI 컴포넌트를 mount하거나 배너를 자동 새로고침하지 않습니다.
+
+SDK 3에는 RN의 `Analytics.init` logger hook이 없습니다. 웹 설정은 매핑한 이벤트를
+`Analytics.log`로 보내며 `press`는 `click`, `custom`·`area`는 `event`, screen·impression은
+같은 타입을 사용합니다. 민감정보를 정리한 scalar 파라미터만 SDK에 보내며 중첩 값은
+TrailBase 상세 수집에서 유지할 수 있습니다. `mapEvent`를 명시해야 SDK로 전송됩니다.
+bootstrap 허용 목록과 수집 끄기 설정은 두 수집처에 적용됩니다. 라우터를 거치지 않은
+직접 SDK 로그는 미러링되지 않습니다. 런타임 이벤트에는 금액 기준 광고수익이 없으므로
+소비 앱의 보고서에서 날짜·광고그룹별 콘솔 수익을 결합하고 미수집 값은 결측으로 두세요.
+
+kit 검증은 splitting 유무별로 축소한 브라우저 번들을 실행합니다. 새 코드 인증,
+기존 저장 키, 광고 보상 콜백, 스킵권 응답 유실·재시작 재조회, 실험군 정보 전달을
+검사하고 전이 의존성의 RN SDK·Granite import를 차단합니다. RN 회귀 및 최소 SDK
+타입 검사도 함께 실행합니다. 소비 앱은 React DOM 화면, 라우팅, 안전 영역,
+가시성·뒤로가기 처리, SDK 3 설정·빌드, 명시적 CORS를 별도 전환해야 합니다.
+출시 후 SQL 보고서에서 군 배정·광고 완료·스킵권 사용을 확인하고 군별 콘솔 수익
+보고서와 대조하세요. 이 헬퍼 변경으로 실험이나 출석 정책을 바꾸지는 않습니다.

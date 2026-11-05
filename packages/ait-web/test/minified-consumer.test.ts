@@ -11,12 +11,25 @@ for (const splitting of [false, true]) {
       const build = await Bun.build({
         entrypoints: [join(import.meta.dir, "fixtures/minified-consumer.ts")],
         target: "browser", minify: true, splitting, outdir: output,
+        plugins: [{ name: "forbid-native-sdk", setup(build) {
+          build.onResolve({ filter: /^(?:@apps-in-toss\/framework(?:\/|$)|@ait-kit\/sdk\/rn(?:\/|$)|react-native(?:\/|$)|@granite-js\/)/ }, args => {
+            throw new Error(`Web consumer acquired native dependency: ${args.path}`);
+          });
+        } }],
       });
       if (!build.success) throw new AggregateError(build.logs, "Consumer browser build failed");
       const entry = build.outputs.find(item => item.kind === "entry-point");
       expect(entry).toBeDefined();
       // Execute generated ESM/chunks, not the source or a successful build status.
       const compiled: typeof import("./fixtures/minified-consumer") = await import(pathToFileURL(entry!.path).href);
+      const migrated = await compiled.exerciseSharedFlow();
+      expect(migrated.saved).toEqual([1, 2, 3]);
+      expect(migrated).toMatchObject({ initial: "unknown", replayed: true, effects: 1, cleanups: 2 });
+      expect(migrated.wire).toHaveLength(2);
+      expect(migrated.wire[0]).toEqual(migrated.wire[1]);
+      expect(Object.keys(migrated.wire[1]).sort()).toEqual(["context", "opportunityKey", "placement", "requestId"]);
+      expect(migrated.shown).toMatchObject({ earned: true, events: ["show", "impression", "userEarnedReward", "dismissed"] });
+      expect(migrated.logs).toEqual([{ log_name: "ad_skip_used", log_type: "event", params: { experiment_id: "fixture-experiment", variant: "control" } }]);
       const consumer = compiled.createConsumer();
       expect(consumer.calls).toEqual({ loads: 0, codes: 0, hashes: 0 });
       expect(await consumer.adapter.createAnonymousKeyAuthCode()).toEqual({ code: "fixture-code-1", expiresIn: 300 });

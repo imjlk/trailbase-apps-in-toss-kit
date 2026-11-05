@@ -1,0 +1,23 @@
+{
+  "name": "@trailbase-apps-in-toss-kit/ait-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared client policies for React Native and WebView Apps in Toss adapters.",
+  "exports": {
+    "./ads": "./src/ads.ts",
+    "./ad-skip": "./src/ad-skip.ts",
+    "./analytics": "./src/analytics.ts",
+    "./engagement": "./src/engagement.ts",
+    "./storage": "./src/storage.ts",
+    "./internal/analytics-core": "./src/internal/analytics-core.ts",
+    "./internal/http": "./src/internal/http.ts",
+    "./internal/event-bridge": "./src/internal/event-bridge.ts"
+  },
+  "dependencies": {
+    "@ait-kit/sdk": "0.7.0"
+  },
+  "peerDependencies": {
+    "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
+  }
+}

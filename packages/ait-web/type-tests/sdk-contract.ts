@@ -14,3 +14,9 @@ void createConsumer().adapter;
 void adapter.purchase({ sku: "coins" });
 // @ts-expect-error SDK3 uses sku rather than the deprecated productId selector.
 void adapter.purchase({ productId: "coins", processProductGrant: async () => true });
+
+import { createAppsInTossFullScreenAdBridge, createAppsInTossSdkStorageBridge, createAppsInTossAnalyticsConfig, createWebViewBannerAds } from "../src/index";
+void createAppsInTossFullScreenAdBridge({ loadFullScreenAd: sdk.loadFullScreenAd, showFullScreenAd: sdk.showFullScreenAd, loadSdk: async () => sdk });
+void createAppsInTossSdkStorageBridge({ framework: sdk });
+void createAppsInTossAnalyticsConfig({ analyticsModule: sdk.Analytics });
+void createWebViewBannerAds({ framework: sdk });

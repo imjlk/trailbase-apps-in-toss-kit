@@ -21,6 +21,7 @@
     "packages/trailbase-client/src/**/*.ts",
     "packages/trailbase-client/type-tests/**/*.ts",
     "packages/ait-web/src/**/*.ts",
-    "packages/ait-web/type-tests/**/*.ts"
+    "packages/ait-web/type-tests/**/*.ts",
+    "packages/ait-core/src/**/*.ts"
   ]
 }
