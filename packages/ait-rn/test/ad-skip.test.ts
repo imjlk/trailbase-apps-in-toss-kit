@@ -164,6 +164,13 @@ describe("redemption controller", () => {
     let persistedBeforeSend = "";
     const { controller } = setup(async (request) => {
       persistedBeforeSend = storage.map.get("app.adSkips") ?? "";
+      expect(request).toEqual({
+        context: "generation:req-1",
+        opportunityKey: "cycle:1",
+        placement: "generation_continue",
+        requestId: "request-000000001",
+      });
+      expect(JSON.parse(persistedBeforeSend).pending[0].createdAt).toBeNumber();
       return receiptFor(request, { balance: 4 });
     }, storage);
     const outcome = await controller.redeem({ context: "generation:req-1", opportunityKey: "cycle:1", placement: "generation_continue" });
@@ -199,6 +206,9 @@ describe("redemption controller", () => {
 
     const seen: AdSkipRedemptionRequest[] = [];
     const restarted = setup(async (request) => {
+      expect(Object.keys(request).sort()).toEqual([
+        "context", "opportunityKey", "placement", "requestId",
+      ]);
       seen.push(request);
       return receiptFor(request, { replayed: true });
     }, storage);
