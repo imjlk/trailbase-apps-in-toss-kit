@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, mock, test } from "bun:test";
-import { createAppsInTossWebAdapter } from "../src/index";
+import { createAppsInTossWebAdapter, createAppsInTossFullScreenAdBridge, createAppsInTossSdkStorageBridge } from "../src/index";
 
 /**
  * Default-loader coverage for the web package: the adapter's default
@@ -10,6 +10,7 @@ import { createAppsInTossWebAdapter } from "../src/index";
  * because bun snapshots a mocked module's namespace at first import.
  */
 type WebProvider = {
+  ads?: { loads: number; shows: number; cleanups: number };
   login?: () => Promise<unknown>;
   getAnonymousKey?: () => Promise<unknown>;
   getAnonymousKeySupported?: boolean;
@@ -41,6 +42,18 @@ function withMutableSupport<T extends (...args: never[]) => unknown>(
 }
 
 mock.module("@apps-in-toss/web-framework", () => ({
+  loadFullScreenAd: Object.assign(({ onEvent }) => {
+    provider.current.ads!.loads++;
+    onEvent({ type: "loaded" });
+    return () => { provider.current.ads!.cleanups++; };
+  }, { isSupported: () => Boolean(provider.current.ads) }),
+  showFullScreenAd: Object.assign(({ onEvent }) => {
+    provider.current.ads!.shows++;
+    onEvent({ type: "show" });
+    onEvent({ type: "userEarnedReward", data: { unitType: "chance", unitAmount: 1 } });
+    onEvent({ type: "dismissed" });
+    return () => { provider.current.ads!.cleanups++; };
+  }, { isSupported: () => Boolean(provider.current.ads) }),
   TossAuth: {
     login: (...args: Parameters<NonNullable<WebProvider["login"]>>) =>
       provider.current.login!(...args),
@@ -174,4 +187,32 @@ describe("web default loader connections through @ait-kit/sdk", () => {
       referrer: "SANDBOX",
     });
   });
+});
+
+test("web full-screen ad default loader uses only the official web module", async () => {
+  const ads = { loads: 0, shows: 0, cleanups: 0 };
+  provider.current = { ads };
+  const bridge = createAppsInTossFullScreenAdBridge();
+  expect(ads.loads).toBe(0);
+  const result = await bridge.preloadAndShow({ adGroupId: "fixture-rewarded", adFormat: "rewarded", preloadNext: false });
+  expect(result).toMatchObject({ earned: true, events: ["show", "userEarnedReward", "dismissed"] });
+  expect(ads).toEqual({ loads: 1, shows: 1, cleanups: 2 });
+  provider.current = {};
+  await expect(bridge.show({ adGroupId: "fixture-rewarded", adFormat: "rewarded" })).rejects.toMatchObject({ code: "AD_SHOW_UNSUPPORTED" });
+});
+
+test("web raw Storage bridge preserves existing fully qualified native keys", async () => {
+  const key = "fixture-app.adSkips.v1.fixture-user";
+  const values = new Map([[key, "existing-ticket-state"]]);
+  provider.current = { storage: {
+    getItem: async k => values.get(k) ?? null,
+    setItem: async (k, value) => { values.set(k, value); },
+    removeItem: async k => { values.delete(k); },
+  } };
+  const storage = createAppsInTossSdkStorageBridge();
+  expect(await storage.getItem!(key)).toBe("existing-ticket-state");
+  await storage.setItem!(key, "updated");
+  expect([...values]).toEqual([[key, "updated"]]);
+  await storage.removeItem!(key);
+  expect(values.size).toBe(0);
 });

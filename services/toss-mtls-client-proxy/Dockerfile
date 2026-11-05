@@ -2,6 +2,7 @@ FROM oven/bun:1.4.2-alpine
 
 WORKDIR /app
 COPY package.json bun.lock ./
+COPY packages/ait-core/package.json ./packages/ait-core/package.json
 COPY packages/ait-rn/package.json ./packages/ait-rn/package.json
 COPY packages/trailbase-client/package.json ./packages/trailbase-client/package.json
 COPY packages/trailbase-runtime/package.json ./packages/trailbase-runtime/package.json

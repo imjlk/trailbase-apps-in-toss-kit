@@ -12,11 +12,22 @@
         "typescript": "7.0.2",
       },
     },
+    "packages/ait-core": {
+      "name": "@trailbase-apps-in-toss-kit/ait-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@ait-kit/sdk": "0.7.0",
+      },
+      "peerDependencies": {
+        "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
+      },
+    },
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
       "version": "0.9.3",
       "dependencies": {
         "@ait-kit/sdk": "0.7.0",
+        "@trailbase-apps-in-toss-kit/ait-core": "workspace:*",
       },
       "peerDependencies": {
         "@apps-in-toss/framework": ">=2.10.10",
@@ -28,6 +39,7 @@
       "version": "0.4.0",
       "dependencies": {
         "@ait-kit/sdk": "0.7.0",
+        "@trailbase-apps-in-toss-kit/ait-core": "workspace:*",
       },
       "peerDependencies": {
         "@apps-in-toss/web-framework": ">=3.4.0 <4",
@@ -881,6 +893,8 @@
     "@toss/utility-types": ["@toss/utility-types@1.2.1", "", {}, "sha512-1y8s1bvmuhuMX/d6qR9mmvcgFZIKYIQqJbAIshlGArXkjk/ec67gXc5uByEV1Y7in9ZhrGNRmjD8DTH0988vpQ=="],
 
     "@toss/utils": ["@toss/utils@1.6.1", "", { "dependencies": { "@babel/runtime": "^7.14.8", "@toss/utility-types": "^1.2.1", "date-fns": "^2.25.0" } }, "sha512-x6m8jLKWtAmCbxTLXbgTzJ5wZyRSUQPLpR/oLJP1ZK9ytXcRf03oA46W/+78kErUkEw/yQz2L+t2xFDHSeZ6IQ=="],
+
+    "@trailbase-apps-in-toss-kit/ait-core": ["@trailbase-apps-in-toss-kit/ait-core@workspace:packages/ait-core"],
 
     "@trailbase-apps-in-toss-kit/ait-rn": ["@trailbase-apps-in-toss-kit/ait-rn@workspace:packages/ait-rn"],
 

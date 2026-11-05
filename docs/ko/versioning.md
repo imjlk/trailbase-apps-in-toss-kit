@@ -7,6 +7,8 @@
 - `cargo/trailbase-guest-common`
 - `cargo/trailbase-toss-identity`
 - `npm/@trailbase-apps-in-toss-kit/toss-mtls-client-proxy`
+- `npm/@trailbase-apps-in-toss-kit/ait-core`
+- `npm/@trailbase-apps-in-toss-kit/ait-web`
 - `npm/@trailbase-apps-in-toss-kit/ait-rn`
 - `npm/@trailbase-apps-in-toss-kit/trailbase-client`
 - `npm/@trailbase-apps-in-toss-kit/trailbase-runtime`
