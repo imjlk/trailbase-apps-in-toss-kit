@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-10-28T06:49:55.800Z
+- Fetched at: 2026-11-06T07:53:26.838Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
@@ -10,24 +10,24 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 23674
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `4c3d25dbe8503c078d9a9976ecfca70db7d46fa6e593a8900710ae03f0b6c2a0`
-  - Bytes: 34487
+  - SHA-256: `88b9adb62fbe3ad62ce756fc90f9fb36c3c8f1eb1a09266e4318626fbbbee8a0`
+  - Bytes: 34959
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
-  - SHA-256: `27fbb317bd2c72acab5231b0121cd2ba0b3c31aaf837ef66ca90f42cf9c04a48`
-  - Bytes: 15049
+  - SHA-256: `ac5f41ca0096126a7e7798231e39c12137080f5b92809df783bbefa4c9a38be0`
+  - Bytes: 14949
 - React Native reference
   - URL: https://developers-apps-in-toss.toss.im/documentation/react-native.md
   - SHA-256: `10ef3f046c5c5e7d974cf55af6cf7c5c4779c07bb2124b548556413c9eaa876f`
   - Bytes: 2641
 - WebView Client SDK overview
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk.md
-  - SHA-256: `a5f4bcee02cae696b04e93ad82a39db232dbbdf0fed1a9f98d82c32b06fd1355`
-  - Bytes: 2558
+  - SHA-256: `c50a36aea13c341b6fd1e23a90245ab947d727f392e8100397eb91b9640ca5c5`
+  - Bytes: 2505
 - WebView SDK 3.x migration
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x.md
-  - SHA-256: `8bbc76f1e537e4450e0f20ae460af317834228b62606bb053d19f7f78eae4644`
-  - Bytes: 12711
+  - SHA-256: `fd9387f7454349645bb5f521c808db4c5a7424d38e6b628e9ef8666831507417`
+  - Bytes: 12283
 - API overview
   - URL: https://developers-apps-in-toss.toss.im/documentation/overview.md
   - SHA-256: `b7c70b441aa6add00329c146ce50a759eac3a58cfd5772e774bb6217ceb44032`
@@ -62,8 +62,8 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 36570
 - Smart Message overview and notification agreement policy
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md
-  - SHA-256: `09ef030e8681466068c13104579fe88549095a5076801419768bbf84fffd5843`
-  - Bytes: 27633
+  - SHA-256: `011f321d02f592dbedb7dbdbd63f5e914c020276fc0ed5b22bea63547a9fce5e`
+  - Bytes: 27828
 - Review request guide
   - URL: https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md
   - SHA-256: `99a208dd8452d88e3fc7eb5f422d1979ec7a3c06f63346fb95b5c32a9997a1ee`
@@ -78,8 +78,8 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 6530
 - Promotion operations guide
   - URL: https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md
-  - SHA-256: `0ed4db2fec090688c043b3c94c35f55792fe3c267bad7159c1c43c5914e417c9`
-  - Bytes: 31619
+  - SHA-256: `7dcef0a010375299458e3c89c1904002566184b32c7b2c49e705183158178ea7`
+  - Bytes: 32017
 - Notification agreement SDK requestNotificationAgreement
   - URL: https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md
   - SHA-256: `7148c6e8b1e763f4aedc9b5388376f5568c5e3534403d0fcf5e0c2144cf6f9b7`
