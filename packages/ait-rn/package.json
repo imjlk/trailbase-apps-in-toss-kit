@@ -3,7 +3,7 @@
   "version": "0.10.0",
   "private": true,
   "type": "module",
-  "description": "React Native Apps in Toss SDK bridge helpers for TrailBase consumer apps.",
+  "description": "Maintenance-mode React Native Apps in Toss SDK bridge helpers for TrailBase consumer apps; new client work targets ait-web.",
   "exports": {
     ".": "./src/index.ts",
     "./analytics": "./src/analytics.ts",

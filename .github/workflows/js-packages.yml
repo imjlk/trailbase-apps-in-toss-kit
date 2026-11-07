@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "fixtures/contracts/**"
+      - "data/webview-migration-map.json"
       - ".github/workflows/js-packages.yml"
       - "bun.lock"
       - "**/Cargo.lock"
@@ -21,6 +22,7 @@ on:
       - main
     paths:
       - "fixtures/contracts/**"
+      - "data/webview-migration-map.json"
       - ".github/workflows/js-packages.yml"
       - "bun.lock"
       - "**/Cargo.lock"

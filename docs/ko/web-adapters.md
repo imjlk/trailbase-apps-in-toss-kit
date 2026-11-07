@@ -2,8 +2,9 @@
 
 `@trailbase-apps-in-toss-kit/ait-web`은 `@apps-in-toss/web-framework >=3.4.0 <4`용
 소스 소비형 WebView 어댑터입니다. SDK 의존성은 소비 앱이 소유하고 kit은 개발용 타입·번들
-검증에만 3.9.0을 설치합니다. RN 소비 앱은 계속 `ait-rn`과
-`@apps-in-toss/framework` 2.x를 사용합니다.
+검증에만 3.9.0을 설치합니다. 기존 RN 소비 앱은 `ait-rn`과
+`@apps-in-toss/framework` 2.x를 계속 쓸 수 있지만 `ait-rn`은 유지보수 모드입니다.
+[RN에서 WebView로 마이그레이션](webview-migration.md)을 참고하세요.
 
 익명 호출자 인증용 `ait.createAnonymousKeyAuthCode()`는 `@ait-kit/sdk` 0.7.0에
 위임하며 runtime의 공식 WebView SDK 3.6+가 필요합니다. 기존 메서드의 peer 하한은

@@ -3,6 +3,10 @@
 `trailbase-client` 패키지는 공식 TrailBase SDK를 대체하지 않습니다. 여러 AppsInToss
 React Native 앱에서 반복되는 연결 코드만 모아 둔 얇은 보조 패키지입니다.
 
+아래의 `ait-rn` 내용은 유지보수 모드인 React Native 어댑터 설명입니다. 새 앱은
+[WebView SDK 3 어댑터](web-adapters.md)로 시작하고, 기존 RN 앱은
+[RN에서 WebView로 마이그레이션](webview-migration.md) 가이드를 따라 옮기세요.
+
 인증 상태, token refresh, Record API 접근은 공식 `trailbase` JavaScript SDK를 사용하세요.
 kit는 AppsInToss bootstrap endpoint가 반환한 token payload를 정규화하고 SDK가 기대하는
 `{ auth_token, refresh_token, csrf_token }` 형태로 바꾸는 헬퍼만 제공합니다.

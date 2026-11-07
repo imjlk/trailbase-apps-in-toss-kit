@@ -4,6 +4,10 @@ The `trailbase-client` package is not a replacement for the official TrailBase
 SDK. It contains AppsInToss and React Native glue that repeats across consumer
 apps.
 
+The `ait-rn` sections below describe the maintenance-mode React Native adapter.
+Start new apps from [WebView SDK 3 adapters](web-adapters.md), and move existing
+RN apps with the [RN to WebView migration](webview-migration.md) guide.
+
 Use the official `trailbase` JavaScript SDK for auth state, token refresh, and
 Record API access. The kit only normalizes token payloads returned by
 AppsInToss bootstrap endpoints and can convert them into the SDK's

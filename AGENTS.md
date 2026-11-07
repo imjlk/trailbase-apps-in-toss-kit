@@ -13,10 +13,29 @@ It is intended to be consumed as a git submodule, usually at
 - `templates/trailbase`: copy-in SQL, Compose, env, smoke, and integration snippets.
 - `docs/en`: English integration, publishing, Coolify, identity, proxy, and versioning notes.
 - `docs/ko`: Korean translations that mirror `docs/en` filenames.
+- `packages/ait-web`, `packages/ait-core`, `packages/ait-rn`,
+  `packages/trailbase-client`: source-consumed client adapters (WebView SDK 3,
+  shared policies, maintenance-mode React Native, TrailBase transport).
 
 Consumer apps should import Rust crates through path dependencies from the
 submodule. SQL migrations and Compose files should be copied into the consumer
 app and owned there, because runtime schema and deployment shape are app-specific.
+
+## Client Adapter Policy
+
+- `packages/ait-web` (WebView SDK 3) is the target for new client work. Put
+  shared, platform-neutral logic in `packages/ait-core` and expose it through
+  `ait-web`.
+- `packages/ait-rn` is in maintenance mode: bug, security, SDK 2.x compatibility
+  and migration-continuity fixes only. Do not add new subpaths or RN-only
+  features, and do not add backend clients to `ait-rn` alone.
+- `data/webview-migration-map.json` classifies every `ait-rn` runtime export.
+  When a WebView export lands for a pending name, move it to `same`; the
+  `ait-web` migration-map test fails until you do. Keep the module tables in
+  `docs/en/webview-migration.md` and `docs/ko/webview-migration.md` in sync.
+- Consumer apps check their remaining RN surface with
+  `scripts/check-consumer-webview-migration.mjs`. Describe consumer apps
+  generically in kit PRs, changesets and docs.
 
 ## Consumer Notes
 
