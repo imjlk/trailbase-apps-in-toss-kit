@@ -2,8 +2,9 @@
 
 `@trailbase-apps-in-toss-kit/ait-web` is a source-consumed WebView adapter for
 `@apps-in-toss/web-framework >=3.4.0 <4`. The consumer owns that SDK dependency.
-The kit installs 3.9.0 only for development type/bundle verification. RN consumers
-continue to use `ait-rn` and `@apps-in-toss/framework` 2.x.
+The kit installs 3.9.0 only for development type/bundle verification. Existing RN
+consumers can keep using `ait-rn` and `@apps-in-toss/framework` 2.x, but `ait-rn` is
+in maintenance mode; see [RN to WebView migration](webview-migration.md).
 
 For anonymous caller authentication, `ait.createAnonymousKeyAuthCode()` delegates
 to `@ait-kit/sdk` 0.7.0 and requires official WebView SDK 3.6+ at runtime. Existing

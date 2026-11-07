@@ -8,7 +8,8 @@ TrailBase is the backend runtime this kit targets for AppsInToss mini-apps. In
 this architecture, TrailBase owns the SQLite database, Record API, Rust WASM
 handlers, jobs, and runtime directory (`traildepot`) for each consumer app. The
 kit collects the parts that repeat across those apps: WASM guest helpers, safe schema and
-deployment templates, production checks, React Native client glue, and the
+deployment templates, production checks, WebView SDK 3 client adapters (plus
+maintenance-mode React Native glue), and the
 private mTLS proxy used to call Toss APIs that require client certificates.
 
 The consuming app still owns its product schema, migrations, Record API ACL,

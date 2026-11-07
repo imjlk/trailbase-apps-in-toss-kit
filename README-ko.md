@@ -6,7 +6,8 @@ AppsInToss 서비스에서 재사용할 수 있는 구성 요소 모음입니다
 TrailBase는 이 kit가 주로 전제하는 AppsInToss 미니앱 백엔드 실행 환경입니다. 이 구조에서
 TrailBase는 각 도입 앱의 SQLite 데이터베이스, Record API, Rust WASM 핸들러, 작업, TrailBase
 실행 디렉터리(`traildepot`)를 맡습니다. Kit는 여러 앱에서 반복되는 부분을 모읍니다. WASM
-게스트 헬퍼, 안전한 스키마/배포 템플릿, 운영 검증, React Native 클라이언트 연결 코드, 그리고
+게스트 헬퍼, 안전한 스키마/배포 템플릿, 운영 검증, WebView SDK 3 클라이언트 어댑터(유지보수
+모드인 React Native 연결 코드 포함), 그리고
 클라이언트 인증서(client certificate)가 필요한 Toss API를 호출하기 위한 사설 mTLS
 프록시(private mTLS proxy)가 여기에 포함됩니다.
 

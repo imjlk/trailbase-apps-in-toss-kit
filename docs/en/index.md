@@ -39,6 +39,7 @@ If you are an AI coding agent, read `AGENTS.md` first and load the
 | Add functional push/inbox messages | [functional-messages.md](functional-messages.md) |
 | Use RN/client-side adapters | [client-adapters.md](client-adapters.md) |
 | Use WebView SDK 3 adapters | [web-adapters.md](web-adapters.md) |
+| Move an RN consumer to WebView | [webview-migration.md](webview-migration.md) |
 | Handle account changes and app foreground | [session-lifecycle.md](session-lifecycle.md) |
 | Diagnose private IAP, promotion and message ledgers | [ledger-doctor.md](ledger-doctor.md) |
 | Pause features and rehearse old-backup recovery | [operation-policy.md](operation-policy.md) |

@@ -77,6 +77,11 @@
 
 ## React Native Client Bootstrap And Helpers
 
+`ait-rn` is in maintenance mode. Start new apps from WebView SDK 3 (`ait-web`, with shared
+logic in `ait-core`), and move existing RN apps with `docs/en/webview-migration.md`; run
+`scripts/check-consumer-webview-migration.mjs --root <consumer>` to list what still blocks a
+cutover. Never add a new helper only to `ait-rn`.
+
 When initializing or refactoring a TrailBase-backed AppsInToss React Native app, do not start by
 copying app-local wrappers for SDK identity, storage, login, or session state. First inspect the
 current kit exports and docs:
