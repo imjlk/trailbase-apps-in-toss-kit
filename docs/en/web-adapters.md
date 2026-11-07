@@ -203,11 +203,16 @@ These WebView subpaths are now available:
 
 | Import | Purpose |
 | --- | --- |
-| `ait-web/ads` | Full-screen lifecycle and `createWebViewBannerAds` DOM adapter |
+| `ait-web/ads` | Full-screen lifecycle, `createWebViewBannerAds` DOM adapter and inline placeholder policy |
 | `ait-web/ad-skip` | Persistent request IDs, receipt reconciliation and once-only local effects |
 | `ait-web/storage` | JSON atoms and verbatim-key SDK Storage bridge |
 | `ait-web/analytics` | TrailBase sink/router plus SDK 3 `Analytics.log` dispatch |
 | `ait-web/engagement` | Referrer normalization, visibility-based exposure and shared engagement helpers |
+| `ait-web/notifications` | Functional message backend client and agreement result normalization |
+| `ait-web/iap` | Backend grant client and the shared IAP error class |
+| `ait-web/promotion` | Promotion campaign claim and status backend clients |
+| `ait-web/share` | Share-link bridge on SDK 3 plus deep-link, OG image and message helpers |
+| `ait-web/shopping` | Shopping link validation and a single-flight open bridge (inject SDK 3 `openURL`) |
 
 ```ts
 import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';

@@ -72,17 +72,18 @@ CI에서 켜 두면 RN import가 다시 들어오는 것을 막을 수 있습니
 | `ait-rn/login` | `ait.login()` | 없음 |
 | `ait-rn/identity` | `ait.createAnonymousKeyAuthCode()` | 없음(SDK 3.6+와 프록시 코드 교환 필요) |
 | `ait-rn/haptics` | SDK 3 `generateHapticFeedback` | 없음(wrapper 계획 없음) |
-| `ait-rn/notifications` | `ait.requestNotificationAgreement()` | 기능성 메시지 백엔드 클라이언트 |
-| `ait-rn/iap` | `ait.purchase()`, `ait.subscribe()`, 주문 조회 | 대기 주문 복구 흐름, 지급 백엔드 클라이언트 |
-| `ait-rn/share` | `ait.createShareLink()`, `ait.share()` | 메시지·딥링크·OG 이미지 헬퍼 |
-| `ait-rn/inline-ads` | `ait-web/ads`의 `createWebViewBannerAds` | placeholder 결정 헬퍼 |
-| `ait-rn/promotion` | 아직 없음 | 캠페인 지급 요청·상태 클라이언트 |
-| `ait-rn/shopping` | 아직 없음 | 링크 정규화와 열기 bridge |
+| `ait-rn/notifications` | `ait-web/notifications`, `ait.requestNotificationAgreement()` | 없음 |
+| `ait-rn/iap` | `ait-web/iap`, `ait.purchase()`, `ait.subscribe()`, 주문 조회 | 대기 주문 복구 흐름 |
+| `ait-rn/share` | `ait-web/share`(`createAppsInTossShareBridge`와 헬퍼) | 없음 |
+| `ait-rn/inline-ads` | `ait-web/ads`(`createWebViewBannerAds`, placeholder 정책) | 없음 |
+| `ait-rn/promotion` | `ait-web/promotion` | 없음 |
+| `ait-rn/shopping` | `ait-web/shopping`(SDK 3 `openURL` 주입) | 없음 |
 | `ait-rn/runtime` | 아직 없음 | 안전한 환경·플랫폼·버전·네트워크 헬퍼 |
 | `ait-rn/diagnostics` | 아직 없음 | runtime 진단 수집기 |
 
-남은 부분 대부분은 플랫폼 중립 코드(백엔드 클라이언트, 정규화 함수, placeholder 정책)라서
-새로 작성하기보다 `ait-core`로 옮기는 편이 맞습니다.
+플랫폼 중립 헬퍼(백엔드 클라이언트, 정규화 함수, 공유·placeholder 정책)는 `ait-core`로
+공유합니다. 남은 부분은 SDK에 묶인 runtime 환경 헬퍼, 진단 수집기, IAP 대기 주문 복구
+흐름입니다.
 
 ## 단계별 전환
 

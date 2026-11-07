@@ -75,17 +75,19 @@ Status at this kit revision. The map file is the source of truth.
 | `ait-rn/login` | `ait.login()` | None |
 | `ait-rn/identity` | `ait.createAnonymousKeyAuthCode()` | None (SDK 3.6+ and proxy code exchange) |
 | `ait-rn/haptics` | SDK 3 `generateHapticFeedback` | None (no wrapper planned) |
-| `ait-rn/notifications` | `ait.requestNotificationAgreement()` | Functional message backend client |
-| `ait-rn/iap` | `ait.purchase()`, `ait.subscribe()` and order queries | Pending-order restore flow, grant backend client |
-| `ait-rn/share` | `ait.createShareLink()`, `ait.share()` | Message, deep-link and OG image helpers |
-| `ait-rn/inline-ads` | `createWebViewBannerAds` from `ait-web/ads` | Placeholder decision helpers |
-| `ait-rn/promotion` | None yet | Campaign claim and status clients |
-| `ait-rn/shopping` | None yet | Link normalizers and open bridge |
+| `ait-rn/notifications` | `ait-web/notifications`, `ait.requestNotificationAgreement()` | None |
+| `ait-rn/iap` | `ait-web/iap`, `ait.purchase()`, `ait.subscribe()` and order queries | Pending-order restore flow |
+| `ait-rn/share` | `ait-web/share` (`createAppsInTossShareBridge` and helpers) | None |
+| `ait-rn/inline-ads` | `ait-web/ads` (`createWebViewBannerAds`, placeholder policy) | None |
+| `ait-rn/promotion` | `ait-web/promotion` | None |
+| `ait-rn/shopping` | `ait-web/shopping` (inject SDK 3 `openURL`) | None |
 | `ait-rn/runtime` | None yet | Safe environment, platform, version and network helpers |
 | `ait-rn/diagnostics` | None yet | Runtime diagnostics collector |
 
-Most remaining gaps are platform-neutral code (backend clients, normalizers,
-placeholder policy) that should move into `ait-core` rather than be rewritten.
+Platform-neutral helpers (backend clients, normalizers, share and placeholder
+policy) are shared through `ait-core`. The remaining gaps are SDK-bound: runtime
+environment helpers, the diagnostics collector and the IAP pending-order restore
+flow.
 
 ## Staged cutover
 
