@@ -265,3 +265,32 @@ for (const completed of [false, true]) {
     expect(seen).toEqual([original]);
   });
 }
+
+for (const subscription of [false, true]) {
+  test(`explicit ${subscription ? "subscription" : "purchase"} cancellation settles and disposes immediately`, async () => {
+    const f = fixture(); let cleanup = 0; let grants = 0; let grant: any;
+    const method = subscription ? "createSubscriptionPurchaseOrder" : "createOneTimePurchaseOrder";
+    (f.api.IAP as any)[method] = available((options: any) => {
+      grant = options.options.processProductGrant;
+      options.onError({ code: "USER_CANCELED", message: "PRIVATE-CANARY" });
+      return () => { cleanup++; };
+    });
+    const adapter = f.make();
+    const input = { sku: "sku", processProductGrant: async () => { grants++; return true; } };
+    const outcome = subscription ? adapter.subscribe(input) : adapter.purchase(input);
+    await expect(outcome).rejects.toMatchObject({ code: "USER_CANCELED" });
+    await expect(outcome).rejects.not.toThrow("PRIVATE-CANARY");
+    expect(cleanup).toBe(1);
+    expect(await grant({ orderId: "late" })).toBe(false);
+    expect(grants).toBe(0);
+  });
+}
+test("an error after a grant started remains eligible for purchase recovery", async () => {
+  const f = fixture();
+  (f.api.IAP as any).createOneTimePurchaseOrder = available((options: any) => {
+    void options.options.processProductGrant({orderId:"paid"});
+    options.onError({code:"USER_CANCELED"});
+    return () => {};
+  });
+  await expect(f.make().purchase({sku:"sku",processProductGrant:async()=>true})).rejects.toMatchObject({code:"SDK_ERROR"});
+});

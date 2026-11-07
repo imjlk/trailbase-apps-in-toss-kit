@@ -257,3 +257,12 @@ routing, safe areas, visibility/back handlers, SDK 3 config/build and explicit C
 After rollout, verify arm assignment, ad completion and skip use in the consumer's
 SQL reports, then reconcile each arm's console revenue report. No experiment or
 attendance policy changes are made by these helpers.
+
+### Purchase cancellation
+
+A store `USER_CANCELED` error before a grant starts rejects `purchase()` or
+`subscribe()` with `WebAdapterError.code === "USER_CANCELED"` and releases the
+subscription immediately. Consumers can clear their pending UI while retaining
+the displayed product and price. Errors after a grant starts continue to use
+the recovery path. The callback timeout remains a fallback for missing SDK
+callbacks and does not control when the native purchase page closes.
