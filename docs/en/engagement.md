@@ -27,7 +27,7 @@ as separate events. An SDK ad impression callback remains the source for ad impr
 ## Foreground and connectivity
 
 Create one `createForegroundRefreshController` per screen lifecycle. Inject
-`safeGetAppsInTossNetworkStatus` from `ait-rn/runtime`, a **read-only** refresh
+`safeGetAppsInTossNetworkStatus` from `ait-rn/runtime` (WebView: `ait-web/runtime`), a **read-only** refresh
 callback, and an optional `onStatus` observer. Call `setActive` with SDK screen
 visibility and an account/session context key; block it while a mutation or
 blocking overlay is active. Initial activation probes connectivity without

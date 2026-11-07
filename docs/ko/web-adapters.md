@@ -146,6 +146,29 @@ SDK 성공 이벤트는 UI 결과이며 결제·권한의 서버 증명이 아�
 알립니다. 기존 IAP 복구 계약으로 미확인·대기 주문을 처리하고, 구독 조회만으로 권한을
 지급하지 않습니다. 응답을 잃었다고 새 거래 식별자를 발급하지 않습니다.
 
+대기 주문을 복구할 때는 `ait-web/iap`의 `createAppsInTossIapRestoreBridge()`를 사용하세요.
+RN 브리지의 `restorePendingOrders`와 같은 흐름을 같은 옵션, 결과, 오류 코드로 실행합니다.
+SDK 3 대기 주문을 조회하고, 주문마다 `source: "restore"`로 백엔드 지급을 호출합니다.
+그 지급이 성공한 주문만 `completeProductGrant`로 완료를 알립니다. 지급이 실패하거나
+시간 초과된 주문은 다음 복구 때까지 대기 상태로 남습니다. 완료 알림을 직접 나중에 보내려면
+`completeAfterGrant: false`를 전달하세요.
+
+```ts
+import {
+  createAppsInTossIapGrantClient,
+  createAppsInTossIapRestoreBridge,
+} from '@trailbase-apps-in-toss-kit/ait-web/iap';
+
+const grants = createAppsInTossIapGrantClient({
+  endpoints: { grantEndpoint: '/api/app/v1/iap/grant', completeEndpoint: '/api/app/v1/iap/complete', pendingEndpoint: '/api/app/v1/iap/pending' },
+  getAuthHeaders,
+});
+const restore = createAppsInTossIapRestoreBridge({ loadSdk: () => import('@apps-in-toss/web-framework') });
+const { restored, failed } = await restore.restorePendingOrders({
+  processProductGrant: ({ orderId, sku, source }) => grants.grant({ orderId, sku, source }),
+});
+```
+
 `createShareLink`는 `intoss://` 경로를 받고 `share`는 공유 시트를 엽니다. 공유 시트가
 종료된 것은 공유 증거가 아니며 보상을 지급하지 않습니다. 광고는 아래의 전면 광고·DOM 배너 어댑터를 사용하고, 앱 자체 재화만 명시적 서버 정책과 함께
 [서버 보상 시도](app-rewards.md)에 연결하세요. 기존 `contactsViral` 리워드 연동은
@@ -191,16 +214,22 @@ JSON atom, 분석 라우터·큐, 참여도 헬퍼를 담습니다. 소비 앱�
 
 | import | 용도 |
 | --- | --- |
-| `ait-web/ads` | 전면 광고 생명주기, `createWebViewBannerAds` DOM 어댑터, 인라인 placeholder 정책 |
+| `ait-web/ads` | 전면 광고 생명주기, `createWebViewBannerAds` DOM 어댑터, 인라인 placeholder 정책, `ait-rn/ads`도 다시 내보내는 runtime 헬퍼 |
 | `ait-web/ad-skip` | 요청 ID 저장, 영수증 재조회, 로컬 효과 1회 적용 |
 | `ait-web/storage` | JSON atom과 키를 그대로 쓰는 SDK Storage 브리지 |
 | `ait-web/analytics` | TrailBase 수집·라우터와 SDK 3 `Analytics.log` 연결 |
+| `ait-web/diagnostics` | RN과 같은 스키마의 명시적 opt-in 읽기 전용 runtime 스냅샷 |
 | `ait-web/engagement` | 유입 경로 정규화, 실제 가시성 기반 노출 및 참여도 헬퍼 |
 | `ait-web/notifications` | 기능성 메시지 백엔드 클라이언트와 동의 결과 정규화 |
-| `ait-web/iap` | 지급 백엔드 클라이언트와 공유 IAP 오류 클래스 |
+| `ait-web/iap` | 지급 백엔드 클라이언트, 공유 IAP 오류 클래스, 대기 주문 복구 브리지 |
 | `ait-web/promotion` | 프로모션 캠페인 지급 요청·상태 백엔드 클라이언트 |
+| `ait-web/runtime` | 운영 환경, 플랫폼, 토스 앱 버전, 네트워크, 최소 버전 확인 |
 | `ait-web/share` | SDK 3 공유 링크 bridge와 딥링크·OG 이미지·메시지 헬퍼 |
 | `ait-web/shopping` | 쇼핑 링크 검증과 중복 실행을 막는 열기 bridge(SDK 3 `openURL` 주입) |
+
+`ait-web/runtime`은 deprecated된 최상위 getter 대신 SDK 3 `Environment`, `Device`
+namespace를 읽습니다. 토스 앱 밖이거나 읽기에 실패하면 운영 환경은 production이 아니라
+`unknown`입니다.
 
 ```ts
 import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';

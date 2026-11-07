@@ -253,14 +253,10 @@ function resolveName(map, subpath, name) {
     ? Object.keys(map.subpaths).filter((key) => bucketOf(map.subpaths[key], name))
     : [subpath];
   if (candidates.length === 0) return null;
-  // Root imports: prefer the subpath whose names all share this bucket, i.e.
-  // the module that owns the helper rather than one that re-exports it.
-  const owner = candidates.find((key) => {
-    const entry = map.subpaths[key];
-    const bucket = bucketOf(entry, name);
-    const all = [...entry.same, ...Object.keys(entry.replaced), ...entry.pending];
-    return all.every((other) => bucketOf(entry, other) === bucket);
-  }) ?? candidates[0];
+  // Root imports: a subpath that re-exports the name from another candidate
+  // (reexportsFrom) is not its owner, so report the module that defines it.
+  const owner = candidates.find((key) =>
+    !(map.subpaths[key].reexportsFrom ?? []).some((source) => candidates.includes(source))) ?? candidates[0];
   const entry = map.subpaths[owner];
   const bucket = bucketOf(entry, name);
   if (!bucket) return null;

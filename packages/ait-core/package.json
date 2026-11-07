@@ -17,9 +17,11 @@
     "./inline-ads": "./src/inline-ads.ts",
     "./notifications": "./src/notifications.ts",
     "./promotion": "./src/promotion.ts",
+    "./runtime": "./src/runtime.ts",
     "./share": "./src/share.ts",
     "./shopping": "./src/shopping.ts",
-    "./internal/iap": "./src/internal/iap.ts"
+    "./internal/iap": "./src/internal/iap.ts",
+    "./internal/runtime": "./src/internal/runtime.ts"
   },
   "dependencies": {
     "@ait-kit/sdk": "0.7.0"

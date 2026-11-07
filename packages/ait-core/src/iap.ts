@@ -1,8 +1,8 @@
 import {
-  AppsInTossIapBridgeError,
   normalizeOptionalString,
   normalizeRequiredOrderId,
   normalizeRequiredSku,
+  type AppsInTossIapPendingOrder,
 } from "./internal/iap";
 import {
   postAppsInTossJson,
@@ -14,13 +14,14 @@ export {
   AppsInTossIapBridgeError,
   type AppsInTossIapBridgeErrorCode,
   type AppsInTossIapBridgeErrorOptions,
+  type AppsInTossIapPendingOrder,
+  type AppsInTossIapProcessProductGrant,
+  type AppsInTossIapProductGrantInput,
+  type AppsInTossIapProductGrantOutcome,
+  type AppsInTossIapRestoredOrderResult,
+  type AppsInTossIapRestorePendingOrdersOptions,
+  type AppsInTossIapRestorePendingOrdersResult,
 } from "./internal/iap";
-
-export interface AppsInTossIapPendingOrder {
-  orderId: string;
-  paymentCompletedDate?: string;
-  sku: string;
-}
 
 export type AppsInTossIapGrantOperation = "complete" | "grant" | "pending";
 

@@ -2,12 +2,15 @@
 
 Kit은 [공식 미니앱 테스트 절차](https://developers-apps-in-toss.toss.im/guide/operation/toss)를 보완합니다. WebView 검사기를 새로 추가하거나 로컬 테스트로 실기기 성공을 추정하지 않습니다.
 
-## RN 런타임 정보
+## 런타임 정보
 
 ```ts
 import { collectAppsInTossRuntimeDiagnostics } from '@trailbase-apps-in-toss-kit/ait-rn/diagnostics';
 const report = await collectAppsInTossRuntimeDiagnostics({ enabled: debugEnabled });
 ```
+
+WebView 앱은 같은 함수를 `ait-web/diagnostics`에서 가져옵니다. SDK 3 `Environment`,
+`Device` namespace를 읽고 같은 스키마를 반환합니다.
 
 기본은 꺼짐입니다. 명시적으로 켰을 때만 실행 환경, OS, 토스 버전, 네트워크를 조회하며 각 조회는 3초로 제한합니다. 미확인·실패·시간초과를 구분합니다. 정해진 상태 값과 숫자형 버전만 반환하고 실행 URL, 사용자 식별자, 토큰, 네이티브 오류 원문이나 SDK 인자는 포함하지 않습니다. `deviceFeaturesVerified`는 항상 false입니다. 소비 앱이 디버그 UI나 콘솔 표시를 선택하며 원격 전송은 기본 제공하지 않습니다.
 

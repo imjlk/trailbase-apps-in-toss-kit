@@ -27,7 +27,7 @@ referrer는 클라이언트 분석용 힌트이며 권한 판정 근거가 아�
 ## 화면 복귀와 연결 상태
 
 화면 생명주기마다 `createForegroundRefreshController`를 생성합니다.
-`ait-rn/runtime`의 `safeGetAppsInTossNetworkStatus`, **조회 전용** 갱신 콜백,
+`ait-rn/runtime`(WebView는 `ait-web/runtime`)의 `safeGetAppsInTossNetworkStatus`, **조회 전용** 갱신 콜백,
 선택적 `onStatus` 관찰자를 주입합니다. SDK 화면 가시성과 계정/세션 구분 키를
 `setActive`에 전달하고 변경 요청이나 차단 모달이 진행 중이면 비활성화합니다.
 최초 활성화는 연결만 확인하여 초기 조회를 중복하지 않습니다. 복귀 시 기본

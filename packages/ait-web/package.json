@@ -10,11 +10,13 @@
     "./ads": "./src/ads.ts",
     "./ad-skip": "./src/ad-skip.ts",
     "./analytics": "./src/analytics.ts",
+    "./diagnostics": "./src/diagnostics.ts",
     "./engagement": "./src/engagement.ts",
     "./storage": "./src/storage.ts",
     "./iap": "./src/iap.ts",
     "./notifications": "./src/notifications.ts",
     "./promotion": "./src/promotion.ts",
+    "./runtime": "./src/runtime.ts",
     "./share": "./src/share.ts",
     "./shopping": "./src/shopping.ts"
   },

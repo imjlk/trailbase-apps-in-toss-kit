@@ -84,19 +84,20 @@ test("classifies RN imports by the migration map", () => {
     assert.match(message.reason, /ait-web\/notifications/);
 
     const diagnostics = item(result, "collectAppsInTossRuntimeDiagnostics", "diagnostics");
-    assert.equal(diagnostics.action, "blocked");
-    assert.ok(diagnostics.interim.includes("getOperationalEnvironment"));
+    assert.equal(diagnostics.action, "swap-import");
+    assert.match(diagnostics.reason, /ait-web\/diagnostics/);
 
     const iap = item(result, "createAppsInTossIapBridge", "iap");
-    assert.equal(iap.action, "blocked");
-    assert.match(iap.gap, /restorePendingOrders/);
+    assert.equal(iap.action, "rewrite");
+    assert.match(iap.reason, /createAppsInTossIapRestoreBridge\(\)/);
+    assert.equal(iap.gap, undefined);
 
     // A root import resolves to the module that owns the helper, not to ads,
     // which only re-exports it.
     const platform = item(result, "safeGetAppsInTossPlatformOS");
     assert.equal(platform.subpath, "runtime");
-    assert.equal(platform.action, "blocked");
-    assert.ok(platform.interim.includes("getPlatformOS"));
+    assert.equal(platform.action, "swap-import");
+    assert.match(platform.reason, /ait-web\/runtime/);
 
     assert.equal(item(result, "AnalyticsPayload", "analytics").action, "review");
     const namespace = result.items.find((entry) => entry.subpath === "share" && entry.name === null);
@@ -108,14 +109,37 @@ test("classifies RN imports by the migration map", () => {
     assert.deepEqual(result.footprint.rnUi.importFiles, ["apps/app-rn/src/session.ts"]);
     assert.deepEqual(result.configs.granite, ["apps/app-rn/granite.config.ts"]);
     assert.deepEqual(result.warnings, []);
-    assert.equal(result.summary.blocked, 3);
+    // Every ait-rn subpath has a WebView path at this kit revision.
+    assert.equal(result.summary.blocked, 0);
+    assert.equal(result.items[0].action, "rewrite");
+    assert.match(renderWebViewMigrationReport(result), /Stage: rn-only/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
+test("pending names and replacement gaps are blocked and listed first", () => {
+  // The shipped map has no gaps left; a narrowed copy keeps the blocked path covered.
+  const narrowed = structuredClone(map);
+  const runtime = narrowed.subpaths.runtime;
+  Object.assign(runtime, { webview: null, pending: runtime.same, same: [], sdk3: ["getPlatformOS"] });
+  narrowed.subpaths.ads.pending = narrowed.subpaths.ads.same.filter((name) => runtime.pending.includes(name));
+  narrowed.subpaths.ads.same = narrowed.subpaths.ads.same.filter((name) => !runtime.pending.includes(name));
+  narrowed.subpaths.iap.replaced.createAppsInTossIapBridge.gap = "restorePendingOrders fixture gap";
+  const root = rnConsumer();
+  try {
+    const result = checkConsumerWebViewMigration({ root, map: narrowed });
+    const platform = item(result, "safeGetAppsInTossPlatformOS");
+    assert.equal(platform.subpath, "runtime");
+    assert.equal(platform.action, "blocked");
+    assert.deepEqual(platform.interim, ["getPlatformOS"]);
+    assert.equal(item(result, "createAppsInTossIapBridge", "iap").action, "blocked");
+    assert.equal(result.summary.blocked, 2);
     // Blocked items are listed first so the report leads with what stops a cutover.
-    assert.equal(result.items[0].action, "blocked");
+    assert.deepEqual(result.items.slice(0, 2).map((entry) => entry.action), ["blocked", "blocked"]);
     const report = renderWebViewMigrationReport(result);
-    assert.match(report, /Stage: rn-only/);
-    assert.match(report, /Gap: restorePendingOrders/);
-    assert.match(report, /Interim SDK 3 APIs: .*getPlatformOS/);
+    assert.match(report, /Gap: restorePendingOrders fixture gap/);
+    assert.match(report, /Interim SDK 3 APIs: getPlatformOS/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -220,6 +244,22 @@ test("migration map names keep one classification across re-exports", () => {
       assert.equal(typeof replacement.use, "string");
       assert.ok(replacement.gap === undefined || typeof replacement.gap === "string");
     }
+  }
+});
+
+test("names shared by two subpaths are declared as re-exports", () => {
+  const owners = new Map();
+  for (const [subpath, entry] of Object.entries(map.subpaths)) {
+    for (const source of entry.reexportsFrom ?? []) assert.ok(map.subpaths[source], `${subpath} re-exports unknown ${source}`);
+    for (const name of [...entry.same, ...Object.keys(entry.replaced), ...entry.pending]) {
+      owners.set(name, [...(owners.get(name) ?? []), subpath]);
+    }
+  }
+  for (const [name, subpaths] of owners) {
+    if (subpaths.length < 2) continue;
+    const declared = subpaths.filter((subpath) =>
+      (map.subpaths[subpath].reexportsFrom ?? []).some((source) => subpaths.includes(source)));
+    assert.equal(declared.length, subpaths.length - 1, `${name} appears in ${subpaths.join(", ")}`);
   }
 });
 

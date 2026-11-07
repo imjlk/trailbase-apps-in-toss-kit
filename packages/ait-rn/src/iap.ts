@@ -12,14 +12,22 @@ import { isSdkError } from "./internal/sdk-errors";
 import {
   AppsInTossIapBridgeError,
   normalizeOptionalString,
+  normalizePendingOrder,
   normalizeRequiredOrderId,
   normalizeRequiredSku,
+  restoreIapPendingOrders,
+  runProductGrant,
+  withIapTimeout as withPromiseTimeout,
   type AppsInTossIapBridgeErrorCode,
+  type AppsInTossIapPendingOrder,
+  type AppsInTossIapProcessProductGrant,
+  type AppsInTossIapRestorePendingOrdersOptions,
+  type AppsInTossIapRestorePendingOrdersResult,
 } from "@trailbase-apps-in-toss-kit/ait-core/internal/iap";
-import type { AppsInTossIapPendingOrder } from "@trailbase-apps-in-toss-kit/ait-core/iap";
 
-// The error class, pending-order shape and backend grant client are shared with
-// WebView through ait-core; the SDK purchase bridge stays here.
+// The error class, grant and restore types, the pending-order restore loop and
+// the backend grant client are shared with WebView through ait-core; the SDK
+// purchase bridge stays here.
 export * from "@trailbase-apps-in-toss-kit/ait-core/iap";
 
 // Structural contracts remain loadable with older peer SDKs. CI checks these
@@ -71,28 +79,6 @@ export interface AppsInTossIapPurchaseResult {
   orderId: string;
   sku: string;
 }
-
-export interface AppsInTossIapProductGrantInput {
-  subscriptionId?: string;
-  orderId: string;
-  providerPayload?: unknown;
-  sku: string;
-  source: "purchase" | "restore";
-}
-
-export type AppsInTossIapProductGrantOutcome =
-  | boolean
-  | {
-      alreadyGranted?: boolean;
-      granted?: boolean;
-      ok?: boolean;
-      status?: string;
-    };
-
-export type AppsInTossIapProcessProductGrant = (
-  input: AppsInTossIapProductGrantInput,
-) =>
-  AppsInTossIapProductGrantOutcome | Promise<AppsInTossIapProductGrantOutcome>;
 
 type AppsInTossIapSupportedFunction<T> = T & {
   isSupported?: () => boolean;
@@ -177,32 +163,6 @@ export interface AppsInTossIapPurchaseSubscriptionOptions extends AppsInTossIapP
 
 export interface AppsInTossIapCompleteProductGrantOptions {
   orderId: string;
-}
-
-export interface AppsInTossIapRestorePendingOrdersOptions {
-  completeAfterGrant?: boolean;
-  onProductGrantCompleted?: (
-    input: AppsInTossIapProductGrantInput,
-  ) => void | Promise<void>;
-  processProductGrant: AppsInTossIapProcessProductGrant;
-  processProductGrantTimeoutMs?: number;
-  stopOnError?: boolean;
-}
-
-export interface AppsInTossIapRestoredOrderResult {
-  completed: boolean;
-  completionDeferred?: boolean;
-  error?: unknown;
-  granted: boolean;
-  hookError?: unknown;
-  order: AppsInTossIapPendingOrder;
-}
-
-export interface AppsInTossIapRestorePendingOrdersResult {
-  failed: AppsInTossIapRestoredOrderResult[];
-  orders: AppsInTossIapPendingOrder[];
-  restored: AppsInTossIapRestoredOrderResult[];
-  results: AppsInTossIapRestoredOrderResult[];
 }
 
 export interface AppsInTossIapBridge {
@@ -491,78 +451,14 @@ export function createAppsInTossIapBridge({
     }
   }
 
-  async function restorePendingOrders({
-    completeAfterGrant = true,
-    onProductGrantCompleted,
-    processProductGrant,
-    processProductGrantTimeoutMs: grantTimeoutMs = processProductGrantTimeoutMs,
-    stopOnError = false,
-  }: AppsInTossIapRestorePendingOrdersOptions) {
-    if (typeof processProductGrant !== "function") {
-      throw new AppsInTossIapBridgeError({
-        code: "IAP_PRODUCT_GRANT_REQUIRED",
-        message: "Apps in Toss IAP product grant processor is required.",
-      });
-    }
-    const orders = await getPendingOrders();
-    const results: AppsInTossIapRestoredOrderResult[] = [];
-
-    for (const order of orders) {
-      let granted = false;
-      try {
-        granted = await runProductGrant({
-          orderId: order.orderId,
-          processProductGrant,
-          providerPayload: order,
-          sku: order.sku,
-          source: "restore",
-          timeoutMs: grantTimeoutMs,
-        });
-        let completed = false;
-        const completionDeferred = granted && !completeAfterGrant;
-        if (granted && completeAfterGrant) {
-          completed = await completeProductGrant({ orderId: order.orderId });
-        }
-        let hookError: unknown;
-        if (granted && completed) {
-          try {
-            await onProductGrantCompleted?.({
-              orderId: order.orderId,
-              providerPayload: order,
-              sku: order.sku,
-              source: "restore",
-            });
-          } catch (error) {
-            hookError = error;
-          }
-        }
-        results.push({
-          completed,
-          ...(completionDeferred ? { completionDeferred } : {}),
-          granted,
-          ...(hookError === undefined ? {} : { hookError }),
-          order,
-        });
-      } catch (error) {
-        const result = {
-          completed: false,
-          error,
-          granted,
-          order,
-        };
-        results.push(result);
-        if (stopOnError) {
-          throw error;
-        }
-      }
-    }
-
-    return {
-      failed: results.filter((result) => !restoreResultSucceeded(result)),
-      orders,
-      restored: results.filter(restoreResultSucceeded),
-      results,
-    };
+  function restorePendingOrders(
+    options: AppsInTossIapRestorePendingOrdersOptions,
+  ): Promise<AppsInTossIapRestorePendingOrdersResult> {
+    return restoreIapPendingOrders(options, {
+      completeProductGrant: (orderId) => completeProductGrant({ orderId }),
+      getPendingOrders,
+      processProductGrantTimeoutMs,
+    });
   }
 
   async function getPendingOrders() {
@@ -967,83 +863,6 @@ function requestPurchase({
   });
 }
 
-async function runProductGrant({
-  orderId,
-  processProductGrant,
-  providerPayload,
-  subscriptionId,
-  sku,
-  source,
-  timeoutMs,
-}: AppsInTossIapProductGrantInput & {
-  processProductGrant: AppsInTossIapProcessProductGrant;
-  timeoutMs: number;
-}) {
-  const normalizedOrderId = normalizeRequiredOrderId(orderId);
-  const normalizedSku = normalizeRequiredSku(sku);
-  try {
-    const outcome = await withPromiseTimeout({
-      code: "IAP_PRODUCT_GRANT_TIMEOUT",
-      message: "Apps in Toss product grant timed out.",
-      promise: Promise.resolve(
-        processProductGrant({
-          orderId: normalizedOrderId,
-          providerPayload,
-          ...(subscriptionId ? { subscriptionId } : {}),
-          sku: normalizedSku,
-          source,
-        }),
-      ),
-      timeoutMs,
-    });
-    if (productGrantSucceeded(outcome)) {
-      return true;
-    }
-    throw new AppsInTossIapBridgeError({
-      cause: outcome,
-      code: "IAP_PRODUCT_GRANT_FAILED",
-      message: "Apps in Toss product grant was not completed.",
-    });
-  } catch (error) {
-    if (error instanceof AppsInTossIapBridgeError) {
-      throw error;
-    }
-    throw new AppsInTossIapBridgeError({
-      cause: error,
-      code: "IAP_PRODUCT_GRANT_FAILED",
-      message: "Apps in Toss product grant failed.",
-    });
-  }
-}
-
-async function withPromiseTimeout<T>({
-  code,
-  message,
-  promise,
-  timeoutMs,
-}: {
-  code: AppsInTossIapBridgeErrorCode;
-  message: string;
-  promise: Promise<T>;
-  timeoutMs: number;
-}) {
-  let timeout: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timeout = setTimeout(() => {
-          reject(new AppsInTossIapBridgeError({ code, message }));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout) {
-      clearTimeout(timeout);
-    }
-  }
-}
-
 function normalizeProduct(value: unknown): AppsInTossIapProduct {
   const record = objectRecord(value);
   const type = ["CONSUMABLE", "NON_CONSUMABLE", "SUBSCRIPTION"].includes(
@@ -1108,28 +927,6 @@ function normalizeSubscriptionProduct(record: Record<string, unknown>) {
   };
 }
 
-function normalizePendingOrder(value: unknown): AppsInTossIapPendingOrder {
-  const record = objectRecord(value);
-  const sku = stringCandidate(record.sku);
-  return {
-    orderId: normalizeRequiredOrderId(
-      stringCandidate(record.orderId, record.order_id),
-    ),
-    ...(stringCandidate(
-      record.paymentCompletedDate,
-      record.payment_completed_date,
-    )
-      ? {
-          paymentCompletedDate: stringCandidate(
-            record.paymentCompletedDate,
-            record.payment_completed_date,
-          ),
-        }
-      : {}),
-    sku: sku ? normalizeRequiredSku(sku) : "",
-  };
-}
-
 function normalizePurchaseResult(
   event: unknown,
   fallbackSku: string,
@@ -1172,37 +969,6 @@ function normalizePurchaseResult(
     ),
     sku: normalizeRequiredSku(stringCandidate(data.sku) ?? fallbackSku),
   };
-}
-
-function productGrantSucceeded(outcome: AppsInTossIapProductGrantOutcome) {
-  if (outcome === true) {
-    return true;
-  }
-  if (!outcome || typeof outcome !== "object") {
-    return false;
-  }
-  if (outcome.granted === true || outcome.alreadyGranted === true) {
-    return true;
-  }
-  if (outcome.granted === false || outcome.alreadyGranted === false) {
-    return false;
-  }
-  const status = outcome.status?.trim().toUpperCase();
-  if (
-    status === "GRANTED" ||
-    status === "ALREADY_GRANTED" ||
-    status === "PURCHASED" ||
-    status === "COMPLETED"
-  ) {
-    return true;
-  }
-  return outcome.ok === true && !status;
-}
-
-function restoreResultSucceeded(result: AppsInTossIapRestoredOrderResult) {
-  return (
-    result.granted && (result.completed || result.completionDeferred === true)
-  );
 }
 
 function assertIapAvailable(
