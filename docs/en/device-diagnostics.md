@@ -2,12 +2,15 @@
 
 The Kit complements the [official mini-app test workflow](https://developers-apps-in-toss.toss.im/guide/operation/toss). It does not add its own WebView inspector or infer real device success from local tests.
 
-## RN runtime snapshot
+## Runtime snapshot
 
 ```ts
 import { collectAppsInTossRuntimeDiagnostics } from '@trailbase-apps-in-toss-kit/ait-rn/diagnostics';
 const report = await collectAppsInTossRuntimeDiagnostics({ enabled: debugEnabled });
 ```
+
+WebView apps import the same function from `ait-web/diagnostics`. It reads the SDK 3
+`Environment` and `Device` namespaces and returns the same schema.
 
 Disabled by default. When explicitly enabled, four read-only probes report operational environment, OS, host Toss version and network state. Each probe is bounded to three seconds. Unknown, failed and timed-out probes remain distinct. Only fixed enums and a numeric version are returned; no launch URL, user identifier, token, native error or SDK arguments are logged. `deviceFeaturesVerified` is always false. The consumer decides whether to display this in its debug UI or a console. No remote log sink is configured.
 

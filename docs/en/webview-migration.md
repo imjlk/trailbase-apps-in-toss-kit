@@ -68,7 +68,7 @@ Status at this kit revision. The map file is the source of truth.
 | ait-rn subpath | WebView path | Remaining gap |
 | --- | --- | --- |
 | `ait-rn/ad-skip` | `ait-web/ad-skip` | None |
-| `ait-rn/ads` | `ait-web/ads` | Runtime helpers it re-exports (see `runtime`) |
+| `ait-rn/ads` | `ait-web/ads` | None (re-exports the `runtime` helpers like RN) |
 | `ait-rn/analytics` | `ait-web/analytics` | None (`Analytics.log`, explicit `mapEvent`) |
 | `ait-rn/engagement` | `ait-web/engagement` | None (drive it from document visibility) |
 | `ait-rn/storage` | `ait-web/storage`, `ait.storage` | None |
@@ -76,18 +76,19 @@ Status at this kit revision. The map file is the source of truth.
 | `ait-rn/identity` | `ait.createAnonymousKeyAuthCode()` | None (SDK 3.6+ and proxy code exchange) |
 | `ait-rn/haptics` | SDK 3 `generateHapticFeedback` | None (no wrapper planned) |
 | `ait-rn/notifications` | `ait-web/notifications`, `ait.requestNotificationAgreement()` | None |
-| `ait-rn/iap` | `ait-web/iap`, `ait.purchase()`, `ait.subscribe()` and order queries | Pending-order restore flow |
+| `ait-rn/iap` | `ait-web/iap`, `ait.purchase()`, `ait.subscribe()` and order queries | None (`createAppsInTossIapRestoreBridge` restores pending orders) |
 | `ait-rn/share` | `ait-web/share` (`createAppsInTossShareBridge` and helpers) | None |
 | `ait-rn/inline-ads` | `ait-web/ads` (`createWebViewBannerAds`, placeholder policy) | None |
 | `ait-rn/promotion` | `ait-web/promotion` | None |
 | `ait-rn/shopping` | `ait-web/shopping` (inject SDK 3 `openURL`) | None |
-| `ait-rn/runtime` | None yet | Safe environment, platform, version and network helpers |
-| `ait-rn/diagnostics` | None yet | Runtime diagnostics collector |
+| `ait-rn/runtime` | `ait-web/runtime` | None (reads SDK 3 `Environment` and `Device`) |
+| `ait-rn/diagnostics` | `ait-web/diagnostics` | None |
 
 Platform-neutral helpers (backend clients, normalizers, share and placeholder
-policy) are shared through `ait-core`. The remaining gaps are SDK-bound: runtime
-environment helpers, the diagnostics collector and the IAP pending-order restore
-flow.
+policy, runtime probes and the IAP restore loop) are shared through `ait-core`.
+Every `ait-rn` subpath now has a WebView path, so a consumer report has no
+`blocked` items at this revision. `ait-rn` still stays in the workspace until
+consumer apps report a WebView-only stage.
 
 ## Staged cutover
 
@@ -143,7 +144,9 @@ These are the properties existing users notice. Verify each one explicitly.
   fresh code. It must never create a second account or fall back to a client hash.
 - **In-flight work**: pending IAP orders, ad skip request IDs and promotion
   intents reconcile on the server. Keep their storage keys and request IDs
-  unchanged so the WebView bundle picks up what the RN bundle started.
+  unchanged so the WebView bundle picks up what the RN bundle started. Run
+  `createAppsInTossIapRestoreBridge().restorePendingOrders()` at WebView startup
+  with the same idempotent backend grant the RN bundle used.
 - **Server records**: notification agreements, Toss Login links, owned-currency
   balances and ledgers live on the server and carry over unchanged.
 

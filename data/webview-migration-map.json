@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "description": "Runtime exports of the maintenance-mode ait-rn adapter and their WebView SDK 3 replacements. packages/ait-web/test/migration-map.test.ts keeps this file exact; scripts/check-consumer-webview-migration.mjs reads it.",
+  "description": "Runtime exports of the maintenance-mode ait-rn adapter and their WebView SDK 3 replacements. reexportsFrom names the subpaths whose exports an entry re-exports, so root imports resolve to the owning module. packages/ait-web/test/migration-map.test.ts keeps this file exact; scripts/check-consumer-webview-migration.mjs reads it.",
   "rnPackage": "@trailbase-apps-in-toss-kit/ait-rn",
   "webPackage": "@trailbase-apps-in-toss-kit/ait-web",
   "rnSdkPackage": "@apps-in-toss/framework",
@@ -34,24 +34,21 @@
         "createAppsInTossFullScreenAdBridge",
         "createFullScreenAdBridge",
         "getAppsInTossTestAdGroupId",
-        "shouldUseAppsInTossMockAd"
-      ],
-      "replaced": {},
-      "pending": [
         "isAppsInTossProductionRuntime",
         "isAppsInTossRuntimeSupported",
         "isAppsInTossSandbox",
         "safeGetAppsInTossAppVersion",
         "safeGetAppsInTossOperationalEnvironment",
-        "safeGetAppsInTossPlatformOS"
+        "safeGetAppsInTossPlatformOS",
+        "shouldUseAppsInTossMockAd"
       ],
-      "sdk3": [
-        "getOperationalEnvironment",
-        "getPlatformOS",
-        "getTossAppVersion",
-        "isMinVersionSupported"
+      "replaced": {},
+      "pending": [],
+      "sdk3": [],
+      "reexportsFrom": [
+        "runtime"
       ],
-      "note": "Pass loadSdk: () => import('@apps-in-toss/web-framework') from the consumer module. The pending names are runtime helpers that ait-rn/ads re-exports from ait-rn/runtime."
+      "note": "Pass loadSdk: () => import('@apps-in-toss/web-framework') from the consumer module. The runtime helpers that ait-rn/ads re-exports from ait-rn/runtime are re-exported from ait-web/ads the same way."
     },
     "analytics": {
       "webview": "@trailbase-apps-in-toss-kit/ait-web/analytics",
@@ -77,19 +74,14 @@
       "note": "SDK 3 has Analytics.log but no RN Analytics.init logger hook. Supply an explicit mapEvent; only sanitized scalar params reach the SDK."
     },
     "diagnostics": {
-      "webview": null,
-      "same": [],
-      "replaced": {},
-      "pending": [
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/diagnostics",
+      "same": [
         "collectAppsInTossRuntimeDiagnostics"
       ],
-      "sdk3": [
-        "getNetworkStatus",
-        "getOperationalEnvironment",
-        "getPlatformOS",
-        "getTossAppVersion"
-      ],
-      "note": "Until a WebView collector exists, keep diagnostics opt-in and call the SDK 3 functions directly without sending identity data."
+      "replaced": {},
+      "pending": [],
+      "sdk3": [],
+      "note": "Same opt-in ait-runtime-diagnostics-v1 snapshot as RN. It reports only normalized values and never invokes login, ads, consent or purchases."
     },
     "engagement": {
       "webview": "@trailbase-apps-in-toss-kit/ait-web/engagement",
@@ -127,13 +119,12 @@
       ],
       "replaced": {
         "createAppsInTossIapBridge": {
-          "use": "ait.purchase, ait.subscribe, ait.getProducts, ait.getSubscriptionInfo, ait.getPendingOrders and ait.completeProductGrant.",
-          "gap": "restorePendingOrders has no WebView helper yet. Reconcile pending orders through the backend IAP ledger before relying on the WebView bundle for purchases."
+          "use": "ait.purchase, ait.subscribe, ait.getProducts and ait.getSubscriptionInfo for purchases, and createAppsInTossIapRestoreBridge() from ait-web/iap for restorePendingOrders and completeProductGrant with the same options, results and error codes."
         }
       },
       "pending": [],
       "sdk3": [],
-      "note": "The backend grant client and its error class are shared through ait-core. Keep the backend verification ledger authoritative; SDK success events are UI results, not proof of payment or entitlement."
+      "note": "The backend grant client, error class and pending-order restore loop are shared through ait-core. Keep the backend verification ledger authoritative; SDK success events are UI results, not proof of payment or entitlement. Acknowledge an order with completeProductGrant only after the backend persisted its grant."
     },
     "identity": {
       "webview": "createAppsInTossWebAdapter()",
@@ -234,10 +225,8 @@
       "note": "Platform-neutral backend clients shared through ait-core. The backend keeps promotion codes and the proxy call."
     },
     "runtime": {
-      "webview": null,
-      "same": [],
-      "replaced": {},
-      "pending": [
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/runtime",
+      "same": [
         "isAppsInTossProductionRuntime",
         "isAppsInTossRuntimeSupported",
         "isAppsInTossSandbox",
@@ -246,14 +235,10 @@
         "safeGetAppsInTossOperationalEnvironment",
         "safeGetAppsInTossPlatformOS"
       ],
-      "sdk3": [
-        "getNetworkStatus",
-        "getOperationalEnvironment",
-        "getPlatformOS",
-        "getTossAppVersion",
-        "isMinVersionSupported"
-      ],
-      "note": "Until WebView wrappers exist, call the SDK 3 functions directly and treat a thrown or missing result as unknown, never as production."
+      "replaced": {},
+      "pending": [],
+      "sdk3": [],
+      "note": "Reads the SDK 3 Environment and Device namespaces instead of the deprecated top-level getters. A thrown, missing or unexpected value is unknown, never production. Pass loadSdk: () => import('@apps-in-toss/web-framework') from the consumer module."
     },
     "share": {
       "webview": "@trailbase-apps-in-toss-kit/ait-web/share",

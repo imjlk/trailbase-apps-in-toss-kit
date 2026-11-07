@@ -5,9 +5,18 @@ import {
   type AppsInTossGetTossAppVersion,
   type AppsInTossIsMinVersionSupported,
 } from "./internal/framework";
+import {
+  readAppVersion,
+  readMinVersionSupported,
+  readNetworkStatusWithin,
+  readOperationalEnvironment,
+  readPlatformOS,
+} from "@trailbase-apps-in-toss-kit/ait-core/internal/runtime";
+import type { AppsInTossMinVersionRequirement } from "@trailbase-apps-in-toss-kit/ait-core/runtime";
 
-export type AppsInTossOperationalEnvironment = "sandbox" | "toss" | "unknown";
-export type AppsInTossPlatformOS = "android" | "ios" | "unknown";
+// Runtime vocabulary and predicates are shared with WebView through ait-core;
+// only the RN SDK acquisition stays here.
+export * from "@trailbase-apps-in-toss-kit/ait-core/runtime";
 
 /** A missing or stalled optional native probe must not block read refreshes. */
 export async function safeGetAppsInTossNetworkStatus({
@@ -17,23 +26,11 @@ export async function safeGetAppsInTossNetworkStatus({
   getNetworkStatus?: () => Promise<unknown>;
   timeoutMs?: number;
 } = {}): Promise<unknown> {
-  if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) return "UNKNOWN";
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      (async () => {
-        const read = getNetworkStatus ?? await defaultFrameworkFunction("getNetworkStatus");
-        return read ? await read() : "UNKNOWN";
-      })(),
-      new Promise((resolve) => { timer = setTimeout(() => resolve("UNKNOWN"), timeoutMs); }),
-    ]);
-  } catch { return "UNKNOWN"; }
-  finally { if (timer !== undefined) clearTimeout(timer); }
+  return readNetworkStatusWithin(async () => {
+    const read = getNetworkStatus ?? await defaultFrameworkFunction("getNetworkStatus");
+    return read ? await read() : "UNKNOWN";
+  }, timeoutMs);
 }
-export type AppsInTossMinVersionRequirement =
-  | `${number}.${number}.${number}`
-  | "always"
-  | "never";
 
 export interface SafeGetAppsInTossOperationalEnvironmentOptions {
   getOperationalEnvironment?: AppsInTossGetOperationalEnvironment;
@@ -55,45 +52,26 @@ export interface IsAppsInTossRuntimeSupportedOptions {
 
 export async function safeGetAppsInTossOperationalEnvironment({
   getOperationalEnvironment,
-}: SafeGetAppsInTossOperationalEnvironmentOptions = {}): Promise<AppsInTossOperationalEnvironment> {
-  const resolvedGetOperationalEnvironment =
+}: SafeGetAppsInTossOperationalEnvironmentOptions = {}) {
+  const resolved =
     getOperationalEnvironment ??
     (await defaultFrameworkFunction("getOperationalEnvironment"));
-
-  try {
-    const result = resolvedGetOperationalEnvironment?.();
-    return result === "sandbox" || result === "toss" ? result : "unknown";
-  } catch {
-    return "unknown";
-  }
+  return readOperationalEnvironment(() => resolved?.());
 }
 
 export async function safeGetAppsInTossPlatformOS({
   getPlatformOS,
-}: SafeGetAppsInTossPlatformOSOptions = {}): Promise<AppsInTossPlatformOS> {
-  const resolvedGetPlatformOS =
-    getPlatformOS ?? (await defaultFrameworkFunction("getPlatformOS"));
-
-  try {
-    const result = resolvedGetPlatformOS?.();
-    return result === "android" || result === "ios" ? result : "unknown";
-  } catch {
-    return "unknown";
-  }
+}: SafeGetAppsInTossPlatformOSOptions = {}) {
+  const resolved = getPlatformOS ?? (await defaultFrameworkFunction("getPlatformOS"));
+  return readPlatformOS(() => resolved?.());
 }
 
 export async function safeGetAppsInTossAppVersion({
   getTossAppVersion,
-}: SafeGetAppsInTossAppVersionOptions = {}): Promise<string | null> {
-  const resolvedGetTossAppVersion =
+}: SafeGetAppsInTossAppVersionOptions = {}) {
+  const resolved =
     getTossAppVersion ?? (await defaultFrameworkFunction("getTossAppVersion"));
-
-  try {
-    const result = resolvedGetTossAppVersion?.();
-    return typeof result === "string" && result.trim() ? result.trim() : null;
-  } catch {
-    return null;
-  }
+  return readAppVersion(() => resolved?.());
 }
 
 export async function isAppsInTossRuntimeSupported({
@@ -101,31 +79,8 @@ export async function isAppsInTossRuntimeSupported({
   minAndroid = "always",
   minIos = "always",
 }: IsAppsInTossRuntimeSupportedOptions = {}) {
-  const resolvedIsMinVersionSupported =
+  const resolved =
     isMinVersionSupported ??
     (await defaultFrameworkFunction("isMinVersionSupported"));
-  if (!resolvedIsMinVersionSupported) {
-    return false;
-  }
-
-  try {
-    return resolvedIsMinVersionSupported({
-      android: minAndroid,
-      ios: minIos,
-    });
-  } catch {
-    return false;
-  }
-}
-
-export function isAppsInTossSandbox(
-  operationalEnvironment?: AppsInTossOperationalEnvironment | null,
-) {
-  return operationalEnvironment === "sandbox";
-}
-
-export function isAppsInTossProductionRuntime(
-  operationalEnvironment?: AppsInTossOperationalEnvironment | null,
-) {
-  return operationalEnvironment === "toss";
+  return readMinVersionSupported(resolved, minAndroid, minIos);
 }

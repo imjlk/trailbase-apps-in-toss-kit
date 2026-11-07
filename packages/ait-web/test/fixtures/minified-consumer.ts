@@ -123,3 +123,36 @@ export async function exerciseClientHelpers() {
   const placeholder = decideAppsInTossInlineAdPlaceholder({ supported: false });
   return { link, shared, opened, shoppingResult, claim: claim.status, posted, placeholder };
 }
+
+import {
+  collectAppsInTossRuntimeDiagnostics,
+  createAppsInTossIapRestoreBridge,
+  isAppsInTossProductionRuntime,
+  safeGetAppsInTossNetworkStatus,
+  safeGetAppsInTossOperationalEnvironment,
+} from "../../src/index";
+
+// Runtime probes use the real SDK loader outside the Toss app; restore uses a
+// synthetic IAP namespace so no order is ever acknowledged for real.
+export async function exerciseRuntimeAndRestore() {
+  const environment = await safeGetAppsInTossOperationalEnvironment();
+  const network = await safeGetAppsInTossNetworkStatus({ timeoutMs: 50 });
+  const diagnostics = await collectAppsInTossRuntimeDiagnostics({ enabled: true, timeoutMs: 50 });
+  const acknowledged: string[] = [];
+  const restore = await createAppsInTossIapRestoreBridge({
+    loadSdk: async () => ({
+      IAP: {
+        getPendingOrders: async () => ({ orders: [{ orderId: "fixture-order", sku: "fixture-sku", paymentCompletedDate: "2026-11-01" }] }),
+        completeProductGrant: async ({ params }: { params: { orderId: string } }) => { acknowledged.push(params.orderId); return true; },
+      },
+    }),
+  }).restorePendingOrders({ processProductGrant: ({ orderId }) => ({ granted: orderId === "fixture-order" }) });
+  return {
+    environment,
+    production: isAppsInTossProductionRuntime(environment),
+    network,
+    diagnostics: diagnostics && { environment: diagnostics.environment, deviceFeaturesVerified: diagnostics.deviceFeaturesVerified },
+    restored: restore.restored.map(entry => entry.order.orderId),
+    acknowledged,
+  };
+}

@@ -37,6 +37,14 @@ for (const splitting of [false, true]) {
       expect(helpers.posted.map(call => call.url)).toEqual(["/claim", "/agreements"]);
       expect(helpers.posted[1].body).toMatchObject({ result: "newAgreement", status: "OPTED_IN", template_code: "fixture-app-alert" });
       expect(helpers.placeholder).toMatchObject({ reason: "unsupported", shouldRenderPlaceholder: true });
+      const runtime = await compiled.exerciseRuntimeAndRestore();
+      // Outside the Toss app the real SDK never reads as production.
+      expect(runtime.environment).toBe("unknown");
+      expect(runtime.production).toBe(false);
+      expect(typeof runtime.network).toBe("string");
+      expect(runtime.diagnostics).toMatchObject({ deviceFeaturesVerified: false });
+      expect(runtime.diagnostics?.environment).toBe("unknown");
+      expect(runtime).toMatchObject({ restored: ["fixture-order"], acknowledged: ["fixture-order"] });
       const consumer = compiled.createConsumer();
       expect(consumer.calls).toEqual({ loads: 0, codes: 0, hashes: 0 });
       expect(await consumer.adapter.createAnonymousKeyAuthCode()).toEqual({ code: "fixture-code-1", expiresIn: 300 });

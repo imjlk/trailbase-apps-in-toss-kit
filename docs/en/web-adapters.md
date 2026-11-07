@@ -155,6 +155,30 @@ Call completion only after a durable backend grant. Use existing IAP recovery
 contracts to reconcile unknown/pending orders; never infer entitlement from a
 subscription query alone. A lost response must not allocate a new transaction identity.
 
+To restore pending orders, use `createAppsInTossIapRestoreBridge()` from `ait-web/iap`.
+It runs the same loop as the RN bridge's `restorePendingOrders`, with the same options,
+results and error codes. It lists SDK 3 pending orders and calls your backend grant
+for each order with `source: "restore"`. It acknowledges an order with
+`completeProductGrant` only after that grant succeeded. A failed or timed-out grant
+leaves the order pending for the next restore. Pass `completeAfterGrant: false` to
+acknowledge orders later yourself.
+
+```ts
+import {
+  createAppsInTossIapGrantClient,
+  createAppsInTossIapRestoreBridge,
+} from '@trailbase-apps-in-toss-kit/ait-web/iap';
+
+const grants = createAppsInTossIapGrantClient({
+  endpoints: { grantEndpoint: '/api/app/v1/iap/grant', completeEndpoint: '/api/app/v1/iap/complete', pendingEndpoint: '/api/app/v1/iap/pending' },
+  getAuthHeaders,
+});
+const restore = createAppsInTossIapRestoreBridge({ loadSdk: () => import('@apps-in-toss/web-framework') });
+const { restored, failed } = await restore.restorePendingOrders({
+  processProductGrant: ({ orderId, sku, source }) => grants.grant({ orderId, sku, source }),
+});
+```
+
 `createShareLink` accepts an `intoss://` path and `share` opens a share sheet. A
 resolved share sheet is not evidence of sharing and does not issue a reward. For ads, use the full-screen and DOM banner adapters below and
 connect only app-owned credits to [server reward attempts](app-rewards.md), with
@@ -203,16 +227,22 @@ These WebView subpaths are now available:
 
 | Import | Purpose |
 | --- | --- |
-| `ait-web/ads` | Full-screen lifecycle, `createWebViewBannerAds` DOM adapter and inline placeholder policy |
+| `ait-web/ads` | Full-screen lifecycle, `createWebViewBannerAds` DOM adapter, inline placeholder policy and the runtime helpers `ait-rn/ads` also re-exports |
 | `ait-web/ad-skip` | Persistent request IDs, receipt reconciliation and once-only local effects |
 | `ait-web/storage` | JSON atoms and verbatim-key SDK Storage bridge |
 | `ait-web/analytics` | TrailBase sink/router plus SDK 3 `Analytics.log` dispatch |
+| `ait-web/diagnostics` | Opt-in read-only runtime snapshot with the same schema as RN |
 | `ait-web/engagement` | Referrer normalization, visibility-based exposure and shared engagement helpers |
 | `ait-web/notifications` | Functional message backend client and agreement result normalization |
-| `ait-web/iap` | Backend grant client and the shared IAP error class |
+| `ait-web/iap` | Backend grant client, the shared IAP error class and the pending-order restore bridge |
 | `ait-web/promotion` | Promotion campaign claim and status backend clients |
+| `ait-web/runtime` | Environment, platform, Toss app version, network and minimum-version checks |
 | `ait-web/share` | Share-link bridge on SDK 3 plus deep-link, OG image and message helpers |
 | `ait-web/shopping` | Shopping link validation and a single-flight open bridge (inject SDK 3 `openURL`) |
+
+`ait-web/runtime` reads the SDK 3 `Environment` and `Device` namespaces instead of the
+deprecated top-level getters. Outside the Toss app, or when any read fails, the
+environment is `unknown`, never production.
 
 ```ts
 import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';

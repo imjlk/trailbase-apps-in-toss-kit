@@ -275,10 +275,12 @@ function eventResult<T>(operation: string, timeout: number, subscribe: (resolve:
 export * from "./ads";
 export * from "./ad-skip";
 export * from "./analytics";
+export * from "./diagnostics";
 export * from "./engagement";
 export * from "./storage";
 export * from "./iap";
 export * from "./notifications";
 export * from "./promotion";
+export * from "./runtime";
 export * from "./share";
 export * from "./shopping";

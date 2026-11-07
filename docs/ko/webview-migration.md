@@ -65,7 +65,7 @@ CI에서 켜 두면 RN import가 다시 들어오는 것을 막을 수 있습니
 | ait-rn subpath | WebView 경로 | 남은 부분 |
 | --- | --- | --- |
 | `ait-rn/ad-skip` | `ait-web/ad-skip` | 없음 |
-| `ait-rn/ads` | `ait-web/ads` | 다시 내보내는 runtime 헬퍼(`runtime` 참고) |
+| `ait-rn/ads` | `ait-web/ads` | 없음(RN처럼 `runtime` 헬퍼를 다시 내보냄) |
 | `ait-rn/analytics` | `ait-web/analytics` | 없음(`Analytics.log`, 명시적 `mapEvent`) |
 | `ait-rn/engagement` | `ait-web/engagement` | 없음(문서 visibility로 구동) |
 | `ait-rn/storage` | `ait-web/storage`, `ait.storage` | 없음 |
@@ -73,17 +73,18 @@ CI에서 켜 두면 RN import가 다시 들어오는 것을 막을 수 있습니
 | `ait-rn/identity` | `ait.createAnonymousKeyAuthCode()` | 없음(SDK 3.6+와 프록시 코드 교환 필요) |
 | `ait-rn/haptics` | SDK 3 `generateHapticFeedback` | 없음(wrapper 계획 없음) |
 | `ait-rn/notifications` | `ait-web/notifications`, `ait.requestNotificationAgreement()` | 없음 |
-| `ait-rn/iap` | `ait-web/iap`, `ait.purchase()`, `ait.subscribe()`, 주문 조회 | 대기 주문 복구 흐름 |
+| `ait-rn/iap` | `ait-web/iap`, `ait.purchase()`, `ait.subscribe()`, 주문 조회 | 없음(`createAppsInTossIapRestoreBridge`로 대기 주문 복구) |
 | `ait-rn/share` | `ait-web/share`(`createAppsInTossShareBridge`와 헬퍼) | 없음 |
 | `ait-rn/inline-ads` | `ait-web/ads`(`createWebViewBannerAds`, placeholder 정책) | 없음 |
 | `ait-rn/promotion` | `ait-web/promotion` | 없음 |
 | `ait-rn/shopping` | `ait-web/shopping`(SDK 3 `openURL` 주입) | 없음 |
-| `ait-rn/runtime` | 아직 없음 | 안전한 환경·플랫폼·버전·네트워크 헬퍼 |
-| `ait-rn/diagnostics` | 아직 없음 | runtime 진단 수집기 |
+| `ait-rn/runtime` | `ait-web/runtime` | 없음(SDK 3 `Environment`, `Device` 사용) |
+| `ait-rn/diagnostics` | `ait-web/diagnostics` | 없음 |
 
-플랫폼 중립 헬퍼(백엔드 클라이언트, 정규화 함수, 공유·placeholder 정책)는 `ait-core`로
-공유합니다. 남은 부분은 SDK에 묶인 runtime 환경 헬퍼, 진단 수집기, IAP 대기 주문 복구
-흐름입니다.
+플랫폼 중립 헬퍼(백엔드 클라이언트, 정규화 함수, 공유·placeholder 정책, runtime 확인,
+IAP 복구 흐름)는 `ait-core`로 공유합니다. 이제 모든 `ait-rn` subpath에 WebView 경로가
+있으므로 이 revision에서는 소비 앱 리포트에 `blocked` 항목이 없습니다. 소비 앱이
+WebView 전용 단계를 보고할 때까지 `ait-rn`은 workspace에 남습니다.
 
 ## 단계별 전환
 
@@ -136,7 +137,8 @@ WebView 앱을 `apps-in-toss.config.*`를 가진 별도 workspace 패키지로 �
   클라이언트 hash로 대체하면 안 됩니다.
 - **진행 중 작업**: 대기 중인 IAP 주문, 광고 스킵 요청 ID, 프로모션 intent는 서버에서
   정산됩니다. 저장 키와 요청 ID를 바꾸지 않아야 RN 번들이 시작한 작업을 WebView 번들이
-  이어받습니다.
+  이어받습니다. WebView 시작 시 RN 번들과 같은 멱등 백엔드 지급으로
+  `createAppsInTossIapRestoreBridge().restorePendingOrders()`를 실행하세요.
 - **서버 기록**: 알림 동의, 토스 로그인 연결, 자체 재화 잔액과 원장은 서버에 있으므로 그대로
   넘어갑니다.
 
