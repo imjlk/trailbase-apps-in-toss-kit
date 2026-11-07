@@ -49,3 +49,11 @@ void createAppsInTossIapRestoreBridge({ loadSdk: async () => sdk }).restorePendi
 void createAppsInTossIapRestoreBridge().restorePendingOrders({});
 // @ts-expect-error Version requirements are semver triples, "always" or "never".
 void isAppsInTossRuntimeSupported({ minAndroid: "latest" });
+
+// The WebView session guard takes the adapter's storage and anonymous hash as is.
+import { createAppsInTossWebSessionStorage } from "../src/index";
+const sessions = createAppsInTossWebSessionStorage({ storage: adapter.storage, resolveAnonymousHash: adapter.anonymousHash });
+const sessionStorage: KeyValueStorage = sessions.storage;
+void sessionStorage;
+// @ts-expect-error The guard needs the current account's anonymous hash.
+void createAppsInTossWebSessionStorage({ storage: adapter.storage });

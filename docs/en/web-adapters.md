@@ -229,7 +229,7 @@ These WebView subpaths are now available:
 | --- | --- |
 | `ait-web/ads` | Full-screen lifecycle, `createWebViewBannerAds` DOM adapter, inline placeholder policy and the runtime helpers `ait-rn/ads` also re-exports |
 | `ait-web/ad-skip` | Persistent request IDs, receipt reconciliation and once-only local effects |
-| `ait-web/storage` | JSON atoms and verbatim-key SDK Storage bridge |
+| `ait-web/storage` | JSON atoms, verbatim-key SDK Storage bridge and `createAppsInTossWebSessionStorage`, which clears stored sessions when the Toss account changed |
 | `ait-web/analytics` | TrailBase sink/router plus SDK 3 `Analytics.log` dispatch |
 | `ait-web/diagnostics` | Opt-in read-only runtime snapshot with the same schema as RN |
 | `ait-web/engagement` | Referrer normalization, visibility-based exposure and shared engagement helpers |
@@ -243,6 +243,24 @@ These WebView subpaths are now available:
 `ait-web/runtime` reads the SDK 3 `Environment` and `Device` namespaces instead of the
 deprecated top-level getters. Outside the Toss app, or when any read fails, the
 environment is `unknown`, never production.
+
+Read stored sessions through `createAppsInTossWebSessionStorage`, not plain
+`ait.storage`. It keeps the RN account check: a session read compares the
+anonymous hash on the device with the current Toss account and, when they
+differ, clears both sessions and returns null. Pass `sessions.storage` and its
+keys to the trailbase-client session manager. The hash only detects an account
+change; authentication still exchanges a fresh code.
+
+```ts
+import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';
+import { createAppsInTossWebSessionStorage } from '@trailbase-apps-in-toss-kit/ait-web/storage';
+
+const ait = createAppsInTossWebAdapter({ appKey, loadSdk: () => import('@apps-in-toss/web-framework') });
+const sessions = createAppsInTossWebSessionStorage({
+  storage: ait.storage,
+  resolveAnonymousHash: ait.anonymousHash,
+});
+```
 
 ```ts
 import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';
