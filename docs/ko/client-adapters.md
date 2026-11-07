@@ -98,12 +98,14 @@ Apps in Toss는 이를 알림 동의문이 연결된 기능성 메시지의 발�
 기능성 메시지 client는 앱이 소유한 백엔드 endpoint만 호출합니다. React Native에서 Toss Smart
 Message API, mTLS proxy, 인증서 기반 서비스를 직접 호출하지 마세요. 알림동의 결과 정규화와
 기능성 메시지 백엔드 client는 `@trailbase-apps-in-toss-kit/ait-rn/notifications`를
-사용하세요.
+사용하세요. WebView 앱은 같은 client를 `@trailbase-apps-in-toss-kit/ait-web/notifications`에서
+가져오고 동의 요청은 `ait.requestNotificationAgreement()`로 합니다.
 
 ## Apps in Toss 프로모션 claim
 
 RN 코드에서 campaign claim client가 필요하면
-`@trailbase-apps-in-toss-kit/ait-rn/promotion`을 사용하세요. 이 client는 앱/백엔드
+`@trailbase-apps-in-toss-kit/ait-rn/promotion`을 사용하세요(WebView는 `ait-web/promotion`에서
+같은 client를 가져옵니다). 이 client는 앱/백엔드
 `campaignId`만 전송합니다. Toss Console promotion code, raw Toss user key, proxy token,
 인증서 자료는 받거나 전달하지 않습니다.
 

@@ -45,7 +45,12 @@
         "safeGetAppsInTossOperationalEnvironment",
         "safeGetAppsInTossPlatformOS"
       ],
-      "sdk3": ["getOperationalEnvironment", "getPlatformOS", "getTossAppVersion", "isMinVersionSupported"],
+      "sdk3": [
+        "getOperationalEnvironment",
+        "getPlatformOS",
+        "getTossAppVersion",
+        "isMinVersionSupported"
+      ],
       "note": "Pass loadSdk: () => import('@apps-in-toss/web-framework') from the consumer module. The pending names are runtime helpers that ait-rn/ads re-exports from ait-rn/runtime."
     },
     "analytics": {
@@ -75,8 +80,15 @@
       "webview": null,
       "same": [],
       "replaced": {},
-      "pending": ["collectAppsInTossRuntimeDiagnostics"],
-      "sdk3": ["getNetworkStatus", "getOperationalEnvironment", "getPlatformOS", "getTossAppVersion"],
+      "pending": [
+        "collectAppsInTossRuntimeDiagnostics"
+      ],
+      "sdk3": [
+        "getNetworkStatus",
+        "getOperationalEnvironment",
+        "getPlatformOS",
+        "getTossAppVersion"
+      ],
       "note": "Until a WebView collector exists, keep diagnostics opt-in and call the SDK 3 functions directly without sending identity data."
     },
     "engagement": {
@@ -102,24 +114,26 @@
         }
       },
       "pending": [],
-      "sdk3": ["generateHapticFeedback"],
+      "sdk3": [
+        "generateHapticFeedback"
+      ],
       "note": "No kit wrapper is planned; the official SDK 3 call is the replacement."
     },
     "iap": {
-      "webview": "createAppsInTossWebAdapter()",
-      "same": [],
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/iap",
+      "same": [
+        "AppsInTossIapBridgeError",
+        "createAppsInTossIapGrantClient"
+      ],
       "replaced": {
-        "AppsInTossIapBridgeError": {
-          "use": "WebAdapterError (code and operation only)."
-        },
         "createAppsInTossIapBridge": {
           "use": "ait.purchase, ait.subscribe, ait.getProducts, ait.getSubscriptionInfo, ait.getPendingOrders and ait.completeProductGrant.",
           "gap": "restorePendingOrders has no WebView helper yet. Reconcile pending orders through the backend IAP ledger before relying on the WebView bundle for purchases."
         }
       },
-      "pending": ["createAppsInTossIapGrantClient"],
+      "pending": [],
       "sdk3": [],
-      "note": "Keep the backend verification ledger authoritative. SDK success events are UI results, not proof of payment or entitlement."
+      "note": "The backend grant client and its error class are shared through ait-core. Keep the backend verification ledger authoritative; SDK success events are UI results, not proof of payment or entitlement."
     },
     "identity": {
       "webview": "createAppsInTossWebAdapter()",
@@ -153,22 +167,20 @@
     },
     "inline-ads": {
       "webview": "@trailbase-apps-in-toss-kit/ait-web/ads",
-      "same": [],
+      "same": [
+        "APPS_IN_TOSS_INLINE_AD_FIXED_HEIGHT",
+        "APPS_IN_TOSS_INLINE_AD_MIN_VERSION",
+        "decideAppsInTossInlineAdPlaceholder",
+        "getAppsInTossInlineAdTestAdGroupId"
+      ],
       "replaced": {
-        "getAppsInTossInlineAdTestAdGroupId": {
-          "use": "getAppsInTossTestAdGroupId(\"banner\") from ait-web/ads."
-        },
         "isAppsInTossInlineAdSupported": {
           "use": "createWebViewBannerAds() from ait-web/ads; treat an initialize or attach failure as unsupported and keep the slot collapsed."
         }
       },
-      "pending": [
-        "APPS_IN_TOSS_INLINE_AD_FIXED_HEIGHT",
-        "APPS_IN_TOSS_INLINE_AD_MIN_VERSION",
-        "decideAppsInTossInlineAdPlaceholder"
-      ],
-      "sdk3": ["TossAds", "isMinVersionSupported"],
-      "note": "The RN InlineAd component becomes a DOM target owned by the consumer. Attach only while the slot is visible and destroy the handle on unmount."
+      "pending": [],
+      "sdk3": [],
+      "note": "The placeholder policy is shared through ait-core. The RN InlineAd component becomes a DOM target owned by the consumer: attach only while the slot is visible and destroy the handle on unmount."
     },
     "login": {
       "webview": "createAppsInTossWebAdapter()",
@@ -186,37 +198,29 @@
       "note": "Toss Login links live in the backend, so an account linked from RN stays linked after the WebView bootstrap resolves the same TrailBase user."
     },
     "notifications": {
-      "webview": "createAppsInTossWebAdapter()",
-      "same": [],
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/notifications",
+      "same": [
+        "APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE",
+        "AppsInTossNotificationAgreementError",
+        "appsInTossNotificationAgreementStatus",
+        "createAppsInTossFunctionalMessageClient",
+        "normalizeAppsInTossNotificationAgreementResult"
+      ],
       "replaced": {
-        "APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE": {
-          "use": "ait.requestNotificationAgreement() results carry source: 'apps_in_toss_sdk'."
-        },
-        "AppsInTossNotificationAgreementError": {
-          "use": "WebAdapterError (code and operation only)."
-        },
-        "appsInTossNotificationAgreementStatus": {
-          "use": "Read status from ait.requestNotificationAgreement()."
-        },
         "createAppsInTossNotificationAgreementBridge": {
           "use": "ait.requestNotificationAgreement(templateCode)."
-        },
-        "normalizeAppsInTossNotificationAgreementResult": {
-          "use": "ait.requestNotificationAgreement() already returns the normalized result, status and template codes."
         },
         "requestAppsInTossNotificationAgreement": {
           "use": "ait.requestNotificationAgreement(templateCode)."
         }
       },
-      "pending": ["createAppsInTossFunctionalMessageClient"],
+      "pending": [],
       "sdk3": [],
-      "note": "The functional message client only calls app-owned backend endpoints and is platform-neutral; it still needs a WebView export."
+      "note": "Request agreement through ait.requestNotificationAgreement(), then sync its result with the shared functional message client, which only calls app-owned backend endpoints. The adapter throws WebAdapterError; the client throws AppsInTossNotificationAgreementError."
     },
     "promotion": {
-      "webview": null,
-      "same": [],
-      "replaced": {},
-      "pending": [
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/promotion",
+      "same": [
         "AppsInTossPromotionCampaignClientError",
         "createAppsInTossPromotionCampaignClient",
         "createAppsInTossPromotionStatusClient",
@@ -224,8 +228,10 @@
         "normalizeAppsInTossPromotionStatusResult",
         "sanitizePromotionClaimContext"
       ],
+      "replaced": {},
+      "pending": [],
       "sdk3": [],
-      "note": "Platform-neutral backend clients that still need a WebView export. The backend keeps promotion codes and the proxy call."
+      "note": "Platform-neutral backend clients shared through ait-core. The backend keeps promotion codes and the proxy call."
     },
     "runtime": {
       "webview": null,
@@ -240,42 +246,51 @@
         "safeGetAppsInTossOperationalEnvironment",
         "safeGetAppsInTossPlatformOS"
       ],
-      "sdk3": ["getNetworkStatus", "getOperationalEnvironment", "getPlatformOS", "getTossAppVersion", "isMinVersionSupported"],
+      "sdk3": [
+        "getNetworkStatus",
+        "getOperationalEnvironment",
+        "getPlatformOS",
+        "getTossAppVersion",
+        "isMinVersionSupported"
+      ],
       "note": "Until WebView wrappers exist, call the SDK 3 functions directly and treat a thrown or missing result as unknown, never as production."
     },
     "share": {
-      "webview": "createAppsInTossWebAdapter()",
-      "same": [],
-      "replaced": {
-        "createAppsInTossShareBridge": {
-          "use": "ait.createShareLink(intossPath) and ait.share(message)."
-        }
-      },
-      "pending": [
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/share",
+      "same": [
         "buildAppsInTossShareMessage",
+        "createAppsInTossShareBridge",
+        "createShareBridge",
         "extractAppsInTossSchemeValue",
         "normalizeAppsInTossOgImageUrl",
         "prewarmAppsInTossOgImage",
         "resolveAppsInTossDeepLink"
       ],
-      "sdk3": ["getSchemeUri", "getTossShareLink"],
-      "note": "A resolved share sheet is not evidence of sharing and never authorizes a reward."
+      "replaced": {},
+      "pending": [],
+      "sdk3": [],
+      "note": "The WebView createAppsInTossShareBridge takes loadSdk: () => import('@apps-in-toss/web-framework') from the consumer module. A resolved share sheet is not evidence of sharing and never authorizes a reward."
     },
     "shopping": {
-      "webview": null,
-      "same": [],
-      "replaced": {},
-      "pending": [
+      "webview": "@trailbase-apps-in-toss-kit/ait-web/shopping",
+      "same": [
         "createAppsInTossShoppingBridge",
         "normalizeAppsInTossShoppingLink",
         "normalizeAppsInTossShoppingOffer"
       ],
-      "sdk3": ["openURL"],
-      "note": "Platform-neutral link validation; the bridge already takes an injected openURL."
+      "replaced": {},
+      "pending": [],
+      "sdk3": [
+        "openURL"
+      ],
+      "note": "Platform-neutral link validation shared through ait-core. Inject openURL from @apps-in-toss/web-framework into createAppsInTossShoppingBridge."
     },
     "storage": {
       "webview": "@trailbase-apps-in-toss-kit/ait-web/storage",
-      "same": ["createAppsInTossSdkStorageBridge", "createPersistentJsonAtom"],
+      "same": [
+        "createAppsInTossSdkStorageBridge",
+        "createPersistentJsonAtom"
+      ],
       "replaced": {
         "createAppsInTossSessionStorage": {
           "use": "ait.storage. It prefixes keys with `${appKey}.`, so ait.storage.getItem('appSession') reads the same `${appKey}.appSession` key the RN helper wrote; also read `${appKey}.tossSession` if the RN app used it."

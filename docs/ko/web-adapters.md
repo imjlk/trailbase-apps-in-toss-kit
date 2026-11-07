@@ -191,11 +191,16 @@ JSON atom, 분석 라우터·큐, 참여도 헬퍼를 담습니다. 소비 앱�
 
 | import | 용도 |
 | --- | --- |
-| `ait-web/ads` | 전면 광고 생명주기와 `createWebViewBannerAds` DOM 어댑터 |
+| `ait-web/ads` | 전면 광고 생명주기, `createWebViewBannerAds` DOM 어댑터, 인라인 placeholder 정책 |
 | `ait-web/ad-skip` | 요청 ID 저장, 영수증 재조회, 로컬 효과 1회 적용 |
 | `ait-web/storage` | JSON atom과 키를 그대로 쓰는 SDK Storage 브리지 |
 | `ait-web/analytics` | TrailBase 수집·라우터와 SDK 3 `Analytics.log` 연결 |
 | `ait-web/engagement` | 유입 경로 정규화, 실제 가시성 기반 노출 및 참여도 헬퍼 |
+| `ait-web/notifications` | 기능성 메시지 백엔드 클라이언트와 동의 결과 정규화 |
+| `ait-web/iap` | 지급 백엔드 클라이언트와 공유 IAP 오류 클래스 |
+| `ait-web/promotion` | 프로모션 캠페인 지급 요청·상태 백엔드 클라이언트 |
+| `ait-web/share` | SDK 3 공유 링크 bridge와 딥링크·OG 이미지·메시지 헬퍼 |
+| `ait-web/shopping` | 쇼핑 링크 검증과 중복 실행을 막는 열기 bridge(SDK 3 `openURL` 주입) |
 
 ```ts
 import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';

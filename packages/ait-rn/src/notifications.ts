@@ -1,34 +1,23 @@
 import { normalizeAppsInTossErrorMessage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
+  AppsInTossNotificationAgreementError,
+  appsInTossNotificationAgreementStatus,
+  APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,
+  normalizeAppsInTossNotificationAgreementResult,
+  type AppsInTossNotificationAgreementErrorCode,
+  type AppsInTossNotificationAgreementPayload,
+  type AppsInTossNotificationAgreementResult,
+} from "@trailbase-apps-in-toss-kit/ait-core/notifications";
+import {
   defaultFrameworkFunction,
   type AppsInTossRequestNotificationAgreement,
 } from "./internal/framework";
-import {
-  postAppsInTossJson,
-  type AppsInTossHeaders,
-  type AppsInTossJsonFetcher,
-} from "./internal/http";
 import { isProductionEnv, resolveRuntimeEnv } from "./internal/runtime";
 
+// Agreement result types, the error class and the functional message client
+// are shared with WebView through ait-core; only the SDK bridge stays here.
+export * from "@trailbase-apps-in-toss-kit/ait-core/notifications";
 export type { AppsInTossRequestNotificationAgreement } from "./internal/framework";
-
-export const APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE =
-  "apps_in_toss_sdk";
-
-export type AppsInTossNotificationAgreementResult =
-  | "newAgreement"
-  | "alreadyAgreed"
-  | "agreementRejected";
-
-export type AppsInTossNotificationAgreementStatus = "OPTED_IN" | "OPTED_OUT";
-
-export interface AppsInTossNotificationAgreementPayload {
-  result: AppsInTossNotificationAgreementResult;
-  source: typeof APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE;
-  status: AppsInTossNotificationAgreementStatus;
-  template_code: string;
-  templateCode: string;
-}
 
 export interface AppsInTossNotificationAgreementRequestOptions {
   templateCode: string;
@@ -48,36 +37,6 @@ export type AppsInTossNotificationAgreementDevFallback = (
       | AppsInTossNotificationAgreementPayload
       | AppsInTossNotificationAgreementResult
     >;
-
-export type AppsInTossNotificationAgreementErrorCode =
-  | "FUNCTIONAL_MESSAGE_REQUEST_ENDPOINT_MISSING"
-  | "REQUEST_NOTIFICATION_AGREEMENT_FAILED"
-  | "REQUEST_NOTIFICATION_AGREEMENT_INVALID_RESULT"
-  | "REQUEST_NOTIFICATION_AGREEMENT_TEMPLATE_CODE_REQUIRED"
-  | "REQUEST_NOTIFICATION_AGREEMENT_THROWN"
-  | "REQUEST_NOTIFICATION_AGREEMENT_UNAVAILABLE";
-
-export interface AppsInTossNotificationAgreementErrorOptions {
-  cause?: unknown;
-  code: AppsInTossNotificationAgreementErrorCode;
-  message: string;
-}
-
-export class AppsInTossNotificationAgreementError extends Error {
-  code: AppsInTossNotificationAgreementErrorCode;
-  override cause?: unknown;
-
-  constructor({
-    cause,
-    code,
-    message,
-  }: AppsInTossNotificationAgreementErrorOptions) {
-    super(message);
-    this.name = "AppsInTossNotificationAgreementError";
-    this.code = code;
-    this.cause = cause;
-  }
-}
 
 export interface CreateAppsInTossNotificationAgreementBridgeOptions {
   createDevFallback?: AppsInTossNotificationAgreementDevFallback;
@@ -249,182 +208,6 @@ export function requestAppsInTossNotificationAgreement({
   });
 }
 
-export function normalizeAppsInTossNotificationAgreementResult(
-  value: unknown,
-): AppsInTossNotificationAgreementResult | null {
-  if (
-    value === "newAgreement" ||
-    value === "alreadyAgreed" ||
-    value === "agreementRejected"
-  ) {
-    return value;
-  }
-  if (value && typeof value === "object") {
-    return normalizeAppsInTossNotificationAgreementResult(
-      (value as Record<string, unknown>).type,
-    );
-  }
-  return null;
-}
-
-export function appsInTossNotificationAgreementStatus(
-  result: AppsInTossNotificationAgreementResult,
-): AppsInTossNotificationAgreementStatus {
-  return result === "agreementRejected" ? "OPTED_OUT" : "OPTED_IN";
-}
-
-export type AppsInTossFunctionalMessageOperation =
-  | "requestMessage"
-  | "syncAgreement";
-
-export interface AppsInTossFunctionalMessageEndpoints {
-  /**
-   * App route that queues a functional message on the caller's behalf. Omit it
-   * when the server queues messages itself; `requestMessage` then rejects
-   * without a network call.
-   */
-  requestMessage?: string;
-  syncAgreement: string;
-}
-
-export interface CreateAppsInTossFunctionalMessageClientOptions<
-  TAgreementSyncResult = unknown,
-  TMessageRequestResult = unknown,
-> {
-  baseUrl?: string;
-  endpoints: AppsInTossFunctionalMessageEndpoints;
-  fetcher?: AppsInTossJsonFetcher;
-  getAuthHeaders?: () => AppsInTossHeaders | Promise<AppsInTossHeaders>;
-  normalizeResponse?: (
-    value: unknown,
-    context: { operation: AppsInTossFunctionalMessageOperation },
-  ) => TAgreementSyncResult | TMessageRequestResult;
-}
-
-export interface AppsInTossNotificationAgreementSyncInput {
-  result: AppsInTossNotificationAgreementResult;
-  source?: typeof APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE | string;
-  status?: AppsInTossNotificationAgreementStatus;
-  templateCode: string;
-}
-
-export interface AppsInTossFunctionalMessageRequestInput {
-  agreementTemplateCode?: string | null;
-  context?: Record<string, unknown>;
-  providerRequestId?: string | null;
-  templateSetCode: string;
-}
-
-export interface AppsInTossFunctionalMessageClient<
-  TAgreementSyncResult = unknown,
-  TMessageRequestResult = unknown,
-> {
-  requestMessage(
-    input: AppsInTossFunctionalMessageRequestInput,
-  ): Promise<TMessageRequestResult>;
-  syncAgreement(
-    input: AppsInTossNotificationAgreementSyncInput,
-  ): Promise<TAgreementSyncResult>;
-}
-
-export function createAppsInTossFunctionalMessageClient<
-  TAgreementSyncResult = unknown,
-  TMessageRequestResult = unknown,
->({
-  baseUrl,
-  endpoints,
-  fetcher,
-  getAuthHeaders,
-  normalizeResponse,
-}: CreateAppsInTossFunctionalMessageClientOptions<
-  TAgreementSyncResult,
-  TMessageRequestResult
->): AppsInTossFunctionalMessageClient<
-  TAgreementSyncResult,
-  TMessageRequestResult
-> {
-  return {
-    async requestMessage({
-      agreementTemplateCode,
-      context,
-      providerRequestId,
-      templateSetCode,
-    }) {
-      const path = endpoints.requestMessage;
-      if (!path) {
-        throw new AppsInTossNotificationAgreementError({
-          code: "FUNCTIONAL_MESSAGE_REQUEST_ENDPOINT_MISSING",
-          message:
-            "Apps in Toss functional message requestMessage endpoint is not configured.",
-        });
-      }
-      const normalizedAgreementTemplateCode =
-        normalizeOptionalCode(agreementTemplateCode);
-      const normalizedProviderRequestId =
-        normalizeOptionalCode(providerRequestId);
-      const payload = await postAppsInTossJson({
-        baseUrl,
-        body: {
-          ...(normalizedAgreementTemplateCode
-            ? { agreementTemplateCode: normalizedAgreementTemplateCode }
-            : {}),
-          ...(context === undefined ? {} : { context }),
-          ...(normalizedProviderRequestId
-            ? { providerRequestId: normalizedProviderRequestId }
-            : {}),
-          templateSetCode: normalizeRequiredCode(
-            templateSetCode,
-            "REQUEST_NOTIFICATION_AGREEMENT_TEMPLATE_CODE_REQUIRED",
-            "Apps in Toss functional message templateSetCode is required.",
-          ),
-        },
-        fetcher,
-        getAuthHeaders,
-        path,
-      });
-      return normalizeFunctionalMessageResponse<TMessageRequestResult>(
-        payload,
-        "requestMessage",
-        normalizeResponse,
-      );
-    },
-    async syncAgreement({ result, source, status, templateCode }) {
-      const normalizedResult =
-        normalizeAppsInTossNotificationAgreementResult(result);
-      if (!normalizedResult) {
-        throw new AppsInTossNotificationAgreementError({
-          cause: result,
-          code: "REQUEST_NOTIFICATION_AGREEMENT_INVALID_RESULT",
-          message: "Apps in Toss notification agreement result was invalid.",
-        });
-      }
-      const normalizedTemplateCode = normalizeRequiredCode(
-        templateCode,
-        "REQUEST_NOTIFICATION_AGREEMENT_TEMPLATE_CODE_REQUIRED",
-        "Apps in Toss notification agreement templateCode is required.",
-      );
-      const payload = await postAppsInTossJson({
-        baseUrl,
-        body: {
-          result: normalizedResult,
-          source: source ?? APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE,
-          status:
-            status ?? appsInTossNotificationAgreementStatus(normalizedResult),
-          template_code: normalizedTemplateCode,
-        },
-        fetcher,
-        getAuthHeaders,
-        path: endpoints.syncAgreement,
-      });
-      return normalizeFunctionalMessageResponse<TAgreementSyncResult>(
-        payload,
-        "syncAgreement",
-        normalizeResponse,
-      );
-    },
-  };
-}
-
 async function handleNotificationAgreementFallback({
   createDevFallback,
   error,
@@ -471,19 +254,6 @@ function notificationAgreementPayload(
     template_code: templateCode,
     templateCode,
   };
-}
-
-function normalizeFunctionalMessageResponse<TResult>(
-  payload: unknown,
-  operation: AppsInTossFunctionalMessageOperation,
-  normalizeResponse?: CreateAppsInTossFunctionalMessageClientOptions<
-    unknown,
-    unknown
-  >["normalizeResponse"],
-) {
-  return normalizeResponse
-    ? (normalizeResponse(payload, { operation }) as TResult)
-    : (payload as TResult);
 }
 
 function normalizeRequiredCode(

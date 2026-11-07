@@ -104,12 +104,14 @@ The functional message client only calls app-owned backend endpoints. It must
 not call Toss Smart Message APIs, the mTLS proxy, or certificate-backed services
 directly from React Native. Use
 `@trailbase-apps-in-toss-kit/ait-rn/notifications` for notification agreement
-normalization and functional message backend clients.
+normalization and functional message backend clients. WebView apps import the
+same client from `@trailbase-apps-in-toss-kit/ait-web/notifications` and request
+agreement with `ait.requestNotificationAgreement()`.
 
 ## Apps in Toss Promotion Claims
 
 Use `@trailbase-apps-in-toss-kit/ait-rn/promotion` when RN code needs a generic
-campaign claim client. The client sends an app/backend `campaignId`; it never
+campaign claim client (`ait-web/promotion` exports the same client for WebView). The client sends an app/backend `campaignId`; it never
 accepts or forwards Toss Console promotion codes, raw Toss user keys, proxy
 tokens, or certificate material.
 

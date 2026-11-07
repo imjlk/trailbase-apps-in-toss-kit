@@ -20,3 +20,9 @@ void createAppsInTossFullScreenAdBridge({ loadFullScreenAd: sdk.loadFullScreenAd
 void createAppsInTossSdkStorageBridge({ framework: sdk });
 void createAppsInTossAnalyticsConfig({ analyticsModule: sdk.Analytics });
 void createWebViewBannerAds({ framework: sdk });
+
+// Shared RN/WebView helpers accept the real SDK 3 functions.
+import { createAppsInTossShareBridge, createAppsInTossShoppingBridge } from "../src/index";
+void createAppsInTossShareBridge({ loadSdk: async () => sdk });
+void createAppsInTossShareBridge({ getTossShareLink: sdk.getTossShareLink, share: sdk.share, getSchemeUri: sdk.getSchemeUri });
+void createAppsInTossShoppingBridge({ openURL: sdk.openURL });

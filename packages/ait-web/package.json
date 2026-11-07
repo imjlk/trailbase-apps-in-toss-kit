@@ -11,7 +11,12 @@
     "./ad-skip": "./src/ad-skip.ts",
     "./analytics": "./src/analytics.ts",
     "./engagement": "./src/engagement.ts",
-    "./storage": "./src/storage.ts"
+    "./storage": "./src/storage.ts",
+    "./iap": "./src/iap.ts",
+    "./notifications": "./src/notifications.ts",
+    "./promotion": "./src/promotion.ts",
+    "./share": "./src/share.ts",
+    "./shopping": "./src/shopping.ts"
   },
   "peerDependencies": {
     "@apps-in-toss/web-framework": ">=3.4.0 <4",

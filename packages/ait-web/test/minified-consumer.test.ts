@@ -30,6 +30,13 @@ for (const splitting of [false, true]) {
       expect(Object.keys(migrated.wire[1]).sort()).toEqual(["context", "opportunityKey", "placement", "requestId"]);
       expect(migrated.shown).toMatchObject({ earned: true, events: ["show", "impression", "userEarnedReward", "dismissed"] });
       expect(migrated.logs).toEqual([{ log_name: "ad_skip_used", log_type: "event", params: { experiment_id: "fixture-experiment", variant: "control" } }]);
+      const helpers = await compiled.exerciseClientHelpers();
+      expect(helpers.link).toBe("https://toss.im/_m/fixture?path=intoss%3A%2F%2Ffixture-app%2Fpoll%2F1");
+      expect(helpers.shared).toEqual([`Fixture\n\n${helpers.link}`]);
+      expect(helpers).toMatchObject({ opened: ["https://toss.shopping/t/fixture"], shoppingResult: { status: "dispatched" }, claim: "GRANTED" });
+      expect(helpers.posted.map(call => call.url)).toEqual(["/claim", "/agreements"]);
+      expect(helpers.posted[1].body).toMatchObject({ result: "newAgreement", status: "OPTED_IN", template_code: "fixture-app-alert" });
+      expect(helpers.placeholder).toMatchObject({ reason: "unsupported", shouldRenderPlaceholder: true });
       const consumer = compiled.createConsumer();
       expect(consumer.calls).toEqual({ loads: 0, codes: 0, hashes: 0 });
       expect(await consumer.adapter.createAnonymousKeyAuthCode()).toEqual({ code: "fixture-code-1", expiresIn: 300 });

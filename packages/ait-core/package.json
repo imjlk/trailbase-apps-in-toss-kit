@@ -12,7 +12,14 @@
     "./storage": "./src/storage.ts",
     "./internal/analytics-core": "./src/internal/analytics-core.ts",
     "./internal/http": "./src/internal/http.ts",
-    "./internal/event-bridge": "./src/internal/event-bridge.ts"
+    "./internal/event-bridge": "./src/internal/event-bridge.ts",
+    "./iap": "./src/iap.ts",
+    "./inline-ads": "./src/inline-ads.ts",
+    "./notifications": "./src/notifications.ts",
+    "./promotion": "./src/promotion.ts",
+    "./share": "./src/share.ts",
+    "./shopping": "./src/shopping.ts",
+    "./internal/iap": "./src/internal/iap.ts"
   },
   "dependencies": {
     "@ait-kit/sdk": "0.7.0"

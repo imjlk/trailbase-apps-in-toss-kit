@@ -277,3 +277,8 @@ export * from "./ad-skip";
 export * from "./analytics";
 export * from "./engagement";
 export * from "./storage";
+export * from "./iap";
+export * from "./notifications";
+export * from "./promotion";
+export * from "./share";
+export * from "./shopping";

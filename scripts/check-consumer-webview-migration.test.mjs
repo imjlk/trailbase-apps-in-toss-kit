@@ -49,6 +49,7 @@ const rnConsumer = () => fixture({
     `  type AppsInTossLoginBridgeError as LoginError,`,
     `} from "${RN}/login";`,
     `import { createAppsInTossFunctionalMessageClient } from '${RN}/notifications';`,
+    `import { collectAppsInTossRuntimeDiagnostics } from '${RN}/diagnostics';`,
     `import { createAppsInTossIapBridge } from "${RN}/iap";`,
     `import type { AnalyticsPayload } from "${RN}/analytics";`,
     `import { safeGetAppsInTossPlatformOS } from "${RN}";`,
@@ -77,8 +78,14 @@ test("classifies RN imports by the migration map", () => {
     assert.equal(item(result, "createAppsInTossLoginBridge", "login").action, "rewrite");
     assert.equal(item(result, "AppsInTossLoginBridgeError", "login").action, "rewrite");
 
+    // Platform-neutral backend clients are shared through ait-core.
     const message = item(result, "createAppsInTossFunctionalMessageClient", "notifications");
-    assert.equal(message.action, "blocked");
+    assert.equal(message.action, "swap-import");
+    assert.match(message.reason, /ait-web\/notifications/);
+
+    const diagnostics = item(result, "collectAppsInTossRuntimeDiagnostics", "diagnostics");
+    assert.equal(diagnostics.action, "blocked");
+    assert.ok(diagnostics.interim.includes("getOperationalEnvironment"));
 
     const iap = item(result, "createAppsInTossIapBridge", "iap");
     assert.equal(iap.action, "blocked");

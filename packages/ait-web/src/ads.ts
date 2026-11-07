@@ -1,6 +1,8 @@
 import { createWebViewAds } from "@ait-kit/sdk/web";
 import { createFullScreenAdBridge, type CreateAppsInTossFullScreenAdBridgeOptions, type AppsInTossLoadFullScreenAd, type AppsInTossShowFullScreenAd } from "@trailbase-apps-in-toss-kit/ait-core/ads";
 export * from "@trailbase-apps-in-toss-kit/ait-core/ads";
+// Inline/banner placeholder policy shared with RN; the slot itself is a consumer-owned DOM target.
+export * from "@trailbase-apps-in-toss-kit/ait-core/inline-ads";
 
 export interface CreateAppsInTossWebFullScreenAdBridgeOptions extends CreateAppsInTossFullScreenAdBridgeOptions {
   /** Resolve from the consumer's SDK dependency; never acquires the RN SDK. */

@@ -90,3 +90,36 @@ export async function exerciseSharedFlow() {
   await router.flush();
   return { saved, initial: initial.status, replayed: result.receipt.replayed, effects, wire, shown, cleanups, logs };
 }
+
+import {
+  createAppsInTossShareBridge, createAppsInTossShoppingBridge,
+  createAppsInTossPromotionCampaignClient, createAppsInTossFunctionalMessageClient,
+  decideAppsInTossInlineAdPlaceholder,
+} from "../../src/index";
+
+/** RN-to-WebView client helpers executed from the emitted browser chunks. */
+export async function exerciseClientHelpers() {
+  const posted: Array<{ url: string; body: unknown }> = [];
+  const fetcher = async (url: string, init: RequestInit) => {
+    posted.push({ url, body: JSON.parse(String(init.body)) });
+    return Response.json({ providerStatus: "SUCCESS", rewardAmount: 1 });
+  };
+  const shared: string[] = [];
+  const share = createAppsInTossShareBridge({
+    fetcher: async () => undefined,
+    loadSdk: async () => ({
+      getTossShareLink: async (path: string) => `https://toss.im/_m/fixture?path=${encodeURIComponent(path)}`,
+      share: async ({ message }: { message: string }) => { shared.push(message); },
+    }),
+  });
+  const link = await share.shareLink({ appName: "fixture-app", path: "/poll/1", message: "Fixture" });
+  const opened: string[] = [];
+  const shopping = createAppsInTossShoppingBridge({ openURL: async url => { opened.push(url); } });
+  const shoppingResult = await shopping.open("https://toss.shopping/t/fixture");
+  const claim = await createAppsInTossPromotionCampaignClient({ claimEndpoint: "/claim", fetcher })
+    .claim({ campaignId: "fixture", eligibilityId: "day-1", requestId: "fixture:day-1" });
+  await createAppsInTossFunctionalMessageClient({ endpoints: { syncAgreement: "/agreements" }, fetcher })
+    .syncAgreement({ result: "newAgreement", templateCode: "fixture-app-alert" });
+  const placeholder = decideAppsInTossInlineAdPlaceholder({ supported: false });
+  return { link, shared, opened, shoppingResult, claim: claim.status, posted, placeholder };
+}

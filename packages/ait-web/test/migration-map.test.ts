@@ -79,12 +79,14 @@ describe("data/webview-migration-map.json", () => {
     }
   });
 
-  test("same-name exports exist for WebView and pending names do not", async () => {
+  test("same-name exports exist for WebView and pending or replaced names do not", async () => {
     const web = await webRuntimeExports();
     for (const [subpath, entry] of Object.entries(map.subpaths)) {
       expect({ subpath, missing: entry.same.filter((name) => !web.has(name)) }).toEqual({ subpath, missing: [] });
-      // A pending name that now exists for WebView must move to "same".
+      // A pending or replaced name that now exists for WebView must move to "same".
       expect({ subpath, stale: entry.pending.filter((name) => web.has(name)) }).toEqual({ subpath, stale: [] });
+      expect({ subpath, replacedButExported: Object.keys(entry.replaced).filter((name) => web.has(name)) })
+        .toEqual({ subpath, replacedButExported: [] });
     }
   });
 
