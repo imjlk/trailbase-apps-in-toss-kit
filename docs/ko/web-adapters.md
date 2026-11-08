@@ -216,7 +216,7 @@ JSON atom, 분석 라우터·큐, 참여도 헬퍼를 담습니다. 소비 앱�
 | --- | --- |
 | `ait-web/ads` | 전면 광고 생명주기, `createWebViewBannerAds` DOM 어댑터, 인라인 placeholder 정책, `ait-rn/ads`도 다시 내보내는 runtime 헬퍼 |
 | `ait-web/ad-skip` | 요청 ID 저장, 영수증 재조회, 로컬 효과 1회 적용 |
-| `ait-web/storage` | JSON atom과 키를 그대로 쓰는 SDK Storage 브리지 |
+| `ait-web/storage` | JSON atom, 키를 그대로 쓰는 SDK Storage 브리지, 토스 계정이 바뀌면 저장된 세션을 지우는 `createAppsInTossWebSessionStorage` |
 | `ait-web/analytics` | TrailBase 수집·라우터와 SDK 3 `Analytics.log` 연결 |
 | `ait-web/diagnostics` | RN과 같은 스키마의 명시적 opt-in 읽기 전용 runtime 스냅샷 |
 | `ait-web/engagement` | 유입 경로 정규화, 실제 가시성 기반 노출 및 참여도 헬퍼 |
@@ -230,6 +230,27 @@ JSON atom, 분석 라우터·큐, 참여도 헬퍼를 담습니다. 소비 앱�
 `ait-web/runtime`은 deprecated된 최상위 getter 대신 SDK 3 `Environment`, `Device`
 namespace를 읽습니다. 토스 앱 밖이거나 읽기에 실패하면 운영 환경은 production이 아니라
 `unknown`입니다.
+
+저장된 세션은 일반 `ait.storage`가 아니라 `createAppsInTossWebSessionStorage`로 읽으세요.
+RN의 계정 확인을 그대로 유지해, 세션을 읽을 때 기기에 저장된 익명 hash와 현재 토스 계정을
+비교하고 다르면 두 세션을 모두 지운 뒤 null을 반환합니다. `sessions.storage`와 키를
+trailbase-client 세션 관리자에 넘기세요. 첫 실행의 `adoptAppSession`처럼 계정이 기록되기
+전에 세션을 저장하면 현재 계정을 먼저 기록하므로 다음 읽기에서 세션이 유지됩니다.
+이 계정 조회가 10초 안에 응답하지 않으면 저장은 아무것도 쓰지 않고 실패하며, 로그아웃
+정리 같은 이후 쓰기는 그대로 실행됩니다. `revalidateAnonymousHash: false`는 RN 기본값처럼 저장된 계정을 그대로 믿으며 계정을
+격리하지 않습니다. 이 hash는 계정 변경을 감지할 때만 쓰며, 인증은 여전히 새 코드를
+교환합니다.
+
+```ts
+import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';
+import { createAppsInTossWebSessionStorage } from '@trailbase-apps-in-toss-kit/ait-web/storage';
+
+const ait = createAppsInTossWebAdapter({ appKey, loadSdk: () => import('@apps-in-toss/web-framework') });
+const sessions = createAppsInTossWebSessionStorage({
+  storage: ait.storage,
+  resolveAnonymousHash: ait.anonymousHash,
+});
+```
 
 ```ts
 import { createAppsInTossFullScreenAdBridge } from '@trailbase-apps-in-toss-kit/ait-web/ads';

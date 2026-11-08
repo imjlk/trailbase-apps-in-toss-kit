@@ -137,13 +137,13 @@
           "use": "WebAdapterError (code and operation only)."
         },
         "DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY": {
-          "use": "Do not persist an anonymous hash in WebView. Request a fresh ait.createAnonymousKeyAuthCode() for each bootstrap."
+          "use": "Never send a stored anonymous hash for WebView authentication; request a fresh ait.createAnonymousKeyAuthCode() for each bootstrap. createAppsInTossWebSessionStorage() keeps the hash only to notice an account change on the device."
         },
         "DEFAULT_APPS_IN_TOSS_APP_SESSION_STORAGE_KEY": {
-          "use": "If the RN app stored sessions under this default key, read the same literal key through createAppsInTossSdkStorageBridge (verbatim keys); ait.storage would prefix it with the appKey."
+          "use": "If the RN app stored sessions under this default key, pass storage: createAppsInTossSdkStorageBridge() (verbatim keys) with appSessionStorageKey: 'trailbase.appSession' and anonymousHashStorageKey: 'trailbase.anonymousHash' to createAppsInTossWebSessionStorage(); ait.storage would prefix them with the appKey."
         },
         "createAppsInTossIdentityStorage": {
-          "use": "ait.storage (or createAppsInTossSdkStorageBridge) with the trailbase-client session stores and session lifecycle."
+          "use": "createAppsInTossWebSessionStorage() from ait-web/storage. It applies the same account check to the session keys before the trailbase-client session manager restores them."
         },
         "isAppsInTossAnonymousHash": {
           "use": "Not needed for WebView authentication; the backend exchanges a fresh code and derives the identity server-side."
@@ -278,7 +278,7 @@
       ],
       "replaced": {
         "createAppsInTossSessionStorage": {
-          "use": "ait.storage. It prefixes keys with `${appKey}.`, so ait.storage.getItem('appSession') reads the same `${appKey}.appSession` key the RN helper wrote; also read `${appKey}.tossSession` if the RN app used it."
+          "use": "createAppsInTossWebSessionStorage() from ait-web/storage with storage: ait.storage and resolveAnonymousHash: ait.anonymousHash. It reads the `${appKey}.appSession`, `${appKey}.tossSession` and `${appKey}.anonymousHash` keys the RN helper wrote, and clears both sessions instead of restoring them when the Toss account changed. Do not read session keys through plain ait.storage."
         }
       },
       "pending": [],

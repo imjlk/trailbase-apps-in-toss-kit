@@ -1,9 +1,13 @@
 import { createReactNativeIdentity } from "@ait-kit/sdk/rn";
 import {
   createAnonymousHash,
-  StaleAppSessionOperationError,
   type KeyValueStorage,
 } from "@trailbase-apps-in-toss-kit/trailbase-client";
+import {
+  APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX,
+  createIdentityGuardedStorage,
+  isAppsInTossAnonymousHash,
+} from "@trailbase-apps-in-toss-kit/ait-core/internal/session-guard";
 import {
   type AppsInTossGetAnonymousKey,
 } from "./internal/framework";
@@ -12,7 +16,9 @@ import { isSdkError } from "./internal/sdk-errors";
 
 export type { AppsInTossGetAnonymousKey } from "./internal/framework";
 
-export const APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX = "ait:";
+// The hash format and the session identity guard are shared with WebView
+// through ait-core; only the RN SDK lookup stays here.
+export { APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX, isAppsInTossAnonymousHash };
 export const DEFAULT_APPS_IN_TOSS_ANONYMOUS_HASH_STORAGE_KEY =
   "trailbase.anonymousHash";
 export const DEFAULT_APPS_IN_TOSS_APP_SESSION_STORAGE_KEY =
@@ -59,14 +65,6 @@ export interface CreateAppsInTossIdentityStorageOptions
   revalidateAnonymousHash?: boolean;
   anonymousHashStorageKey?: string;
   appSessionStorageKey?: string | readonly string[];
-}
-
-export function isAppsInTossAnonymousHash(value: unknown): value is string {
-  return (
-    typeof value === "string" &&
-    value.startsWith(APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX) &&
-    value.slice(APPS_IN_TOSS_ANONYMOUS_HASH_PREFIX.length).trim().length > 0
-  );
 }
 
 export async function resolveAppsInTossAnonymousHash({
@@ -131,59 +129,14 @@ export function createAppsInTossIdentityStorage(
   }: CreateAppsInTossIdentityStorageOptions = {},
 ): KeyValueStorage {
   const production = resolverOptions.production ?? isProductionRuntime();
-
-  const revalidate = production && revalidateAnonymousHash;
-  let writeTail: Promise<void> = Promise.resolve();
-  function checkActive(signal?: AbortSignal) {
-    if (signal?.aborted) throw new StaleAppSessionOperationError();
-  }
-  function write(key: string, value: string, signal?: AbortSignal) {
-    const result = writeTail.then(() => { checkActive(signal); return storage.setItem(key, value); });
-    // Include identity invalidation and normal session writes in the same queue.
-    writeTail = result.catch(() => {});
-    return result;
-  }
-  async function resolveStoredAnonymousHash(signal?: AbortSignal) {
-    const existing = await storage.getItem(anonymousHashStorageKey);
-    checkActive(signal);
-    if (!revalidate && existing && (!production || isAppsInTossAnonymousHash(existing))) {
-      return { refreshed: false, value: existing };
-    }
-
-    const next = await resolveAppsInTossAnonymousHash({
-      ...resolverOptions,
-      production,
-    });
-    checkActive(signal);
-    if (revalidate && existing !== next) {
-      // Clear every credential mirror before publishing the new identity. If a
-      // write fails the old identity remains, so the next attempt repeats cleanup.
-      const keys = typeof appSessionStorageKey === "string" ? [appSessionStorageKey] : appSessionStorageKey;
-      for (const key of keys) await write(key, "", signal);
-    }
-    if (existing !== next) await write(anonymousHashStorageKey, next, signal);
-    checkActive(signal);
-    return { refreshed: existing !== next, value: next };
-  }
-
-  async function read(key: string, signal?: AbortSignal) {
-    await writeTail;
-    checkActive(signal);
-    if (key === anonymousHashStorageKey) {
-      return (await resolveStoredAnonymousHash(signal)).value;
-    }
-    if (production && isAppSessionStorageKey(key, appSessionStorageKey)) {
-      const { refreshed } = await resolveStoredAnonymousHash(signal);
-      if (refreshed) return null;
-    }
-    return storage.getItem(key);
-  }
-  return {
-    getItem: key => read(key),
-    getItemWithSignal: (key, signal) => read(key, signal),
-    setItem: (key, value) => write(key, value),
-  };
-
+  return createIdentityGuardedStorage(storage, {
+    anonymousHashStorageKey,
+    appSessionStorageKey,
+    production,
+    revalidate: production && revalidateAnonymousHash,
+    resolveAnonymousHash: () =>
+      resolveAppsInTossAnonymousHash({ ...resolverOptions, production }),
+  });
 }
 
 function anonymousHashFromResult(
@@ -228,16 +181,6 @@ function identityErrorFromResult(
     code: "ANONYMOUS_KEY_INVALID_RESPONSE",
     message: "Apps in Toss anonymous key response was invalid.",
   });
-}
-
-function isAppSessionStorageKey(
-  key: string,
-  appSessionStorageKey: string | readonly string[],
-) {
-  if (Array.isArray(appSessionStorageKey)) {
-    return appSessionStorageKey.includes(key);
-  }
-  return key === appSessionStorageKey;
 }
 
 /**

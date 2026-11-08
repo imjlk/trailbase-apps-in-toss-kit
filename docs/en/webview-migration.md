@@ -37,7 +37,12 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-consumer-webview-migration.
 
 It reads `package.json` files and import statements only. It does not import,
 install or execute anything, and it skips `node_modules`, `vendor`, build output
-and dot directories. The report shows:
+and dot directories. Imports inside comments, strings and template text do not
+count; a dynamic import inside a template `${...}` expression does, and escaped
+specifiers such as `\u0040` are decoded. The scanner is a lightweight lexer, not
+a parser: an import on the same line as JSX text with an apostrophe (`don't`)
+can be missed. The report lists file paths for each item and the module notes
+for each `ait-rn` subpath it found, and shows:
 
 - **Stage**: `rn-only`, `dual` (RN and WebView packages side by side),
   `webview-only` or `none`.
@@ -53,7 +58,10 @@ and dot directories. The report shows:
 
 Use `--json` for tooling. `--strict` (or `CI_STRICT=1`) fails while any
 `ait-rn` or `@apps-in-toss/framework` footprint remains. Enable it in consumer CI
-after retiring the RN app so RN imports cannot come back. The report is static
+after retiring the RN app so RN imports cannot come back. A root that does not
+exist is an error. Unreadable directories, unparsable `package.json` files and
+source files over 2 MiB are reported as scan issues, and strict mode fails while
+any remain because an unread file can still import RN code. The report is static
 analysis: device and QR tests still decide login, payment, ad and storage behavior.
 
 The checker reads `data/webview-migration-map.json`. The `ait-web` package tests
@@ -71,7 +79,7 @@ Status at this kit revision. The map file is the source of truth.
 | `ait-rn/ads` | `ait-web/ads` | None (re-exports the `runtime` helpers like RN) |
 | `ait-rn/analytics` | `ait-web/analytics` | None (`Analytics.log`, explicit `mapEvent`) |
 | `ait-rn/engagement` | `ait-web/engagement` | None (drive it from document visibility) |
-| `ait-rn/storage` | `ait-web/storage`, `ait.storage` | None |
+| `ait-rn/storage` | `ait-web/storage` (`createAppsInTossWebSessionStorage` for sessions), `ait.storage` | None |
 | `ait-rn/login` | `ait.login()` | None |
 | `ait-rn/identity` | `ait.createAnonymousKeyAuthCode()` | None (SDK 3.6+ and proxy code exchange) |
 | `ait-rn/haptics` | SDK 3 `generateHapticFeedback` | None (no wrapper planned) |
@@ -137,11 +145,15 @@ These are the properties existing users notice. Verify each one explicitly.
   bundle must resolve to the same TrailBase `_user` after the WebView bootstrap.
   Cover this in a backend smoke test that creates accounts the RN way on the
   previous server version, then boots through the WebView route.
-- **Sessions**: `ait.storage` prefixes keys with `${appKey}.`, which matches the
-  keys `createAppsInTossSessionStorage` wrote. If the RN app used a custom or
-  default literal key, read it through `createAppsInTossSdkStorageBridge` instead.
-  If a stored session cannot be read, the WebView app must re-authenticate with a
-  fresh code. It must never create a second account or fall back to a client hash.
+- **Sessions**: read stored sessions through `createAppsInTossWebSessionStorage`
+  with `ait.storage` and `ait.anonymousHash`, never through plain `ait.storage`.
+  It reads the `${appKey}.` keys `createAppsInTossSessionStorage` wrote and keeps
+  the RN account check: when the Toss account on the device changed, it clears
+  both sessions instead of restoring another account's session. If the RN app
+  used a custom or default literal key, pass `createAppsInTossSdkStorageBridge`
+  and those keys instead. If a stored session cannot be read, the WebView app must
+  re-authenticate with a fresh code. It must never create a second account or
+  fall back to a client hash.
 - **In-flight work**: pending IAP orders, ad skip request IDs and promotion
   intents reconcile on the server. Keep their storage keys and request IDs
   unchanged so the WebView bundle picks up what the RN bundle started. Run

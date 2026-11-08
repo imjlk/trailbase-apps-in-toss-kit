@@ -35,7 +35,11 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-consumer-webview-migration.
 
 `package.json`과 import 문만 읽습니다. 아무것도 import·설치·실행하지 않으며
 `node_modules`, `vendor`, 빌드 산출물, 점(.)으로 시작하는 디렉터리는 건너뜁니다.
-리포트에는 다음이 나옵니다.
+주석, 문자열, template 문자열 부분 안의 import는 세지 않습니다. template의 `${...}` 식
+안에 있는 dynamic import는 세며, `\u0040` 같은 escape가 들어간 specifier는 풀어서
+비교합니다. 파서가 아닌 가벼운 lexer라서, 아포스트로피가 들어간 JSX 텍스트(`don't`)와
+같은 줄에 있는 import는 놓칠 수 있습니다. 리포트는 항목마다 파일 경로를, 발견한
+`ait-rn` subpath마다 모듈 메모를 보여 주며 다음 내용을 담습니다.
 
 - **Stage**: `rn-only`, `dual`(RN과 WebView 패키지가 나란히 있음), `webview-only`,
   `none` 중 하나입니다.
@@ -50,7 +54,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-consumer-webview-migration.
 
 도구 연동에는 `--json`을 사용합니다. `--strict`(또는 `CI_STRICT=1`)는 `ait-rn`이나
 `@apps-in-toss/framework` 사용처가 남아 있으면 실패합니다. RN 앱을 정리한 뒤 소비 앱
-CI에서 켜 두면 RN import가 다시 들어오는 것을 막을 수 있습니다. 리포트는 정적 분석일
+CI에서 켜 두면 RN import가 다시 들어오는 것을 막을 수 있습니다. 존재하지 않는 root는
+오류입니다. 읽을 수 없는 디렉터리, 파싱할 수 없는 `package.json`, 2 MiB를 넘는 소스
+파일은 scan issue로 보고하며, 읽지 못한 파일에도 RN import가 있을 수 있으므로 하나라도
+남아 있으면 strict 모드는 실패합니다. 리포트는 정적 분석일
 뿐이며 로그인·결제·광고·저장소 동작은 기기와 QR 테스트로 판단합니다.
 
 점검 스크립트는 `data/webview-migration-map.json`을 읽습니다. `ait-web` 패키지 테스트가
@@ -68,7 +75,7 @@ CI에서 켜 두면 RN import가 다시 들어오는 것을 막을 수 있습니
 | `ait-rn/ads` | `ait-web/ads` | 없음(RN처럼 `runtime` 헬퍼를 다시 내보냄) |
 | `ait-rn/analytics` | `ait-web/analytics` | 없음(`Analytics.log`, 명시적 `mapEvent`) |
 | `ait-rn/engagement` | `ait-web/engagement` | 없음(문서 visibility로 구동) |
-| `ait-rn/storage` | `ait-web/storage`, `ait.storage` | 없음 |
+| `ait-rn/storage` | `ait-web/storage`(세션은 `createAppsInTossWebSessionStorage`), `ait.storage` | 없음 |
 | `ait-rn/login` | `ait.login()` | 없음 |
 | `ait-rn/identity` | `ait.createAnonymousKeyAuthCode()` | 없음(SDK 3.6+와 프록시 코드 교환 필요) |
 | `ait-rn/haptics` | SDK 3 `generateHapticFeedback` | 없음(wrapper 계획 없음) |
@@ -130,11 +137,14 @@ WebView 앱을 `apps-in-toss.config.*`를 가진 별도 workspace 패키지로 �
 - **식별**: RN 번들이 만든 익명 사용자와 토스 로그인 연결 사용자가 WebView bootstrap 뒤에도
   같은 TrailBase `_user`로 이어져야 합니다. 이전 서버 버전에서 RN 방식으로 계정을 만든 뒤
   WebView 경로로 bootstrap하는 백엔드 smoke 테스트로 확인합니다.
-- **세션**: `ait.storage`는 키 앞에 `${appKey}.`를 붙이며 이는
-  `createAppsInTossSessionStorage`가 쓰던 키와 같습니다. RN 앱이 직접 정한 키나 기본 리터럴
-  키를 썼다면 `createAppsInTossSdkStorageBridge`로 그 키를 그대로 읽습니다. 저장된 세션을
-  읽을 수 없으면 WebView 앱은 새 코드로 다시 인증해야 하며, 두 번째 계정을 만들거나
-  클라이언트 hash로 대체하면 안 됩니다.
+- **세션**: 저장된 세션은 일반 `ait.storage`가 아니라 `ait.storage`와
+  `ait.anonymousHash`를 넘긴 `createAppsInTossWebSessionStorage`로 읽습니다.
+  `createAppsInTossSessionStorage`가 쓰던 `${appKey}.` 키를 그대로 읽고 RN의 계정 확인도
+  유지합니다. 기기의 토스 계정이 바뀌었으면 다른 계정의 세션을 복원하지 않고 두 세션을
+  모두 지웁니다. RN 앱이 직접 정한 키나 기본 리터럴 키를 썼다면
+  `createAppsInTossSdkStorageBridge`와 그 키를 넘깁니다. 저장된 세션을 읽을 수 없으면
+  WebView 앱은 새 코드로 다시 인증해야 하며, 두 번째 계정을 만들거나 클라이언트 hash로
+  대체하면 안 됩니다.
 - **진행 중 작업**: 대기 중인 IAP 주문, 광고 스킵 요청 ID, 프로모션 intent는 서버에서
   정산됩니다. 저장 키와 요청 ID를 바꾸지 않아야 RN 번들이 시작한 작업을 WebView 번들이
   이어받습니다. WebView 시작 시 RN 번들과 같은 멱등 백엔드 지급으로

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -76,7 +76,10 @@ test("classifies RN imports by the migration map", () => {
     assert.match(atom.reason, /ait-web\/storage/);
 
     assert.equal(item(result, "createAppsInTossLoginBridge", "login").action, "rewrite");
-    assert.equal(item(result, "AppsInTossLoginBridgeError", "login").action, "rewrite");
+    // The map classifies runtime exports only; a type import is reviewed by hand.
+    const loginError = item(result, "AppsInTossLoginBridgeError", "login");
+    assert.equal(loginError.action, "review");
+    assert.match(loginError.reason, /Type-only import/);
 
     // Platform-neutral backend clients are shared through ait-core.
     const message = item(result, "createAppsInTossFunctionalMessageClient", "notifications");
@@ -112,7 +115,14 @@ test("classifies RN imports by the migration map", () => {
     // Every ait-rn subpath has a WebView path at this kit revision.
     assert.equal(result.summary.blocked, 0);
     assert.equal(result.items[0].action, "rewrite");
-    assert.match(renderWebViewMigrationReport(result), /Stage: rn-only/);
+    assert.deepEqual(result.scanIssues, []);
+    const report = renderWebViewMigrationReport(result);
+    assert.match(report, /Stage: rn-only/);
+    // Paths and module notes are in the text report, not only in --json.
+    assert.match(report, /Declared in: apps\/app-rn\/package\.json/);
+    assert.match(report, /granite\.config\.\*: apps\/app-rn\/granite\.config\.ts/);
+    assert.match(report, /Files: apps\/app-rn\/src\/other\.tsx, apps\/app-rn\/src\/session\.ts/);
+    assert.match(report, /Module notes:\n(?:.*\n)*  - ait-rn\/storage: /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -189,6 +199,165 @@ test("reports dual and WebView-only stages and SDK 3 config placement", () => {
   }
 });
 
+test("comments and string contents never count as imports", () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "src/app.tsx": [
+      `// import { createAppsInTossLoginBridge } from "${RN}/login";`,
+      `/* import { createPersistentJsonAtom } from "${RN}/storage"; */`,
+      `const example = "import { createAppsInTossIapBridge } from '${RN}/iap'";`,
+      "const template = `",
+      `  import { collectAppsInTossRuntimeDiagnostics } from "${RN}/diagnostics";`,
+      "`;",
+      `const quote = /'/; const slash = /["/]/g;`,
+      `export const view = <p>Don't import from "${RN}/share" here</p>;`,
+      `import { createAppsInTossWebAdapter } from "@trailbase-apps-in-toss-kit/ait-web";`,
+    ].join("\n"),
+  });
+  try {
+    const result = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(result.stage, "webview-only");
+    assert.equal(result.ok, true, result.failures.join("; "));
+    assert.deepEqual(result.items, []);
+    assert.deepEqual(result.footprint.aitWeb.importFiles, ["src/app.tsx"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("comments between import tokens do not hide an RN import", () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "src/a.ts": [
+      `const ratio = total / count; const pattern = /it's/;`,
+      `import /* kept for migration */ { createPersistentJsonAtom } from /* rn */ "${RN}/storage";`,
+      `import {`,
+      `  // still used`,
+      `  createAppsInTossShoppingBridge,`,
+      `} from '${RN}/shopping';`,
+      `import{createAppsInTossPromotionCampaignClient}from"${RN}/promotion";`,
+    ].join("\n"),
+  });
+  try {
+    const result = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(result.stage, "dual");
+    assert.equal(result.ok, false);
+    assert.equal(item(result, "createPersistentJsonAtom", "storage").action, "swap-import");
+    assert.equal(item(result, "createAppsInTossShoppingBridge", "shopping").action, "swap-import");
+    assert.equal(item(result, "createAppsInTossPromotionCampaignClient", "promotion").action, "swap-import");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("imports inside template interpolations are code, template text is not", () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "src/text.ts": `const label = \`\${name} import { createAppsInTossIapBridge } from "${RN}/iap"\`;\n`,
+    "src/lazy.ts": `const view = \`\${(await import("${RN}/diagnostics")).collectAppsInTossRuntimeDiagnostics}\`;\n`,
+  });
+  try {
+    const result = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.deepEqual(result.footprint.aitRn.importFiles, ["src/lazy.ts"]);
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].subpath, "diagnostics");
+    assert.equal(result.ok, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("slash context tells division from regex literals", () => {
+  const imports = parseImports([
+    `let half = count++ / 2; const share = await import("${RN}/share"); const ratio = 1 / 2;`,
+    `if (ready) /import "${RN.replaceAll("/", "\\/")}\\/iap"/.test(text);`,
+    // Whitespace and comments between the keyword and "(" keep the condition.
+    `while /* ${"wait ".repeat(10)}*/ ${" ".repeat(40)}(ready) /import "${RN.replaceAll("/", "\\/")}\\/push"/.test(text);`,
+    `const mean = (a + b) / 2; const login = await import("${RN}/login"); const third = mean / 3;`,
+  ].join("\n"));
+  assert.deepEqual(imports.map((entry) => entry.specifier), [`${RN}/share`, `${RN}/login`]);
+});
+
+test("escaped specifiers and quoted import names are decoded", () => {
+  const imports = parseImports([
+    `import legacy from "\\u0040trailbase-apps-in-toss-kit/ait-rn/login";`,
+    `import { "createPersistentJsonAtom" as atom } from "\\x40trailbase-apps-in-toss-kit\\u{2F}ait-rn/storage";`,
+  ].join("\n"));
+  assert.deepEqual(imports, [
+    { specifier: `${RN}/login`, kind: "default", names: [] },
+    { specifier: `${RN}/storage`, kind: "named", names: [{ name: "createPersistentJsonAtom", typeOnly: false }] },
+  ]);
+  const root = fixture({ "src/a.ts": `import { "createPersistentJsonAtom" as atom } from "\\u0040trailbase-apps-in-toss-kit/ait-rn/storage";\n` });
+  try {
+    const result = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(item(result, "createPersistentJsonAtom", "storage").action, "swap-import");
+    assert.equal(result.ok, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a missing or non-directory root is an error, not an empty scan", () => {
+  const root = fixture({ "file.txt": "not a directory\n" });
+  try {
+    assert.throws(() => checkConsumerWebViewMigration({ root: join(root, "missing"), map, strict: true }), /does not exist or cannot be read/);
+    assert.throws(() => checkConsumerWebViewMigration({ root: join(root, "file.txt"), map }), /is not a directory/);
+    const cli = spawnSync(process.execPath, [script, "--root", join(root, "missing"), "--strict"], { encoding: "utf8" });
+    assert.equal(cli.status, 2);
+    assert.match(cli.stderr, /does not exist or cannot be read/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an incomplete scan is reported and fails strict mode", () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "apps/legacy/package.json": "{ not json",
+    "src/a.ts": `import { createAppsInTossWebAdapter } from "@trailbase-apps-in-toss-kit/ait-web";\n`,
+  });
+  try {
+    const advisory = checkConsumerWebViewMigration({ root, map });
+    assert.equal(advisory.ok, true);
+    assert.deepEqual(advisory.scanIssues, ["Could not parse apps/legacy/package.json."]);
+    assert.deepEqual(advisory.warnings, []);
+    const strict = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(strict.stage, "webview-only");
+    assert.equal(strict.ok, false);
+    assert.match(strict.failures[0], /Scan incomplete \(1 issue\)/);
+    assert.match(renderWebViewMigrationReport(strict), /Scan issue: Could not parse apps\/legacy\/package\.json\./);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("oversized, unreadable files and unreadable directories are scan issues", { skip: process.platform === "win32" || process.getuid?.() === 0 }, () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "src/big.ts": `export const blob = "${"x".repeat(2 * 1024 * 1024)}";\n`,
+    "src/locked.ts": `import { createPersistentJsonAtom } from "${RN}/storage";\n`,
+    "src/private/hidden.ts": `import { createPersistentJsonAtom } from "${RN}/storage";\n`,
+  });
+  chmodSync(join(root, "src/locked.ts"), 0o000);
+  chmodSync(join(root, "src/private"), 0o000);
+  try {
+    const advisory = checkConsumerWebViewMigration({ root, map });
+    assert.deepEqual(advisory.scanIssues, [
+      "Could not read directory src/private.",
+      "Skipped src/big.ts: larger than 2 MiB, so its imports were not checked.",
+      "Could not read src/locked.ts.",
+    ]);
+    assert.equal(advisory.ok, true);
+    const strict = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(strict.ok, false);
+    assert.match(strict.failures[0], /Scan incomplete \(3 issues\)/);
+  } finally {
+    chmodSync(join(root, "src/private"), 0o755);
+    chmodSync(join(root, "src/locked.ts"), 0o644);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("unknown subpaths are reviewed instead of guessed", () => {
   const root = fixture({ "src/a.ts": `import { futureHelper } from "${RN}/future";\n` });
   try {
@@ -211,6 +380,8 @@ test("parses named, aliased, type-only, re-export and dynamic imports", () => {
     `import "side";`,
     `const lazy = await import("dyn");`,
     `const legacy = require('req');`,
+    `import type from "./type-default";`,
+    `export type { F } from "u";`,
   ].join("\n"));
   const by = (specifier) => imports.filter((entry) => entry.specifier === specifier);
   assert.deepEqual(by("x").find((entry) => entry.kind === "named").names, [
@@ -225,6 +396,27 @@ test("parses named, aliased, type-only, re-export and dynamic imports", () => {
   assert.equal(by("side")[0].kind, "side-effect");
   assert.equal(by("dyn")[0].kind, "dynamic");
   assert.equal(by("req")[0].kind, "dynamic");
+  assert.equal(by("./type-default")[0].kind, "default");
+  assert.deepEqual(by("u")[0].names, [{ name: "F", typeOnly: true }]);
+});
+
+test("analytics notes reach the text report for a same-name swap and a namespace import", () => {
+  const root = fixture({ "src/a.ts": `import { createAppsInTossAnalyticsConfig } from "${RN}/analytics";\n` });
+  try {
+    const report = renderWebViewMigrationReport(checkConsumerWebViewMigration({ root, map }));
+    assert.match(report, /ait-rn\/analytics: .*mapEvent/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+  const namespaced = fixture({ "src/a.ts": `import * as analytics from "${RN}/analytics";\n` });
+  try {
+    const result = checkConsumerWebViewMigration({ root: namespaced, map });
+    assert.equal(result.items[0].action, "review");
+    assert.match(result.items[0].note, /mapEvent/);
+    assert.match(renderWebViewMigrationReport(result), /Module notes:\n {2}- ait-rn\/analytics: .*mapEvent/);
+  } finally {
+    rmSync(namespaced, { recursive: true, force: true });
+  }
 });
 
 test("migration map names keep one classification across re-exports", () => {
