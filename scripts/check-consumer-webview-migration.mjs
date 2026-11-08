@@ -221,7 +221,9 @@ export function parseImports(source) {
       const names = clause.slice(1, -1).split(",").map((part) => part.trim()).filter(Boolean).map((part) => {
         const itemTypeOnly = typeOnly || /^type\s/.test(part);
         const imported = part.replace(/^type\s+/, "").split(/\s+as\s+/)[0].trim();
-        return { name: imported, typeOnly: itemTypeOnly };
+        // `import { "name" as alias }`: restore the quoted name from its placeholder.
+        const quoted = /^(["'])(\d+)\1$/.exec(imported);
+        return { name: quoted ? strings[Number(quoted[2])] : imported, typeOnly: itemTypeOnly };
       });
       imports.push({ specifier, kind: "named", names });
       if (defaultBinding) imports.push({ specifier, kind: "default", names: [] });
@@ -244,12 +246,16 @@ const REGEX_PRECEDING_PUNCTUATORS = new Set([..."(,=:[!&|?{};+-*%<>~^"]);
 const REGEX_PRECEDING_KEYWORDS = new Set([
   "return", "typeof", "case", "do", "else", "in", "of", "void", "throw", "delete", "new", "yield", "await", "instanceof",
 ]);
+// A "(" that opens a statement condition: a "/" after its ")" starts a regex.
+const CONDITION_KEYWORD = /(?<![\w$.])(?:if|while|with|for(?:\s+await)?)\s*$/;
+const SIMPLE_ESCAPES = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", v: "\v" };
 
 /**
  * Lexes just enough JavaScript/TypeScript to tell code from non-code. Comments
- * and template/regex literals become spaces (newlines kept). Each quoted
- * string becomes a numbered placeholder whose value is kept in `strings`, so an
- * import specifier can be recovered while string contents never match.
+ * and regex literals become spaces (newlines kept), and template text is
+ * blanked while `${...}` expressions stay code. Each quoted string becomes a
+ * numbered placeholder whose decoded value is kept in `strings`, so an import
+ * specifier can be recovered while string contents never match.
  * A quote left open at the end of a line (JSX text such as "don't") masks the
  * rest of that line.
  */
@@ -262,7 +268,35 @@ export function maskSource(source) {
     tail = (tail + text).slice(-32);
   };
   const blank = (text) => text.replace(/[^\n]/g, " ");
-  const special = /[/'"`]/g;
+  // One entry per open "(": whether it opened a statement condition.
+  const parens = [];
+  let closedCondition = false;
+  // Brace depth inside each open template interpolation, innermost last.
+  const interpolations = [];
+  // Template text from `start` to the closing backtick or the next "${".
+  const template = (start) => {
+    let cursor = start;
+    while (cursor < source.length) {
+      const current = source[cursor];
+      if (current === "\\") {
+        cursor += 2;
+        continue;
+      }
+      if (current === "`") {
+        emit(`${blank(source.slice(start, cursor))}\``);
+        return cursor + 1;
+      }
+      if (current === "$" && source[cursor + 1] === "{") {
+        emit(`${blank(source.slice(start, cursor))}\${`);
+        interpolations.push(0);
+        return cursor + 2;
+      }
+      cursor += 1;
+    }
+    emit(blank(source.slice(start)));
+    return source.length;
+  };
+  const special = /[/'"`(){}]/g;
   let index = 0;
   while (index < source.length) {
     special.lastIndex = index;
@@ -275,7 +309,21 @@ export function maskSource(source) {
     index = found.index;
     const char = source[index];
     const next = source[index + 1];
-    if (char === "/" && next === "/") {
+    const open = interpolations.length - 1;
+    if (char === "(" || char === ")" || char === "{" || char === "}") {
+      if (char === "(") parens.push(CONDITION_KEYWORD.test(tail));
+      if (char === ")") closedCondition = parens.pop() ?? false;
+      if (char === "}" && open >= 0 && interpolations[open] === 0) {
+        interpolations.pop();
+        emit(char);
+        index = template(index + 1);
+        continue;
+      }
+      if (open >= 0 && char === "{") interpolations[open] += 1;
+      if (open >= 0 && char === "}") interpolations[open] -= 1;
+      emit(char);
+      index += 1;
+    } else if (char === "/" && next === "/") {
       const end = source.indexOf("\n", index);
       const stop = end === -1 ? source.length : end;
       emit(" ".repeat(stop - index));
@@ -290,8 +338,9 @@ export function maskSource(source) {
       let value = "";
       while (cursor < source.length && source[cursor] !== char && source[cursor] !== "\n") {
         if (source[cursor] === "\\" && cursor + 1 < source.length) {
-          value += source[cursor + 1];
-          cursor += 2;
+          const escape = readEscape(source, cursor);
+          value += escape.value;
+          cursor = escape.end;
           continue;
         }
         value += source[cursor];
@@ -302,32 +351,14 @@ export function maskSource(source) {
         strings.push(value);
         index = cursor + 1;
       } else {
-        emit(" ".repeat(cursor - index));
+        emit(blank(source.slice(index, cursor)));
         index = cursor;
       }
     } else if (char === "`") {
-      let cursor = index + 1;
-      let depth = 0;
-      while (cursor < source.length) {
-        const current = source[cursor];
-        if (current === "\\") {
-          cursor += 2;
-          continue;
-        }
-        if (current === "`" && depth === 0) break;
-        if (current === "$" && source[cursor + 1] === "{") {
-          depth += 1;
-          cursor += 2;
-          continue;
-        }
-        if (current === "}" && depth > 0) depth -= 1;
-        cursor += 1;
-      }
-      const stop = Math.min(source.length, cursor + 1);
-      emit(blank(source.slice(index, stop)));
-      index = stop;
+      emit(char);
+      index = template(index + 1);
     } else {
-      const stop = regexAllowedAfter(tail) ? regexLiteralEnd(source, index) : -1;
+      const stop = regexAllowedAfter(tail, closedCondition) ? regexLiteralEnd(source, index) : -1;
       if (stop === -1) {
         emit(char);
         index += 1;
@@ -340,10 +371,35 @@ export function maskSource(source) {
   return { code: out.join(""), strings };
 }
 
-function regexAllowedAfter(tail) {
+/** The decoded value and end offset of the string escape at `at` (a backslash). */
+function readEscape(source, at) {
+  const char = source[at + 1];
+  if (char === "\r") return { value: "", end: source[at + 2] === "\n" ? at + 3 : at + 2 };
+  if (char === "\n" || char === "\u2028" || char === "\u2029") return { value: "", end: at + 2 };
+  if (Object.hasOwn(SIMPLE_ESCAPES, char)) return { value: SIMPLE_ESCAPES[char], end: at + 2 };
+  if (char === "x") {
+    const hex = /^[0-9a-f]{2}/i.exec(source.slice(at + 2, at + 4));
+    if (hex) return { value: String.fromCharCode(Number.parseInt(hex[0], 16)), end: at + 4 };
+  }
+  if (char === "u") {
+    const braced = /^\{([0-9a-f]{1,6})\}/i.exec(source.slice(at + 2, at + 10));
+    const code = braced ? Number.parseInt(braced[1], 16) : -1;
+    if (braced && code <= 0x10ffff) return { value: String.fromCodePoint(code), end: at + 2 + braced[0].length };
+    const hex = /^[0-9a-f]{4}/i.exec(source.slice(at + 2, at + 6));
+    if (hex) return { value: String.fromCharCode(Number.parseInt(hex[0], 16)), end: at + 6 };
+  }
+  if (char === "0" && !/[0-9]/.test(source[at + 2] ?? "")) return { value: "\0", end: at + 2 };
+  return { value: char, end: at + 2 };
+}
+
+function regexAllowedAfter(tail, closedCondition) {
   const trimmed = tail.trimEnd();
   if (!trimmed) return true;
+  // A postfix increment or decrement is an operand: `count++ / 2` divides.
+  if (/(?:\+\+|--)$/.test(trimmed)) return false;
   const last = trimmed[trimmed.length - 1];
+  // `if (ready) /re/.test(text)` starts a regex; `(a + b) / 2` divides.
+  if (last === ")") return closedCondition;
   if (REGEX_PRECEDING_PUNCTUATORS.has(last)) return true;
   const word = /[\w$]+$/.exec(trimmed)?.[0];
   return word !== undefined && REGEX_PRECEDING_KEYWORDS.has(word);
@@ -387,9 +443,13 @@ function recordRnImport(entry, rel, map, usages, warnings) {
     warnings.push(`Unknown ait-rn subpath '${subpath}' in ${rel}.`);
     return;
   }
+  // Items that are not classified by name still carry their module's note
+  // (for example the analytics mapEvent warning).
+  const note = subpath === "." ? undefined : map.subpaths[subpath].note;
+  const moduleNote = note ? { note } : {};
   if (entry.kind !== "named") {
     addUsage(usages, {
-      subpath, name: null, action: "review", rel,
+      subpath, name: null, action: "review", rel, ...moduleNote,
       reason: `A ${entry.kind} import cannot be classified by name; switch to named imports or review every export it uses.`,
     });
     return;
@@ -398,7 +458,7 @@ function recordRnImport(entry, rel, map, usages, warnings) {
     // The map classifies runtime exports only, so a type never gets runtime guidance.
     if (typeOnly) {
       addUsage(usages, {
-        subpath, name, action: "review", rel, typeOnly,
+        subpath, name, action: "review", rel, typeOnly, ...moduleNote,
         reason: "Type-only import; find the matching type in the WebView module.",
       });
       continue;
@@ -406,7 +466,7 @@ function recordRnImport(entry, rel, map, usages, warnings) {
     const resolved = resolveName(map, subpath, name);
     if (!resolved) {
       addUsage(usages, {
-        subpath, name, action: "review", rel, typeOnly,
+        subpath, name, action: "review", rel, typeOnly, ...moduleNote,
         reason: "Not a classified runtime export (possibly a type); review it manually.",
       });
       continue;

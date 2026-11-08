@@ -234,8 +234,11 @@ namespace를 읽습니다. 토스 앱 밖이거나 읽기에 실패하면 운영
 저장된 세션은 일반 `ait.storage`가 아니라 `createAppsInTossWebSessionStorage`로 읽으세요.
 RN의 계정 확인을 그대로 유지해, 세션을 읽을 때 기기에 저장된 익명 hash와 현재 토스 계정을
 비교하고 다르면 두 세션을 모두 지운 뒤 null을 반환합니다. `sessions.storage`와 키를
-trailbase-client 세션 관리자에 넘기세요. 이 hash는 계정 변경을 감지할 때만 쓰며, 인증은
-여전히 새 코드를 교환합니다.
+trailbase-client 세션 관리자에 넘기세요. 첫 실행의 `adoptAppSession`처럼 계정이 기록되기
+전에 세션을 저장하면 현재 계정을 먼저 기록하므로 다음 읽기에서 세션이 유지됩니다.
+`revalidateAnonymousHash: false`는 RN 기본값처럼 저장된 계정을 그대로 믿으며 계정을
+격리하지 않습니다. 이 hash는 계정 변경을 감지할 때만 쓰며, 인증은 여전히 새 코드를
+교환합니다.
 
 ```ts
 import { createAppsInTossWebAdapter } from '@trailbase-apps-in-toss-kit/ait-web';

@@ -81,8 +81,45 @@ describe("WebView session storage", () => {
   test("a first launch without a stored account starts signed out", async () => {
     const { raw, aitStorage } = sharedSdkStorage();
     raw.set(`${APP_KEY}.appSession`, "orphaned-session");
+    raw.set(`${APP_KEY}.tossSession`, "orphaned-toss-session");
     const { session } = webSession(aitStorage, async () => "ait:account-a");
     expect(await session.storage.getItem(session.appSessionStorageKey)).toBeNull();
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("");
+    // Later reads do not bring an orphaned session back.
+    expect(await session.storage.getItem(session.appSessionStorageKey)).toBe("");
+    expect(await session.storage.getItem(session.tossSessionStorageKey)).toBe("");
+  });
+
+  test("a session saved before any account is recorded survives the next read", async () => {
+    const { raw, aitStorage } = sharedSdkStorage();
+    raw.set(`${APP_KEY}.tossSession`, "orphaned-toss-session");
+    const { session } = webSession(aitStorage, async () => "ait:account-a");
+    await session.storage.setItem(session.appSessionStorageKey, "adopted-session");
+    expect(raw.get(`${APP_KEY}.anonymousHash`)).toBe("ait:account-a");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("");
+    expect(await session.storage.getItem(session.appSessionStorageKey)).toBe("adopted-session");
+    // Clearing a session never needs the account.
+    const offline = webSession(sharedSdkStorage().aitStorage, async () => { throw new Error("no SDK"); });
+    await offline.session.storage.setItem(offline.session.appSessionStorageKey, "");
+    expect(offline.lookups()).toBe(0);
+  });
+
+  test("a delayed account check cannot clear a session saved after the switch", async () => {
+    const { raw, rnBridge, aitStorage } = sharedSdkStorage();
+    await rnBundleWroteSession(rnBridge);
+    const pending: Array<(hash: string) => void> = [];
+    const { session } = webSession(aitStorage, () => new Promise<string>((resolve) => { pending.push(resolve); }));
+    const first = session.storage.getItem(session.appSessionStorageKey);
+    const second = session.storage.getItem(session.tossSessionStorageKey);
+    while (pending.length < 2) await new Promise((resolve) => setTimeout(resolve, 0));
+    pending[0]!("ait:account-b");
+    expect(await first).toBeNull();
+    await session.storage.setItem(session.tossSessionStorageKey, "fresh-b-session");
+    pending[1]!("ait:account-b");
+    expect(await second).toBe("fresh-b-session");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("fresh-b-session");
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
   });
 
   test("other keys and local development skip the account lookup", async () => {

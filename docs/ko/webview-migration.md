@@ -35,8 +35,11 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-consumer-webview-migration.
 
 `package.json`과 import 문만 읽습니다. 아무것도 import·설치·실행하지 않으며
 `node_modules`, `vendor`, 빌드 산출물, 점(.)으로 시작하는 디렉터리는 건너뜁니다.
-주석, 문자열, template literal 안의 import는 세지 않습니다. 리포트는 항목마다 파일
-경로를, 발견한 `ait-rn` subpath마다 모듈 메모를 보여 주며 다음 내용을 담습니다.
+주석, 문자열, template 문자열 부분 안의 import는 세지 않습니다. template의 `${...}` 식
+안에 있는 dynamic import는 세며, `\u0040` 같은 escape가 들어간 specifier는 풀어서
+비교합니다. 파서가 아닌 가벼운 lexer라서, 아포스트로피가 들어간 JSX 텍스트(`don't`)와
+같은 줄에 있는 import는 놓칠 수 있습니다. 리포트는 항목마다 파일 경로를, 발견한
+`ait-rn` subpath마다 모듈 메모를 보여 주며 다음 내용을 담습니다.
 
 - **Stage**: `rn-only`, `dual`(RN과 WebView 패키지가 나란히 있음), `webview-only`,
   `none` 중 하나입니다.

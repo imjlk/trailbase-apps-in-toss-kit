@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -250,6 +250,51 @@ test("comments between import tokens do not hide an RN import", () => {
   }
 });
 
+test("imports inside template interpolations are code, template text is not", () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "src/text.ts": `const label = \`\${name} import { createAppsInTossIapBridge } from "${RN}/iap"\`;\n`,
+    "src/lazy.ts": `const view = \`\${(await import("${RN}/diagnostics")).collectAppsInTossRuntimeDiagnostics}\`;\n`,
+  });
+  try {
+    const result = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.deepEqual(result.footprint.aitRn.importFiles, ["src/lazy.ts"]);
+    assert.equal(result.items.length, 1);
+    assert.equal(result.items[0].subpath, "diagnostics");
+    assert.equal(result.ok, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("slash context tells division from regex literals", () => {
+  const imports = parseImports([
+    `let half = count++ / 2; const share = await import("${RN}/share"); const ratio = 1 / 2;`,
+    `if (ready) /from "${RN}\\/iap"/.test(text);`,
+    `const mean = (a + b) / 2; const login = await import("${RN}/login"); const third = mean / 3;`,
+  ].join("\n"));
+  assert.deepEqual(imports.map((entry) => entry.specifier), [`${RN}/share`, `${RN}/login`]);
+});
+
+test("escaped specifiers and quoted import names are decoded", () => {
+  const imports = parseImports([
+    `import legacy from "\\u0040trailbase-apps-in-toss-kit/ait-rn/login";`,
+    `import { "createPersistentJsonAtom" as atom } from "\\x40trailbase-apps-in-toss-kit\\u{2F}ait-rn/storage";`,
+  ].join("\n"));
+  assert.deepEqual(imports, [
+    { specifier: `${RN}/login`, kind: "default", names: [] },
+    { specifier: `${RN}/storage`, kind: "named", names: [{ name: "createPersistentJsonAtom", typeOnly: false }] },
+  ]);
+  const root = fixture({ "src/a.ts": `import { "createPersistentJsonAtom" as atom } from "\\u0040trailbase-apps-in-toss-kit/ait-rn/storage";\n` });
+  try {
+    const result = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(item(result, "createPersistentJsonAtom", "storage").action, "swap-import");
+    assert.equal(result.ok, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("a missing or non-directory root is an error, not an empty scan", () => {
   const root = fixture({ "file.txt": "not a directory\n" });
   try {
@@ -280,6 +325,33 @@ test("an incomplete scan is reported and fails strict mode", () => {
     assert.match(strict.failures[0], /Scan incomplete \(1 issue\)/);
     assert.match(renderWebViewMigrationReport(strict), /Scan issue: Could not parse apps\/legacy\/package\.json\./);
   } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("oversized, unreadable files and unreadable directories are scan issues", { skip: process.platform === "win32" || process.getuid?.() === 0 }, () => {
+  const root = fixture({
+    "package.json": { dependencies: { "@apps-in-toss/web-framework": "3.9.0" } },
+    "src/big.ts": `export const blob = "${"x".repeat(2 * 1024 * 1024)}";\n`,
+    "src/locked.ts": `import { createPersistentJsonAtom } from "${RN}/storage";\n`,
+    "src/private/hidden.ts": `import { createPersistentJsonAtom } from "${RN}/storage";\n`,
+  });
+  chmodSync(join(root, "src/locked.ts"), 0o000);
+  chmodSync(join(root, "src/private"), 0o000);
+  try {
+    const advisory = checkConsumerWebViewMigration({ root, map });
+    assert.deepEqual(advisory.scanIssues, [
+      "Could not read directory src/private.",
+      "Skipped src/big.ts: larger than 2 MiB, so its imports were not checked.",
+      "Could not read src/locked.ts.",
+    ]);
+    assert.equal(advisory.ok, true);
+    const strict = checkConsumerWebViewMigration({ root, map, strict: true });
+    assert.equal(strict.ok, false);
+    assert.match(strict.failures[0], /Scan incomplete \(3 issues\)/);
+  } finally {
+    chmodSync(join(root, "src/private"), 0o755);
+    chmodSync(join(root, "src/locked.ts"), 0o644);
     rmSync(root, { recursive: true, force: true });
   }
 });
@@ -326,13 +398,22 @@ test("parses named, aliased, type-only, re-export and dynamic imports", () => {
   assert.deepEqual(by("u")[0].names, [{ name: "F", typeOnly: true }]);
 });
 
-test("analytics notes reach the text report for a same-name swap", () => {
+test("analytics notes reach the text report for a same-name swap and a namespace import", () => {
   const root = fixture({ "src/a.ts": `import { createAppsInTossAnalyticsConfig } from "${RN}/analytics";\n` });
   try {
     const report = renderWebViewMigrationReport(checkConsumerWebViewMigration({ root, map }));
     assert.match(report, /ait-rn\/analytics: .*mapEvent/);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+  const namespaced = fixture({ "src/a.ts": `import * as analytics from "${RN}/analytics";\n` });
+  try {
+    const result = checkConsumerWebViewMigration({ root: namespaced, map });
+    assert.equal(result.items[0].action, "review");
+    assert.match(result.items[0].note, /mapEvent/);
+    assert.match(renderWebViewMigrationReport(result), /Module notes:\n {2}- ait-rn\/analytics: .*mapEvent/);
+  } finally {
+    rmSync(namespaced, { recursive: true, force: true });
   }
 });
 

@@ -37,9 +37,12 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-consumer-webview-migration.
 
 It reads `package.json` files and import statements only. It does not import,
 install or execute anything, and it skips `node_modules`, `vendor`, build output
-and dot directories. Imports inside comments, strings and template literals do
-not count. The report lists file paths for each item and the module notes for
-each `ait-rn` subpath it found, and shows:
+and dot directories. Imports inside comments, strings and template text do not
+count; a dynamic import inside a template `${...}` expression does, and escaped
+specifiers such as `\u0040` are decoded. The scanner is a lightweight lexer, not
+a parser: an import on the same line as JSX text with an apostrophe (`don't`)
+can be missed. The report lists file paths for each item and the module notes
+for each `ait-rn` subpath it found, and shows:
 
 - **Stage**: `rn-only`, `dual` (RN and WebView packages side by side),
   `webview-only` or `none`.
