@@ -270,7 +270,9 @@ test("imports inside template interpolations are code, template text is not", ()
 test("slash context tells division from regex literals", () => {
   const imports = parseImports([
     `let half = count++ / 2; const share = await import("${RN}/share"); const ratio = 1 / 2;`,
-    `if (ready) /from "${RN}\\/iap"/.test(text);`,
+    `if (ready) /import "${RN.replaceAll("/", "\\/")}\\/iap"/.test(text);`,
+    // Whitespace and comments between the keyword and "(" keep the condition.
+    `while /* ${"wait ".repeat(10)}*/ ${" ".repeat(40)}(ready) /import "${RN.replaceAll("/", "\\/")}\\/push"/.test(text);`,
     `const mean = (a + b) / 2; const login = await import("${RN}/login"); const third = mean / 3;`,
   ].join("\n"));
   assert.deepEqual(imports.map((entry) => entry.specifier), [`${RN}/share`, `${RN}/login`]);

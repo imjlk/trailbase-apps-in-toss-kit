@@ -262,10 +262,13 @@ const SIMPLE_ESCAPES = { n: "\n", r: "\r", t: "\t", b: "\b", f: "\f", v: "\v" };
 export function maskSource(source) {
   const out = [];
   const strings = [];
+  // The last code before the cursor, with whitespace runs (and the blanked
+  // comments they came from) collapsed, so a long comment cannot push a
+  // keyword out of view.
   let tail = "";
   const emit = (text) => {
     out.push(text);
-    tail = (tail + text).slice(-32);
+    tail = (tail + text).replace(/\s+/g, " ").slice(-32);
   };
   const blank = (text) => text.replace(/[^\n]/g, " ");
   // One entry per open "(": whether it opened a statement condition.

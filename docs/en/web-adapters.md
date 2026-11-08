@@ -250,7 +250,9 @@ anonymous hash on the device with the current Toss account and, when they
 differ, clears both sessions and returns null. Pass `sessions.storage` and its
 keys to the trailbase-client session manager. A session saved before any
 account is recorded, such as `adoptAppSession` on a first launch, records the
-current account first so the next read keeps it. `revalidateAnonymousHash:
+current account first so the next read keeps it. If that account lookup does
+not answer within 10 seconds, the save rejects without writing and later
+writes, such as a logout clear, still run. `revalidateAnonymousHash:
 false` trusts the stored account like the RN default and does not isolate
 accounts. The hash only detects an account change; authentication still
 exchanges a fresh code.

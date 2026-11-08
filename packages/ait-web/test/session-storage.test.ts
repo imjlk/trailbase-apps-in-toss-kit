@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { createIdentityGuardedStorage } from "@trailbase-apps-in-toss-kit/ait-core/internal/session-guard";
 import type { KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import * as rnIdentity from "../../ait-rn/src/identity";
 import { createAppsInTossSessionStorage } from "../../ait-rn/src/storage";
@@ -103,6 +104,29 @@ describe("WebView session storage", () => {
     const offline = webSession(sharedSdkStorage().aitStorage, async () => { throw new Error("no SDK"); });
     await offline.session.storage.setItem(offline.session.appSessionStorageKey, "");
     expect(offline.lookups()).toBe(0);
+  });
+
+  test("a stalled account lookup on save cannot hold a later clear or save late", async () => {
+    const { raw, aitStorage } = sharedSdkStorage();
+    let answer: (hash: string) => void = () => {};
+    const guarded = createIdentityGuardedStorage(aitStorage, {
+      anonymousHashStorageKey: "anonymousHash",
+      appSessionStorageKey: ["appSession", "tossSession"],
+      production: true,
+      revalidate: true,
+      resolveAnonymousHash: () => new Promise<string>((resolve) => { answer = resolve; }),
+      saveLookupTimeoutMs: 20,
+    });
+    const save = guarded.setItem("appSession", "adopted-session");
+    const clear = guarded.setItem("appSession", "");
+    await expect(save).rejects.toThrow("timed out");
+    await clear;
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
+    // The SDK answering after the timeout records nothing and saves nothing.
+    answer("ait:account-a");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
+    expect(raw.has(`${APP_KEY}.anonymousHash`)).toBe(false);
   });
 
   test("a delayed account check cannot clear a session saved after the switch", async () => {

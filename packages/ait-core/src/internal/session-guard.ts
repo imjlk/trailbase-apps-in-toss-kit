@@ -25,6 +25,19 @@ export interface IdentityGuardedStorageOptions {
   /** Production only: resolve the SDK identity on every session read and clear sessions on change. */
   revalidate: boolean;
   resolveAnonymousHash: () => Promise<string>;
+  /** Bound on the account lookup a session save makes inside the write queue. */
+  saveLookupTimeoutMs?: number;
+}
+
+/** A session save gives up on a stalled account lookup so queued clears still run. */
+export const DEFAULT_SAVE_LOOKUP_TIMEOUT_MS = 10_000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Apps in Toss account lookup timed out.")), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /**
@@ -34,7 +47,8 @@ export interface IdentityGuardedStorageOptions {
  * authenticates again instead of restoring another account's session. With
  * `revalidate`, every session key is cleared before the new hash is stored.
  * A session saved before any account is recorded records the current account
- * first, so the next read keeps it.
+ * first, so the next read keeps it. That lookup is bounded: on timeout the save
+ * rejects without writing, and later writes such as a logout clear proceed.
  */
 export function createIdentityGuardedStorage(
   storage: KeyValueStorage,
@@ -44,6 +58,7 @@ export function createIdentityGuardedStorage(
     production,
     revalidate,
     resolveAnonymousHash,
+    saveLookupTimeoutMs = DEFAULT_SAVE_LOOKUP_TIMEOUT_MS,
   }: IdentityGuardedStorageOptions,
 ): KeyValueStorage {
   const sessionKeys: readonly string[] = typeof appSessionStorageKey === "string"
@@ -94,8 +109,10 @@ export function createIdentityGuardedStorage(
           !isAppsInTossAnonymousHash(await storage.getItem(anonymousHashStorageKey))) {
         // No account is recorded yet (for example a session adopted before any
         // read). Record the current one first, or the next read would treat
-        // this session as another account's and clear it.
-        await switchIdentity(await resolveAnonymousHash());
+        // this session as another account's and clear it. The lookup runs
+        // inside the queue, so bound it: a stalled SDK call must not hold a
+        // later logout clear, and a late answer must not save after it.
+        await switchIdentity(await withTimeout(resolveAnonymousHash(), saveLookupTimeoutMs));
       }
       await storage.setItem(key, value);
     });
