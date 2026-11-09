@@ -50,10 +50,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
  * authenticates again instead of restoring another account's session. With
  * `revalidate`, every session key is cleared before the new hash is stored.
  * A session saved before any account is recorded records the current account
- * first, so the next read keeps it. Every account lookup is bounded: on
- * timeout a read rejects without recording an account or clearing anything,
- * and a save rejects without writing, so later writes such as a logout clear
- * proceed. A late SDK answer is ignored.
+ * first, so the next read keeps it. With `revalidate`, a session saved before
+ * a read has confirmed the account in this process (for example after a
+ * failed or timed-out read) checks the account the same way and switches the
+ * stored identity if it changed, so a later read as the previous account
+ * never restores it. Every account lookup is bounded: on timeout a read
+ * rejects without recording an account or clearing anything, and a save
+ * rejects without writing, so later writes such as a logout clear proceed.
+ * A late SDK answer is ignored.
  */
 export function createIdentityGuardedStorage(
   storage: KeyValueStorage,
@@ -73,6 +77,10 @@ export function createIdentityGuardedStorage(
   // Identity changes and every write share one queue, so a step that reads
   // the stored identity and then writes cannot interleave with another write.
   let queueTail: Promise<void> = Promise.resolve();
+  // Whether a lookup in this process confirmed the stored identity. Until one
+  // does, a session save under `revalidate` checks the account first: the app
+  // may be saving another account's session after a failed read.
+  let accountConfirmed = false;
   function checkActive(signal?: AbortSignal) {
     if (signal?.aborted) throw new StaleAppSessionOperationError();
   }
@@ -111,14 +119,19 @@ export function createIdentityGuardedStorage(
   }
   function write(key: string, value: string) {
     return enqueue(async () => {
-      if (production && value && sessionKeys.includes(key) &&
-          !isAppsInTossAnonymousHash(await storage.getItem(anonymousHashStorageKey))) {
+      if (production && value && sessionKeys.includes(key)) {
         // No account is recorded yet (for example a session adopted before any
-        // read). Record the current one first, or the next read would treat
-        // this session as another account's and clear it. The lookup runs
-        // inside the queue; its bound keeps a stalled SDK call from holding a
-        // later logout clear, and a late answer from saving after it.
-        await switchIdentity(await lookupAccount());
+        // read), or none was confirmed in this process. Record the current one
+        // first: otherwise the next read would clear this session as another
+        // account's, or a read as the stored account would restore it. The
+        // lookup runs inside the queue; its bound keeps a stalled SDK call from
+        // holding a later logout clear, and a late answer from saving after it.
+        const stored = await storage.getItem(anonymousHashStorageKey);
+        if (!isAppsInTossAnonymousHash(stored) || (revalidate && !accountConfirmed)) {
+          const next = await lookupAccount();
+          if (next !== stored) await switchIdentity(next);
+          accountConfirmed = true;
+        }
       }
       await storage.setItem(key, value);
     });
@@ -134,6 +147,8 @@ export function createIdentityGuardedStorage(
     const next = await lookupAccount();
     checkActive(signal);
     const refreshed = existing !== next && await publishIdentity(next, signal);
+    // The stored identity now matches the SDK account.
+    accountConfirmed = true;
     checkActive(signal);
     return { refreshed, value: next };
   }

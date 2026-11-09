@@ -253,7 +253,10 @@ account is recorded, such as `adoptAppSession` on a first launch, records the
 current account first so the next read keeps it. An account lookup that does
 not answer within 10 seconds fails: a read rejects without recording an account
 or clearing a session, so treat it as no stored session, and a save rejects
-without writing while later writes, such as a logout clear, still run.
+without writing while later writes, such as a logout clear, still run. Until a
+read confirms the account in the current app process, for example after a
+failed read, a session save checks the account first and replaces another
+account's stored hash, so the previous account cannot restore that session.
 `revalidateAnonymousHash:
 false` trusts the stored account like the RN default and does not isolate
 accounts. The hash only detects an account change; authentication still

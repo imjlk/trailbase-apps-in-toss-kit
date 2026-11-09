@@ -153,6 +153,58 @@ describe("WebView session storage", () => {
     expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
   });
 
+  test("a session saved after a failed read checks the account first", async () => {
+    const { raw, rnBridge, aitStorage } = sharedSdkStorage();
+    await rnBundleWroteSession(rnBridge);
+    let sdk: () => Promise<string> = async () => { throw new Error("SDK stalled"); };
+    const { session, lookups } = webSession(aitStorage, () => sdk());
+    await expect(session.storage.getItem(session.appSessionStorageKey)).rejects.toThrow("SDK stalled");
+    // The app treats the failed read as no stored session and signs in again,
+    // but the device now runs another Toss account.
+    sdk = async () => "ait:account-b";
+    await session.storage.setItem(session.tossSessionStorageKey, "b-toss-session");
+    await session.storage.setItem(session.appSessionStorageKey, "b-app-session");
+    expect(lookups()).toBe(2);
+    expect(raw.get(`${APP_KEY}.anonymousHash`)).toBe("ait:account-b");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("b-toss-session");
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("b-app-session");
+    // The previous account never restores that session.
+    const accountA = webSession(aitStorage, async () => "ait:account-a").session;
+    expect(await accountA.storage.getItem(accountA.appSessionStorageKey)).toBeNull();
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("");
+  });
+
+  test("a session adopted before any read checks the account first", async () => {
+    const { raw, rnBridge, aitStorage } = sharedSdkStorage();
+    await rnBundleWroteSession(rnBridge);
+    const { session, lookups } = webSession(aitStorage, async () => "ait:account-b");
+    await session.storage.setItem(session.appSessionStorageKey, "adopted-b-session");
+    expect(raw.get(`${APP_KEY}.anonymousHash`)).toBe("ait:account-b");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("");
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("adopted-b-session");
+    // Once confirmed, later saves and reads of the same account keep the session.
+    await session.storage.setItem(session.tossSessionStorageKey, "b-toss-session");
+    expect(await session.storage.getItem(session.appSessionStorageKey)).toBe("adopted-b-session");
+    expect(lookups()).toBe(2);
+  });
+
+  test("without revalidation a save trusts the stored account", async () => {
+    const { raw, rnBridge, aitStorage } = sharedSdkStorage();
+    await rnBundleWroteSession(rnBridge);
+    let lookups = 0;
+    const guarded = createIdentityGuardedStorage(aitStorage, {
+      anonymousHashStorageKey: "anonymousHash",
+      appSessionStorageKey: ["appSession", "tossSession"],
+      production: true,
+      revalidate: false,
+      resolveAnonymousHash: async () => { lookups++; return "ait:account-a"; },
+    });
+    await guarded.setItem("appSession", "next-session");
+    expect(lookups).toBe(0);
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("next-session");
+  });
+
   test("a delayed account check cannot clear a session saved after the switch", async () => {
     const { raw, rnBridge, aitStorage } = sharedSdkStorage();
     await rnBundleWroteSession(rnBridge);
