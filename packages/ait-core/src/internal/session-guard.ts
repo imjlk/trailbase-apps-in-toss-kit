@@ -25,12 +25,15 @@ export interface IdentityGuardedStorageOptions {
   /** Production only: resolve the SDK identity on every session read and clear sessions on change. */
   revalidate: boolean;
   resolveAnonymousHash: () => Promise<string>;
-  /** Bound on the account lookup a session save makes inside the write queue. */
-  saveLookupTimeoutMs?: number;
+  /** Bound on every SDK account lookup a read or save makes. */
+  lookupTimeoutMs?: number;
 }
 
-/** A session save gives up on a stalled account lookup so queued clears still run. */
-export const DEFAULT_SAVE_LOOKUP_TIMEOUT_MS = 10_000;
+/**
+ * Reads and saves give up on a stalled SDK account lookup, so session restore
+ * settles and queued clears still run.
+ */
+export const DEFAULT_ACCOUNT_LOOKUP_TIMEOUT_MS = 10_000;
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -47,8 +50,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
  * authenticates again instead of restoring another account's session. With
  * `revalidate`, every session key is cleared before the new hash is stored.
  * A session saved before any account is recorded records the current account
- * first, so the next read keeps it. That lookup is bounded: on timeout the save
- * rejects without writing, and later writes such as a logout clear proceed.
+ * first, so the next read keeps it. Every account lookup is bounded: on
+ * timeout a read rejects without recording an account or clearing anything,
+ * and a save rejects without writing, so later writes such as a logout clear
+ * proceed. A late SDK answer is ignored.
  */
 export function createIdentityGuardedStorage(
   storage: KeyValueStorage,
@@ -58,9 +63,10 @@ export function createIdentityGuardedStorage(
     production,
     revalidate,
     resolveAnonymousHash,
-    saveLookupTimeoutMs = DEFAULT_SAVE_LOOKUP_TIMEOUT_MS,
+    lookupTimeoutMs = DEFAULT_ACCOUNT_LOOKUP_TIMEOUT_MS,
   }: IdentityGuardedStorageOptions,
 ): KeyValueStorage {
+  const lookupAccount = () => withTimeout(resolveAnonymousHash(), lookupTimeoutMs);
   const sessionKeys: readonly string[] = typeof appSessionStorageKey === "string"
     ? [appSessionStorageKey]
     : appSessionStorageKey;
@@ -110,9 +116,9 @@ export function createIdentityGuardedStorage(
         // No account is recorded yet (for example a session adopted before any
         // read). Record the current one first, or the next read would treat
         // this session as another account's and clear it. The lookup runs
-        // inside the queue, so bound it: a stalled SDK call must not hold a
-        // later logout clear, and a late answer must not save after it.
-        await switchIdentity(await withTimeout(resolveAnonymousHash(), saveLookupTimeoutMs));
+        // inside the queue; its bound keeps a stalled SDK call from holding a
+        // later logout clear, and a late answer from saving after it.
+        await switchIdentity(await lookupAccount());
       }
       await storage.setItem(key, value);
     });
@@ -124,7 +130,8 @@ export function createIdentityGuardedStorage(
       return { refreshed: false, value: existing };
     }
 
-    const next = await resolveAnonymousHash();
+    // Bounded so a stalled SDK call cannot hang session restore.
+    const next = await lookupAccount();
     checkActive(signal);
     const refreshed = existing !== next && await publishIdentity(next, signal);
     checkActive(signal);

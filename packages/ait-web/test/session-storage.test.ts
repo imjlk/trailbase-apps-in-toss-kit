@@ -115,7 +115,7 @@ describe("WebView session storage", () => {
       production: true,
       revalidate: true,
       resolveAnonymousHash: () => new Promise<string>((resolve) => { answer = resolve; }),
-      saveLookupTimeoutMs: 20,
+      lookupTimeoutMs: 20,
     });
     const save = guarded.setItem("appSession", "adopted-session");
     const clear = guarded.setItem("appSession", "");
@@ -127,6 +127,30 @@ describe("WebView session storage", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
     expect(raw.has(`${APP_KEY}.anonymousHash`)).toBe(false);
+  });
+
+  test("a stalled account lookup on read rejects without recording or clearing", async () => {
+    const { raw, rnBridge, aitStorage } = sharedSdkStorage();
+    await rnBundleWroteSession(rnBridge);
+    let answer: (hash: string) => void = () => {};
+    const guarded = createIdentityGuardedStorage(aitStorage, {
+      anonymousHashStorageKey: "anonymousHash",
+      appSessionStorageKey: ["appSession", "tossSession"],
+      production: true,
+      revalidate: true,
+      resolveAnonymousHash: () => new Promise<string>((resolve) => { answer = resolve; }),
+      lookupTimeoutMs: 20,
+    });
+    await expect(guarded.getItem("appSession")).rejects.toThrow("timed out");
+    // The SDK answering after the timeout switches nothing.
+    answer("ait:account-b");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(raw.get(`${APP_KEY}.anonymousHash`)).toBe("ait:account-a");
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("rn-app-session");
+    expect(raw.get(`${APP_KEY}.tossSession`)).toBe("rn-toss-session");
+    // Writes are not held behind the timed-out read.
+    await guarded.setItem("appSession", "");
+    expect(raw.get(`${APP_KEY}.appSession`)).toBe("");
   });
 
   test("a delayed account check cannot clear a session saved after the switch", async () => {
