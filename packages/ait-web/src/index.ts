@@ -5,7 +5,7 @@ import type { IapCreateOneTimePurchaseOrderResult, IapCreateSubscriptionPurchase
 
 type Sdk = typeof import("@apps-in-toss/web-framework");
 export type AppsInTossWebSdk = Pick<Sdk, "Storage" | "TossAuth" | "User" | "Notification" | "IAP" | "Share">;
-export type WebAdapterErrorCode = "INVALID_INPUT" | "UNSUPPORTED" | "SDK_ERROR" | "INVALID_RESULT" | "TIMEOUT";
+export type WebAdapterErrorCode = "INVALID_INPUT" | "UNSUPPORTED" | "SDK_ERROR" | "INVALID_RESULT" | "TIMEOUT" | "USER_CANCELED";
 export class WebAdapterError extends Error {
   constructor(public readonly code: WebAdapterErrorCode, public readonly operation: string) {
     super(`Apps in Toss Web ${operation}: ${code}`);
@@ -242,7 +242,13 @@ function purchaseFlow(operation: string, timeout: number, grant: WebPurchaseOpti
         candidate = result;
         if (pendingGrant) void pendingGrant.then(finish);
       },
-      onError: () => fail("SDK_ERROR"),
+      onError(error) {
+        // Only an explicit store cancellation before any grant is a clean exit.
+        // A paid or ambiguous order still needs the consumer's recovery flow.
+        const canceled = !grantOrderId && !candidate && error !== null &&
+          typeof error === "object" && "code" in error && error.code === "USER_CANCELED";
+        fail(canceled ? "USER_CANCELED" : "SDK_ERROR");
+      },
     }); } catch (error) { active = false; throw error; }
     // Always provide a disposer to stop late new grants after timeout, including
     // SDK implementations without cleanup. In-flight backend work cannot be undone.
