@@ -184,7 +184,11 @@ test("a cancelled identity lookup cannot erase a newer adopted session", async (
   let started=false;
   const persistence=createAppsInTossSessionStorage({
     appKey:"race",production:true,revalidateAnonymousHash:true,storage,
-    getAnonymousKey:async()=>{started=true;return new Promise(resolve=>{finish=resolve;});},
+    getAnonymousKey:async()=>{
+      // The adopted session's own account check answers; the restore's lookup stalls.
+      if(started)return {type:"HASH",hash:"a"};
+      started=true;return new Promise(resolve=>{finish=resolve;});
+    },
   });
   const manager=createAppsInTossSessionManager({
     ...persistence, appLogin:async()=>({authorizationCode:"unused"}),
@@ -226,7 +230,7 @@ test("in-flight identity clearing settles before a newer adopted session is save
     appKey:"write-race",production:true,revalidateAnonymousHash:true,
     getAnonymousKey:async()=>({type:"HASH",hash:"b"}),
     storage:{getItem:raw.getItem,setItem:async(key,value)=>{
-      if(key==="write-race.appSession" && value==="") {paused=true;await new Promise<void>(resolve=>{finish=resolve;});}
+      if(key==="write-race.appSession" && value==="" && !paused) {paused=true;await new Promise<void>(resolve=>{finish=resolve;});}
       await raw.setItem(key,value);
     }},
   });
@@ -244,4 +248,6 @@ test("in-flight identity clearing settles before a newer adopted session is save
   await adopted;
   expect(JSON.parse(raw.map.get("write-race.appSession")!).authTokens.authToken).toBe("canonical");
   expect(raw.map.get("write-race.appSession")).toBe(raw.map.get("write-race.tossSession"));
+  // The adopted session is recorded under the current account, so the next read keeps it.
+  expect(raw.map.get("write-race.anonymousHash")).toBe("ait:b");
 });

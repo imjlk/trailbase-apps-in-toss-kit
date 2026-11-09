@@ -50,8 +50,12 @@ export interface AppsInTossWebSessionStorage {
  * account's session. The default keys read what the RN session storage wrote.
  * Saving a session before any account is recorded (for example
  * `adoptAppSession` on a first launch) records the current account first, so
- * the next read keeps it. A failed account lookup rejects the read or save;
- * treat a rejected read as no stored session.
+ * the next read keeps it. A failed account lookup, or one that does not answer
+ * within 10 seconds, rejects the read or save without recording an account;
+ * treat a rejected read as no stored session. Until a read confirms the
+ * account in this process, for example after a failed read, a session save
+ * checks the account first, so another account's session is never stored
+ * under the previous account's hash.
  */
 export function createAppsInTossWebSessionStorage({
   storage,
