@@ -14,7 +14,7 @@
     },
     "packages/ait-core": {
       "name": "@trailbase-apps-in-toss-kit/ait-core",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "dependencies": {
         "@ait-kit/sdk": "0.7.0",
       },
@@ -24,7 +24,7 @@
     },
     "packages/ait-rn": {
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "dependencies": {
         "@ait-kit/sdk": "0.7.0",
         "@trailbase-apps-in-toss-kit/ait-core": "workspace:*",
@@ -36,7 +36,7 @@
     },
     "packages/ait-web": {
       "name": "@trailbase-apps-in-toss-kit/ait-web",
-      "version": "0.5.0",
+      "version": "0.6.0",
       "dependencies": {
         "@ait-kit/sdk": "0.7.0",
         "@trailbase-apps-in-toss-kit/ait-core": "workspace:*",
