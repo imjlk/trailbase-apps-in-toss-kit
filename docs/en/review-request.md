@@ -68,7 +68,7 @@ async function handleTaskCompleted() {
 }
 ```
 
-For Web, import `createWebReview` from `@ait-kit/sdk/web`. The example
+For WebView, import `createWebViewReview` from `@ait-kit/sdk/webview`. The example
 cooldown is an app setting, not an Apps in Toss limit. The controller writes an
 attempt before `review.request()` and keeps that record after success, failure,
 or a UI that is not shown. A storage read/write failure skips the review so it

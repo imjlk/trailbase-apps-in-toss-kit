@@ -1,5 +1,5 @@
 import http from "node:http";
-import { createTossMtlsCore, exchangeAnonAuthCode, clientError, publicError as corePublicError, upstreamError } from "@ait-kit/api-core";
+import { createTossMtlsCore, clientError, publicError as corePublicError, upstreamError } from "@ait-kit/api-core";
 import { NodeMtlsTransportError } from "@ait-kit/api-client/node";
 import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 import { createConfig, requestBodyLimitBytes, validateConfig } from "./config.mjs";
@@ -134,7 +134,7 @@ function createCore(config) {
     log: (message, fields) => console.info(`[toss-mtls-client-proxy] ${message}`, fields),
     mtlsClient: createNodeMtlsClient(config),
   };
-  return { ...createTossMtlsCore(options), exchangeAnonAuthCode: input => exchangeAnonAuthCode(input, options) };
+  return createTossMtlsCore(options);
 }
 
 async function promotionRewardStatus(core, body) {

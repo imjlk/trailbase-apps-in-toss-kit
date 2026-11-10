@@ -58,6 +58,8 @@ const CLIENT_RESULTS = {
   tossLoginRemoveByUserKey: { ok: true, providerStatus: "REMOVED" },
   iapOrderStatus: { ok: true, orderId: "fixture-order", providerStatus: "PAYMENT_COMPLETED", sku: "fixture-coins" },
   anonKeyVerify: { ok: true, valid: true, mode: "stub" },
+  // Stub mode never fabricates an identity for a one-time code.
+  anonAuthCodeExchange: { ok: false, error: "FORWARD_MODE_REQUIRED", mode: "stub" },
   promotionRewardGrant: undefined,
   promotionPrepareReward: { ok: true, providerTransactionKey: "stub-promotion-transaction-key" },
   promotionExecuteReward: { ok: true, result: "SUBMITTED", providerTransactionKey: "fixture-key" },

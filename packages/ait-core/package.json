@@ -25,7 +25,7 @@
     "./internal/session-guard": "./src/internal/session-guard.ts"
   },
   "dependencies": {
-    "@ait-kit/sdk": "0.7.0"
+    "@ait-kit/sdk": "0.8.0"
   },
   "peerDependencies": {
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"

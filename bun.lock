@@ -16,7 +16,7 @@
       "name": "@trailbase-apps-in-toss-kit/ait-core",
       "version": "0.3.0",
       "dependencies": {
-        "@ait-kit/sdk": "0.7.0",
+        "@ait-kit/sdk": "0.8.0",
       },
       "peerDependencies": {
         "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*",
@@ -26,7 +26,7 @@
       "name": "@trailbase-apps-in-toss-kit/ait-rn",
       "version": "0.10.1",
       "dependencies": {
-        "@ait-kit/sdk": "0.7.0",
+        "@ait-kit/sdk": "0.8.0",
         "@trailbase-apps-in-toss-kit/ait-core": "workspace:*",
       },
       "peerDependencies": {
@@ -38,7 +38,7 @@
       "name": "@trailbase-apps-in-toss-kit/ait-web",
       "version": "0.6.0",
       "dependencies": {
-        "@ait-kit/sdk": "0.7.0",
+        "@ait-kit/sdk": "0.8.0",
         "@trailbase-apps-in-toss-kit/ait-core": "workspace:*",
       },
       "peerDependencies": {
@@ -89,8 +89,8 @@
       "name": "@trailbase-apps-in-toss-kit/toss-mtls-client-proxy",
       "version": "0.7.2",
       "dependencies": {
-        "@ait-kit/api-client": "0.6.0",
-        "@ait-kit/api-core": "0.6.0",
+        "@ait-kit/api-client": "0.7.0",
+        "@ait-kit/api-core": "0.7.0",
       },
       "devDependencies": {
         "@trailbase-apps-in-toss-kit/trailbase-runtime": "workspace:*",
@@ -98,11 +98,11 @@
     },
   },
   "packages": {
-    "@ait-kit/api-client": ["@ait-kit/api-client@0.6.0", "", { "dependencies": { "@ait-kit/api-core": "0.6.0" } }, "sha512-FuHUJ96aHN737fIcJSmd/n+Oijq0m+8VIe24TrN59lH5yWWHQNYPF3EwpImfDl8g9GWAuDdQp52u395fZj48xg=="],
+    "@ait-kit/api-client": ["@ait-kit/api-client@0.7.0", "", { "dependencies": { "@ait-kit/api-core": "0.7.0" } }, "sha512-cdSn0gFwI9CjhrgB2TteWbRSffXiTeb8ajXiUZWbnXqgzX6GhqQpbGQ4pz9aLEno3xNFmuO7Qp3J7ZtaiHCbBg=="],
 
-    "@ait-kit/api-core": ["@ait-kit/api-core@0.6.0", "", {}, "sha512-10dH9dTI6j642iHMar7JLOoRjZEpfAKFlHCFUItKDQnrYPIG/YunQwfzo6GrdxUSFxEP1dLDZIvmTn6zVycVFA=="],
+    "@ait-kit/api-core": ["@ait-kit/api-core@0.7.0", "", {}, "sha512-uukbehFntDwimcwAHfYg6KiwtmRhnVaudMP4BTOdxsyu1MuRLLR34RyhXB9BwfkvYdWHWEC7Mta8DQdGoVwqFQ=="],
 
-    "@ait-kit/sdk": ["@ait-kit/sdk@0.7.0", "", { "peerDependencies": { "@apps-in-toss/framework": ">=2.10.10", "@apps-in-toss/web-framework": ">=3.4.0" }, "optionalPeers": ["@apps-in-toss/framework", "@apps-in-toss/web-framework"] }, "sha512-Tw7g9OEiT1bFX141fzt5IkMwaqnxDdgQw98DHEtSXOr8XFF4TjR6aqHb0W/6d1MLYWYqjb8YCgVApCLMwnV0YA=="],
+    "@ait-kit/sdk": ["@ait-kit/sdk@0.8.0", "", { "peerDependencies": { "@apps-in-toss/framework": ">=2.10.10", "@apps-in-toss/web-framework": ">=3.4.0" }, "optionalPeers": ["@apps-in-toss/framework", "@apps-in-toss/web-framework"] }, "sha512-ivirh4u6r9MV60kaBxajAQMiQWxCJxr+UhUdTcXIX3D3xnbSoui2eV+UGZvc7ssqQUNsDMai+NWhC/fc+pktCg=="],
 
     "@ampproject/remapping": ["@ampproject/remapping@2.3.0", "", { "dependencies": { "@jridgewell/gen-mapping": "^0.3.5", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw=="],
 

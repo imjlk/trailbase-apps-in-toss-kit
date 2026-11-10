@@ -6,7 +6,7 @@
 `@apps-in-toss/framework` 2.x를 계속 쓸 수 있지만 `ait-rn`은 유지보수 모드입니다.
 [RN에서 WebView로 마이그레이션](webview-migration.md)을 참고하세요.
 
-익명 호출자 인증용 `ait.createAnonymousKeyAuthCode()`는 `@ait-kit/sdk` 0.7.0에
+익명 호출자 인증용 `ait.createAnonymousKeyAuthCode()`는 `@ait-kit/sdk` 0.8.0에
 위임하며 runtime의 공식 WebView SDK 3.6+가 필요합니다. 기존 메서드의 peer 하한은
 3.4.0으로 유지합니다. 일회용 코드를 즉시 백엔드에 보내고 저장하거나 인증 실패 시
 `anonymousHash()`로 대체하지 마세요. 프록시·Rust 교환은

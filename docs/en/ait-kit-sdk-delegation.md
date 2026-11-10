@@ -7,7 +7,7 @@ deadline budgets, and cleanup locally. TrailBase keeps what it owns: the
 public API surface, TrailBase server integration, session bootstrap, and
 storage-key compatibility.
 
-Both packages pin `@ait-kit/sdk` exactly (currently `0.7.0`). The SDK's
+Both packages pin `@ait-kit/sdk` exactly (currently `0.8.0`). The SDK's
 peer floor defines this kit's RN minimum: `@apps-in-toss/framework`
 `>=2.10.10` (raised from `>=2.5.0` when adopting the SDK pin). WebView
 consumers keep `@apps-in-toss/web-framework >=3.4.0 <4`.
@@ -17,18 +17,29 @@ method requires official SDK 3.6+ and a supporting runtime; it returns `UNSUPPOR
 on older peers without calling login or falling back to a hash. Send each fresh
 code to the private server exchange described in [anonymous identity](anonymous-identity.md).
 
+SDK 0.8.0 shares one in-flight anonymous key lookup per adapter, on RN and
+WebView. Lookups that arrive while one is pending join it, so a host that never
+answers holds at most one bridge call, even when the kit's 10-second session
+read deadline expires again and again. The kit keeps its own deadline and does
+not pass the SDK's opt-in `timeoutMs`.
+
+WebView sources import the `createWebView*` factories from
+`@ait-kit/sdk/webview`. `@ait-kit/sdk/web` and its `createWeb*` names are
+deprecated aliases of the same module, so this changes no behaviour.
+
 ## What is delegated
 
-| Domain | RN (`@ait-kit/sdk/rn`) | Web (`@ait-kit/sdk/web`) |
+| Domain | RN (`@ait-kit/sdk/rn`) | WebView (`@ait-kit/sdk/webview`) |
 |---|---|---|
 | Login (`appLogin`) | Default path (no injected function) | — (see boundary below) |
 | Anonymous key lookup | Default path (no injected function) | `anonymousHash()` lookup |
 | Storage | `createAppsInTossSdkStorageBridge()` helper | `storage.*` operations |
-| Full-screen ad load | Default path (no injected function) | — (ads are RN-only) |
+| Full-screen ad load | Default path (no injected function) | `createAppsInTossFullScreenAdBridge()` load (`createWebViewAds`) |
+| Banner ads | — | `createWebViewBannerAds()` re-export |
 | IAP purchases + pending orders | Default path (no injected `IAP` module) | — (see boundary below) |
 | Share link / share sheet | — | `createShareLink` / `share` |
-| Review request | `createReactNativeReview()` | `createWebReview()` |
-| Direct promotion adapter | `createReactNativePromotion()` | `createWebPromotion()` |
+| Review request | `createReactNativeReview()` | `createWebViewReview()` |
+| Direct promotion adapter | `createReactNativePromotion()` | `createWebViewPromotion()` |
 
 "Default path" means the production flow when no replacement function or
 module is injected. Injected seams (`appLogin`, `getAnonymousKey`,
@@ -86,7 +97,7 @@ automatic fallback.
 ## Platform isolation
 
 RN sources import only `@ait-kit/sdk/rn` (plus the runtime-neutral root for
-`SdkError`); web sources import only `@ait-kit/sdk/web` and the root. Both
+`SdkError`); WebView sources import only `@ait-kit/sdk/webview` and the root. Both
 official SDKs remain **optional peers** of `@ait-kit/sdk`, so an RN consumer
 never needs `@apps-in-toss/web-framework` and vice versa — enforced by the
 consumer-fixture tests in both packages.

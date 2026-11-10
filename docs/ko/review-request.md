@@ -68,7 +68,7 @@ async function handleTaskCompleted() {
 }
 ```
 
-Web에서는 `@ait-kit/sdk/web`에서 `createWebReview`를 가져옵니다. 예시 cooldown은
+WebView에서는 `@ait-kit/sdk/webview`에서 `createWebViewReview`를 가져옵니다. 예시 cooldown은
 앱 설정이며 앱인토스의 제한을 뜻하지 않습니다. Controller는
 `review.request()` 호출 전에 시도 기록을 남기고, SDK 성공·실패나 화면 미표시 이후에도
 그 기록을 유지합니다. Storage 읽기/쓰기가 실패하면 리뷰 요청만 생략해 핵심 행동에

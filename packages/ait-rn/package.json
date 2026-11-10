@@ -32,7 +32,7 @@
     "test": "bun test"
   },
   "dependencies": {
-    "@ait-kit/sdk": "0.7.0",
+    "@ait-kit/sdk": "0.8.0",
     "@trailbase-apps-in-toss-kit/ait-core": "workspace:*"
   }
 }

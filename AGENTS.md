@@ -118,6 +118,7 @@ It also has AppsInToss adapter endpoints:
   (alias: `POST /internal/apps-in-toss/users/anon-key/verify`, the
   `@ait-kit/api-client` `PROXY_ENDPOINTS.anonKeyVerify` path)
 - `POST /internal/apps-in-toss/anonymous-key/exchange`
+  (the `@ait-kit/api-client` `PROXY_ENDPOINTS.anonAuthCodeExchange` path)
 - `POST /internal/apps-in-toss/promotion/reward/prepare`
 - `POST /internal/apps-in-toss/promotion/reward/execute`
 - `POST /internal/apps-in-toss/promotion/reward/status`

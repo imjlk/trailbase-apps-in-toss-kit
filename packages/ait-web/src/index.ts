@@ -1,5 +1,5 @@
 import { SdkError, type SdkAnonymousAuthCode } from "@ait-kit/sdk";
-import { createWebIdentity, createWebShare, createWebStorage } from "@ait-kit/sdk/web";
+import { createWebViewIdentity, createWebViewShare, createWebViewStorage } from "@ait-kit/sdk/webview";
 import type { AppsInTossLoginResult, KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import type { IapCreateOneTimePurchaseOrderResult, IapCreateSubscriptionPurchaseOrderResult, NotificationAgreementResult } from "@apps-in-toss/web-framework";
 
@@ -39,7 +39,7 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
   }
   let sdkPromise: Promise<AppsInTossWebSdk> | undefined;
   const sdk = () => sdkPromise ??= loadSdk().catch(() => { sdkPromise = undefined; throw new WebAdapterError("UNSUPPORTED", "load"); });
-  // Shared loader feeding the @ait-kit/sdk web adapters (identity lookup,
+  // Shared loader feeding the @ait-kit/sdk WebView adapters (identity lookup,
   // storage, sharing): one memoized SDK load backs every delegated
   // operation, matching the local lazy-load semantics. Failures clear the
   // memo so a later call retries.
@@ -50,9 +50,9 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
       return { available: false as const, reason: "web sdk unavailable" };
     }
   };
-  const sdkIdentity = createWebIdentity({ framework: sharedSdkLoader });
-  const sdkStorage = createWebStorage({ framework: sharedSdkLoader });
-  const sdkShare = createWebShare({ framework: sharedSdkLoader });
+  const sdkIdentity = createWebViewIdentity({ framework: sharedSdkLoader });
+  const sdkStorage = createWebViewStorage({ framework: sharedSdkLoader });
+  const sdkShare = createWebViewShare({ framework: sharedSdkLoader });
   const mapSdkError = (operation: string, error: unknown): WebAdapterError =>
     error instanceof SdkError && (error.code === "SDK_UNAVAILABLE" || error.code === "UNSUPPORTED")
       ? new WebAdapterError("UNSUPPORTED", operation)
@@ -62,7 +62,7 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
     catch (error) { throw error instanceof WebAdapterError ? error : new WebAdapterError("SDK_ERROR", operation); }
   }
   const storageKey = (key: string) => `${appKey}.${requiredText(key, "storage key", 256)}`;
-  // Storage delegated to @ait-kit/sdk's web storage adapter (lazy module
+  // Storage delegated to @ait-kit/sdk's WebView storage adapter (lazy module
   // acquisition, verbatim keys); the appKey namespacing stays here.
   const storage: KeyValueStorage & { removeItem(key: string): Promise<void> } = {
     getItem: async key => {
@@ -100,7 +100,7 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
       });
     },
     async anonymousHash(): Promise<string> {
-      // Lookup delegated to @ait-kit/sdk's web identity adapter (module
+      // Lookup delegated to @ait-kit/sdk's WebView identity adapter (module
       // acquisition, HASH-shape validation); the ait: prefix policy and the
       // strict length/whitespace checks stay here.
       let hash: string;
