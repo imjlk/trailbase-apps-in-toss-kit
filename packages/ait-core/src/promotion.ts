@@ -329,11 +329,12 @@ function resolvePromotionClaimStatus(
     return alreadyGrantedOutcome ? "ALREADY_GRANTED" : "GRANTED";
   }
 
-  if (nonSuccessStatuses.length > 0) {
+  const nonSuccessStatus = nonSuccessStatuses[0];
+  if (nonSuccessStatus !== undefined) {
     if (flags.granted === true || flags.alreadyGranted === true) {
       throwInvalidPromotionClaimResponse(cause);
     }
-    return nonSuccessStatuses[0];
+    return nonSuccessStatus;
   }
 
   if (flags.alreadyGranted === true) {
