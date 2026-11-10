@@ -1,4 +1,4 @@
-import { createWebViewAds } from "@ait-kit/sdk/web";
+import { createWebViewAds } from "@ait-kit/sdk/webview";
 import { createFullScreenAdBridge, type CreateAppsInTossFullScreenAdBridgeOptions, type AppsInTossLoadFullScreenAd, type AppsInTossShowFullScreenAd } from "@trailbase-apps-in-toss-kit/ait-core/ads";
 export * from "@trailbase-apps-in-toss-kit/ait-core/ads";
 // Inline/banner placeholder policy shared with RN; the slot itself is a consumer-owned DOM target.
@@ -45,4 +45,4 @@ export function createAppsInTossFullScreenAdBridge({ loadSdk = () => import("@ap
 }
 
 // DOM banner lifetime is implemented by the shared SDK adapter, not an RN component.
-export { createWebViewBannerAds, type WebViewBannerAdsOptions, type WebViewBannerHandle, type WebViewBannerOptions } from "@ait-kit/sdk/web";
+export { createWebViewBannerAds, type WebViewBannerAdsOptions, type WebViewBannerHandle, type WebViewBannerOptions } from "@ait-kit/sdk/webview";

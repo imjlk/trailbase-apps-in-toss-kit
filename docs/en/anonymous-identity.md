@@ -26,7 +26,7 @@ validity check remains for compatibility and recipient validation, not caller au
    `anonymous_identity::exchange_anonymous_auth_code(proxy_url, token, code)`.
    Require the running proxy's `anonymous-key.exchange-auth-code` capability and
    forward mode. Its private `POST /internal/apps-in-toss/anonymous-key/exchange`
-   route delegates to `@ait-kit/api-core` 0.6.0. Only an authoritative successful
+   route delegates to `@ait-kit/api-core` 0.7.0. Only an authoritative successful
    exchange supplies the server identity. A failed or indeterminate exchange must
    not authenticate `_user`; never retry the same code automatically. Request a
    fresh code for a new explicit attempt and do not substitute a client hash.

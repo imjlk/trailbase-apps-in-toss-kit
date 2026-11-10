@@ -1,4 +1,4 @@
-import { createWebStorage, type WebStorageOptions } from "@ait-kit/sdk/web";
+import { createWebViewStorage, type WebViewStorageOptions } from "@ait-kit/sdk/webview";
 import type { AppsInTossStorageBridge, KeyValueStorage } from "@trailbase-apps-in-toss-kit/trailbase-client";
 import {
   createIdentityGuardedStorage,
@@ -7,8 +7,8 @@ import {
 export * from "@trailbase-apps-in-toss-kit/ait-core/storage";
 
 /** Verbatim SDK Storage keys for consumers migrating existing persisted state. No browser fallback. */
-export function createAppsInTossSdkStorageBridge(options: WebStorageOptions = {}): AppsInTossStorageBridge {
-  const storage = createWebStorage(options);
+export function createAppsInTossSdkStorageBridge(options: WebViewStorageOptions = {}): AppsInTossStorageBridge {
+  const storage = createWebViewStorage(options);
   return {
     getItem: (key) => storage.get(key),
     setItem: (key, value) => storage.set(key, value),

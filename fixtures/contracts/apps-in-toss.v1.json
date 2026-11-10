@@ -606,6 +606,7 @@
       "id": "anonymous-key.exchange",
       "method": "POST",
       "path": "/internal/apps-in-toss/anonymous-key/exchange",
+      "aitKitEndpoint": "anonAuthCodeExchange",
       "rustConst": "ANONYMOUS_AUTH_CODE_EXCHANGE_PATH"
     },
     {

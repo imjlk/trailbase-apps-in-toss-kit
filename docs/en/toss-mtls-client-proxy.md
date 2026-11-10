@@ -2,7 +2,7 @@
 
 The private `POST /internal/apps-in-toss/anonymous-key/exchange` route accepts
 `{ "code": "..." }` from the backend and delegates single-use code exchange to
-`@ait-kit/api-core` 0.6.0. It requires forward mode and the internal bearer token;
+`@ait-kit/api-core` 0.7.0. It requires forward mode and the internal bearer token;
 stub mode cannot fabricate an authenticated identity. Capability:
 `anonymous-key.exchange-auth-code`. A successful response contains a backend-only
 raw `anonKey`; never expose it publicly or log it. Failed exchanges return fixed
@@ -119,7 +119,8 @@ order visible before the application decides whether to grant or defer the purch
 - `POST /internal/apps-in-toss/anonymous-key/verify`: anonymous key validity check (not caller ownership).
 - `POST /internal/apps-in-toss/users/anon-key/verify`: alias of the verify route for the
   `@ait-kit/api-client` `PROXY_ENDPOINTS.anonKeyVerify` path; same handler and response.
-- `POST /internal/apps-in-toss/anonymous-key/exchange`: forward-mode anonymous auth-code exchange.
+- `POST /internal/apps-in-toss/anonymous-key/exchange`: forward-mode anonymous auth-code exchange; the
+  `@ait-kit/api-client` `PROXY_ENDPOINTS.anonAuthCodeExchange` path.
 - `POST /internal/apps-in-toss/promotion/reward/grant`: removed; returns `410 PROMOTION_GRANT_REMOVED`.
 - `POST /internal/apps-in-toss/promotion/reward/prepare`: recipient-bound promotion key issuance.
 - `POST /internal/apps-in-toss/promotion/reward/execute`: promotion execution with a persisted key.
@@ -376,7 +377,7 @@ normalization or multi-step flow handling.
 
 ## API Core 0.4 Contracts
 
-The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.6.0` and
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.7.0` and
 explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
 behind the same internal bearer authentication; forward mode still requires a
 token. Bun is pinned to `1.4.2` across local tooling, CI, and the container.

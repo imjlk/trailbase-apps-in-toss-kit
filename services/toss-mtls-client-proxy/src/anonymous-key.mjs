@@ -4,7 +4,7 @@ import { PROXY_ENDPOINTS } from "@ait-kit/api-client";
 export const ANONYMOUS_KEY_VERIFY_PATH = "/internal/apps-in-toss/anonymous-key/verify";
 // Alias for @ait-kit/api-client's anonKeyVerify spelling; same handler as ANONYMOUS_KEY_VERIFY_PATH.
 export const ANONYMOUS_KEY_VERIFY_ALIAS_PATH = PROXY_ENDPOINTS.anonKeyVerify;
-export const ANONYMOUS_AUTH_CODE_EXCHANGE_PATH = "/internal/apps-in-toss/anonymous-key/exchange";
+export const ANONYMOUS_AUTH_CODE_EXCHANGE_PATH = PROXY_ENDPOINTS.anonAuthCodeExchange;
 export const TOSS_ANONYMOUS_KEY_VERIFY_PATH = TOSS_ENDPOINTS.anonKeyVerify;
 
 export function requireAnonymousKey(value) {

@@ -26,7 +26,7 @@ SUCCESS 봉투와 boolean `success: true`를 모두 확인하며 HTTP 200만으�
    `anonymous_identity::exchange_anonymous_auth_code(proxy_url, token, code)`를 호출합니다.
    실행 중인 프록시의 `anonymous-key.exchange-auth-code` capability와 forward mode를
    요구하세요. 비공개 `POST /internal/apps-in-toss/anonymous-key/exchange`는
-   `@ait-kit/api-core` 0.6.0에 교환을 위임합니다. 명시적인 교환 성공 응답만 서버
+   `@ait-kit/api-core` 0.7.0에 교환을 위임합니다. 명시적인 교환 성공 응답만 서버
    식별자로 사용하며 실패·결과 불명 시 `_user`를 인증하지 않습니다. 같은 코드를 자동
    재시도하지 말고 새 명시적 시도에서 코드를 다시 발급받으세요. client hash로 대체하지 마세요.
 3. 반환된 `VerifiedAnonymousKey::hmac`에 기존 컨슈머 익명 HMAC secret을 전달합니다.

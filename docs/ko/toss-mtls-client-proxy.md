@@ -1,7 +1,7 @@
 # Toss mTLS 클라이언트 프록시
 
 비공개 `POST /internal/apps-in-toss/anonymous-key/exchange`는 백엔드의
-`{ "code": "..." }`를 받아 `@ait-kit/api-core` 0.6.0에 일회용 코드 교환을 위임합니다.
+`{ "code": "..." }`를 받아 `@ait-kit/api-core` 0.7.0에 일회용 코드 교환을 위임합니다.
 Forward mode와 내부 bearer token이 필요하며 stub mode는 인증된 식별자를 만들지
 않습니다. Capability는 `anonymous-key.exchange-auth-code`입니다. 성공 시 백엔드용
 원본 `anonKey`를 반환하므로 공개 응답이나 로그에 넣지 마세요. 실패는 고정 오류로
@@ -120,6 +120,7 @@ order가 Toss에서 조회 가능해질 짧은 시간을 주기 위한 동작입
 - `POST /internal/apps-in-toss/users/anon-key/verify`: `@ait-kit/api-client`
   `PROXY_ENDPOINTS.anonKeyVerify` 경로를 위한 verify 라우트 별칭. 핸들러와 응답이 같습니다.
 - `POST /internal/apps-in-toss/anonymous-key/exchange`: forward 모드 익명 auth code 교환.
+  `@ait-kit/api-client` `PROXY_ENDPOINTS.anonAuthCodeExchange` 경로입니다.
 - `POST /internal/apps-in-toss/promotion/reward/grant`: 제거됨. `410 PROMOTION_GRANT_REMOVED`를 반환합니다.
 - `POST /internal/apps-in-toss/promotion/reward/prepare`: 수신자에 바인딩된 프로모션 키 발급.
 - `POST /internal/apps-in-toss/promotion/reward/execute`: 저장된 키로 프로모션 실행.
@@ -378,7 +379,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 
 ## API Core 0.4 계약
 
-프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.6.0`으로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.7.0`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를

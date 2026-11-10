@@ -6,7 +6,7 @@
 TrailBase는 자신이 소유한 부분(공개 API 표면, TrailBase 서버 연동, 세션
 부트스트랩, 저장 키 호환성)을 계속 담당합니다.
 
-두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.7.0`).
+두 패키지 모두 `@ait-kit/sdk`를 정확한 버전으로 고정합니다(현재 `0.8.0`).
 SDK의 peer 하한이 이 kit의 RN 최소 버전을 정의합니다:
 `@apps-in-toss/framework >=2.10.10`(SDK pin 채택 시 `>=2.5.0`에서 상향).
 WebView 소비자는 `@apps-in-toss/web-framework >=3.4.0 <4`를 유지합니다.
@@ -16,18 +16,28 @@ SDK 0.7.0의 WebView `createAnonymousKeyAuthCode()`에 발급을 위임합니다
 대체하지 않고 `UNSUPPORTED`를 반환합니다. 매번 새 코드를
 [익명 식별](anonymous-identity.md)의 비공개 서버 교환 경로에 전달하세요.
 
+SDK 0.8.0은 RN과 WebView 모두 adapter마다 진행 중인 익명 키 조회를 하나로 공유합니다.
+조회가 진행 중일 때 들어온 조회는 그 호출에 합류하므로, 앱이 응답하지 않아도 브리지
+호출은 최대 하나만 남습니다. kit의 10초 세션 읽기 제한이 반복해서 만료돼도 마찬가지입니다.
+kit은 자체 제한 시간을 유지하며 SDK의 선택 옵션 `timeoutMs`는 넘기지 않습니다.
+
+WebView 소스는 `@ait-kit/sdk/webview`에서 `createWebView*` 팩토리를 가져옵니다.
+`@ait-kit/sdk/web`과 그 `createWeb*` 이름은 같은 모듈의 deprecated 별칭이므로
+동작은 바뀌지 않습니다.
+
 ## 위임 대상
 
-| 기능 | RN (`@ait-kit/sdk/rn`) | Web (`@ait-kit/sdk/web`) |
+| 기능 | RN (`@ait-kit/sdk/rn`) | WebView (`@ait-kit/sdk/webview`) |
 |---|---|---|
 | 로그인 (`appLogin`) | 기본 경로 (주입 함수 없을 때) | — (아래 경계 참고) |
 | 익명 키 조회 | 기본 경로 (주입 함수 없을 때) | `anonymousHash()` 조회 |
 | Storage | `createAppsInTossSdkStorageBridge()` 헬퍼 | `storage.*` 연산 |
-| 전면 광고 로드 | 기본 경로 (주입 함수 없을 때) | — (광고는 RN 전용) |
+| 전면 광고 로드 | 기본 경로 (주입 함수 없을 때) | `createAppsInTossFullScreenAdBridge()` 로드 (`createWebViewAds`) |
+| 배너 광고 | — | `createWebViewBannerAds()` 재노출 |
 | IAP 결제 + 대기 주문 | 기본 경로 (`IAP` 모듈 미주입 시) | — (아래 경계 참고) |
 | 공유 링크 / 공유 시트 | — | `createShareLink` / `share` |
-| 리뷰 요청 | `createReactNativeReview()` | `createWebReview()` |
-| 직접 프로모션 adapter | `createReactNativePromotion()` | `createWebPromotion()` |
+| 리뷰 요청 | `createReactNativeReview()` | `createWebViewReview()` |
+| 직접 프로모션 adapter | `createReactNativePromotion()` | `createWebViewPromotion()` |
 
 "기본 경로"는 대체 함수나 모듈을 주입하지 않은 프로덕션 흐름입니다. 주입
 seam(`appLogin`, `getAnonymousKey`, `loadFullScreenAd`, `IAP` 등)은 로컬
@@ -80,8 +90,8 @@ adapter도 TrailBase의 3단계 서버 지급 흐름을 대체하거나 자동 f
 
 ## 플랫폼 격리
 
-RN 소스는 `@ait-kit/sdk/rn`(과 런타임 중립 루트의 `SdkError`)만, web
-소스는 `@ait-kit/sdk/web`과 루트만 import합니다. 두 공식 SDK 모두
+RN 소스는 `@ait-kit/sdk/rn`(과 런타임 중립 루트의 `SdkError`)만, WebView
+소스는 `@ait-kit/sdk/webview`와 루트만 import합니다. 두 공식 SDK 모두
 `@ait-kit/sdk`의 **선택적 peer**로 남아 있어 RN 소비자는
 `@apps-in-toss/web-framework`를, web 소비자는 RN SDK를 요구하지 않습니다.
 두 패키지의 consumer-fixture 테스트가 이를 강제합니다.

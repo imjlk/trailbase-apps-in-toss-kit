@@ -16,9 +16,9 @@ the same release train.
 | Component | Version | Notes |
 |---|---|---|
 | Proxy image | Exact published version matching `services/toss-mtls-client-proxy/package.json` | Require the three promotion v2 capabilities below, plus `anonymous-key.exchange-auth-code` before adopting code authentication |
-| Proxy internal `@ait-kit/api-core` / `api-client` | `0.6.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures |
-| RN/Web `@ait-kit/sdk` | `0.7.0` (exact pins) | `ait-rn` / `ait-web` (private, Sampo-versioned) |
-| RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.7.0 peer floor; minimum fixture compiles against the same reviewed pin |
+| Proxy internal `@ait-kit/api-core` / `api-client` | `0.7.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures, first-class anonymous auth-code exchange |
+| RN/Web `@ait-kit/sdk` | `0.8.0` (exact pins) | `ait-rn` / `ait-web` (private, Sampo-versioned) |
+| RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.8.0 peer floor (unchanged since 0.3.0); minimum fixture compiles against the same reviewed pin |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Existing methods unchanged; code authentication requires 3.6+ and runtime support |
 | Rust guest crates | See both crate `Cargo.toml` files | Fixed pair; moves together with the code-exchange helper |
 | SQL templates | Additive v2 migration; v3 index before idle cleanup | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers and `promotion_reward_ledger.v3.sql` before idle cleanup; preserve legacy rows |
@@ -83,7 +83,7 @@ Keep dispatch paused throughout reconciliation, migration and deployment:
    guests soon after the proxy, and keep dispatch paused until they are
    live.
 5. **Client apps last**: rebuild with `ait-rn` / `ait-web`
-   (`@ait-kit/sdk` 0.7.0). RN consumers must already be on
+   (`@ait-kit/sdk` 0.8.0). RN consumers must already be on
    `@apps-in-toss/framework >=2.10.10`.
 6. **Resume and watch**: re-enable dispatch features and monitor ledger
    outcomes. In-flight promotion attempts and message outbox rows survive
