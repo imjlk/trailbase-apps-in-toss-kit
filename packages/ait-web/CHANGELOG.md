@@ -1,5 +1,19 @@
 # @trailbase-apps-in-toss-kit/ait-web
 
+## 0.7.0 — 2026-11-10
+
+### Minor changes
+
+- [013cd82](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/013cd826896dd5a1ca58beac81414f6c604e242a) Add a WebView adapter for separately consented user data. It checks SDK support,
+  keeps repeat prompts opt-in, redacts provider errors and does not cache or persist
+  returned personal data. Consumers still own consent-purpose configuration,
+  withdrawal callbacks, field minimization and their retention policy. Toss Login
+  is not required by this adapter. — Thanks @imjlk!
+
+### Patch changes
+
+- Updated dependencies: ait-core (npm)@0.3.2
+
 ## 0.6.1 — 2026-11-10
 
 ### Patch changes

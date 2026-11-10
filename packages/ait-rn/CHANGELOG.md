@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.10.3 — 2026-11-10
+
+### Patch changes
+
+- Updated dependencies: ait-core (npm)@0.3.2
+
 ## 0.10.2 — 2026-11-10
 
 ### Patch changes
