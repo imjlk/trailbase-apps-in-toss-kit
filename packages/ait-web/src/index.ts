@@ -5,6 +5,8 @@ import type { IapCreateOneTimePurchaseOrderResult, IapCreateSubscriptionPurchase
 
 type Sdk = typeof import("@apps-in-toss/web-framework");
 export type AppsInTossWebSdk = Pick<Sdk, "Storage" | "TossAuth" | "User" | "Notification" | "IAP" | "Share">;
+export type WebConsentedDataOptions = Parameters<Sdk["User"]["getConsentedData"]>[0];
+export type WebConsentedData = Awaited<ReturnType<Sdk["User"]["getConsentedData"]>>;
 export type WebAdapterErrorCode = "INVALID_INPUT" | "UNSUPPORTED" | "SDK_ERROR" | "INVALID_RESULT" | "TIMEOUT" | "USER_CANCELED";
 export class WebAdapterError extends Error {
   constructor(public readonly code: WebAdapterErrorCode, public readonly operation: string) {
@@ -81,6 +83,26 @@ export function createAppsInTossWebAdapter({ appKey, loadSdk = () => import("@ap
   };
   return {
     storage,
+    /** Invoke only from an explicit user action; never caches, logs or persists personal data. */
+    async getConsentedData(options: WebConsentedDataOptions): Promise<WebConsentedData> {
+      const key = requiredText(options?.consentedUserDataKey, "consent purpose", 256);
+      if (!key.startsWith("cud_") || key.length <= 4 ||
+          (options.shouldRequestAgreementWhenUserDeclined !== undefined &&
+           typeof options.shouldRequestAgreementWhenUserDeclined !== "boolean")) {
+        throw new WebAdapterError("INVALID_INPUT", "consented data");
+      }
+      return invoke("consented data", async api => {
+        const read = required(api.User?.getConsentedData, "consented data");
+        if (typeof read.isSupported !== "function" || !read.isSupported()) {
+          throw new WebAdapterError("UNSUPPORTED", "consented data");
+        }
+        // Keep repeat prompts opt-in. Do not retry consent UI or failed bridge calls.
+        return read({
+          consentedUserDataKey: key,
+          shouldRequestAgreementWhenUserDeclined: options.shouldRequestAgreementWhenUserDeclined ?? false,
+        });
+      });
+    },
     /** SDK 3.6+: fresh single-use server authentication code; never a hash fallback. */
     async createAnonymousKeyAuthCode(): Promise<SdkAnonymousAuthCode> {
       try { return await sdkIdentity.createAnonymousKeyAuthCode(); }

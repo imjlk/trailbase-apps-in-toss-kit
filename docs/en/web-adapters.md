@@ -1,5 +1,20 @@
 # WebView SDK 3 adapters
 
+## Separately consented user data
+
+`adapter.getConsentedData({ consentedUserDataKey, shouldRequestAgreementWhenUserDeclined? })`
+wraps `User.getConsentedData`. Call it only from an explicit user action after
+configuring a console consent purpose. Toss Login is not required. A missing or
+unsupported capability returns `UNSUPPORTED`; provider errors become redacted
+`SDK_ERROR` errors without retries. Repeat consent prompts default to false.
+
+Missing fields remain missing. The adapter does not cache responses or persist
+personal data. Consumers own field minimization, decline/fallback UX, withdrawal
+callbacks and retention. Do not log the response or treat it as identity proof.
+See the [official user-information guide](https://developers-apps-in-toss.toss.im/guide/authentication/user-info).
+
+## Setup
+
 `@trailbase-apps-in-toss-kit/ait-web` is a source-consumed WebView adapter for
 `@apps-in-toss/web-framework >=3.4.0 <4`. The consumer owns that SDK dependency.
 The kit installs 3.9.0 only for development type/bundle verification. Existing RN

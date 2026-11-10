@@ -1,5 +1,20 @@
 # WebView SDK 3 어댑터
 
+## 별도 동의 기반 사용자 정보
+
+`adapter.getConsentedData({ consentedUserDataKey, shouldRequestAgreementWhenUserDeclined? })`는
+`User.getConsentedData`를 감쌉니다. 콘솔에 동의 목적을 등록한 뒤 사용자의 명시적인
+동작에서만 호출하며 토스 로그인은 필요하지 않습니다. 기능이 없거나 지원되지 않으면
+`UNSUPPORTED`, 제공자 오류는 민감정보 없이 `SDK_ERROR`로 반환하고 재시도하지 않습니다.
+동의 재요청 옵션의 기본값은 false입니다.
+
+누락된 필드는 그대로 두며 응답을 캐시하거나 개인정보를 저장하지 않습니다. 최소 수집,
+거절·대체 입력 UX, 철회 콜백과 보관 기간은 소비자가 관리합니다. 응답을 로그로 남기거나
+본인확인 증거로 취급하지 마세요.
+[공식 사용자 정보 가이드](https://developers-apps-in-toss.toss.im/guide/authentication/user-info)를 확인하세요.
+
+## 설정
+
 `@trailbase-apps-in-toss-kit/ait-web`은 `@apps-in-toss/web-framework >=3.4.0 <4`용
 소스 소비형 WebView 어댑터입니다. SDK 의존성은 소비 앱이 소유하고 kit은 개발용 타입·번들
 검증에만 3.9.0을 설치합니다. 기존 RN 소비 앱은 `ait-rn`과
