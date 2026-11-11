@@ -1,6 +1,6 @@
 # Apps in Toss Upstream Document Snapshot
 
-- Fetched at: 2026-11-09T07:54:42.977Z
+- Fetched at: 2026-11-11T07:43:19.933Z
 
 Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-toss-tracking.md.
 
@@ -10,8 +10,8 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 23674
 - Apps in Toss llms.txt
   - URL: https://developers-apps-in-toss.toss.im/llms.txt
-  - SHA-256: `88b9adb62fbe3ad62ce756fc90f9fb36c3c8f1eb1a09266e4318626fbbbee8a0`
-  - Bytes: 34959
+  - SHA-256: `aef4562d2f6813a482b7bacd80e52da69db461ca23bf3e4e8c04eef31b87eb16`
+  - Bytes: 34360
 - React Native tutorial
   - URL: https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md
   - SHA-256: `ac5f41ca0096126a7e7798231e39c12137080f5b92809df783bbefa4c9a38be0`
@@ -34,8 +34,8 @@ Discovery only. Reviewed reference versions are maintained in docs/en/apps-in-to
   - Bytes: 8276
 - Apps in Toss integration getting started
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md
-  - SHA-256: `821933a67c970889dc2308beef2592a8432a42d25b3004dd3c5c04b9b22fb4d8`
-  - Bytes: 9213
+  - SHA-256: `1985166121f33c47ca027563948298accef16ad71d3f7d284842b58047c7bf88`
+  - Bytes: 9261
 - Server API integration
   - URL: https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md
   - SHA-256: `0f6da5cb97545d05ba39260eb3871875f73ba6b65c88f419e38b92331fb2f9bc`
