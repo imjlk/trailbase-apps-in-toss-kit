@@ -305,6 +305,13 @@ if (shouldUseAppsInTossMockAd({ isDev, rewardMode, operationalEnvironment })) {
 `userEarnedReward`가 필요하며 시간 경과만으로 보상을 인정하지 않습니다.
 앱에서 이 흐름 전체에 짧은 시청 제한 타이머를 추가하지 마세요.
 
+서버에서 `show`, `impression`, `dismissed`를 모두 검증한다면 `show` 또는
+`preloadAndShow`에 `interstitialCompletionPolicy: "dismissed"`를 지정하세요.
+이 옵션은 클릭 후에도 콜백을 유지하고 노출 시간 기반 폴백을 사용하지 않습니다.
+세 SDK 이벤트가 모두 있어야 완료로 처리하며, 닫힘 콜백이 없으면 위의 비활성
+복구 제한을 적용합니다. 이벤트를 임의로 만들지 않습니다. 기본 `"compatible"`
+정책과 보상형 광고 동작은 그대로 유지됩니다.
+
 앱 자체 스킵권으로 광고를 건너뛰게 하려면 사용자가 명시적으로 선택하게 하고, 스킵권
 경로에서는 광고 SDK를 호출하지 마세요. `ait-rn/ad-skip`과 서버 사용 계약은
 [광고 스킵권](ad-skip-tickets.md)을 참고하세요.

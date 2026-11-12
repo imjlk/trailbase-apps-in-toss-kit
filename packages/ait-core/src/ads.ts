@@ -105,6 +105,8 @@ export interface AppsInTossPreloadFullScreenAdOptions {
 export interface AppsInTossShowFullScreenAdOptions {
   adFormat: AppsInTossFullScreenAdFormat;
   adGroupId: string;
+  /** Require show + impression + dismissed for server-verified interstitials. */
+  interstitialCompletionPolicy?: "compatible" | "dismissed";
   interstitialCompletionFallbackMs?: number;
 }
 
@@ -526,6 +528,7 @@ async function showFullScreenAdAsync({
   adFormat,
   adGroupId,
   completionTimeoutMs,
+  interstitialCompletionPolicy = "compatible",
   interstitialCompletionFallbackMs = 4_500,
   rewardFallbackMs,
   showFullScreenAd,
@@ -642,18 +645,20 @@ async function showFullScreenAdAsync({
           if (
             type === "impression" &&
             adFormat === "interstitial" &&
+            interstitialCompletionPolicy === "compatible" &&
             events.includes("clicked")
           ) {
             settleResolve();
             return;
           }
-          if (type === "impression" && adFormat === "interstitial") {
+          if (type === "impression" && adFormat === "interstitial" && interstitialCompletionPolicy === "compatible") {
             scheduleInterstitialFallback();
             return;
           }
           if (
             type === "clicked" &&
             adFormat === "interstitial" &&
+            interstitialCompletionPolicy === "compatible" &&
             events.includes("impression")
           ) {
             settleResolve();
@@ -688,6 +693,8 @@ async function showFullScreenAdAsync({
       const completed =
         adFormat === "rewarded"
           ? earned
+          : interstitialCompletionPolicy === "dismissed"
+          ? ["show", "impression", "dismissed"].every(type => events.includes(type))
           : interstitialAdCompleted({
               events,
               shownDurationMs,

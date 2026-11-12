@@ -36,3 +36,61 @@ test("WebView loader errors and load timeouts reject without native fallbacks", 
   const stalled = createAppsInTossFullScreenAdBridge({ loadTimeoutMs: 10, loadSdk: () => new Promise(() => {}) });
   await expect(stalled.preload({ adGroupId: "fixture" })).rejects.toMatchObject({ code: "AD_LOAD_TIMEOUT" });
 });
+
+for (const middle of [["impression", "clicked"], ["clicked", "impression"]] as const) {
+  test(`strict interstitial keeps callbacks through ${middle.join("/")} until real dismissal`, async () => {
+    let emit: (event: AppsInTossShowFullScreenAdEvent) => void = () => {};
+    let cleanup = 0;
+    const bridge = createAppsInTossFullScreenAdBridge({
+      showTimeoutMs: 10, showCompletionTimeoutMs: 500,
+      showFullScreenAd: Object.assign(({ onEvent }) => {
+        emit = onEvent;
+        onEvent({ type: "show" });
+        return () => { cleanup++; };
+      }, { isSupported: () => true }),
+    });
+    let settled = false;
+    const pending = bridge.show({ adGroupId: "strict", adFormat: "interstitial",
+      interstitialCompletionPolicy: "dismissed", interstitialCompletionFallbackMs: 1,
+    }).then(result => { settled = true; return result; });
+    for (const type of middle) emit({ type });
+    await Bun.sleep(35);
+    expect(settled).toBe(false);
+    expect(cleanup).toBe(0);
+    emit({ type: "dismissed" });
+    expect(await pending).toMatchObject({ completed: true, events: ["show", ...middle, "dismissed"] });
+    emit({ type: "dismissed" });
+    expect(cleanup).toBe(1);
+  });
+}
+
+test("strict interstitial does not infer missing show or impression from time or dismissal", async () => {
+  for (const types of [["impression", "dismissed"], ["show", "dismissed"]] as const) {
+    const bridge = createAppsInTossFullScreenAdBridge({
+      showFullScreenAd: Object.assign(({ onEvent }) => {
+        for (const type of types) onEvent({ type });
+        return () => {};
+      }, { isSupported: () => true }),
+    });
+    expect(await bridge.show({ adGroupId: "strict", adFormat: "interstitial",
+      interstitialCompletionPolicy: "dismissed", interstitialCompletionFallbackMs: 0,
+    })).toMatchObject({ completed: false, events: [...types] });
+  }
+});
+
+test("strict interstitial with missing dismissal recovers by error and permits a retry", async () => {
+  let cleanup = 0;
+  const bridge = createAppsInTossFullScreenAdBridge({
+    showCompletionTimeoutMs: 15,
+    showFullScreenAd: Object.assign(({ onEvent }) => {
+      onEvent({ type: "show" }); onEvent({ type: "impression" });
+      return () => { cleanup++; };
+    }, { isSupported: () => true }),
+  });
+  for (let i = 0; i < 2; i++) {
+    await expect(bridge.show({ adGroupId: "strict", adFormat: "interstitial",
+      interstitialCompletionPolicy: "dismissed", interstitialCompletionFallbackMs: 1,
+    })).rejects.toMatchObject({ code: "AD_SHOW_TIMEOUT" });
+  }
+  expect(cleanup).toBe(2);
+});
