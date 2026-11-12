@@ -18,8 +18,8 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.35.9`
 - Last verified TrailBase release date: `2026-11-03`
-- Upstream latest TrailBase server: `0.35.9`
-- Upstream latest TrailBase release date: `2026-11-03`
+- Upstream latest TrailBase server: `0.35.12`
+- Upstream latest TrailBase release date: `2026-11-10`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -49,7 +49,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.9`
+- `trailbase-server-github-release`: `0.35.12`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -212,3 +212,5 @@ loopback host port에서 일회용 컨테이너를 실행합니다. 기능성 �
 `0.35.6`은 SSE 버퍼링 방지 헤더를 추가하고 SQLite WAL 및 종료 처리를 개선합니다. `0.35.7`은 SSE 스트림 다중화를 위한 HTTP/2 협상을 활성화하고 WASM SQLite 확장 런타임을 HTTP handler와 분리하며 종료 순서를 개선합니다.
 
 `0.35.8`은 주로 Wasmtime 보안 권고에 대응하며, 다중 DB SQLite 연결을 in-memory `main`으로 열고 기본값이 아닌 `main` DB에도 base·user migration을 적용합니다. `0.35.9`는 로그인하지 않은 `/api/auth/v1/logout` 요청에 401을 반환하고 JSON 요청을 리다이렉트하지 않으며, 보안 권고에 대응해 의존성을 갱신합니다. 두 버전 모두 `0.35.9` 검증 기준에 포함됩니다.
+
+`0.35.10`은 읽기 전용 파일의 내부 id를 list API로 알아낸 뒤 그 파일을 삭제할 수 있던 문제를 고치고, 공백을 무시하도록 UUID 파싱을 더 일관되게 바꿉니다. `0.35.11`은 롤백된 트랜잭션의 변경 이벤트를 더 이상 보내지 않습니다. `0.35.12`는 hook/subscription 수명 주기를 단순화하고, 레코드 단위 subscription과 레코드 삭제가 경쟁해 subscription이 고아로 남을 수 있던 문제를 고칩니다. 세 릴리스 노트 모두 Rust MSRV/MVRV, toolchain, WASM component interface 변경은 언급하지 않습니다. 아직 `0.35.9` 검증 기준에는 포함되지 않습니다. 레코드 컬럼에 파일을 저장하는 컨슈머는 자체 smoke test를 거친 뒤 `0.35.10` 수정을 반영할 계획을 세우세요.
