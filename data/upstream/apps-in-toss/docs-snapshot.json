@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-11-09T07:54:42.977Z",
+  "fetchedAt": "2026-11-11T07:43:19.933Z",
   "documents": [
     {
       "key": "release-notes",
@@ -12,8 +12,8 @@
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "88b9adb62fbe3ad62ce756fc90f9fb36c3c8f1eb1a09266e4318626fbbbee8a0",
-      "bytes": 34959
+      "sha256": "aef4562d2f6813a482b7bacd80e52da69db461ca23bf3e4e8c04eef31b87eb16",
+      "bytes": 34360
     },
     {
       "key": "react-native-tutorial",
@@ -54,8 +54,8 @@
       "key": "integration-getting-started",
       "title": "Apps in Toss integration getting started",
       "url": "https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md",
-      "sha256": "821933a67c970889dc2308beef2592a8432a42d25b3004dd3c5c04b9b22fb4d8",
-      "bytes": 9213
+      "sha256": "1985166121f33c47ca027563948298accef16ad71d3f7d284842b58047c7bf88",
+      "bytes": 9261
     },
     {
       "key": "server-api-integration",

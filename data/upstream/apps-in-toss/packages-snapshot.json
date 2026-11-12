@@ -1,9 +1,9 @@
 {
-  "fetchedAt": "2026-11-09T07:54:36.283Z",
+  "fetchedAt": "2026-11-11T07:43:13.711Z",
   "packages": [
     {
       "packageName": "@ait-kit/sdk",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@ait-kit%2Fsdk/latest"
