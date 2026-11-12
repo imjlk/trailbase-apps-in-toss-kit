@@ -45,7 +45,7 @@ SDK, Granite runtime, TDS package를 vendoring하지 않습니다. 해당 depend
   identity seed가 아닙니다.
 - 비게임 mini-app은 TDS를 반드시 사용해야 합니다. 게임에서는 TDS가 선택 사항입니다.
 - 신규 React Native mini-app은 Granite 용어와 framework 1.0 이상을 기준으로 합니다.
-- Apps in Toss SDK 3.x는 현재 `@apps-in-toss/web-framework@3.9.0`를 사용하는 WebView
+- Apps in Toss SDK 3.x는 현재 `@apps-in-toss/web-framework@3.10.0`을 사용하는 WebView
   프로젝트 대상입니다. 이 저장소가 참조하는 React Native
   `@apps-in-toss/framework`의 업데이트 대상과 섞지 않습니다.
 - Framework 1.0 이상에서는 `@toss/tds-react-native`를 사용합니다. Legacy framework에서는
@@ -100,13 +100,24 @@ root `package.json`과 영문/국문 reference의 일치를 검사합니다. 새
 
 ## 최근 검토한 SDK 변경
 
-2026-10-29 기준 RN `2.10.13`, WebView `3.9.0`, Granite reference 패키지
-`1.0.45`를 검토했습니다. 루트 개발 의존성과 lockfile을 갱신하며 RN 최소
-`2.10.10`과 WebView peer 하한 `3.4.0`은 유지합니다. WebView 3.9.0은 완료·환불
-주문 페이지 조회를 수정하고 상품 지급 콜백의 예외·Promise 거부를 지급 실패로 처리해
-`onError`에 한 번만 전달합니다. 3.6+ 익명 인증 코드 API는 선택적이며 runtime 지원이
-필요합니다. 컨슈머는 도입 전에 페이지 조회, 구매 복원, 지급 실패, 익명 bootstrap을
-실기기에서 검증해야 합니다.
+2026-11-12 기준 WebView `3.10.0`을 검토했습니다. RN `2.10.13`과 Granite reference
+패키지 `1.0.45`는 여전히 최신 배포 버전이며 2026-10-29 검토 이후 바뀌지 않았습니다.
+루트 개발 의존성과 lockfile을 검토한 SDK로 맞추며 RN 최소 `2.10.10`과 WebView peer
+하한 `3.4.0`은 유지합니다.
+
+WebView 3.10.0은 `granite.config`의 `brand` 설정을 생략할 수 있게 하고 deprecated로
+표시합니다. 기존 `primaryColor`는 그대로 보존하며, 설정을 생략하면 구버전 Host 호환을
+위해 빌드 메타데이터에 기본 토스 블루(`#3182F6`)를 채웁니다.
+`NavigationBar.addAccessoryButton`, `removeAccessoryButton`,
+`subscribeAccessoryButton`을 추가하고 `tdsEvent`, `partner` 액세서리 버튼 객체,
+`navigationBar.initialAccessoryButton`의 `id`·`title` 필드를 deprecated로 표시합니다.
+`title` 대신 `accessibilityLabel`을 사용합니다. deprecated 호출은 계속 동작합니다.
+kit adapter는 이 API를 쓰지 않으므로 adapter 변경은 필요 없습니다.
+
+WebView 3.9.0은 완료·환불 주문 페이지 조회를 수정하고 상품 지급 콜백의 예외·Promise
+거부를 지급 실패로 처리해 `onError`에 한 번만 전달합니다. 3.6+ 익명 인증 코드 API는
+선택적이며 runtime 지원이 필요합니다. 컨슈머는 도입 전에 페이지 조회, 구매 복원, 지급
+실패, 익명 bootstrap, 내비게이션 바 액세서리 버튼을 실기기에서 검증해야 합니다.
 
 저장소 reference는 `@apps-in-toss/framework` `2.10.13`까지 검토했습니다.
 
