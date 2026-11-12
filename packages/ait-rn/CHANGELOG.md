@@ -1,5 +1,12 @@
 # @trailbase-apps-in-toss-kit/ait-rn
 
+## 0.10.4 — 2026-11-12
+
+### Patch changes
+
+- [6eeaf07](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6eeaf07be866588c4c200c3cfa360d52e0ce0d50) Add an opt-in interstitial completion policy that retains SDK callbacks until dismissal for server-verified ad receipts. — Thanks @imjlk!
+- Updated dependencies: ait-core (npm)@0.3.3
+
 ## 0.10.3 — 2026-11-10
 
 ### Patch changes
