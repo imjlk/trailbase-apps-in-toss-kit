@@ -311,6 +311,13 @@ reward uses its completion fallback instead of the inactivity deadline. Rewarded
 ads still require `userEarnedReward`; elapsed time never earns a reward. Apps
 should not add a short wall-clock viewing deadline around this flow.
 
+For servers that verify `show`, `impression`, and `dismissed`, set
+`interstitialCompletionPolicy: "dismissed"` on `show` or `preloadAndShow`.
+This opt-in keeps listening after clicks and ignores the impression-duration
+fallback. It reports completion only after all three SDK events; a missing
+close callback uses the inactivity recovery above. It never invents events.
+The default `"compatible"` policy and rewarded-ad behavior remain unchanged.
+
 To let users skip an ad with an app-owned ticket instead, keep the choice explicit
 and never call the ad SDK for a ticket. See [ad skip tickets](ad-skip-tickets.md)
 for `ait-rn/ad-skip` and the server redemption contract.
