@@ -1,5 +1,13 @@
 # @trailbase-apps-in-toss-kit/ait-core
 
+## 0.3.2 — 2026-11-10
+
+### Patch changes
+
+- [91e1902](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/91e190221dc297c205d1f6722c7a3861fe5851d3) Keep promotion response normalization compatible with source consumers that enable
+  `noUncheckedIndexedAccess`. Explicitly narrow the selected non-success status
+  without changing provider outcomes or weakening conflicting-response validation. — Thanks @imjlk!
+
 ## 0.3.1 — 2026-11-10
 
 ### Patch changes
