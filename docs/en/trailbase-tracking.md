@@ -19,8 +19,8 @@ These values are policy values for this kit.
 - Kit minimum supported TrailBase server: `TBD`
 - Last verified TrailBase server: `0.35.9`
 - Last verified TrailBase release date: `2026-11-03`
-- Upstream latest TrailBase server: `0.35.9`
-- Upstream latest TrailBase release date: `2026-11-03`
+- Upstream latest TrailBase server: `0.35.12`
+- Upstream latest TrailBase release date: `2026-11-10`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -54,7 +54,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.9`
+- `trailbase-server-github-release`: `0.35.12`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -235,3 +235,5 @@ consumer's full application migrations.
 `0.35.6` adds an SSE anti-buffering header and improves SQLite WAL and shutdown handling. `0.35.7` enables HTTP/2 negotiation for multiplexed SSE streams, separates the WASM SQLite extension runtime from HTTP handlers, and refines shutdown order.
 
 `0.35.8` mostly addresses Wasmtime security advisories, opens multi-database SQLite connections with an in-memory `main`, and applies base and user migrations on non-default `main` databases. `0.35.9` returns 401 from `/api/auth/v1/logout` when not signed in, stops redirecting JSON requests there, and updates dependencies for security advisories. Both are covered by the `0.35.9` verified baseline.
+
+`0.35.10` fixes an issue where the internal ids of read-only files could be discovered through the list API and the files then deleted, and parses UUIDs more consistently by ignoring whitespace. `0.35.11` stops sending change events for rolled-back transactions. `0.35.12` simplifies the hook/subscription lifecycle and fixes a race between record-level subscriptions and record deletion that could leave an orphaned subscription. None of the three release notes mention Rust MSRV/MVRV, toolchain, or WASM component interface changes. They are not covered by the `0.35.9` verified baseline yet. Consumers that store files in record columns should plan to pick up the `0.35.10` fix after their own smoke tests.
