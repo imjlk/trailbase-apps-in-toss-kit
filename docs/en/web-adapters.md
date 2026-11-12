@@ -17,7 +17,7 @@ See the [official user-information guide](https://developers-apps-in-toss.toss.i
 
 `@trailbase-apps-in-toss-kit/ait-web` is a source-consumed WebView adapter for
 `@apps-in-toss/web-framework >=3.4.0 <4`. The consumer owns that SDK dependency.
-The kit installs 3.9.0 only for development type/bundle verification. Existing RN
+The kit installs 3.10.0 only for development type/bundle verification. Existing RN
 consumers can keep using `ait-rn` and `@apps-in-toss/framework` 2.x, but `ait-rn` is
 in maintenance mode; see [RN to WebView migration](webview-migration.md).
 
@@ -65,7 +65,7 @@ For example (keep the consumer's other dependencies and workspace entries):
     "vendor/trailbase-apps-in-toss-kit/packages/trailbase-client"
   ],
   "dependencies": {
-    "@apps-in-toss/web-framework": "3.9.0",
+    "@apps-in-toss/web-framework": "3.10.0",
     "@trailbase-apps-in-toss-kit/ait-web": "workspace:*",
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
   }

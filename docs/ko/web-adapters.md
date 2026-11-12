@@ -17,7 +17,7 @@
 
 `@trailbase-apps-in-toss-kit/ait-web`은 `@apps-in-toss/web-framework >=3.4.0 <4`용
 소스 소비형 WebView 어댑터입니다. SDK 의존성은 소비 앱이 소유하고 kit은 개발용 타입·번들
-검증에만 3.9.0을 설치합니다. 기존 RN 소비 앱은 `ait-rn`과
+검증에만 3.10.0을 설치합니다. 기존 RN 소비 앱은 `ait-rn`과
 `@apps-in-toss/framework` 2.x를 계속 쓸 수 있지만 `ait-rn`은 유지보수 모드입니다.
 [RN에서 WebView로 마이그레이션](webview-migration.md)을 참고하세요.
 
@@ -64,7 +64,7 @@ Bun으로 소스 패키지를 소비할 때는 사용할 패키지를 소비 앱
     "vendor/trailbase-apps-in-toss-kit/packages/trailbase-client"
   ],
   "dependencies": {
-    "@apps-in-toss/web-framework": "3.9.0",
+    "@apps-in-toss/web-framework": "3.10.0",
     "@trailbase-apps-in-toss-kit/ait-web": "workspace:*",
     "@trailbase-apps-in-toss-kit/trailbase-client": "workspace:*"
   }

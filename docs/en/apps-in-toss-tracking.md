@@ -48,7 +48,7 @@ only after app-level smoke tests.
 - New React Native mini-apps should use Granite terminology and framework 1.0 or
   newer.
 - Apps in Toss SDK 3.x currently applies to WebView projects through
-  `@apps-in-toss/web-framework@3.9.0`; it is not an upgrade target for this
+  `@apps-in-toss/web-framework@3.10.0`; it is not an upgrade target for this
   repository's React Native `@apps-in-toss/framework` reference.
 - Framework 1.0 and newer should use `@toss/tds-react-native`; legacy framework
   versions used `@toss-design-system/react-native`.
@@ -107,14 +107,28 @@ not automatically raise the reviewed version or fail a detection-only PR.
 
 ## Latest Reviewed SDK Delta
 
-Reviewed on 2026-10-29: RN `2.10.13`, WebView `3.9.0`, and Granite reference
-packages `1.0.45`. Root development dependencies and the lockfile use the
-reviewed SDKs; RN minimum `2.10.10` and WebView peer floor `3.4.0` are unchanged.
-WebView 3.9.0 fixes completed/refunded order pagination and reports rejected
+Reviewed on 2026-11-12: WebView `3.10.0`. RN `2.10.13` and Granite reference
+packages `1.0.45` are still the latest published versions and are unchanged
+since the 2026-10-29 review. Root development dependencies and the lockfile use
+the reviewed SDKs; RN minimum `2.10.10` and WebView peer floor `3.4.0` are
+unchanged.
+
+WebView 3.10.0 makes the `granite.config` `brand` setting optional and
+deprecated. Existing `primaryColor` values are kept; when the setting is
+omitted, the build metadata falls back to Toss blue (`#3182F6`) for older hosts.
+It adds `NavigationBar.addAccessoryButton`, `removeAccessoryButton`, and
+`subscribeAccessoryButton`, and deprecates `tdsEvent`, the `partner`
+accessory-button object, and the `id`/`title` fields of
+`navigationBar.initialAccessoryButton` in favor of `accessibilityLabel`.
+Deprecated calls keep working. The kit adapters use none of these APIs, so no
+adapter change is needed.
+
+WebView 3.9.0 fixed completed/refunded order pagination and reports rejected
 product-grant callbacks as failures with a single `onError` notification.
 The 3.6+ anonymous auth-code API remains opt-in and needs runtime support.
-Consumer apps must test pagination, purchase restoration, grant failures, and
-anonymous bootstrap on devices before adopting these versions.
+Consumer apps must test pagination, purchase restoration, grant failures,
+anonymous bootstrap, and any navigation-bar accessory buttons on devices before
+adopting these versions.
 
 The repository reference has been reviewed through `@apps-in-toss/framework`
 `2.10.13`.
