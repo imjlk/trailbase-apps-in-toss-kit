@@ -144,12 +144,22 @@ it into SQL. Then guard fallback DDL with `PRAGMA analytics.user_version`: only 
 mixing that fallback with legacy `analytics.analytics_events` in the same database can collide, so use
 it only for new or reset analytics databases.
 
-When upgrading to TrailBase `0.34.0` or later, WASM `ATTACH DATABASE` relative
-paths resolve under `<depot>/data`, rather than the process working directory;
-parent-directory paths are disallowed. Update the bound fallback path or move
-the existing database before upgrading, and verify the expected database is
-attached so the initializer does not silently create a different one. The kit's
-last-verified server is `0.35.9`; its smokes do not attach a database from WASM.
+TrailBase `0.34.0` and later resolve relative `ATTACH DATABASE` paths under
+`<depot>/data` in the asynchronous WASM SQL host and disallow parent-directory
+paths there. This rule does not apply to `Transaction::execute`: in `0.35.12`,
+transaction statements run directly through SQLite and relative paths still use
+the server process working directory. A transaction fallback should bind an
+explicit path to its existing database, such as `<depot>/data/analytics.db` with
+`<depot>` replaced by the deployment's absolute depot path. Do not pass that
+absolute path to the asynchronous host, which validates paths differently.
+
+Before upgrading, identify which SQL API executes the attachment and verify that
+a write before and after upgrade reaches the same file. Do not move the database
+or switch to a bare filename based only on the server version. The kit's
+last-verified server remains `0.35.9`; its smokes do not attach a database from
+WASM. The API distinction above follows the upstream `0.35.12`
+[asynchronous host](https://github.com/trailbaseio/trailbase/blob/v0.35.12/crates/wasm-runtime-host/src/sqlite_host.rs)
+and [transaction implementation](https://github.com/trailbaseio/trailbase/blob/v0.35.12/crates/wasm-runtime-host/src/host.rs).
 
 To verify the template against the currently verified TrailBase image:
 

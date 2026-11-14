@@ -156,12 +156,13 @@ Kit의 새 스키마용 helper는 검증된 service email을 직접 저장하므
 principal은 정리 대상이 아닙니다. 아직 `0.33.14`를 쓰는 컨슈머는 새 조합으로 옮기고,
 배포 전 인증 데이터·세션 동작과 앱 자체 smoke test를 확인하세요.
 
-TrailBase `0.34.0`부터 WASM `ATTACH DATABASE`의 상대 경로 기준은 프로세스 작업
-디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조는 허용하지 않습니다.
-보조 DB를 사용하는 컨슈머는 업그레이드 전에 bind할 경로를 수정하거나 DB 파일을 옮긴 뒤
-의도한 기존 DB가 연결되는지 확인하세요. [analytics fallback initializer](analytics.md)에도
-해당합니다. Kit smoke는 WASM에서 DB를 연결하지 않으므로, fallback 경로를 bind하는
-컨슈머는 의도한 파일에 행이 기록되는지 직접 확인해야 합니다.
+TrailBase `0.34.0`부터 비동기 WASM SQL host의 `ATTACH DATABASE` 상대 경로 기준은
+프로세스 작업 디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조를 허용하지 않습니다.
+`Transaction::execute`는 `0.35.12`에서도 SQLite를 직접 사용하므로 상대 경로의 기준이
+프로세스 작업 디렉터리입니다. fallback에 bind할 경로를 바꾸기 전에 SQL API를 확인하세요.
+API 차이와 upstream 소스는 [analytics fallback initializer](analytics.md)에 설명합니다.
+Kit smoke는 WASM에서 DB를 연결하지 않으므로 컨슈머는 업그레이드 전후 쓰기가 같은 기존
+파일에 도달하는지 확인해야 합니다.
 
 중간 버전의 다른 변경도 확인하세요. `0.33.15`는 WASM에서 연결할 수 있는 DB를
 제한하고 guest `execute_batch`를 추가합니다. `0.33.18`은 batch·transaction 오류의
