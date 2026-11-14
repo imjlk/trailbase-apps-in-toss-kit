@@ -173,13 +173,15 @@ directly, so anonymous service principals are not cleaned up. Consumers still on
 `0.33.14` should move to the new pair; review auth data and session behavior and
 run the application's own smoke tests before rollout.
 
-TrailBase `0.34.0` changes relative paths in WASM `ATTACH DATABASE` calls from
-the process working directory to `<depot>/data` and disallows parent-directory
-references. Before upgrading an auxiliary-database consumer, update its bound
-paths or move its database files, then verify it attaches the intended existing
-database. This also applies to the [analytics fallback initializer](analytics.md).
-The kit's smokes do not attach a database from WASM, so a consumer that binds a
-fallback path must still check that the expected file receives its rows.
+TrailBase `0.34.0` changes relative `ATTACH DATABASE` paths in the asynchronous
+WASM SQL host from the process working directory to `<depot>/data` and disallows
+parent-directory references. `Transaction::execute` still runs attachment through
+SQLite directly in `0.35.12`, using the process working directory for relative
+paths. Check the SQL API before changing a bound fallback path; see the
+[analytics fallback initializer](analytics.md) for the API distinction and
+upstream source references. The kit's smokes do not attach a database from WASM,
+so consumers must verify that writes before and after upgrade reach the same
+existing file.
 
 Other intervening changes also need consumer attention: `0.33.15` constrains
 databases attachable by WASM and adds guest `execute_batch`; `0.33.18` corrects

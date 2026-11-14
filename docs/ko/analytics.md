@@ -149,11 +149,20 @@ parameter로 bind합니다. 이후 fallback DDL은 `PRAGMA analytics.user_versio
 `analytics.events` schema 기준입니다. 같은 analytics DB에 legacy `analytics.analytics_events`
 schema와 섞으면 충돌할 수 있으므로 새 analytics DB나 reset된 analytics DB에서만 사용하세요.
 
-TrailBase `0.34.0` 이상으로 업그레이드하면 WASM `ATTACH DATABASE`의 상대 경로는
-프로세스 작업 디렉터리가 아니라 `<depot>/data` 기준이며 상위 디렉터리 경로는 허용하지
-않습니다. 업그레이드 전에 fallback에 bind하는 경로를 수정하거나 기존 DB를 옮기고,
-initializer가 다른 DB를 새로 만들지 않도록 의도한 DB가 연결되는지 확인하세요.
-Kit의 마지막 검증 서버는 `0.35.9`이며, kit smoke는 WASM에서 DB를 연결하지 않습니다.
+TrailBase `0.34.0` 이상의 비동기 WASM SQL host는 `ATTACH DATABASE`의 상대 경로를
+`<depot>/data` 기준으로 해석하며 상위 디렉터리 경로를 허용하지 않습니다. 이 규칙은
+`Transaction::execute`에는 적용되지 않습니다. `0.35.12`의 transaction 문장은 SQLite에서
+직접 실행되므로 상대 경로가 여전히 서버 프로세스의 작업 디렉터리를 기준으로 합니다.
+transaction fallback에서는 `<depot>`을 배포 환경의 절대 depot 경로로 바꾼
+`<depot>/data/analytics.db`처럼 기존 DB의 명시적인 경로를 bind하세요. 경로를 다르게
+검증하는 비동기 host에 이 절대 경로를 그대로 전달하지 마세요.
+
+업그레이드 전에 연결을 실행하는 SQL API를 확인하고, 업그레이드 전후 쓰기가 같은 파일에
+도달하는지 검사하세요. 서버 버전만 보고 DB를 옮기거나 파일명만으로 바꾸지 마세요.
+Kit의 마지막 검증 서버는 여전히 `0.35.9`이며, kit smoke는 WASM에서 DB를 연결하지
+않습니다. 위 API 차이는 upstream `0.35.12`의
+[비동기 host](https://github.com/trailbaseio/trailbase/blob/v0.35.12/crates/wasm-runtime-host/src/sqlite_host.rs)와
+[transaction 구현](https://github.com/trailbaseio/trailbase/blob/v0.35.12/crates/wasm-runtime-host/src/host.rs)을 기준으로 합니다.
 
 현재 검증된 TrailBase image로 템플릿을 확인하려면 다음 smoke를 실행합니다.
 
