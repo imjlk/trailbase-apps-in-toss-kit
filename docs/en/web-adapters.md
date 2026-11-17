@@ -387,7 +387,7 @@ const back = createAppsInTossBackNavigation({
   currentPath: () => router.state.location.pathname,
   canGoBack: () => router.history.canGoBack(),
   goBack: () => router.history.back(),
-  goToRoot: () => void router.navigate({ to: "/", replace: true }),
+  goToRoot: () => router.navigate({ to: "/", replace: true }),
 });
 
 const stop = await back.start(); // once, at app start
@@ -403,7 +403,13 @@ router.subscribe("onResolved", () => void back.syncSwipeBack());
 - Subscribe once. Re-subscribing on every route change leaves moments without a
   listener, where the SDK default handles the press instead.
 - If the router or `dismissOverlay` throws, the press closes the app rather than
-  doing nothing.
+  doing nothing. Return the router's promise from `goBack` and `goToRoot` (do not
+  discard it with `void`): a navigation that rejects later closes the app too.
+- `dismissTopDialog` treats the dialog that holds focus as the one on top, then
+  falls back to document order. The browser does not expose the real stacking
+  order, so pass your own `dismissOverlay` if dialogs can stack differently.
+- The function `start()` resolves to is safe to call more than once and never
+  removes a subscription that was started after it.
 - `press(exit)` runs the same decision without the SDK, for tests and for local
   preview tools that have no Toss shell.
 

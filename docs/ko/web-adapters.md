@@ -362,7 +362,7 @@ const back = createAppsInTossBackNavigation({
   currentPath: () => router.state.location.pathname,
   canGoBack: () => router.history.canGoBack(),
   goBack: () => router.history.back(),
-  goToRoot: () => void router.navigate({ to: "/", replace: true }),
+  goToRoot: () => router.navigate({ to: "/", replace: true }),
 });
 
 const stop = await back.start(); // 앱 시작 시 한 번
@@ -378,6 +378,13 @@ router.subscribe("onResolved", () => void back.syncSwipeBack());
 - 구독은 한 번만 하세요. 화면이 바뀔 때마다 다시 구독하면 처리기가 없는 순간이
   생기고, 그때는 SDK 기본 동작이 뒤로가기를 처리합니다.
 - 라우터나 `dismissOverlay`가 예외를 던지면 아무 일도 하지 않는 대신 앱을 닫습니다.
+  `goBack`과 `goToRoot`에서는 라우터의 promise를 그대로 반환하세요(`void`로 버리지
+  마세요). 나중에 실패한 이동도 앱을 닫는 것으로 끝납니다.
+- `dismissTopDialog`는 포커스를 가진 대화상자를 맨 위로 보고, 없으면 문서 순서로
+  판단합니다. 브라우저는 실제 쌓인 순서를 알려 주지 않으므로, 대화상자가 다른
+  순서로 쌓일 수 있다면 직접 `dismissOverlay`를 넘기세요.
+- `start()`가 돌려주는 함수는 여러 번 호출해도 안전하고, 그 뒤에 시작된 구독을
+  제거하지 않습니다.
 - `press(exit)`는 SDK 없이 같은 판단을 실행합니다. 테스트와, 토스 셸이 없는 로컬
   미리보기 도구에서 사용합니다.
 

@@ -142,6 +142,60 @@ describe("createAppsInTossBackNavigation", () => {
     state.listeners.forEach((listener) => listener());
     expect(state.closed).toBe(1);
   });
+  test("a stale cleanup never removes a subscription started after it", async () => {
+    const run = app("/");
+    const first = await run.navigation.start();
+    const sameAsFirst = await run.navigation.start();
+    first();
+    const second = await run.navigation.start();
+    // The other holder of the first cleanup calls it late, and again.
+    sameAsFirst();
+    first();
+    await run.navigation.start();
+    expect(run.state.subscriptions).toBe(2);
+    expect(run.state.listeners).toHaveLength(1);
+    run.back();
+    expect(run.state.closed).toBe(1);
+    second();
+    expect(run.state.listeners).toHaveLength(0);
+  });
+  test("a navigation that rejects later closes the app", async () => {
+    for (const path of ["/topics", "/topics/animals"]) {
+      const { sdk, state } = fakeSdk();
+      const navigation = createAppsInTossBackNavigation({
+        ...policy,
+        currentPath: () => path,
+        canGoBack: () => true,
+        goBack: () => Promise.reject(new Error("navigation failed")),
+        goToRoot: () => Promise.reject(new Error("navigation failed")),
+        dismissOverlay: () => false,
+        loadSdk: async () => sdk,
+      });
+      await navigation.start();
+      state.listeners.forEach((listener) => listener());
+      expect(state.closed).toBe(0);
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(state.closed).toBe(1);
+    }
+  });
+  test("a navigation that resolves does not close the app", async () => {
+    const { sdk, state } = fakeSdk();
+    const navigation = createAppsInTossBackNavigation({
+      ...policy,
+      currentPath: () => "/topics",
+      canGoBack: () => true,
+      goBack: () => {},
+      goToRoot: () => Promise.resolve(),
+      dismissOverlay: () => false,
+      loadSdk: async () => sdk,
+    });
+    await navigation.start();
+    state.listeners.forEach((listener) => listener());
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(state.closed).toBe(0);
+  });
   test("a failed SDK load rejects and can be retried", async () => {
     let fail = true;
     const { sdk, state } = fakeSdk();
@@ -168,6 +222,26 @@ describe("createAppsInTossBackNavigation", () => {
     await run.navigation.syncSwipeBack("/play");
     expect(run.state.swipe).toEqual([true, false, false, true]);
   });
+  test("an older swipe update never lands after a newer one", async () => {
+    const { sdk, state } = fakeSdk();
+    const loads: (() => void)[] = [];
+    const navigation = createAppsInTossBackNavigation({
+      ...policy,
+      currentPath: () => "/",
+      canGoBack: () => false,
+      goBack: () => {},
+      goToRoot: () => {},
+      loadSdk: () => new Promise((resolve) => loads.push(() => resolve(sdk))),
+    });
+    const older = navigation.syncSwipeBack("/");
+    const newer = navigation.syncSwipeBack("/topics/animals");
+    // The newer call's SDK load settles first, the older one afterwards.
+    loads[1]!();
+    await newer;
+    loads[0]!();
+    await older;
+    expect(state.swipe).toEqual([false]);
+  });
   test("an SDK without the swipe setting is fine", async () => {
     const { sdk } = fakeSdk();
     const navigation = createAppsInTossBackNavigation({
@@ -182,11 +256,12 @@ describe("createAppsInTossBackNavigation", () => {
 });
 
 describe("dismissTopDialog", () => {
-  function fakeDialog(options: { preventCancel?: boolean } = {}) {
+  function fakeDialog(options: { preventCancel?: boolean; holds?: unknown } = {}) {
     const dialog = {
       open: true,
       canceled: 0,
       closed: 0,
+      contains: (node: unknown) => node === options.holds,
       dispatchEvent(event: Event) {
         dialog.canceled += 1;
         if (options.preventCancel) event.preventDefault();
@@ -199,7 +274,8 @@ describe("dismissTopDialog", () => {
     };
     return dialog;
   }
-  const root = (dialogs: unknown[]) => ({ querySelectorAll: () => dialogs }) as unknown as ParentNode;
+  const root = (dialogs: unknown[], activeElement: unknown = null) =>
+    ({ querySelectorAll: () => dialogs, activeElement }) as unknown as ParentNode;
 
   test("returns false when nothing is open", () => {
     expect(dismissTopDialog(root([]))).toBe(false);
@@ -210,6 +286,15 @@ describe("dismissTopDialog", () => {
     expect(dismissTopDialog(root([below, top]))).toBe(true);
     expect([below.canceled, below.closed]).toEqual([0, 0]);
     expect([top.canceled, top.closed]).toEqual([1, 1]);
+  });
+  test("prefers the dialog that holds focus over document order", () => {
+    const focus = {};
+    // Opened later, so it is on top, although it comes first in the document.
+    const top = fakeDialog({ holds: focus });
+    const below = fakeDialog();
+    expect(dismissTopDialog(root([top, below], focus))).toBe(true);
+    expect(top.closed).toBe(1);
+    expect(below.closed).toBe(0);
   });
   test("leaves a dialog that refuses to close to its owner", () => {
     const dialog = fakeDialog({ preventCancel: true });
