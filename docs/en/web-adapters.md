@@ -246,6 +246,7 @@ These WebView subpaths are now available:
 | `ait-web/ad-skip` | Persistent request IDs, receipt reconciliation and once-only local effects |
 | `ait-web/storage` | JSON atoms, verbatim-key SDK Storage bridge and `createAppsInTossWebSessionStorage`, which clears stored sessions when the Toss account changed |
 | `ait-web/analytics` | TrailBase sink/router plus SDK 3 `Analytics.log` dispatch |
+| `ait-web/back-navigation` | One `backEvent` subscription and the policy for what a Back press does; see [Back navigation](#back-navigation) |
 | `ait-web/diagnostics` | Opt-in read-only runtime snapshot with the same schema as RN |
 | `ait-web/engagement` | Referrer normalization, visibility-based exposure and shared engagement helpers |
 | `ait-web/notifications` | Functional message backend client and agreement result normalization |
@@ -346,3 +347,72 @@ subscription immediately. Consumers can clear their pending UI while retaining
 the displayed product and price. Errors after a grant starts continue to use
 the recovery path. The callback timeout remains a fallback for missing SDK
 callbacks and does not control when the native purchase page closes.
+
+## Back navigation
+
+A WebView app that does not listen to `backEvent` gets the SDK's default: Back
+walks the WebView history and closes the app when there is none. Keep that
+default when it already does what the launch checklist asks. Navigation history
+still belongs to the app, as described for
+[React Native](client-adapters.md#react-native-screen-history-and-back-navigation):
+an interceptor is not a substitute for a missing history entry.
+
+The default cannot express three things, and each one is a common review
+finding:
+
+- **Something is open on top of the screen.** A sheet or dialog is not a
+  history entry. Android's system Back may close a `<dialog>` through the
+  browser, but the navigation-bar back button does not, so it appears dead.
+- **The first screen must close the app.** With a tab bar, every tab visit adds
+  a history entry, so Back on the first screen replays tabs instead of closing.
+- **A listener that returns without acting.** Once the app listens, Toss stops
+  handling the press itself. A handler with an early return leaves no outcome.
+
+`createAppsInTossBackNavigation` covers these with one subscription for the
+life of the app. Every press ends in exactly one step:
+
+| Step | When | Effect |
+| --- | --- | --- |
+| `overlay` | `dismissOverlay()` closed something | Nothing else moves |
+| `exit` | The path is a `rootPaths` entry, or an inner screen with no earlier screen (opened from a deep link) | `closeView()` |
+| `root` | The path is a `siblingPaths` entry | `goToRoot()` |
+| `back` | Any other screen with an earlier screen | `goBack()` |
+
+```ts
+import { createAppsInTossBackNavigation } from "@trailbase-apps-in-toss-kit/ait-web/back-navigation";
+
+const back = createAppsInTossBackNavigation({
+  rootPaths: ["/"],
+  siblingPaths: ["/topics", "/ranking", "/activity"],
+  currentPath: () => router.state.location.pathname,
+  canGoBack: () => router.history.canGoBack(),
+  goBack: () => router.history.back(),
+  goToRoot: () => void router.navigate({ to: "/", replace: true }),
+});
+
+const stop = await back.start(); // once, at app start
+router.subscribe("onResolved", () => void back.syncSwipeBack());
+```
+
+- `dismissOverlay` defaults to `dismissTopDialog`, which sends the top open
+  `<dialog>` a `cancel` event (as Escape does) and closes it if its owner did
+  not. Pass your own function when sheets are not `<dialog>` elements; return
+  `true` only when something actually closed.
+- `syncSwipeBack` turns the iOS edge swipe, which closes the app, on for
+  `rootPaths` only. It does nothing on SDK versions without the setting.
+- Subscribe once. Re-subscribing on every route change leaves moments without a
+  listener, where the SDK default handles the press instead.
+- If the router or `dismissOverlay` throws, the press closes the app rather than
+  doing nothing.
+- `press(exit)` runs the same decision without the SDK, for tests and for local
+  preview tools that have no Toss shell.
+
+Do not show a back control of your own on screens where the navigation bar
+shows its back button; the launch checklist rejects both being visible at once.
+The policy and its types (`resolveBackStep`, `BackStep`) are platform-neutral
+and live in `ait-core/back-navigation`.
+
+Before resubmitting, reproduce on the submitted bundle: the navigation-bar back
+button, Android system Back and the iOS edge swipe, each on the first screen,
+on a tab, on an inner screen, with a sheet open, and after opening the app from
+a deep link. A passing unit test of the policy does not establish that.

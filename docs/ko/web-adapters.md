@@ -233,6 +233,7 @@ JSON atom, 분석 라우터·큐, 참여도 헬퍼를 담습니다. 소비 앱�
 | `ait-web/ad-skip` | 요청 ID 저장, 영수증 재조회, 로컬 효과 1회 적용 |
 | `ait-web/storage` | JSON atom, 키를 그대로 쓰는 SDK Storage 브리지, 토스 계정이 바뀌면 저장된 세션을 지우는 `createAppsInTossWebSessionStorage` |
 | `ait-web/analytics` | TrailBase 수집·라우터와 SDK 3 `Analytics.log` 연결 |
+| `ait-web/back-navigation` | `backEvent` 단일 구독과 뒤로가기 한 번의 동작을 정하는 정책. [뒤로가기](#뒤로가기) 참고 |
 | `ait-web/diagnostics` | RN과 같은 스키마의 명시적 opt-in 읽기 전용 runtime 스냅샷 |
 | `ait-web/engagement` | 유입 경로 정규화, 실제 가시성 기반 노출 및 참여도 헬퍼 |
 | `ait-web/notifications` | 기능성 메시지 백엔드 클라이언트와 동의 결과 정규화 |
@@ -323,3 +324,69 @@ kit 검증은 splitting 유무별로 축소한 브라우저 번들을 실행합�
 해제할 수 있습니다. 지급이 시작된 이후 오류는 구매 복구 경로로 처리합니다.
 콜백 타임아웃은 SDK 콜백 누락에 대한 제한이며 네이티브 결제 화면이 닫히는
 시점을 제어하지 않습니다.
+
+## 뒤로가기
+
+`backEvent`를 구독하지 않는 WebView 앱은 SDK 기본 동작을 따릅니다. 뒤로가기는
+WebView 이력을 거슬러 올라가고, 이력이 없으면 앱을 닫습니다. 이 기본 동작이 출시
+체크리스트를 이미 만족한다면 그대로 두세요. 화면 이력은 여전히 앱의 책임이며,
+[React Native](client-adapters.md#react-native-화면-이력과-뒤로가기)에서 설명한 것처럼
+가로채기는 빠진 이력을 대신하지 못합니다.
+
+기본 동작으로 표현할 수 없는 경우가 세 가지 있고, 모두 검수에서 자주 지적됩니다.
+
+- **화면 위에 무언가 열려 있는 경우.** 시트와 대화상자는 이력 항목이 아닙니다.
+  안드로이드 시스템 뒤로가기는 브라우저가 `<dialog>`를 닫아 줄 수 있지만 내비게이션
+  바의 뒤로가기 버튼은 그렇지 않아서 버튼이 동작하지 않는 것처럼 보입니다.
+- **첫 화면에서는 앱이 닫혀야 하는 경우.** 탭 바가 있으면 탭을 누를 때마다 이력이
+  쌓여서, 첫 화면에서 뒤로가기를 눌러도 앱이 닫히지 않고 탭을 되짚습니다.
+- **아무 동작 없이 끝나는 처리기.** 앱이 구독하는 순간 토스는 뒤로가기를 직접
+  처리하지 않습니다. 중간에 그냥 반환하는 처리기는 아무 결과도 남기지 않습니다.
+
+`createAppsInTossBackNavigation`은 앱 수명 동안 한 번의 구독으로 이 경우들을
+처리합니다. 뒤로가기 한 번은 반드시 아래 단계 중 하나로 끝납니다.
+
+| 단계 | 조건 | 결과 |
+| --- | --- | --- |
+| `overlay` | `dismissOverlay()`가 무언가를 닫음 | 다른 것은 움직이지 않음 |
+| `exit` | 경로가 `rootPaths`에 있거나, 이전 화면이 없는 내부 화면(딥링크로 진입) | `closeView()` |
+| `root` | 경로가 `siblingPaths`에 있음 | `goToRoot()` |
+| `back` | 이전 화면이 있는 그 밖의 화면 | `goBack()` |
+
+```ts
+import { createAppsInTossBackNavigation } from "@trailbase-apps-in-toss-kit/ait-web/back-navigation";
+
+const back = createAppsInTossBackNavigation({
+  rootPaths: ["/"],
+  siblingPaths: ["/topics", "/ranking", "/activity"],
+  currentPath: () => router.state.location.pathname,
+  canGoBack: () => router.history.canGoBack(),
+  goBack: () => router.history.back(),
+  goToRoot: () => void router.navigate({ to: "/", replace: true }),
+});
+
+const stop = await back.start(); // 앱 시작 시 한 번
+router.subscribe("onResolved", () => void back.syncSwipeBack());
+```
+
+- `dismissOverlay`의 기본값은 `dismissTopDialog`입니다. 맨 위에 열린 `<dialog>`에
+  Escape와 같은 `cancel` 이벤트를 보내고, 소유한 컴포넌트가 닫지 않았으면 직접
+  닫습니다. 시트가 `<dialog>`가 아니면 직접 함수를 넘기고, 실제로 무언가를 닫았을
+  때만 `true`를 반환하세요.
+- `syncSwipeBack`은 앱을 닫는 iOS 가장자리 스와이프를 `rootPaths`에서만 켭니다.
+  해당 설정이 없는 SDK 버전에서는 아무 일도 하지 않습니다.
+- 구독은 한 번만 하세요. 화면이 바뀔 때마다 다시 구독하면 처리기가 없는 순간이
+  생기고, 그때는 SDK 기본 동작이 뒤로가기를 처리합니다.
+- 라우터나 `dismissOverlay`가 예외를 던지면 아무 일도 하지 않는 대신 앱을 닫습니다.
+- `press(exit)`는 SDK 없이 같은 판단을 실행합니다. 테스트와, 토스 셸이 없는 로컬
+  미리보기 도구에서 사용합니다.
+
+내비게이션 바가 뒤로가기 버튼을 보여 주는 화면에는 자체 뒤로가기 컨트롤을 두지
+마세요. 출시 체크리스트는 둘이 동시에 보이는 것을 반려합니다. 정책과 타입
+(`resolveBackStep`, `BackStep`)은 플랫폼 중립이며 `ait-core/back-navigation`에
+있습니다.
+
+재제출 전에 제출한 번들에서 재현하세요. 내비게이션 바 뒤로가기 버튼, 안드로이드
+시스템 뒤로가기, iOS 가장자리 스와이프를 첫 화면, 탭, 내부 화면, 시트가 열린 상태,
+딥링크로 진입한 직후에 각각 확인합니다. 정책 단위 테스트가 통과했다는 사실만으로는
+이것이 확인되지 않습니다.

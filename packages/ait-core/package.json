@@ -8,6 +8,7 @@
     "./ads": "./src/ads.ts",
     "./ad-skip": "./src/ad-skip.ts",
     "./analytics": "./src/analytics.ts",
+    "./back-navigation": "./src/back-navigation.ts",
     "./engagement": "./src/engagement.ts",
     "./storage": "./src/storage.ts",
     "./internal/analytics-core": "./src/internal/analytics-core.ts",
