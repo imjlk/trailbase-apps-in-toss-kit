@@ -1,6 +1,6 @@
 {
   "name": "@trailbase-apps-in-toss-kit/ait-rn",
-  "version": "0.10.3",
+  "version": "0.10.4",
   "private": true,
   "type": "module",
   "description": "Maintenance-mode React Native Apps in Toss SDK bridge helpers for TrailBase consumer apps; new client work targets ait-web.",

@@ -1,5 +1,16 @@
 # @trailbase-apps-in-toss-kit/ait-web
 
+## 0.8.0 — 2026-11-17
+
+### Minor changes
+
+- [35358e4](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/35358e4e0eff669ca93fc73512a6fd67d13bbbb4) Add `ait-web/back-navigation`: one `backEvent` subscription for the life of a WebView app and a policy that ends every Back press in a visible step. An open sheet or dialog closes first, the first screen closes the app, a sibling tab leads to the first screen, an inner screen goes one screen back, and a screen opened from a deep link closes the app. The platform-neutral policy is `ait-core/back-navigation`. — Thanks @imjlk!
+
+### Patch changes
+
+- [6eeaf07](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6eeaf07be866588c4c200c3cfa360d52e0ce0d50) Add an opt-in interstitial completion policy that retains SDK callbacks until dismissal for server-verified ad receipts. — Thanks @imjlk!
+- Updated dependencies: ait-core (npm)@0.4.0
+
 ## 0.7.0 — 2026-11-10
 
 ### Minor changes
