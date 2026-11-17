@@ -10,6 +10,7 @@
     "./ads": "./src/ads.ts",
     "./ad-skip": "./src/ad-skip.ts",
     "./analytics": "./src/analytics.ts",
+    "./back-navigation": "./src/back-navigation.ts",
     "./diagnostics": "./src/diagnostics.ts",
     "./engagement": "./src/engagement.ts",
     "./storage": "./src/storage.ts",
