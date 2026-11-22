@@ -1,5 +1,20 @@
 # trailbase-toss-identity
 
+## 0.17.0 — 2026-11-22
+
+### Minor changes
+
+- [95abe60](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/95abe605896d32a1386201737d434cb204436e62) IAP order-status lookups now check who bought the order. The Apps in Toss API reports `purchaserMatched` for the user named in the lookup, and the proxy (via `@ait-kit/api-core` 0.8) returns it as `purchaserCheck.status`: `MATCHED`, `MISMATCHED` or `NOT_PROVIDED`. The identifier is sent only in the official `x-toss-user-key` / `x-anon-key` header and is never echoed back.
+  
+  - **Proxy:** A payable order whose purchaser check is `MISMATCHED` now fails with `UNVERIFIED_IAP_ORDER` ("Toss order was bought by a different user"). `NOT_PROVIDED` passes through unchanged. Health metadata advertises the new `iap.purchaser-check` capability. Requests without a purchaser behave as before.
+  - **Rust:** `IapOrderStatus` gains `purchaser_check` and `purchaser_confirmed()`, which is true only for `MATCHED`. `iap_order_status_for_purchaser` with `IapPurchaser::AnonKey` covers anonymous WebView users and rejects a blank identifier before the request. `iap_order_status` is unchanged. Code that builds `IapOrderStatus` with a struct literal must add the new field.
+  - **Rollout:** `NOT_PROVIDED`, a missing purchaser, or an older proxy (which omits the check) is not purchase evidence. To stop a caller from redeeming another user's paid `orderId`, user-bound grants must require `purchaser_confirmed()` (`MATCHED`) together with `grant_required`, and the lookup must name the authenticated user's own identifier from the backend identity store, never a client-supplied key. Update the proxy image before relying on `purchaser_check`. — Thanks @imjlk!
+
+### Patch changes
+
+- [00e963d](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/00e963d0ea8e05ee6b07315799bde3986af7d5d9) Upgrade the identity sealing stack to `aes-gcm` 0.11 and `base64` 0.23, aligning AES-GCM with the `hmac` 0.13 / `sha2` 0.11 RustCrypto generation and with the `base64` version TrailBase's own WASM crates already use. The sealed formats do not change: `toss_user_key_sealed` and anonymous-key `v1` values, and keyring `v2` envelopes written by earlier releases still open, and new seals keep the same wire format. Pinned test vectors produced by the previous release guard this. No migration, reseal, env or config change is needed. Consumer WASM guests need Rust 1.89 or newer for the new `aes` crate, which the kit's 1.93 minimum already covers. `aes-gcm` is built without its unused `getrandom` default, because nonces come from the TrailBase WASI random source. — Thanks @imjlk!
+- Updated dependencies: trailbase-guest-common (Cargo)@0.17.0
+
 ## 0.16.0 — 2026-11-05
 
 ### Patch changes

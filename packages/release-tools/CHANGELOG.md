@@ -1,5 +1,23 @@
 # @trailbase-apps-in-toss-kit/release-tools
 
+## 0.5.1 — 2026-11-22
+
+### Patch changes
+
+- [6897a01](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/6897a014b70a4d20a8fd2d8a97c8c97d6ce89963) `uploadVerifiedAit` accepts the test scheme that the WebView SDK 3 CLI (3.10)
+  prints: `intoss-private://<app>?_deploymentId=<id>&host=appsInTossHost`.
+  
+  It used to compare the CLI output with the scheme without `host`, so a tag
+  upload failed after the bundle was already in the console, and a re-run
+  uploaded a second bundle.
+  
+  The scheme is now parsed instead (`readUploadedScheme`):
+  - it must name the app and the uploaded deployment
+  - `host=appsInTossHost` is the only extra parameter allowed
+  - the CLI's own line is kept as `testScheme`
+  
+  `createDeviceTestScheme` keeps that marker as well. — Thanks @imjlk!
+
 ## 0.5.0 — 2026-11-22
 
 ### Minor changes
