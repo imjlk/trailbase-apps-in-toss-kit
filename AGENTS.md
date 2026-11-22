@@ -201,7 +201,11 @@ Optional request/response guards are `MTLS_PROXY_REQUEST_BODY_LIMIT_BYTES`,
 ## Versioning And Releases
 
 Sampo is used for Rust WASM crate versioning and changelogs. The local CLI
-version in use is `0.17.4`.
+version in use is `0.20.0`, matching the CLI that the release workflow's
+pinned `sampo-github-action` v0.18.0 installs. Stay on that line for now:
+Sampo 0.21+ (action 0.19+) refreshes `bun.lock` with
+`bun update --lockfile-only --no-save`, which Bun 1.4 does not write, so
+`sampo release` stops before it can prepare the release PR.
 
 Typical Rust helper change flow:
 

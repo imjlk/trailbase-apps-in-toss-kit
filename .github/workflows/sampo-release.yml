@@ -35,13 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           token: ${{ secrets.SAMPO_RELEASE_TOKEN || secrets.TRAILBASE_RELEASE_WATCH_TOKEN || github.token }}
 
       - name: Setup mise tools
-        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
         with:
           install: true
           cache: true
@@ -60,10 +60,14 @@ jobs:
             echo "No pending changesets; skipping Sampo release PR generation."
           fi
 
+      # Hold the action at v0.18.x (Sampo CLI 0.20.x). From v0.19.0 Sampo refreshes
+      # bun.lock with `bun update --lockfile-only --no-save` and fails the release when
+      # the lockfile stays stale; Bun 1.4 writes nothing for that command. The next step
+      # already synchronizes bun.lock with `bun install --lockfile-only`.
       - name: Run Sampo release automation
         if: steps.changesets.outputs.count != '0'
         id: sampo
-        uses: bruits/sampo/crates/sampo-github-action@cargo-sampo-github-action-v0.16.0
+        uses: bruits/sampo/crates/sampo-github-action@7b4698bc71db6c9f053c68ad6149101e970f304a # cargo-sampo-github-action-v0.18.0
         with:
           command: auto
           base-branch: main
