@@ -1,7 +1,7 @@
 //! Opt-in encryption-key rotation. HMAC lookup secrets are deliberately absent.
 //! No Debug/Serialize implementations: keys and plaintext stay server-private.
+use aes_gcm::Aes256Gcm;
 use aes_gcm::aead::{Aead, KeyInit, Payload};
-use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use std::collections::BTreeMap;
@@ -79,7 +79,7 @@ impl TossIdentityKeyRing {
             let aad = associated_data(id);
             let plaintext = cipher
                 .decrypt(
-                    Nonce::from_slice(&nonce),
+                    &nonce.into(),
                     Payload {
                         msg: &ciphertext,
                         aad: aad.as_bytes(),
@@ -123,7 +123,7 @@ impl TossIdentityKeyRing {
         let aad = associated_data(&self.active_id);
         let ciphertext = cipher
             .encrypt(
-                Nonce::from_slice(&nonce),
+                &nonce.into(),
                 Payload {
                     msg: value.as_bytes(),
                     aad: aad.as_bytes(),
@@ -206,6 +206,37 @@ mod tests {
                 hmac
             );
         }
+    }
+
+    /// Pinned `v2` envelope produced by the aes-gcm 0.10 / base64 0.22 code and
+    /// cross-checked against an independent AES-256-GCM implementation. The
+    /// key ID is authenticated as AAD, so this also pins the AAD layout.
+    #[test]
+    fn v2_envelope_wire_format_matches_pinned_vectors() {
+        use crate::tests::{VECTOR_KEY_B64, VECTOR_KEY_HEX};
+        const PLAINTEXT: &str = "synthetic-toss-user-key-0002/\u{d1a0}";
+        const SEALED: &str = "v2.2026a.QEFCQ0RFRkdISUpL.sS3T9TgTsWIxHyRH9jl8B2Dr766eJd7zXs6kMk8HSaJYsQPpcmlIhtLPOomPF95E";
+        const LEGACY_V1: &str =
+            "v1.EBESExQVFhcYGRob.Dof2YiGsTtqpWHxyfApEJqQ1PCNwpy6c18nSVjOxreYnX0g7I-MXFYox9Xw";
+        let ring = TossIdentityKeyRing::new(
+            "2026a",
+            &[("legacy", VECTOR_KEY_HEX), ("2026a", VECTOR_KEY_B64)],
+            Some("legacy"),
+        )
+        .unwrap();
+        let nonce: [u8; 12] = core::array::from_fn(|i| 0x40 + i as u8);
+        assert_eq!(ring.unseal(SEALED).unwrap(), PLAINTEXT);
+        assert_eq!(ring.seal_with_nonce(PLAINTEXT, nonce).unwrap(), SEALED);
+        assert!(ring.reseal_if_needed(SEALED).unwrap().is_none());
+        assert_eq!(
+            ring.unseal(LEGACY_V1).unwrap(),
+            "synthetic-toss-user-key-0001"
+        );
+        assert_eq!(
+            ring.unseal(&SEALED.replace("v2.2026a.", "v2.legacy."))
+                .unwrap_err(),
+            INVALID
+        );
     }
 
     #[test]

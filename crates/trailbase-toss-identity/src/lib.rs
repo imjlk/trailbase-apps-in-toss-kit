@@ -2,8 +2,8 @@ pub mod keyring;
 pub mod reseal;
 pub use keyring::TossIdentityKeyRing;
 
+use aes_gcm::Aes256Gcm;
 use aes_gcm::aead::{Aead, KeyInit};
-use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -100,7 +100,7 @@ fn seal_toss_user_key_with_nonce(
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
         .map_err(|err| format!("invalid Toss encryption key: {err}"))?;
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), toss_user_key.as_bytes())
+        .encrypt(&nonce.into(), toss_user_key.as_bytes())
         .map_err(|err| format!("Toss userKey sealing failed: {err}"))?;
     Ok(format!(
         "v1.{}.{}",
@@ -125,11 +125,11 @@ pub fn unseal_toss_user_key(encryption_key: &str, sealed: &str) -> CommonResult<
     let ciphertext = URL_SAFE_NO_PAD
         .decode(ciphertext_text)
         .map_err(|err| format!("invalid sealed Toss ciphertext: {err}"))?;
-    if nonce.len() != 12 {
-        return Err("sealed Toss nonce must be 12 bytes".to_string());
-    }
+    let nonce: [u8; 12] = nonce
+        .try_into()
+        .map_err(|_| "sealed Toss nonce must be 12 bytes".to_string())?;
     let plaintext = cipher
-        .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
+        .decrypt(&nonce.into(), ciphertext.as_ref())
         .map_err(|err| format!("Toss userKey unsealing failed: {err}"))?;
     String::from_utf8(plaintext).map_err(|err| format!("sealed Toss userKey was not UTF-8: {err}"))
 }
@@ -206,6 +206,65 @@ mod tests {
         assert_eq!(
             unseal_toss_user_key(&secrets.encryption_key, &sealed.sealed).unwrap(),
             "toss-user-key"
+        );
+    }
+
+    /// Synthetic hex key: bytes 0x00..=0x1f.
+    pub(crate) const VECTOR_KEY_HEX: &str =
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    /// Synthetic padded standard-base64 key: bytes 0x20..=0x3f.
+    pub(crate) const VECTOR_KEY_B64: &str = "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=";
+
+    fn vector_nonce(start: u8) -> [u8; 12] {
+        core::array::from_fn(|i| start + i as u8)
+    }
+
+    /// Pinned `v1` ciphertexts produced by the aes-gcm 0.10 / base64 0.22 code
+    /// and cross-checked against an independent AES-256-GCM implementation.
+    /// Rows sealed by earlier releases must keep opening, and sealing with the
+    /// same nonce must keep producing these exact strings.
+    #[test]
+    fn v1_sealed_wire_format_matches_pinned_vectors() {
+        for (key, nonce, plaintext, sealed) in [
+            (
+                VECTOR_KEY_HEX,
+                vector_nonce(0x10),
+                "synthetic-toss-user-key-0001",
+                "v1.EBESExQVFhcYGRob.Dof2YiGsTtqpWHxyfApEJqQ1PCNwpy6c18nSVjOxreYnX0g7I-MXFYox9Xw",
+            ),
+            (
+                VECTOR_KEY_B64,
+                vector_nonce(0xa0),
+                "ait:synthetic-anonymous-seed",
+                "v1.oKGio6Slpqeoqaqr.H1XQDreu7t7JTdnTRXAXyP4RuGpTwVUPfPeunT_xB7_3dogis-cDR6e4sVs",
+            ),
+            (
+                VECTOR_KEY_HEX,
+                vector_nonce(0x70),
+                "",
+                "v1.cHFyc3R1dnd4eXp7.ZulCDAMZa0u1NlvmxuKG-Q",
+            ),
+        ] {
+            assert_eq!(unseal_toss_user_key(key, sealed).unwrap(), plaintext);
+            assert_eq!(
+                seal_toss_user_key_with_nonce(key, plaintext, nonce).unwrap(),
+                sealed
+            );
+        }
+        assert_eq!(
+            unseal_anonymous_key(
+                VECTOR_KEY_B64,
+                "v1.oKGio6Slpqeoqaqr.H1XQDreu7t7JTdnTRXAXyP4RuGpTwVUPfPeunT_xB7_3dogis-cDR6e4sVs"
+            )
+            .unwrap(),
+            "synthetic-anonymous-seed"
+        );
+        assert!(
+            unseal_toss_user_key(
+                VECTOR_KEY_B64,
+                "v1.EBESExQVFhcYGRob.Dof2YiGsTtqpWHxyfApEJqQ1PCNwpy6c18nSVjOxreYnX0g7I-MXFYox9Xw"
+            )
+            .is_err()
         );
     }
 
