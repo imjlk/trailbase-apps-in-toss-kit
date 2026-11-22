@@ -37,6 +37,13 @@ Changeset이 `main`에 들어가면 `Sampo release` workflow가 Sampo를 `auto` 
 `sampo release`를 실행하는 방식은 workflow를 사용할 수 없거나 릴리스 복구가 필요할 때만
 사용합니다.
 
+workflow는 Sampo CLI 0.20.0을 설치하는 `sampo-github-action` v0.18.0에 고정되어 있습니다.
+로컬에서 `sampo release`를 실행할 때도 같은 CLI 라인을 사용하세요. Sampo 0.21 이상은
+`bun update --lockfile-only --no-save`로 `bun.lock`을 갱신하고 lockfile이 그대로면 릴리스를
+중단하는데, Bun 1.4는 이 명령에서 lockfile을 쓰지 않습니다. 이 경로가 repo의 Bun 버전에서
+동작하는 것을 확인한 뒤에만 고정 버전을 올리세요. 그 전까지는 workflow의 lockfile 단계가
+`bun install --lockfile-only`로 `bun.lock`을 동기화합니다.
+
 `SAMPO_RELEASE_TOKEN` repo secret에는 contents와 pull requests 쓰기 권한이 있는 fine-grained
 PAT 또는 GitHub App token을 설정하세요. 이 secret이 없으면 workflow는
 `TRAILBASE_RELEASE_WATCH_TOKEN`을 재사용한 뒤 `github.token`으로 fallback합니다. 기본 토큰으로

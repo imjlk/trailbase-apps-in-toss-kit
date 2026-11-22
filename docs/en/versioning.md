@@ -36,6 +36,13 @@ Sampo instead of publishing this repo's private/unpublishable packages. Review t
 PR for package version bumps and changelog output, then merge it to publish the release commit. Use a
 manual local `sampo release` only for release recovery or when the workflow is unavailable.
 
+The workflow pins `sampo-github-action` v0.18.0, which installs Sampo CLI 0.20.0; use the same CLI
+line for a local `sampo release`. Sampo 0.21 and later refresh `bun.lock` with
+`bun update --lockfile-only --no-save` and stop the release when the lockfile stays stale, and Bun
+1.4 writes nothing for that command. Raise the pin only after that path works with the repo's Bun
+version. Until then the workflow's lockfile step synchronizes `bun.lock` with
+`bun install --lockfile-only`.
+
 Configure `SAMPO_RELEASE_TOKEN` as a repository secret with a fine-grained PAT or GitHub App token
 that can write contents and pull requests. If that secret is absent, the workflow reuses
 `TRAILBASE_RELEASE_WATCH_TOKEN` before falling back to `github.token`. PRs created with the default
