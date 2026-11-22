@@ -16,7 +16,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { createSseParser } from "../packages/trailbase-client/src/index.ts";
 
 const image =
-  process.env.TRAILBASE_SMOKE_IMAGE || "trailbase/trailbase:0.36.1";
+  process.env.TRAILBASE_SMOKE_IMAGE || "trailbase/trailbase:0.36.2";
 const root = path.resolve(import.meta.dirname, "..");
 const scratch = await mkdtemp(path.join(tmpdir(), "trailbase-kit-smoke-"));
 const runtimeRoot = await mkdtemp(path.join(tmpdir(), "kit-smoke-runtime-"));
