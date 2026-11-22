@@ -20,8 +20,9 @@ instead of replacing the table.
    proxy.
 4. `trailbase_guest_common::iap_orders` normalizes the provider response and can
    upsert the local `iap_orders` row.
-5. If the normalized status is `PENDING_GRANT`, the app applies its product
-   grant exactly once and then calls `mark_iap_order_granted_tx`.
+5. If the normalized status is `PENDING_GRANT` (and, for grants bound to the
+   authenticated user, `purchaser_confirmed()` is true), the app applies its
+   product grant exactly once and then calls `mark_iap_order_granted_tx`.
 
 The shared helper deliberately does not know product entitlement rules, local
 currency names, inventory tables, restore UX, or refund policy. Keep those in
@@ -36,11 +37,15 @@ the official `x-toss-user-key` / `x-anon-key` header and returns the verdict as
 echoes the identifier back.
 
 - A payable order whose check is `MISMATCHED` fails with
-  `UNVERIFIED_IAP_ORDER` ("Toss order was bought by a different user"), so a
-  caller cannot redeem another user's paid `orderId`.
-- `NOT_PROVIDED` passes through: the provider gave no verdict. Consumers
-  decide whether to hold the grant. `IapOrderStatus::purchaser_confirmed()` is
-  true only for `MATCHED`.
+  `UNVERIFIED_IAP_ORDER` ("Toss order was bought by a different user").
+- `NOT_PROVIDED` passes through (the provider gave no verdict), and a proxy
+  older than this check omits `purchaserCheck` entirely. Neither proves who
+  bought the order.
+- For grants bound to the authenticated user, require
+  `IapOrderStatus::purchaser_confirmed()` (true only for `MATCHED`) together
+  with `grant_required`, and send that user's own identifier from the backend
+  identity store, never a client-supplied key. Only then does the check stop a
+  caller from redeeming another user's paid `orderId`.
 - `iap_order_status` keeps sending the Toss login key. Use
   `iap_order_status_for_purchaser` with `IapPurchaser::AnonKey` for anonymous
   WebView users; a blank identifier is rejected before the request.
