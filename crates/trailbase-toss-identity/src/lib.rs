@@ -2,8 +2,8 @@ pub mod keyring;
 pub mod reseal;
 pub use keyring::TossIdentityKeyRing;
 
+use aes_gcm::Aes256Gcm;
 use aes_gcm::aead::{Aead, KeyInit};
-use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use serde::{Deserialize, Serialize};
@@ -100,7 +100,7 @@ fn seal_toss_user_key_with_nonce(
     let cipher = Aes256Gcm::new_from_slice(&key_bytes)
         .map_err(|err| format!("invalid Toss encryption key: {err}"))?;
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), toss_user_key.as_bytes())
+        .encrypt(&nonce.into(), toss_user_key.as_bytes())
         .map_err(|err| format!("Toss userKey sealing failed: {err}"))?;
     Ok(format!(
         "v1.{}.{}",
@@ -125,11 +125,11 @@ pub fn unseal_toss_user_key(encryption_key: &str, sealed: &str) -> CommonResult<
     let ciphertext = URL_SAFE_NO_PAD
         .decode(ciphertext_text)
         .map_err(|err| format!("invalid sealed Toss ciphertext: {err}"))?;
-    if nonce.len() != 12 {
-        return Err("sealed Toss nonce must be 12 bytes".to_string());
-    }
+    let nonce: [u8; 12] = nonce
+        .try_into()
+        .map_err(|_| "sealed Toss nonce must be 12 bytes".to_string())?;
     let plaintext = cipher
-        .decrypt(Nonce::from_slice(&nonce), ciphertext.as_ref())
+        .decrypt(&nonce.into(), ciphertext.as_ref())
         .map_err(|err| format!("Toss userKey unsealing failed: {err}"))?;
     String::from_utf8(plaintext).map_err(|err| format!("sealed Toss userKey was not UTF-8: {err}"))
 }

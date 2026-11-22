@@ -1,7 +1,7 @@
 //! Opt-in encryption-key rotation. HMAC lookup secrets are deliberately absent.
 //! No Debug/Serialize implementations: keys and plaintext stay server-private.
+use aes_gcm::Aes256Gcm;
 use aes_gcm::aead::{Aead, KeyInit, Payload};
-use aes_gcm::{Aes256Gcm, Nonce};
 use base64::Engine;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use std::collections::BTreeMap;
@@ -79,7 +79,7 @@ impl TossIdentityKeyRing {
             let aad = associated_data(id);
             let plaintext = cipher
                 .decrypt(
-                    Nonce::from_slice(&nonce),
+                    &nonce.into(),
                     Payload {
                         msg: &ciphertext,
                         aad: aad.as_bytes(),
@@ -123,7 +123,7 @@ impl TossIdentityKeyRing {
         let aad = associated_data(&self.active_id);
         let ciphertext = cipher
             .encrypt(
-                Nonce::from_slice(&nonce),
+                &nonce.into(),
                 Payload {
                     msg: value.as_bytes(),
                     aad: aad.as_bytes(),
