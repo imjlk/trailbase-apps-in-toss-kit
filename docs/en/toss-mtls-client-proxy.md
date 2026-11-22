@@ -380,7 +380,7 @@ normalization or multi-step flow handling.
 The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.7.0` and
 explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
 behind the same internal bearer authentication; forward mode still requires a
-token. Bun is pinned to `1.4.2` across local tooling, CI, and the container.
+token. Bun is pinned to `1.4.5` across local tooling, CI, and the container.
 The Compose copy-in template pins the published proxy image (see the
 [rollout and verification record](ait-kit-rollout.md) for the current
 baseline, rollout order, and remaining real-device checks); update the

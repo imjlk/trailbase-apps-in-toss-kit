@@ -39,6 +39,6 @@
     "test": "bun test"
   },
   "devDependencies": {
-    "semver": "7.8.5"
+    "semver": "7.8.6"
   }
 }

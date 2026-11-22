@@ -37,7 +37,7 @@ concurrency:
 
 env:
   IMAGE_NAME: ghcr.io/${{ github.repository }}/toss-mtls-client-proxy
-  BUN_VERSION: "1.4.2"
+  BUN_VERSION: "1.4.5"
 
 jobs:
   test:

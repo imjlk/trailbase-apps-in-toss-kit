@@ -2,7 +2,7 @@
 
 The ledger doctor inspects a private SQLite snapshot without issuing writes or
 calling Toss. It reports **stored** provider/ledger state, not the provider's current
-state. Use it for a support inquiry before choosing a recovery action. Bun 1.4.2
+state. Use it for a support inquiry before choosing a recovery action. Bun 1.4.5
 is the kit's pinned runtime; the CLI uses [Bun SQLite](https://bun.com/docs/runtime/sqlite)
 with a read-only connection, query-only mode, and a consistent read transaction.
 
