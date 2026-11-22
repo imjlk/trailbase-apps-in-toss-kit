@@ -1,5 +1,11 @@
 # @trailbase-apps-in-toss-kit/toss-mtls-client-proxy
 
+## 0.7.4 — 2026-11-22
+
+### Patch changes
+
+- [1924adb](https://github.com/imjlk/trailbase-apps-in-toss-kit/commit/1924adb2e1a2e76cae12f04d4e35d9c8a3dce3fa) The proxy image now builds on `oven/bun:1.4.5-alpine` instead of `1.4.2-alpine`. Proxy routes, environment variables, and response shapes are unchanged. Consumers that pin an exact image tag pick up the new base by moving to this release's tag. — Thanks @imjlk!
+
 ## 0.7.3 — 2026-11-10
 
 ### Patch changes
