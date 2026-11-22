@@ -1,7 +1,7 @@
 # Toss mTLS 클라이언트 프록시
 
 비공개 `POST /internal/apps-in-toss/anonymous-key/exchange`는 백엔드의
-`{ "code": "..." }`를 받아 `@ait-kit/api-core` 0.7.0에 일회용 코드 교환을 위임합니다.
+`{ "code": "..." }`를 받아 `@ait-kit/api-core` 0.8.0에 일회용 코드 교환을 위임합니다.
 Forward mode와 내부 bearer token이 필요하며 stub mode는 인증된 식별자를 만들지
 않습니다. Capability는 `anonymous-key.exchange-auth-code`입니다. 성공 시 백엔드용
 원본 `anonKey`를 반환하므로 공개 응답이나 로그에 넣지 마세요. 실패는 고정 오류로
@@ -379,7 +379,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 
 ## API Core 0.4 계약
 
-프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.7.0`으로 고정하고 범용 mTLS
+프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.8.0`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
 Bun을 `1.4.5`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를
@@ -439,7 +439,7 @@ ID가 다른 PAYMENT_COMPLETED/PURCHASED 응답은 `ok: false`와 `UNVERIFIED_IA
 
 인증된 health 응답은 기존 `ok`, `mode`를 유지하고
 `kit: { contractVersion: 1, proxyVersion, capabilities }`를 추가합니다. 버전은 실행 중인
-패키지에서 읽으며 `anonymous-key.verify`, `iap.provider-sku-required`,
+패키지에서 읽으며 `anonymous-key.verify`, `iap.provider-sku-required`, `iap.purchaser-check`,
 `promotion.prepare.v2`, `promotion.execute.v2`, `promotion.status.v2`,
 `promotion.anonymous-recipient`, `smart-message.channel-results` 같은 구현된 어댑터 계약을
 알립니다. 프로모션 capability는 영속 3단계 계약과 함께 버전 표기(`.v2`)를 달며

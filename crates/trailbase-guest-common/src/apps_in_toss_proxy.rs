@@ -46,6 +46,18 @@ pub async fn toss_login_remove_by_user_key(
     .await
 }
 
+/// The user whose purchase an IAP status lookup checks. The proxy sends it
+/// only as the official `x-toss-user-key` / `x-anon-key` header and returns
+/// the provider's verdict as `purchaserCheck.status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IapPurchaser<'a> {
+    TossUserKey(&'a str),
+    AnonKey(&'a str),
+}
+
+/// Legacy lookup: sends `toss_user_key` as given (a blank key reaches the
+/// proxy as no purchaser). Prefer [`iap_order_status_for_purchaser`], which
+/// also covers anonymous users and rejects a blank purchaser locally.
 pub async fn iap_order_status(
     proxy_url: &str,
     bearer_token: Option<&str>,
@@ -63,6 +75,40 @@ pub async fn iap_order_status(
         bearer_token,
     )
     .await
+}
+
+/// IAP status lookup that names the purchaser, including anonymous WebView
+/// users. A blank identifier is rejected before any network call.
+pub async fn iap_order_status_for_purchaser(
+    proxy_url: &str,
+    bearer_token: Option<&str>,
+    order_id: &str,
+    sku: &str,
+    purchaser: IapPurchaser<'_>,
+) -> CommonResult<JsonValue> {
+    post_json_with_optional_bearer(
+        &join_url(proxy_url, IAP_ORDER_STATUS_PATH),
+        iap_order_status_payload(order_id, sku, purchaser)?,
+        bearer_token,
+    )
+    .await
+}
+
+fn iap_order_status_payload(
+    order_id: &str,
+    sku: &str,
+    purchaser: IapPurchaser<'_>,
+) -> CommonResult<JsonValue> {
+    let (field, value) = match purchaser {
+        IapPurchaser::TossUserKey(value) => ("tossUserKey", value),
+        IapPurchaser::AnonKey(value) => ("anonKey", value),
+    };
+    if value.trim().is_empty() {
+        return Err(format!("{field} is required for an IAP purchaser check"));
+    }
+    let mut payload = json!({ "orderId": order_id, "sku": sku });
+    payload[field] = JsonValue::String(value.to_string());
+    Ok(payload)
 }
 
 /// Prepare step of the three-step reward contract: issues a provider
@@ -372,6 +418,23 @@ mod tests {
             json!({ "anonKey": "anon" }),
         ] {
             assert!(require_promotion_recipient(&payload).is_ok(), "{payload}");
+        }
+    }
+
+    #[test]
+    fn iap_purchaser_payload_names_exactly_one_identifier() {
+        assert_eq!(
+            iap_order_status_payload("order-1", "sku-1", IapPurchaser::AnonKey("anon-hash"))
+                .unwrap(),
+            json!({ "orderId": "order-1", "sku": "sku-1", "anonKey": "anon-hash" })
+        );
+        assert_eq!(
+            iap_order_status_payload("order-1", "sku-1", IapPurchaser::TossUserKey("user-key"))
+                .unwrap(),
+            json!({ "orderId": "order-1", "sku": "sku-1", "tossUserKey": "user-key" })
+        );
+        for purchaser in [IapPurchaser::AnonKey(" "), IapPurchaser::TossUserKey("")] {
+            assert!(iap_order_status_payload("order-1", "sku-1", purchaser).is_err());
         }
     }
 }

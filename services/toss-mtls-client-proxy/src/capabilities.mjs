@@ -13,6 +13,7 @@ export const PROXY_CAPABILITIES = Object.freeze([
   "anonymous-key.exchange-auth-code",
   "iap.order-status",
   "iap.provider-sku-required",
+  "iap.purchaser-check",
   "promotion.prepare.v2",
   "promotion.execute.v2",
   "promotion.status.v2",

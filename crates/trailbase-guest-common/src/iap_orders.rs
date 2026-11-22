@@ -55,10 +55,24 @@ pub struct IapOrderStatus {
     pub ok: bool,
     pub order_id: Option<String>,
     pub provider_status: String,
+    /// Provider verdict on whether the purchaser named in the status request
+    /// bought this order: `MATCHED`, `MISMATCHED`, or `NOT_PROVIDED`. `None`
+    /// when the request named no purchaser or the proxy predates the check.
+    pub purchaser_check: Option<String>,
     pub reason: Option<String>,
     pub sku: Option<String>,
     pub status_determined_at: Option<String>,
     pub terminal: bool,
+}
+
+impl IapOrderStatus {
+    /// True only when the provider confirmed that the purchaser named in the
+    /// status request bought this order. Grants bound to the calling user
+    /// should require this alongside `grant_required`; the proxy already
+    /// refuses a payable order whose purchaser check is `MISMATCHED`.
+    pub fn purchaser_confirmed(&self) -> bool {
+        self.purchaser_check.as_deref() == Some("MATCHED")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -326,6 +340,10 @@ pub fn normalize_iap_order_status_response(response: &JsonValue) -> IapOrderStat
             ],
         ),
         provider_status,
+        purchaser_check: read_string_path(
+            response,
+            &["purchaserCheck.status", "purchaser_check.status"],
+        ),
         reason: read_string_path(
             response,
             &["reason", "success.reason", "data.reason", "result.reason"],

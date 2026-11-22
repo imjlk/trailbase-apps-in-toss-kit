@@ -23,6 +23,24 @@ TrailBase가 주문/지급 상태를 저장해야 한다면
 공유 helper는 상품 지급 규칙, 로컬 재화 이름, 인벤토리 테이블, 복원 UX, 환불 정책을 알지
 않습니다. 이 정책은 소비 앱에 남겨둡니다.
 
+## 구매자 확인
+
+Apps in Toss 주문 상태 API는 조회에 지정한 사용자가 그 주문을 구매했는지
+(`purchaserMatched`) 알려 줍니다. 프록시는 사용자를 공식 `x-toss-user-key` /
+`x-anon-key` 헤더로만 보내고, 판정을 `purchaserCheck.status`(`MATCHED`,
+`MISMATCHED`, `NOT_PROVIDED`)로 돌려줍니다. 식별자는 응답에 다시 담지 않습니다.
+
+- 결제 완료 상태인데 `MISMATCHED`이면 `UNVERIFIED_IAP_ORDER`("Toss order was
+  bought by a different user")로 실패합니다. 다른 사용자가 결제한 `orderId`로는
+  지급받을 수 없습니다.
+- `NOT_PROVIDED`는 그대로 전달합니다. provider가 판정을 주지 않았다는 뜻이며, 지급을
+  보류할지는 컨슈머가 정합니다. `IapOrderStatus::purchaser_confirmed()`는
+  `MATCHED`일 때만 true입니다.
+- `iap_order_status`는 기존처럼 토스 로그인 키를 보냅니다. 익명 WebView 사용자는
+  `IapPurchaser::AnonKey`와 함께 `iap_order_status_for_purchaser`를 사용하세요. 빈
+  식별자는 요청 전에 거절합니다.
+- 이 기능을 지원하는 프록시는 `iap.purchaser-check` capability를 알립니다.
+
 ## 안전 메모
 
 - `_user` id와 선택적 `toss_user_key_hmac`만 저장하고, raw Toss `userKey`는 `iap_orders`에

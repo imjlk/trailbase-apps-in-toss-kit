@@ -43,6 +43,19 @@ fn iap_wire_contracts_preserve_status_and_verification_failures() {
             "{}",
             case["id"]
         );
+        let expected_check = case["proxyResponse"]["purchaserCheck"]["status"].as_str();
+        assert_eq!(
+            result.purchaser_check.as_deref(),
+            expected_check,
+            "{}",
+            case["id"]
+        );
+        assert_eq!(
+            result.purchaser_confirmed(),
+            expected_check == Some("MATCHED"),
+            "{}",
+            case["id"]
+        );
     }
 }
 

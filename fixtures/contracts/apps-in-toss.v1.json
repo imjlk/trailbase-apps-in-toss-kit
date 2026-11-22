@@ -342,6 +342,86 @@
       "diagnosticAction": "verify-order-with-provider"
     },
     {
+      "id": "purchaser-matched",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins",
+        "purchaserCheck": {
+          "status": "MATCHED"
+        }
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins",
+        "purchaserCheck": {
+          "status": "MATCHED"
+        }
+      },
+      "ledgerStatus": "PENDING_GRANT",
+      "grantRequired": true,
+      "terminal": false,
+      "diagnosticProviderStatus": "PAYMENT_COMPLETED",
+      "diagnosticAction": "review-local-grant-transaction"
+    },
+    {
+      "id": "purchaser-not-provided",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins",
+        "purchaserCheck": {
+          "status": "NOT_PROVIDED"
+        }
+      },
+      "proxyResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins",
+        "purchaserCheck": {
+          "status": "NOT_PROVIDED"
+        }
+      },
+      "ledgerStatus": "PENDING_GRANT",
+      "grantRequired": true,
+      "terminal": false,
+      "diagnosticProviderStatus": "PAYMENT_COMPLETED",
+      "diagnosticAction": "review-local-grant-transaction"
+    },
+    {
+      "id": "purchaser-mismatched",
+      "coreResponse": {
+        "ok": true,
+        "orderId": "fixture-order",
+        "providerStatus": "PAYMENT_COMPLETED",
+        "sku": "fixture-coins",
+        "purchaserCheck": {
+          "status": "MISMATCHED"
+        }
+      },
+      "proxyResponse": {
+        "ok": false,
+        "orderId": "fixture-order",
+        "sku": "fixture-coins",
+        "providerStatus": "ERROR",
+        "error": "UNVERIFIED_IAP_ORDER",
+        "purchaserCheck": {
+          "status": "MISMATCHED"
+        },
+        "failureReason": "Toss order was bought by a different user"
+      },
+      "ledgerStatus": "FAILED",
+      "grantRequired": false,
+      "terminal": true,
+      "diagnosticProviderStatus": "ERROR",
+      "diagnosticAction": "verify-order-with-provider"
+    },
+    {
       "id": "failure-with-paid-status",
       "coreResponse": {
         "ok": false,

@@ -981,6 +981,73 @@ describe("toss-mtls-client-proxy", () => {
     });
   });
 
+  test("forward IAP refuses a payable order bought by a different purchaser", async () => {
+    let seenAnonKey;
+    let seenUserKey;
+    const upstream = http.createServer((req, res) => {
+      seenAnonKey = req.headers["x-anon-key"];
+      seenUserKey = req.headers["x-toss-user-key"];
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: {
+        orderId: "order-1", sku: "coins", status: "PURCHASED", purchaserMatched: false,
+      } }));
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
+        { orderId: "order-1", sku: "coins", anonKey: "synthetic-anon" },
+        { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(seenAnonKey).toBe("synthetic-anon");
+      expect(seenUserKey).toBeUndefined();
+      expect(result.body).toMatchObject({
+        ok: false,
+        error: "UNVERIFIED_IAP_ORDER",
+        providerStatus: "ERROR",
+        purchaserCheck: { status: "MISMATCHED" },
+      });
+      expect(result.body.failureReason).toContain("different user");
+      expect(JSON.stringify(result.body)).not.toContain("synthetic-anon");
+    });
+  });
+
+  test("forward IAP returns a matched purchaser verdict without echoing the key", async () => {
+    const upstream = http.createServer((req, res) => {
+      req.resume();
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ resultType: "SUCCESS", success: {
+        orderId: "order-1", sku: "coins", status: "PURCHASED", purchaserMatched: true,
+      } }));
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
+        { orderId: "order-1", sku: "coins", tossUserKey: "synthetic-user" },
+        { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(result.body).toEqual({
+        ok: true,
+        orderId: "order-1",
+        providerStatus: "PURCHASED",
+        sku: "coins",
+        purchaserCheck: { status: "MATCHED" },
+      });
+    });
+  });
+
+  test("forward IAP rejects an ambiguous purchaser before calling Toss", async () => {
+    let calls = 0;
+    const upstream = http.createServer((req, res) => {
+      calls += 1;
+      req.resume();
+      res.writeHead(500).end();
+    });
+    await withServer(upstream, async (upstreamBaseUrl) => {
+      const result = await handleRequest(request("POST", PROXY_ENDPOINTS.iapOrderStatus,
+        { orderId: "order-1", tossUserKey: "synthetic-user", anonKey: "synthetic-anon" },
+        { authorization: "Bearer secret" }), { mode: "forward", internalToken: "secret", upstreamBaseUrl });
+      expect(result.body).toMatchObject({ ok: false, error: "INVALID_PURCHASER" });
+      expect(calls).toBe(0);
+    });
+  });
+
   test("forward iap order status retries transient provider statuses", async () => {
     let hitCount = 0;
     const upstreamServer = http.createServer((req, res) => {

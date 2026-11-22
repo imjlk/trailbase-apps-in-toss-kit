@@ -27,6 +27,25 @@ The shared helper deliberately does not know product entitlement rules, local
 currency names, inventory tables, restore UX, or refund policy. Keep those in
 the consumer app.
 
+## Purchaser Check
+
+The Apps in Toss order-status API reports whether the user named in the
+lookup bought the order (`purchaserMatched`). The proxy sends that user only in
+the official `x-toss-user-key` / `x-anon-key` header and returns the verdict as
+`purchaserCheck.status` (`MATCHED`, `MISMATCHED`, or `NOT_PROVIDED`). It never
+echoes the identifier back.
+
+- A payable order whose check is `MISMATCHED` fails with
+  `UNVERIFIED_IAP_ORDER` ("Toss order was bought by a different user"), so a
+  caller cannot redeem another user's paid `orderId`.
+- `NOT_PROVIDED` passes through: the provider gave no verdict. Consumers
+  decide whether to hold the grant. `IapOrderStatus::purchaser_confirmed()` is
+  true only for `MATCHED`.
+- `iap_order_status` keeps sending the Toss login key. Use
+  `iap_order_status_for_purchaser` with `IapPurchaser::AnonKey` for anonymous
+  WebView users; a blank identifier is rejected before the request.
+- Proxies that support this advertise the `iap.purchaser-check` capability.
+
 ## Safety Notes
 
 - Store `_user` ids and optional `toss_user_key_hmac`; never store raw Toss
