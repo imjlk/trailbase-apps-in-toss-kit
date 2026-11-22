@@ -1,7 +1,7 @@
 {
   "kitMinimumSupportedTrailbaseServer": null,
-  "lastVerifiedTrailbaseServer": "0.35.9",
-  "lastVerifiedTrailbaseReleaseDate": "2026-11-03",
+  "lastVerifiedTrailbaseServer": "0.36.1",
+  "lastVerifiedTrailbaseReleaseDate": "2026-11-18",
   "description": "Manual TrailBase server compatibility policy for this kit. null means TBD and must not be auto-promoted from upstream latest.",
   "strictMode": {
     "failWhenBelowMinimum": true,
@@ -15,6 +15,7 @@
     "Raise lastVerifiedTrailbaseServer only after this kit has been checked against that server version.",
     "TrailBase 0.31.1 passed the kit analytics multi-database migration, healthcheck, and SQLite verification smoke test.",
     "TrailBase 0.33.14 passed the disposable kit WASM component, anonymous proxy-stub bootstrap, official auth login/refresh, authenticated WASM, Record API ownership/ACL, SSE, and combined functional-ledger migration smoke. This is not consumer device or production validation.",
-    "TrailBase 0.35.9 passed the same disposable WASM smoke (with and without the operations hold) and the analytics multi-database smoke on 2026-11-03. It includes the 0.33.23 account-enumeration timing fix and the Wasmtime security updates in 0.34.7, 0.35.2 and 0.35.8. This is not consumer device or production validation."
+    "TrailBase 0.35.9 passed the same disposable WASM smoke (with and without the operations hold) and the analytics multi-database smoke on 2026-11-03. It includes the 0.33.23 account-enumeration timing fix and the Wasmtime security updates in 0.34.7, 0.35.2 and 0.35.8. This is not consumer device or production validation.",
+    "TrailBase 0.36.1 passed the same disposable WASM smoke (with and without the operations hold), the analytics multi-database smoke, and the owned-currency SQL smoke on 2026-11-22. It includes the 0.35.10 read-only file id fix, the 0.36.0 file write-consistency change that removes file support from batch operations and transactions (kit templates and packages declare no file upload columns), and the 0.36.1 ProxyConfig and dependency security updates. This is not consumer device or production validation."
   ]
 }
