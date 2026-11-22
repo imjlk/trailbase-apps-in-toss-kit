@@ -127,12 +127,12 @@ describe("AppsInToss share helpers", () => {
       }),
     ).toBe("hello\n\nworld\n\nhttps://toss.example/share");
     expect(
-      extractAppsInTossSchemeValue("intoss://poll-maker/polls/poll%201", {
+      extractAppsInTossSchemeValue("intoss://example-app/polls/poll%201", {
         pathPattern: /\/polls\/([^/?#]+)/,
       }),
     ).toBe("poll 1");
     expect(
-      extractAppsInTossSchemeValue("intoss://poll-maker?pid=poll_abc", {
+      extractAppsInTossSchemeValue("intoss://example-app?pid=poll_abc", {
         queryKeys: ["pollId", "pid"],
       }),
     ).toBe("poll_abc");

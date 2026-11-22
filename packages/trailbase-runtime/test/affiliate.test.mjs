@@ -164,7 +164,7 @@ describe('Toss official wire contract', () => {
   function create(reply) {
     const calls = [];
     const cache = createAffiliateCache({ now: () => NOW });
-    const provider = createTossSharelinkProvider({ accessKey: 'access', secretKey: 'secret', publisherId: 'publisher', subTagId: 'poll-maker',
+    const provider = createTossSharelinkProvider({ accessKey: 'access', secretKey: 'secret', publisherId: 'publisher', subTagId: 'example-app',
       cache, now: () => NOW, sleep: async () => {}, fetch: async (url, init) => {
         calls.push({ url, init });
         return Response.json(url.includes('oauth2') ? { access_token: 'test-token', expires_in: 3600 } : reply(url, init));
@@ -183,7 +183,7 @@ describe('Toss official wire contract', () => {
     expect(calls.filter((call) => call.url.endsWith('/links'))).toHaveLength(1);
     expect(calls.filter((call) => call.url.includes('oauth2'))).toHaveLength(1);
     expect(new URLSearchParams(calls[0].init.body).get('scope')).toBe('sharelink:read sharelink:write');
-    expect(JSON.parse(calls.at(-1).init.body)).toEqual({ tacaItemId: 123, publisherId: 'publisher', subTagId: 'poll-maker' });
+    expect(JSON.parse(calls.at(-1).init.body)).toEqual({ tacaItemId: 123, publisherId: 'publisher', subTagId: 'example-app' });
   });
   test('HTTP 200 FAIL is rejected and quotas pause further provider calls', async () => {
     const { provider, calls } = create(() => ({ resultType: 'FAIL', error: { errorCode: 'SHARELINK_OPENAPI_QUOTA_EXCEEDED' } }));

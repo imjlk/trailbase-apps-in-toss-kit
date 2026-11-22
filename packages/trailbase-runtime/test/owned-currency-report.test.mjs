@@ -17,20 +17,20 @@ describe("owned currency report", () => {
   test("aggregates a half-open period, preserves valuation denominations, and reports quality facts", () => {
     const db = createDatabase();
     try {
-      seedPolicy(db, "gold_dust", "mg", "v1", "FIXED_RATE", "TOSS_POINT", 1, 100, 0, null);
-      seedPolicy(db, "gold_dust", "mg", "v2", "MARKET_SNAPSHOT", "KRW", null, null, 3000, null);
-      seedPolicy(db, "gold_bar", "mg", "v1", "NONE", null, null, null, 0, null);
-      insertEvent(db, ["issue", "gold_dust", "mg", "ISSUE", 100, "mission", "mission-1", "event:issue", "v1", null, null, null, null, 1000]);
-      insertEvent(db, ["exchange-point", "gold_dust", "mg", "EXCHANGE", -10, "promotion", "exchange-1", "event:exchange-point", "v1", null, "exchange-1", 50, "TOSS_POINT", 2000]);
-      insertEvent(db, ["exchange-krw", "gold_dust", "mg", "EXCHANGE", -5, "promotion", "exchange-2", "event:exchange-krw", "v1", null, "exchange-2", 100, "KRW", 2500]);
-      insertEvent(db, ["convert-out", "gold_dust", "mg", "CONVERT_OUT", -20, "refine", "refine-1", "event:convert-out", "v1", "conversion-1", null, null, null, 2600]);
-      insertEvent(db, ["convert-in", "gold_bar", "mg", "CONVERT_IN", 2, "refine", "refine-1", "event:convert-in", "v1", "conversion-1", null, null, null, 2600]);
+      seedPolicy(db, "example_coin", "mg", "v1", "FIXED_RATE", "TOSS_POINT", 1, 100, 0, null);
+      seedPolicy(db, "example_coin", "mg", "v2", "MARKET_SNAPSHOT", "KRW", null, null, 3000, null);
+      seedPolicy(db, "example_bar", "mg", "v1", "NONE", null, null, null, 0, null);
+      insertEvent(db, ["issue", "example_coin", "mg", "ISSUE", 100, "mission", "mission-1", "event:issue", "v1", null, null, null, null, 1000]);
+      insertEvent(db, ["exchange-point", "example_coin", "mg", "EXCHANGE", -10, "promotion", "exchange-1", "event:exchange-point", "v1", null, "exchange-1", 50, "TOSS_POINT", 2000]);
+      insertEvent(db, ["exchange-krw", "example_coin", "mg", "EXCHANGE", -5, "promotion", "exchange-2", "event:exchange-krw", "v1", null, "exchange-2", 100, "KRW", 2500]);
+      insertEvent(db, ["convert-out", "example_coin", "mg", "CONVERT_OUT", -20, "refine", "refine-1", "event:convert-out", "v1", "conversion-1", null, null, null, 2600]);
+      insertEvent(db, ["convert-in", "example_bar", "mg", "CONVERT_IN", 2, "refine", "refine-1", "event:convert-in", "v1", "conversion-1", null, null, null, 2600]);
       insertEvent(db, ["missing-policy", "stars", "count", "ISSUE", 4, "vote", "vote-1", "event:missing-policy", "missing", null, null, null, null, 3000]);
-      insertEvent(db, ["policy-window", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "window-source", "event:policy-window", "v2", null, null, null, null, 2900]);
-      insertEvent(db, ["duplicate-a", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-a", "v2", null, null, null, null, 3500]);
-      insertEvent(db, ["duplicate-b", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-b", "v2", null, null, null, null, 3501]);
-      insertEvent(db, ["exchange-missing-valuation", "gold_dust", "mg", "EXCHANGE", -1, "promotion", "exchange-3", "event:exchange-3", "v2", null, "exchange-3", null, null, 4000]);
-      insertEvent(db, ["boundary", "gold_dust", "mg", "ISSUE", 9, "mission", "boundary", "event:boundary", "v1", null, null, null, null, 5000]);
+      insertEvent(db, ["policy-window", "example_coin", "mg", "ADJUSTMENT", 1, "operator", "window-source", "event:policy-window", "v2", null, null, null, null, 2900]);
+      insertEvent(db, ["duplicate-a", "example_coin", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-a", "v2", null, null, null, null, 3500]);
+      insertEvent(db, ["duplicate-b", "example_coin", "mg", "ADJUSTMENT", 1, "operator", "same-source", "event:duplicate-b", "v2", null, null, null, null, 3501]);
+      insertEvent(db, ["exchange-missing-valuation", "example_coin", "mg", "EXCHANGE", -1, "promotion", "exchange-3", "event:exchange-3", "v2", null, "exchange-3", null, null, 4000]);
+      insertEvent(db, ["boundary", "example_coin", "mg", "ISSUE", 9, "mission", "boundary", "event:boundary", "v1", null, null, null, null, 5000]);
 
       const report = buildOwnedCurrencyReport({
         db,
@@ -50,7 +50,7 @@ describe("owned currency report", () => {
         unknownEventCount: 0,
       });
       expect(report.lines.find(line => line.valuationCurrencyCode === "TOSS_POINT")).toMatchObject({
-        currencyCode: "gold_dust",
+        currencyCode: "example_coin",
         exchangedQuantity: 10,
         recordedValuationAmount: 50,
         policy: {
@@ -62,7 +62,7 @@ describe("owned currency report", () => {
         },
       });
       expect(report.lines.find(line => line.valuationCurrencyCode === "KRW")).toMatchObject({
-        currencyCode: "gold_dust",
+        currencyCode: "example_coin",
         exchangedQuantity: 5,
         recordedValuationAmount: 100,
         policy: { valuationCurrencyCode: "TOSS_POINT" },
@@ -80,13 +80,13 @@ describe("owned currency report", () => {
         policy: { present: false },
       });
       expect(report.balances).toEqual([
-        { currencyCode: "gold_bar", unitCode: "mg", balanceQuantity: 2, eventCount: 1 },
-        { currencyCode: "gold_dust", unitCode: "mg", balanceQuantity: 67, eventCount: 8 },
+        { currencyCode: "example_bar", unitCode: "mg", balanceQuantity: 2, eventCount: 1 },
+        { currencyCode: "example_coin", unitCode: "mg", balanceQuantity: 67, eventCount: 8 },
         { currencyCode: "stars", unitCode: "count", balanceQuantity: 4, eventCount: 1 },
       ]);
 
-      insertEvent(db, ["future-duplicate-a", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "future-source", "event:future-a", "v1", null, null, null, null, 6000]);
-      insertEvent(db, ["future-duplicate-b", "gold_dust", "mg", "ADJUSTMENT", 1, "operator", "future-source", "event:future-b", "v1", null, null, null, null, 6001]);
+      insertEvent(db, ["future-duplicate-a", "example_coin", "mg", "ADJUSTMENT", 1, "operator", "future-source", "event:future-a", "v1", null, null, null, null, 6000]);
+      insertEvent(db, ["future-duplicate-b", "example_coin", "mg", "ADJUSTMENT", 1, "operator", "future-source", "event:future-b", "v1", null, null, null, null, 6001]);
       expect(buildOwnedCurrencyReport({
         db,
         periodStart: 1000,
@@ -97,8 +97,8 @@ describe("owned currency report", () => {
 
       const csv = formatOwnedCurrencyCsv(report);
       expect(csv).toContain("rowType,currencyCode,unitCode");
-      expect(csv).toContain("period,gold_dust,mg");
-      expect(csv).toContain("balance,gold_dust,mg");
+      expect(csv).toContain("period,example_coin,mg");
+      expect(csv).toContain("balance,example_coin,mg");
       expect(csv).toContain("policyValuationMode,policyConversionNumerator,policyConversionDenominator,policyEffectiveFrom,policyEffectiveTo");
       expect(csv).toContain("recordedValuationAmount,missingValuationEventCount,eventCount");
       const qualityRow = csv.split("\n").find(row => row.startsWith("quality,"));
@@ -117,11 +117,11 @@ describe("owned currency report", () => {
       expect(metadataValues[column("periodEnd")]).toBe("5000");
       expect(metadataValues[column("timestampUnit")]).toBe("milliseconds");
       expect(metadataValues[column("generatedAt")]).toBe("5000");
-      const balanceRow = csv.split("\n").find(row => row.startsWith("balance,gold_dust,mg"));
+      const balanceRow = csv.split("\n").find(row => row.startsWith("balance,example_coin,mg"));
       const balanceValues = balanceRow.split(",");
       expect(balanceValues[column("eventCount")]).toBe("8");
       expect(balanceValues[column("balanceQuantity")]).toBe("67");
-      const fixedPeriodRow = csv.split("\n").find(row => row.startsWith("period,gold_dust,mg,v1,TOSS_POINT"));
+      const fixedPeriodRow = csv.split("\n").find(row => row.startsWith("period,example_coin,mg,v1,TOSS_POINT"));
       const fixedPeriodValues = fixedPeriodRow.split(",");
       expect(fixedPeriodValues[column("policyValuationMode")]).toBe("FIXED_RATE");
       expect(fixedPeriodValues[column("policyConversionNumerator")]).toBe("1");
