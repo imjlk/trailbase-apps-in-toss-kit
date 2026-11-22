@@ -2,7 +2,7 @@
 
 Ledger doctor는 SQLite 스냅샷을 읽고 Toss 호출이나 데이터 쓰기 없이 진단합니다.
 표시하는 내용은 제공자의 현재 상태가 아닌 **원장에 저장된** 상태입니다. 문의를 받았을 때
-복구 조치를 선택하기 전에 사용하세요. kit의 고정 런타임은 Bun 1.4.2이며 CLI는
+복구 조치를 선택하기 전에 사용하세요. kit의 고정 런타임은 Bun 1.4.5이며 CLI는
 [Bun SQLite](https://bun.com/docs/runtime/sqlite)의 읽기 전용 연결, query-only 모드와
 일관된 읽기 트랜잭션을 사용합니다.
 

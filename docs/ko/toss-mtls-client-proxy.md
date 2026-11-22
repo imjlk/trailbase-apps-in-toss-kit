@@ -382,7 +382,7 @@ metadata도 반환합니다. 이 metadata는 backend identity boundary 안에만
 프록시는 `@ait-kit/api-core`와 `@ait-kit/api-client`를 `0.7.0`으로 고정하고 범용 mTLS
 relay를 명시적으로 활성화합니다. `/internal/mtls/request`에는 기존 내부 bearer
 인증이 적용되며 forward mode는 계속 token을 요구합니다. 로컬 도구, CI, 컨테이너의
-Bun을 `1.4.2`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를
+Bun을 `1.4.5`로 맞췄습니다. 복사형 Compose 템플릿은 게시된 프록시 이미지를
 참조합니다(현재 기준선, 롤아웃 순서, 남은 실기 검사는
 [롤아웃 및 검증 기록](ait-kit-rollout.md) 참고). 새 흐름을 활성화하기 전에 소비
 앱의 이미지 버전을 갱신하고 마이그레이션과 WASM guest를 함께 확인하세요.

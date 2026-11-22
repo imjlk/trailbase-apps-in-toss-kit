@@ -40,7 +40,7 @@ jobs:
           persist-credentials: false
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
-          bun-version: "1.4.2"
+          bun-version: "1.4.5"
       - run: bun test scripts/compare-consumer-templates.test.mjs scripts/consumer-upgrade-plan.test.mjs
       - run: node --test scripts/cargo-local.test.mjs scripts/cargo-cache-report.test.mjs
       - run: node --test scripts/check-consumer-webview-migration.test.mjs
