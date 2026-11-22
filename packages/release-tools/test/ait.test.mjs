@@ -74,6 +74,19 @@ test('WebView inspection finds settings in any chunk and any quote style', async
   await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
 });
 
+test('WebView inspection compares settings as runtime strings, escapes resolved', async () => {
+  const special = { TITLE: `Bob's "gold" app`, NOTE: 'café ${x}' };
+  const policy = { appName: 'test-app', webview: true, config: special, settingKeys: Object.keys(special) };
+  const writer = AppsInTossBundle.writer({ appName: 'test-app' });
+  writer.addFile('sources/index.html', new TextEncoder().encode('<script></script>'));
+  // As a minifier writes them: escaped quotes, a Unicode escape and an escaped interpolation.
+  writer.addFile('sources/assets/index-abc123.js', new TextEncoder().encode(String.raw`const e={TITLE:'Bob\'s "gold" app',NOTE:` + '`caf\\u00e9 \\${x}`' + '};'));
+  const buffer = await writer.toBuffer();
+  await expect(inspectAitArtifact(buffer, policy)).resolves.toBeDefined();
+  // The source spelling is not the runtime value.
+  await expect(inspectAitArtifact(buffer, { ...policy, config: { ...special, TITLE: String.raw`Bob\'s "gold" app` } })).rejects.toThrow('Packaged setting differs: TITLE');
+});
+
 test('evidence rejects replaced bytes, stale source, fixtures, changed settings, and repeat upload', async () => {
   const artifact = await inspectAitArtifact(await bundle(), policy);
   const report = evidence(artifact);

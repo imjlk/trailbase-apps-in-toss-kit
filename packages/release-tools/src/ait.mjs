@@ -86,10 +86,23 @@ async function inspectReactNativeArtifact(buffer, { appName, expectedBundles, co
 // Minifiers may quote string values with backticks (`KEY:`value``).
 const QUOTES = `"'\``;
 
-/** Every `KEY: <quoted value>` in a script, in any quote style. */
+const SIMPLE_ESCAPES = { b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v', 0: '\0', '\n': '', '\r': '' };
+
+/** The runtime value of a JS string literal's body: escapes resolved. */
+function decodeJsString(raw) {
+  return raw.replace(/\\(u\{[0-9a-fA-F]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2}|[\s\S])/g, (_, escape) => {
+    if (escape[0] === 'u' && escape.length > 1) {
+      return String.fromCodePoint(Number.parseInt(escape[1] === '{' ? escape.slice(2, -1) : escape.slice(1), 16));
+    }
+    if (escape[0] === 'x' && escape.length === 3) return String.fromCharCode(Number.parseInt(escape.slice(1), 16));
+    return SIMPLE_ESCAPES[escape] ?? escape;
+  });
+}
+
+/** Every `KEY: <quoted value>` in a script, in any quote style, as runtime strings. */
 function packagedValues(text, key) {
-  const pattern = new RegExp(`(?:[${QUOTES}]${escapeRegex(key)}[${QUOTES}]|\\b${escapeRegex(key)})\\s*:\\s*([${QUOTES}])((?:(?!\\1)[^\\\\]|\\\\.)*)\\1`, 'g');
-  return [...text.matchAll(pattern)].map((match) => match[2]);
+  const pattern = new RegExp(`(?:[${QUOTES}]${escapeRegex(key)}[${QUOTES}]|\\b${escapeRegex(key)})\\s*:\\s*([${QUOTES}])((?:(?!\\1)[^\\\\]|\\\\[\\s\\S])*)\\1`, 'g');
+  return [...text.matchAll(pattern)].map((match) => decodeJsString(match[2]));
 }
 
 async function inspectWebViewArtifact(buffer, { appName, webview, config, settingKeys, maxUnpackedBytes = 100_000_000 }) {
