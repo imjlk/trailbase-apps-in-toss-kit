@@ -9,11 +9,12 @@ const roots = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const config = { API_URL: 'https://release.invalid', AD_ID: 'issued-ad', DEBUG: 'false' };
 const policy = { appName: 'test-app', expectedBundles: ['bundle.ios.0_84_0.js', 'bundle.android.0_84_0.js', 'bundle.ios.0_72_6.js', 'bundle.android.0_72_6.js'], config, settingKeys: Object.keys(config) };
-async function bundle({ appName = policy.appName, missing, noMap, replace = {}, extra = '' } = {}) {
+async function bundle({ appName = policy.appName, missing, noMap, replace = {}, omit, extra = '' } = {}) {
   const writer = AppsInTossBundle.writer({ appName }); writer.setMetadata({ runtimeVersion: '0.84.0' });
+  const env = Object.fromEntries(Object.entries({ ...config, ...replace }).filter(([key]) => key !== omit));
   for (const name of policy.expectedBundles) {
     if (name === missing) continue;
-    writer.addFile(name, new TextEncoder().encode(`const env=${JSON.stringify({ ...config, ...replace })};${extra}`));
+    writer.addFile(name, new TextEncoder().encode(`const env=${JSON.stringify(env)};${extra}`));
     if (name !== noMap) writer.addFile(`${name}.map`, new TextEncoder().encode('{}'));
   }
   return writer.toBuffer();
@@ -39,7 +40,56 @@ test('artifact inspection checks both runtimes, actual settings, maps, and expan
   const result = await inspectAitArtifact(await bundle(), policy);
   expect(result.bundles).toHaveLength(4); expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
   for (const options of [{ appName: 'other-app' }, { missing: policy.expectedBundles[2] }, { noMap: policy.expectedBundles[0] }, { replace: { DEBUG: 'true' } }, { extra: 'const ad="ait-ad-test-banner";' }]) await expect(inspectAitArtifact(await bundle(options), policy)).rejects.toThrow();
+  // Another identifier ending in the key is not the setting.
+  await expect(inspectAitArtifact(await bundle({ omit: 'API_URL', extra: 'const x={$API_URL:"https://release.invalid"};' }), policy)).rejects.toThrow('Packaged setting differs: API_URL');
   await expect(inspectAitArtifact(await bundle(), { ...policy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
+});
+
+const webPolicy = { appName: 'test-app', webview: true, config, settingKeys: Object.keys(config) };
+// A Vite-style build: content-hashed chunks, settings inlined once with backtick quotes.
+async function webBundle({ appName = webPolicy.appName, entry = true, rn = false, map = false, replace = {}, omit, extra = '' } = {}) {
+  const writer = AppsInTossBundle.writer({ appName });
+  const values = Object.entries({ ...config, ...replace }).filter(([key]) => key !== omit);
+  if (entry) writer.addFile('sources/index.html', new TextEncoder().encode('<script type="module" src="./assets/index-abc123.js"></script>'));
+  writer.addFile('sources/assets/index-abc123.js', new TextEncoder().encode(`function env(e={${values.map(([key, value]) => `${key}:\`${value}\``).join(',')}}){return e}${extra}`));
+  writer.addFile('sources/assets/vendor-def456.js', new TextEncoder().encode('export const ui=1;'));
+  if (map) for (const chunk of ['index-abc123', 'vendor-def456']) writer.addFile(`sources/assets/${chunk}.js.map`, new TextEncoder().encode('{}'));
+  if (rn) writer.addFile('bundle.ios.0_84_0.js', new TextEncoder().encode('rn'));
+  return writer.toBuffer();
+}
+
+test('WebView inspection finds settings in any chunk and any quote style', async () => {
+  const result = await inspectAitArtifact(await webBundle(), webPolicy);
+  expect(result.bundles).toEqual(['sources/assets/index-abc123.js', 'sources/assets/vendor-def456.js']);
+  expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
+  for (const options of [
+    { appName: 'other-app' },
+    { entry: false },
+    { rn: true },
+    { replace: { DEBUG: 'true' } },
+    { omit: 'AD_ID' },
+    { extra: 'const ad="ait-ad-test-banner";' },
+    // A second, different value for the same key anywhere in the scripts.
+    { extra: `const stale={API_URL:'https://stale.invalid'};` },
+  ]) await expect(inspectAitArtifact(await webBundle(options), webPolicy)).rejects.toThrow();
+  // Another identifier ending in the key is not the setting.
+  await expect(inspectAitArtifact(await webBundle({ omit: 'API_URL', extra: 'const x={$API_URL:"https://release.invalid"};' }), webPolicy)).rejects.toThrow('Missing packaged setting: API_URL');
+  await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, webview: { requireSourceMaps: true } })).rejects.toThrow('source map');
+  await expect(inspectAitArtifact(await webBundle({ map: true }), { ...webPolicy, webview: { requireSourceMaps: true } })).resolves.toBeDefined();
+  await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
+});
+
+test('WebView inspection compares settings as runtime strings, escapes resolved', async () => {
+  const special = { TITLE: `Bob's "gold" app`, NOTE: 'café ${x}' };
+  const policy = { appName: 'test-app', webview: true, config: special, settingKeys: Object.keys(special) };
+  const writer = AppsInTossBundle.writer({ appName: 'test-app' });
+  writer.addFile('sources/index.html', new TextEncoder().encode('<script></script>'));
+  // As a minifier writes them: escaped quotes, a Unicode escape and an escaped interpolation.
+  writer.addFile('sources/assets/index-abc123.js', new TextEncoder().encode(String.raw`const e={TITLE:'Bob\'s "gold" app',NOTE:` + '`caf\\u00e9 \\${x}`' + '};'));
+  const buffer = await writer.toBuffer();
+  await expect(inspectAitArtifact(buffer, policy)).resolves.toBeDefined();
+  // The source spelling is not the runtime value.
+  await expect(inspectAitArtifact(buffer, { ...policy, config: { ...special, TITLE: String.raw`Bob\'s "gold" app` } })).rejects.toThrow('Packaged setting differs: TITLE');
 });
 
 test('evidence rejects replaced bytes, stale source, fixtures, changed settings, and repeat upload', async () => {
