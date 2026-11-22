@@ -24,7 +24,10 @@ the same release train.
 | SQL templates | Additive v2 migration; v3 index before idle cleanup | Apply `promotion_reward_ledger.v2.sql` for existing v1 ledgers and `promotion_reward_ledger.v3.sql` before idle cleanup; preserve legacy rows |
 
 The published 0.7.0 image is the first release that serves the code-exchange
-route; the compose template pins it. The earlier 0.6.4 image remains the
+route. The compose template now pins 0.8.0, which also serves the IAP purchaser
+check (`iap.purchaser-check`); a consumer that gates user-bound grants on
+`purchaser_confirmed()` needs 0.8.0 or later, because an older proxy reports no
+verdict and every such grant is refused. The earlier 0.6.4 image remains the
 historical promotion v2 baseline and does not support code exchange. Deploy
 0.7.0 or later, check capabilities, then migrate consumer-owned public bootstrap
 callbacks as described in [anonymous identity](anonymous-identity.md). Code exchange proves
@@ -153,7 +156,7 @@ Keep dispatch paused throughout reconciliation, migration and deployment:
 ## Historical Verification Record: proxy 0.5.0 (2026-09-17)
 
 This record covers the previous baseline, not promotion v2. The current baseline
-is proxy 0.7.0 and Rust crates 0.15.0 (release PR #185). Verify the v2 migration
+is proxy 0.8.0 and Rust crates 0.17.0 (release PR #240). Verify the v2 migration
 and versioned capabilities separately; this historical record is not v2 evidence.
 
 Local checks ran on the feature range `ced5f86..08ae12f` (PRs #133, #134,
