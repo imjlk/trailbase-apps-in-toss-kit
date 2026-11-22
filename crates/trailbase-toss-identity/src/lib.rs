@@ -209,6 +209,65 @@ mod tests {
         );
     }
 
+    /// Synthetic hex key: bytes 0x00..=0x1f.
+    pub(crate) const VECTOR_KEY_HEX: &str =
+        "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+    /// Synthetic padded standard-base64 key: bytes 0x20..=0x3f.
+    pub(crate) const VECTOR_KEY_B64: &str = "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=";
+
+    fn vector_nonce(start: u8) -> [u8; 12] {
+        core::array::from_fn(|i| start + i as u8)
+    }
+
+    /// Pinned `v1` ciphertexts produced by the aes-gcm 0.10 / base64 0.22 code
+    /// and cross-checked against an independent AES-256-GCM implementation.
+    /// Rows sealed by earlier releases must keep opening, and sealing with the
+    /// same nonce must keep producing these exact strings.
+    #[test]
+    fn v1_sealed_wire_format_matches_pinned_vectors() {
+        for (key, nonce, plaintext, sealed) in [
+            (
+                VECTOR_KEY_HEX,
+                vector_nonce(0x10),
+                "synthetic-toss-user-key-0001",
+                "v1.EBESExQVFhcYGRob.Dof2YiGsTtqpWHxyfApEJqQ1PCNwpy6c18nSVjOxreYnX0g7I-MXFYox9Xw",
+            ),
+            (
+                VECTOR_KEY_B64,
+                vector_nonce(0xa0),
+                "ait:synthetic-anonymous-seed",
+                "v1.oKGio6Slpqeoqaqr.H1XQDreu7t7JTdnTRXAXyP4RuGpTwVUPfPeunT_xB7_3dogis-cDR6e4sVs",
+            ),
+            (
+                VECTOR_KEY_HEX,
+                vector_nonce(0x70),
+                "",
+                "v1.cHFyc3R1dnd4eXp7.ZulCDAMZa0u1NlvmxuKG-Q",
+            ),
+        ] {
+            assert_eq!(unseal_toss_user_key(key, sealed).unwrap(), plaintext);
+            assert_eq!(
+                seal_toss_user_key_with_nonce(key, plaintext, nonce).unwrap(),
+                sealed
+            );
+        }
+        assert_eq!(
+            unseal_anonymous_key(
+                VECTOR_KEY_B64,
+                "v1.oKGio6Slpqeoqaqr.H1XQDreu7t7JTdnTRXAXyP4RuGpTwVUPfPeunT_xB7_3dogis-cDR6e4sVs"
+            )
+            .unwrap(),
+            "synthetic-anonymous-seed"
+        );
+        assert!(
+            unseal_toss_user_key(
+                VECTOR_KEY_B64,
+                "v1.EBESExQVFhcYGRob.Dof2YiGsTtqpWHxyfApEJqQ1PCNwpy6c18nSVjOxreYnX0g7I-MXFYox9Xw"
+            )
+            .is_err()
+        );
+    }
+
     #[test]
     fn unseal_rejects_wrong_key() {
         let sealed = seal_toss_user_key_with_nonce(KEY, "toss-user-key", [3u8; 12]).unwrap();
