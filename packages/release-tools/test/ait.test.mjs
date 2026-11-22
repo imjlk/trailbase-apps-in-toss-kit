@@ -42,6 +42,38 @@ test('artifact inspection checks both runtimes, actual settings, maps, and expan
   await expect(inspectAitArtifact(await bundle(), { ...policy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
 });
 
+const webPolicy = { appName: 'test-app', webview: true, config, settingKeys: Object.keys(config) };
+// A Vite-style build: content-hashed chunks, settings inlined once with backtick quotes.
+async function webBundle({ appName = webPolicy.appName, entry = true, rn = false, map = false, replace = {}, omit, extra = '' } = {}) {
+  const writer = AppsInTossBundle.writer({ appName });
+  const values = Object.entries({ ...config, ...replace }).filter(([key]) => key !== omit);
+  if (entry) writer.addFile('sources/index.html', new TextEncoder().encode('<script type="module" src="./assets/index-abc123.js"></script>'));
+  writer.addFile('sources/assets/index-abc123.js', new TextEncoder().encode(`function env(e={${values.map(([key, value]) => `${key}:\`${value}\``).join(',')}}){return e}${extra}`));
+  writer.addFile('sources/assets/vendor-def456.js', new TextEncoder().encode('export const ui=1;'));
+  if (map) for (const chunk of ['index-abc123', 'vendor-def456']) writer.addFile(`sources/assets/${chunk}.js.map`, new TextEncoder().encode('{}'));
+  if (rn) writer.addFile('bundle.ios.0_84_0.js', new TextEncoder().encode('rn'));
+  return writer.toBuffer();
+}
+
+test('WebView inspection finds settings in any chunk and any quote style', async () => {
+  const result = await inspectAitArtifact(await webBundle(), webPolicy);
+  expect(result.bundles).toEqual(['sources/assets/index-abc123.js', 'sources/assets/vendor-def456.js']);
+  expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
+  for (const options of [
+    { appName: 'other-app' },
+    { entry: false },
+    { rn: true },
+    { replace: { DEBUG: 'true' } },
+    { omit: 'AD_ID' },
+    { extra: 'const ad="ait-ad-test-banner";' },
+    // A second, different value for the same key anywhere in the scripts.
+    { extra: `const stale={API_URL:'https://stale.invalid'};` },
+  ]) await expect(inspectAitArtifact(await webBundle(options), webPolicy)).rejects.toThrow();
+  await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, webview: { requireSourceMaps: true } })).rejects.toThrow('source map');
+  await expect(inspectAitArtifact(await webBundle({ map: true }), { ...webPolicy, webview: { requireSourceMaps: true } })).resolves.toBeDefined();
+  await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
+});
+
 test('evidence rejects replaced bytes, stale source, fixtures, changed settings, and repeat upload', async () => {
   const artifact = await inspectAitArtifact(await bundle(), policy);
   const report = evidence(artifact);

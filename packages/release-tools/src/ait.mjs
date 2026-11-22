@@ -49,7 +49,16 @@ export function readReleaseContext({ root, appName, version, requireTag = false,
   return { appName, version, tag, commit: git(['rev-parse', 'HEAD']), dirty: Boolean(git(['status', '--porcelain'])) };
 }
 
-export async function inspectAitArtifact(buffer, { appName, expectedBundles, config, settingKeys, maxUnpackedBytes = 100_000_000 }) {
+/**
+ * Inspect an AIT before upload. React Native artifacts list their exact
+ * platform/runtime bundles (`expectedBundles`); WebView SDK 3 artifacts pass
+ * `webview` instead, since a web build names its chunks by content hash.
+ */
+export async function inspectAitArtifact(buffer, policy) {
+  return policy.webview ? inspectWebViewArtifact(buffer, policy) : inspectReactNativeArtifact(buffer, policy);
+}
+
+async function inspectReactNativeArtifact(buffer, { appName, expectedBundles, config, settingKeys, maxUnpackedBytes = 100_000_000 }) {
   assert(Array.isArray(expectedBundles) && expectedBundles.length > 0, 'Expected RN bundles must be explicit');
   assert.equal(AppsInTossBundle.detect(buffer), AppsInTossBundle.Format.AIT, 'Expected current AIT format');
   const reader = AppsInTossBundle.reader(buffer);
@@ -72,6 +81,48 @@ export async function inspectAitArtifact(buffer, { appName, expectedBundles, con
     }
   }
   return { appName: reader.appName, deploymentId: reader.deploymentId, bytes: buffer.byteLength, unpackedBytes, sha256: sha256(buffer), bundles: [...expectedBundles] };
+}
+
+// Minifiers may quote string values with backticks (`KEY:`value``).
+const QUOTES = `"'\``;
+
+/** Every `KEY: <quoted value>` in a script, in any quote style. */
+function packagedValues(text, key) {
+  const pattern = new RegExp(`(?:[${QUOTES}]${escapeRegex(key)}[${QUOTES}]|\\b${escapeRegex(key)})\\s*:\\s*([${QUOTES}])((?:(?!\\1)[^\\\\]|\\\\.)*)\\1`, 'g');
+  return [...text.matchAll(pattern)].map((match) => match[2]);
+}
+
+async function inspectWebViewArtifact(buffer, { appName, webview, config, settingKeys, maxUnpackedBytes = 100_000_000 }) {
+  const { entry = 'sources/index.html', requireSourceMaps = false } = webview === true ? {} : webview;
+  assert.equal(AppsInTossBundle.detect(buffer), AppsInTossBundle.Format.AIT, 'Expected current AIT format');
+  const reader = AppsInTossBundle.reader(buffer);
+  assert.equal(reader.appName, appName, 'Bundle belongs to a different app');
+  const entries = reader.listEntries();
+  assert(entries.includes(entry), `Missing WebView entry: ${entry}`);
+  assert(!entries.some((name) => /^bundle\.(ios|android)\./.test(name)), 'React Native bundles found in a WebView artifact');
+  const scripts = entries.filter((name) => name.startsWith('sources/') && name.endsWith('.js')).sort();
+  assert(scripts.length > 0, 'WebView artifact has no scripts');
+  const found = new Map(settingKeys.map((key) => [key, new Set()]));
+  let unpackedBytes = 0;
+  for (const name of entries) {
+    const bytes = await reader.readEntry(name);
+    unpackedBytes += bytes.byteLength;
+    assert(unpackedBytes <= maxUnpackedBytes, 'Unpacked AIT exceeds the configured size limit');
+    if (!/\.(js|map|json|html|css|txt)$/.test(name)) continue;
+    const text = new TextDecoder().decode(bytes);
+    assert(!text.includes('ait-ad-test-'), `Test ad ID found in ${name}`);
+    if (!scripts.includes(name)) continue;
+    if (requireSourceMaps) assert(entries.includes(`${name}.map`), `Missing source map: ${name}`);
+    for (const key of settingKeys) for (const value of packagedValues(text, key)) found.get(key).add(value);
+  }
+  // A web build inlines its settings once, in whichever chunk reads them.
+  for (const key of settingKeys) {
+    assert(typeof config[key] === 'string', `Missing expected bundle setting: ${key}`);
+    const values = [...found.get(key)];
+    assert(values.length > 0, `Missing packaged setting: ${key}`);
+    assert(values.every((value) => value === config[key]), `Packaged setting differs: ${key}`);
+  }
+  return { appName: reader.appName, deploymentId: reader.deploymentId, bytes: buffer.byteLength, unpackedBytes, sha256: sha256(buffer), bundles: scripts };
 }
 
 export function validateReleaseEvidence(report, context, artifact, configHash) {

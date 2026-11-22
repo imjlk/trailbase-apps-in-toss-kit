@@ -71,6 +71,15 @@ changeset 또는 해당 태그가 있으면 `plan.tag`는 빈 문자열입니다
    태그는 앱·버전과 일치하고 HEAD를 가리켜야 하며, fetch한
    `origin/main`의 이력에 포함되어야 합니다. 성공하면 반환된 보고서를 저장하세요.
 
+WebView SDK 3 앱은 검사 `policy`에 `expectedBundles` 대신 `webview: true`
+(또는 `webview: { entry, requireSourceMaps }`)를 넣습니다. 웹 빌드는 청크
+이름에 내용 해시가 붙기 때문입니다. 이때 검사는 진입 파일(기본값
+`sources/index.html`)과 `sources/` 아래 JS 하나 이상을 요구하고, React Native
+번들이 있으면 거부합니다. `settingKeys`의 각 값은 어느 스크립트에든 예상한
+값으로 있어야 하고, 다른 값으로 있으면 안 됩니다. `import.meta.env`를 번들에
+넣는 번들러는 값을 백틱으로 감싸기도 하므로 모든 따옴표 형식을 읽습니다.
+WebView 산출물의 소스맵은 `requireSourceMaps`를 켤 때만 요구합니다.
+
 Windows 네이티브에서는 `.cmd` shim 대신 설치된 CLI의 실제 JavaScript
 진입 파일을 `cliPath`로 전달하세요. 예를 들어
 `node_modules/@apps-in-toss/framework/bin/ait.js`를 사용할 수 있습니다.
@@ -78,7 +87,7 @@ Windows 네이티브에서는 `.cmd` shim 대신 설치된 CLI의 실제 JavaScr
 셸을 거치지 않습니다. Unix 실행 파일도 계속 지원합니다. 공백이나 셸
 문자가 포함된 산출물 경로와 API 키는 각각 하나의 인자로 전달됩니다.
 
-검사는 예상과 다른 런타임, 소스맵 누락, 포함된 테스트 광고 ID, 잘못된
+검사는 예상과 다른 런타임이나 WebView 진입 파일, 필요한 소스맵 누락, 포함된 테스트 광고 ID, 잘못된
 설정, 압축 해제 후 100 MB 초과 번들을 거부합니다. 업로드 직전에 실제 파일의
 해시·deployment ID, 소스 커밋, 버전, 태그, 설정 해시와 깨끗한 프로덕션 빌드
 증거를 재확인하고 정확한 산출물 경로를 CLI에 전달합니다. CLI 실패 메시지에는
