@@ -24,6 +24,13 @@ test('rejects replaced/duplicate IDs, production schemes, unsafe paths and sensi
  for(const patch of [{deploymentId:'changed'},{scheme:scheme+'&_deploymentId='+id},{scheme:'intoss://app'},{path:'//other'},{path:'/%2e%2e/private'},{path:'/%0a'},{query:{accessToken:'secret'},allowedQueryKeys:['accessToken']},{scheme:scheme+'&token=secret'},{scheme:scheme+'&queryParams='+encodeURIComponent(JSON.stringify({accessToken:'secret'})),allowedQueryKeys:['accessToken']}])
   expect(()=>createDeviceTestScheme({scheme,deploymentId:id,...patch})).toThrow();
 });
+test('keeps the WebView CLI host marker and rejects any other host value',()=>{
+ const cli=`intoss-private://fixture-app?_deploymentId=${id}&host=appsInTossHost`;
+ const url=new URL(createDeviceTestScheme({scheme:cli,deploymentId:id,path:'/furnace'}));
+ expect(url.searchParams.get('host')).toBe('appsInTossHost');expect(url.pathname).toBe('/furnace');expect(url.searchParams.get('_deploymentId')).toBe(id);
+ for(const issued of [`${cli}&host=appsInTossHost`,cli.replace('appsInTossHost','evil.invalid')])
+  expect(()=>createDeviceTestScheme({scheme:issued,deploymentId:id})).toThrow();
+});
 test('existing route query parameters obey the same allowlist',()=>{
  const issued = `${scheme}&queryParams=${encodeURIComponent(JSON.stringify({entry:'direct'}))}`;
  expect(()=>createDeviceTestScheme({scheme:issued,deploymentId:id})).toThrow();
