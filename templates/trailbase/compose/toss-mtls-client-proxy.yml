@@ -2,12 +2,13 @@ services:
   # Put Toss Login unlink callback settings on the TrailBase app service, not on this proxy.
   # See templates/trailbase/env/toss-login-unlink.env.example.
   toss-mtls-client-proxy:
-    # Released baseline: @ait-kit api-core/api-client 0.6.0 contracts,
+    # Released baseline: @ait-kit api-core/api-client 0.8.0 contracts,
     # message UNKNOWN outcomes, recipient-bound promotion v2 rewards,
-    # anonymous-recipient/recovery adapters, and one-time anonymous
-    # authentication code exchange (anonymous-key.exchange-auth-code).
+    # anonymous-recipient/recovery adapters, one-time anonymous
+    # authentication code exchange (anonymous-key.exchange-auth-code), and the
+    # IAP purchaser check (iap.purchaser-check).
     # Reconcile consumer-owned migrations and rebuild WASM guests before rollout.
-    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.7.0
+    image: ghcr.io/imjlk/trailbase-apps-in-toss-kit/toss-mtls-client-proxy:0.8.0
     init: true
     stop_grace_period: 100s
     profiles:
