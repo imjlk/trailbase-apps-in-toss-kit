@@ -17,10 +17,10 @@ inputs.
 These values are policy values for this kit.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.36.1`
-- Last verified TrailBase release date: `2026-11-18`
-- Upstream latest TrailBase server: `0.36.1`
-- Upstream latest TrailBase release date: `2026-11-18`
+- Last verified TrailBase server: `0.36.2`
+- Last verified TrailBase release date: `2026-11-20`
+- Upstream latest TrailBase server: `0.36.2`
+- Upstream latest TrailBase release date: `2026-11-20`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -31,7 +31,7 @@ The manual server compatibility values are mirrored in
 `data/trailbase-compat-policy.json`. That file is intentionally not generated
 from the upstream latest release, because latest upstream and supported-by-this-kit
 are different signals.
-TrailBase `0.36.1` is now the last version verified with the disposable kit
+TrailBase `0.36.2` is now the last version verified with the disposable kit
 WASM/auth/Record API/SSE fixture and the analytics multi-database smoke. Run
 `bun run trailbase:wasm:smoke` and
 `bun scripts/smoke-trailbase-analytics-multidb.mjs` to reproduce it with Docker.
@@ -54,7 +54,7 @@ After pulling a new `.mise.toml`, run `mise trust` once for this checkout, then
 ## Renovate-Tracked Upstream Versions
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.36.1`
+- `trailbase-server-github-release`: `0.36.2`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -132,10 +132,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbase/trailbase:0.36.1
+  --image trailbase/trailbase:0.36.2
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.36.1
+  --version 0.36.2
 ```
 
 In non-strict mode the script warns and exits successfully. In strict mode it
@@ -176,7 +176,7 @@ run the application's own smoke tests before rollout.
 TrailBase `0.34.0` changes relative `ATTACH DATABASE` paths in the asynchronous
 WASM SQL host from the process working directory to `<depot>/data` and disallows
 parent-directory references. `Transaction::execute` still runs attachment through
-SQLite directly through `0.36.1`, using the process working directory for relative
+SQLite directly through `0.36.2`, using the process working directory for relative
 paths. Check the SQL API before changing a bound fallback path; see the
 [analytics fallback initializer](analytics.md) for the API distinction and
 upstream source references. The kit's smokes do not attach a database from WASM,
@@ -205,7 +205,7 @@ only after the consumer's pinned server includes it.
 
 TrailBase 0.32 changed the component interface. This checkout now builds with
 `trailbase-wasm` 0.6.1 and must be deployed together with a compatible server;
-0.36.1 is the verified pairing. Rebuild all consumer Rust components and update
+0.36.2 is the verified pairing. Rebuild all consumer Rust components and update
 the first-party auth-ui component following the upstream component instructions.
 Keep a consumer on its previous kit/server pair until that coordinated migration
 is ready. The unchanged TBD minimum policy is not a claim that new components run
@@ -223,7 +223,7 @@ remain the token authority.
 The reviewed upstream delta also includes nested JSON subscription fixes in
 0.31.3, recycled Rust guest state and auth-ui metadata changes in 0.32, stronger
 refresh-token entropy and OAuth/cookie fixes in 0.33, admin UI/SQL tooling
-changes through 0.33.14, and the 0.33.15–0.36.1 changes in this section. No Postgres
+changes through 0.33.14, and the 0.33.15–0.36.2 changes in this section. No Postgres
 compatibility claim is added; this kit's SQL and integration smoke remain
 SQLite-based. Keep request/user state out of global Rust guest caches because
 guest instances may serve multiple requests.
@@ -245,4 +245,6 @@ consumer's full application migrations.
 
 `0.36.1` adds `ProxyConfig` (`server.proxy` in `config.textproto`) for a known, trusted reverse-proxy topology. `client_ip_header` selects the header the client IP is taken from for logging and rate limiting, including `auth_ip_rate_limit`, and `trusted_proxies` lists proxy addresses to skip right-to-left in `X-Forwarded-For`; `0.36.1` parses these entries as exact IP addresses, not CIDR ranges. When `proxy` is unset, TrailBase keeps the permissive fallback that takes the first of several proxy headers it finds, which a client can forge whenever its request does not pass through a proxy that sets those headers. Kit templates do not set `server.proxy`. Consumers deploying behind a reverse proxy, for example Coolify's, should evaluate an explicit setting: `X_FORWARDED_FOR` when a single appending proxy fronts TrailBase, `trusted_proxies` for each additional hop, or a CDN header such as `CF_CONNECTING_IP` only when that CDN is the sole path in. `0.36.1` also persists Admin UI ERD node positions and updates Rust and JavaScript dependencies for security advisories; between `0.35.9` and `0.36.1` this includes Wasmtime `48.0.9` and `jsonwebtoken` 12.
 
-Neither `0.36` release changes the Rust MSRV/MVRV (`1.93`) or toolchain (`1.95`), `bun run trailbase:rust-policy:check` stays synchronized, the upstream WASM host sources are unchanged since `0.35.9`, and `trailbase-wasm` remains `0.6.1`. The verified baseline moved from `0.35.9` to `0.36.1` on 2026-11-22: the disposable WASM smoke (with and without the operations hold), the analytics multi-database smoke and the owned-currency SQL smoke pass against `trailbase/trailbase:0.36.1`. This is not consumer device or production validation, and the kit minimum stays TBD.
+`0.36.2` adds an Admin UI page for the `server.proxy` settings introduced in `0.36.1`, so operators can set the client-IP header and trusted proxies without editing `config.textproto`, and updates Rust dependencies for Wasmtime security advisories (Wasmtime `48.0.9` to `48.0.10`). The upstream diff touches no WASM host, WIT or guest crate sources, so guest components need no rebuild for this step. The Wasmtime fixes live in the server's WASM host, so consumers that run Rust WASM guests should move their server pin to `0.36.2` after their own smoke tests.
+
+None of the `0.36` releases change the Rust MSRV/MVRV (`1.93`) or toolchain (`1.95`), `bun run trailbase:rust-policy:check` stays synchronized, the upstream WASM host sources are unchanged since `0.35.9`, and `trailbase-wasm` remains `0.6.1`. The verified baseline moved from `0.35.9` to `0.36.1` on 2026-11-22, then to `0.36.2` the same day: the disposable WASM smoke (with and without the operations hold), the analytics multi-database smoke and the owned-currency SQL smoke pass against `trailbase/trailbase:0.36.2`. This is not consumer device or production validation, and the kit minimum stays TBD.

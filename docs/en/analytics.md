@@ -146,7 +146,7 @@ it only for new or reset analytics databases.
 
 TrailBase `0.34.0` and later resolve relative `ATTACH DATABASE` paths under
 `<depot>/data` in the asynchronous WASM SQL host and disallow parent-directory
-paths there. This rule does not apply to `Transaction::execute`: through `0.36.1`,
+paths there. This rule does not apply to `Transaction::execute`: through `0.36.2`,
 transaction statements run directly through SQLite and relative paths still use
 the server process working directory. A transaction fallback should bind an
 explicit path to its existing database, such as `<depot>/data/analytics.db` with
@@ -156,10 +156,10 @@ absolute path to the asynchronous host, which validates paths differently.
 Before upgrading, identify which SQL API executes the attachment and verify that
 a write before and after upgrade reaches the same file. Do not move the database
 or switch to a bare filename based only on the server version. The kit's
-last-verified server is `0.36.1`; its smokes do not attach a database from
-WASM. The API distinction above follows the upstream `0.36.1`
-[asynchronous host](https://github.com/trailbaseio/trailbase/blob/v0.36.1/crates/wasm-runtime-host/src/sqlite_host.rs)
-and [transaction implementation](https://github.com/trailbaseio/trailbase/blob/v0.36.1/crates/wasm-runtime-host/src/host.rs).
+last-verified server is `0.36.2`; its smokes do not attach a database from
+WASM. The API distinction above follows the upstream `0.36.2`
+[asynchronous host](https://github.com/trailbaseio/trailbase/blob/v0.36.2/crates/wasm-runtime-host/src/sqlite_host.rs)
+and [transaction implementation](https://github.com/trailbaseio/trailbase/blob/v0.36.2/crates/wasm-runtime-host/src/host.rs).
 
 To verify the template against the currently verified TrailBase image:
 
