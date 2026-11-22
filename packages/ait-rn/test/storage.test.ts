@@ -8,37 +8,37 @@ import { mapStorage } from "./helpers";
 describe("AppsInToss RN storage helpers", () => {
   test("creates app-scoped session storage and invalidates legacy sessions", async () => {
     const storage = mapStorage([
-      ["poll-maker.anonymousHash", "anon_legacy"],
-      ["poll-maker.appSession", "session"],
+      ["example-app.anonymousHash", "anon_legacy"],
+      ["example-app.appSession", "session"],
     ]);
     const sessionStorage = createAppsInTossSessionStorage({
-      appKey: "poll-maker",
+      appKey: "example-app",
       env: "production",
       getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
       storage,
     });
 
     expect(sessionStorage.anonymousHashStorageKey).toBe(
-      "poll-maker.anonymousHash",
+      "example-app.anonymousHash",
     );
-    expect(sessionStorage.appSessionStorageKey).toBe("poll-maker.appSession");
-    expect(sessionStorage.tossSessionStorageKey).toBe("poll-maker.tossSession");
+    expect(sessionStorage.appSessionStorageKey).toBe("example-app.appSession");
+    expect(sessionStorage.tossSessionStorageKey).toBe("example-app.tossSession");
     await expect(
-      sessionStorage.storage.getItem("poll-maker.appSession"),
+      sessionStorage.storage.getItem("example-app.appSession"),
     ).resolves.toBeNull();
-    expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:user-key");
+    expect(storage.map.get("example-app.anonymousHash")).toBe("ait:user-key");
   });
 
   test("requires native Apps in Toss storage in production session storage", () => {
     expect(() =>
       createAppsInTossSessionStorage({
-        appKey: "poll-maker",
+        appKey: "example-app",
         env: "production",
       }),
     ).toThrow("Apps in Toss Storage is required");
     expect(() =>
       createAppsInTossSessionStorage({
-        appKey: "poll-maker",
+        appKey: "example-app",
         env: "development",
         fallbackStorage: mapStorage(),
         production: true,
@@ -48,13 +48,13 @@ describe("AppsInToss RN storage helpers", () => {
 
   test("allows fallback session storage outside production", async () => {
     const sessionStorage = createAppsInTossSessionStorage({
-      appKey: "poll-maker",
+      appKey: "example-app",
       createDevFallback: () => "dev-anon_local",
       env: "development",
     });
 
     await expect(
-      sessionStorage.storage.getItem("poll-maker.anonymousHash"),
+      sessionStorage.storage.getItem("example-app.anonymousHash"),
     ).resolves.toBe("dev-anon_local");
   });
 

@@ -1351,7 +1351,7 @@ mod tests {
         let record = NotificationTemplateAgreementRecord {
             id: "agreement-1".to_string(),
             user_id: vec![1, 2, 3],
-            template_code: "poll-maker-poll-status-result".to_string(),
+            template_code: "example-poll-status-result".to_string(),
             status: "OPTED_IN".to_string(),
             source: APPS_IN_TOSS_NOTIFICATION_AGREEMENT_SDK_SOURCE.to_string(),
             last_result: Some("newAgreement".to_string()),
@@ -1361,7 +1361,7 @@ mod tests {
 
         let value = serde_json::to_value(record).unwrap();
 
-        assert_eq!(value["templateCode"], "poll-maker-poll-status-result");
+        assert_eq!(value["templateCode"], "example-poll-status-result");
         assert!(value.get("agreementTemplateCode").is_none());
     }
 
@@ -1370,9 +1370,9 @@ mod tests {
         let gate = MessageDispatchGate {
             allowed: true,
             purpose: MessagePurpose::Functional,
-            template_code: "poll-maker-poll-status-result".to_string(),
+            template_code: "example-poll-status-result".to_string(),
             requires_notification_agreement: true,
-            notification_template_code: Some("poll-maker-poll-status-result".to_string()),
+            notification_template_code: Some("example-poll-status-result".to_string()),
             skip_reason: None,
             template_status: Some("APPROVED".to_string()),
         };
@@ -1381,7 +1381,7 @@ mod tests {
 
         assert_eq!(
             value["notificationTemplateCode"],
-            "poll-maker-poll-status-result"
+            "example-poll-status-result"
         );
         assert_eq!(value["requiresNotificationAgreement"], true);
         assert!(value.get("agreementTemplateCode").is_none());
@@ -1394,7 +1394,7 @@ mod tests {
             Value::Text("FUNCTIONAL".to_string()),
             Value::Text("APPROVED".to_string()),
             Value::Integer(1),
-            Value::Text(" poll-maker-poll-status-result ".to_string()),
+            Value::Text(" example-poll-status-result ".to_string()),
         ];
 
         let template = message_template_from_row(&row).unwrap();
@@ -1403,7 +1403,7 @@ mod tests {
         assert!(template.requires_agreement);
         assert_eq!(
             template.notification_template_code.as_deref(),
-            Some("poll-maker-poll-status-result")
+            Some("example-poll-status-result")
         );
     }
 
@@ -1431,12 +1431,12 @@ mod tests {
         ];
 
         let template =
-            legacy_message_template_from_row(&row, " poll-maker-poll-status-result ").unwrap();
+            legacy_message_template_from_row(&row, " example-poll-status-result ").unwrap();
 
         assert!(template.requires_agreement);
         assert_eq!(
             template.notification_template_code.as_deref(),
-            Some("poll-maker-poll-status-result")
+            Some("example-poll-status-result")
         );
     }
 
@@ -1449,7 +1449,7 @@ mod tests {
         ];
 
         let template =
-            legacy_message_template_from_row(&row, "poll-maker-poll-status-result").unwrap();
+            legacy_message_template_from_row(&row, "example-poll-status-result").unwrap();
 
         assert!(!template.requires_agreement);
         assert_eq!(template.notification_template_code, None);

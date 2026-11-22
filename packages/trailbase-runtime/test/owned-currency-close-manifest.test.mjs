@@ -227,9 +227,9 @@ describe("owned currency close manifest", () => {
          conversion_numerator, conversion_denominator, effective_from)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
-        "gold_dust",
+        "example_coin",
         "mg",
-        "gold-dust-v1",
+        "example-app-v1",
         "FIXED_RATE",
         "TOSS_POINT",
         1,
@@ -243,13 +243,13 @@ describe("owned currency close manifest", () => {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         "event-1",
-        "gold_dust",
+        "example_coin",
         "mg",
         "ISSUE",
         1,
         "mission",
         "mission-1",
-        "gold-dust-v1",
+        "example-app-v1",
         1788192000000,
         null,
       );
@@ -319,7 +319,7 @@ function reportFixture() {
         version: "0.5.0",
         sourceCommit,
       },
-      lines: [{ policyVersion: "gold-dust-v1" }],
+      lines: [{ policyVersion: "example-app-v1" }],
       quality: {},
     }),
   );
@@ -331,7 +331,7 @@ function manifestFixture(reportBytes) {
     reportSchemaVersion: 1,
     reportFormat: "json",
     reportRevision: "2026-09-r1",
-    appId: "gold-dust",
+    appId: "example-app",
     period: { start: 1788192000000, end: 1790870400000 },
     timestampUnit: "milliseconds",
     timezone: "Asia/Seoul",
@@ -339,7 +339,7 @@ function manifestFixture(reportBytes) {
     snapshotRef: "snapshot-2026-09-r1",
     sourceCommit,
     tool: { name: "trailbase-owned-currency-report", version: "0.5.0" },
-    policyVersions: ["gold-dust-v1"],
+    policyVersions: ["example-app-v1"],
     approvalRevision: 2,
     records: [
       {

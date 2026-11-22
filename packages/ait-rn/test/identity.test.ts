@@ -128,86 +128,86 @@ describe("AppsInToss RN identity helpers", () => {
   });
 
   test("preserves existing Apps in Toss hashes in storage", async () => {
-    const storage = mapStorage([["poll-maker.anonymousHash", "ait:existing"]]);
+    const storage = mapStorage([["example-app.anonymousHash", "ait:existing"]]);
     const identityStorage = createAppsInTossIdentityStorage(storage, {
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      anonymousHashStorageKey: "example-app.anonymousHash",
       getAnonymousKey: async () => ({ type: "HASH", hash: "new-key" }),
       production: true,
     });
 
     await expect(
-      identityStorage.getItem("poll-maker.anonymousHash"),
+      identityStorage.getItem("example-app.anonymousHash"),
     ).resolves.toBe("ait:existing");
-    expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:existing");
+    expect(storage.map.get("example-app.anonymousHash")).toBe("ait:existing");
   });
 
   test("replaces legacy random anonymous hashes in production", async () => {
-    const storage = mapStorage([["poll-maker.anonymousHash", "anon_legacy"]]);
+    const storage = mapStorage([["example-app.anonymousHash", "anon_legacy"]]);
     const identityStorage = createAppsInTossIdentityStorage(storage, {
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      anonymousHashStorageKey: "example-app.anonymousHash",
       getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
       production: true,
     });
 
     await expect(
-      identityStorage.getItem("poll-maker.anonymousHash"),
+      identityStorage.getItem("example-app.anonymousHash"),
     ).resolves.toBe("ait:user-key");
-    expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:user-key");
+    expect(storage.map.get("example-app.anonymousHash")).toBe("ait:user-key");
   });
 
   test("preserves legacy random anonymous hashes outside production", async () => {
-    const storage = mapStorage([["poll-maker.anonymousHash", "anon_legacy"]]);
+    const storage = mapStorage([["example-app.anonymousHash", "anon_legacy"]]);
     const identityStorage = createAppsInTossIdentityStorage(storage, {
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      anonymousHashStorageKey: "example-app.anonymousHash",
       getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
       production: false,
     });
 
     await expect(
-      identityStorage.getItem("poll-maker.anonymousHash"),
+      identityStorage.getItem("example-app.anonymousHash"),
     ).resolves.toBe("anon_legacy");
-    expect(storage.map.get("poll-maker.anonymousHash")).toBe("anon_legacy");
+    expect(storage.map.get("example-app.anonymousHash")).toBe("anon_legacy");
   });
 
   test("invalidates stored app sessions when production refreshes a legacy hash", async () => {
     const storage = mapStorage([
-      ["poll-maker.anonymousHash", "anon_legacy"],
-      ["poll-maker.appSession", "session"],
+      ["example-app.anonymousHash", "anon_legacy"],
+      ["example-app.appSession", "session"],
     ]);
     const identityStorage = createAppsInTossIdentityStorage(storage, {
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
-      appSessionStorageKey: "poll-maker.appSession",
+      anonymousHashStorageKey: "example-app.anonymousHash",
+      appSessionStorageKey: "example-app.appSession",
       getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
       production: true,
     });
 
-    await expect(identityStorage.getItem("poll-maker.appSession")).resolves.toBeNull();
-    expect(storage.map.get("poll-maker.anonymousHash")).toBe("ait:user-key");
-    expect(storage.map.get("poll-maker.appSession")).toBe("session");
+    await expect(identityStorage.getItem("example-app.appSession")).resolves.toBeNull();
+    expect(storage.map.get("example-app.anonymousHash")).toBe("ait:user-key");
+    expect(storage.map.get("example-app.appSession")).toBe("session");
   });
 
   test("delegates non-anonymous storage keys", async () => {
-    const storage = mapStorage([["poll-maker.appSession", "session"]]);
+    const storage = mapStorage([["example-app.appSession", "session"]]);
     const identityStorage = createAppsInTossIdentityStorage(storage, {
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      anonymousHashStorageKey: "example-app.anonymousHash",
       production: true,
     });
 
-    await expect(identityStorage.getItem("poll-maker.appSession")).resolves.toBe(
+    await expect(identityStorage.getItem("example-app.appSession")).resolves.toBe(
       "session",
     );
   });
 
   test("integrates with the TrailBase session manager bootstrap body", async () => {
     const storage = createAppsInTossIdentityStorage(mapStorage(), {
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      anonymousHashStorageKey: "example-app.anonymousHash",
       getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
       production: true,
     });
     let bootstrapAnonymousHash = "";
     const manager = createAppsInTossSessionManager({
       storage,
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
+      anonymousHashStorageKey: "example-app.anonymousHash",
       appLogin: async () => ({ authorizationCode: "code", referrer: "DEFAULT" }),
       bootstrap: async (anonymousHash) => {
         bootstrapAnonymousHash = anonymousHash;
@@ -231,9 +231,9 @@ describe("AppsInToss RN identity helpers", () => {
   test("migrates legacy hashes before restoring stored app sessions", async () => {
     const storage = createAppsInTossIdentityStorage(
       mapStorage([
-        ["poll-maker.anonymousHash", "anon_legacy"],
+        ["example-app.anonymousHash", "anon_legacy"],
         [
-          "poll-maker.appSession",
+          "example-app.appSession",
           JSON.stringify({
             authProvider: "anonymous",
             sessionToken: "legacy-session",
@@ -242,8 +242,8 @@ describe("AppsInToss RN identity helpers", () => {
         ],
       ]),
       {
-        anonymousHashStorageKey: "poll-maker.anonymousHash",
-        appSessionStorageKey: "poll-maker.appSession",
+        anonymousHashStorageKey: "example-app.anonymousHash",
+        appSessionStorageKey: "example-app.appSession",
         getAnonymousKey: async () => ({ type: "HASH", hash: "user-key" }),
         production: true,
       },
@@ -252,8 +252,8 @@ describe("AppsInToss RN identity helpers", () => {
     let loadSessionCalls = 0;
     const manager = createAppsInTossSessionManager({
       storage,
-      anonymousHashStorageKey: "poll-maker.anonymousHash",
-      appSessionStorageKey: "poll-maker.appSession",
+      anonymousHashStorageKey: "example-app.anonymousHash",
+      appSessionStorageKey: "example-app.appSession",
       appLogin: async () => ({ authorizationCode: "code", referrer: "DEFAULT" }),
       bootstrap: async (anonymousHash) => {
         bootstrapAnonymousHash = anonymousHash;
