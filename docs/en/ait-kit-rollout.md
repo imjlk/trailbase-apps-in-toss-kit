@@ -49,9 +49,11 @@ Keep dispatch paused throughout reconciliation, migration and deployment:
 2. **Proxy next** (breaking promotion v2): update the consumer-owned
    Compose image pin to the released proxy (template updated accordingly;
    final tag comes from the release — this cycle removes the promotion
-   grant route) and roll the proxy behind the light-on/off switch. Wire
-   shapes for login, messages, IAP, and stub responses are unchanged, but
-   `promotion/reward/grant` now answers `410 PROMOTION_GRANT_REMOVED`
+   grant route) and roll the proxy out behind an on/off switch. Wire
+   shapes for login, messages, and stub responses are unchanged. From proxy
+   0.8.0, IAP status responses can add `purchaserCheck`, and a payable order
+   bought by another user fails as `UNVERIFIED_IAP_ORDER`, so IAP response
+   parsers must accept both. `promotion/reward/grant` now answers `410 PROMOTION_GRANT_REMOVED`
    without touching the upstream, prepare requires exactly one recipient,
    and status passes the observed verdict through verbatim (UNKNOWN stays
    UNKNOWN; no PENDING remap). A paused worker survives an accidental

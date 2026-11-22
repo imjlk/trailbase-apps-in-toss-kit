@@ -44,9 +44,12 @@
    정산합니다. PREPARED 재실행이나 대체 키 발급으로 소진하지 마세요.
 2. **프록시 다음**(프로모션 v2 breaking): 컨슈머 소유 Compose 이미지 핀을
    릴리즈된 프록시로 올리고(템플릿도 같이 갱신, 최종 태그는 릴리즈에서
-   확정 — 이번 주기는 프로모션 grant 라우트를 제거합니다) light-on-off와
-   함께 프록시를 교체합니다. 로그인, 메시지, IAP, stub 응답의 wire 형태는
-   변경되지 않지만 `promotion/reward/grant`는 업스트림을 건드리지 않고 `410
+   확정 — 이번 주기는 프로모션 grant 라우트를 제거합니다) 켜고 끌 수 있는
+   스위치 뒤에서 프록시를 교체합니다. 로그인, 메시지, stub 응답의 wire 형태는
+   변경되지 않습니다. 프록시 0.8.0부터 IAP 상태 응답에 `purchaserCheck`가
+   추가될 수 있고, 다른 사용자가 결제한 결제 완료 주문은
+   `UNVERIFIED_IAP_ORDER`로 실패하므로 IAP 응답 파서는 둘 다 받아들여야
+   합니다. `promotion/reward/grant`는 업스트림을 건드리지 않고 `410
    PROMOTION_GRANT_REMOVED`로 응답하고, prepare는 수신자를 정확히 하나
    요구하며, status는 관찰된 판정을 그대로 전달합니다(UNKNOWN 유지, PENDING
    재매핑 없음). 발송이 멈춘 워커는 프록시가 먼저 교체돼도 안전합니다.
