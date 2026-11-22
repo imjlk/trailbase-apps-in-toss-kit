@@ -8,6 +8,8 @@ import { releaseTag } from './sampo.mjs';
 export const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 export const buildConfigDigest = (config) => sha256(JSON.stringify(Object.fromEntries(Object.entries(config).sort(([a], [b]) => a.localeCompare(b)))));
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// A bare property name, never the tail of a longer identifier (`$KEY`, `XKEY`).
+const bareName = (key) => `(?<![\\w$])${escapeRegex(key)}`;
 
 export function validatePublicBuildConfig(value, { allowedKeys, constants = {}, httpsKeys = [], adKeys = [], optionalAdKeys = [] }) {
   assert(value && typeof value === 'object' && !Array.isArray(value), 'Build configuration must be an object');
@@ -77,7 +79,7 @@ async function inspectReactNativeArtifact(buffer, { appName, expectedBundles, co
     assert(entries.includes(`${entry}.map`), `Missing source map: ${entry}`);
     for (const key of settingKeys) {
       assert(typeof config[key] === 'string', `Missing expected bundle setting: ${key}`);
-      assert(new RegExp(`(?:["']${escapeRegex(key)}["']|\\b${escapeRegex(key)})\\s*:\\s*["']${escapeRegex(config[key])}["']`).test(text), `Packaged setting differs: ${key} in ${entry}`);
+      assert(new RegExp(`(?:["']${escapeRegex(key)}["']|${bareName(key)})\\s*:\\s*["']${escapeRegex(config[key])}["']`).test(text), `Packaged setting differs: ${key} in ${entry}`);
     }
   }
   return { appName: reader.appName, deploymentId: reader.deploymentId, bytes: buffer.byteLength, unpackedBytes, sha256: sha256(buffer), bundles: [...expectedBundles] };
@@ -101,7 +103,7 @@ function decodeJsString(raw) {
 
 /** Every `KEY: <quoted value>` in a script, in any quote style, as runtime strings. */
 function packagedValues(text, key) {
-  const pattern = new RegExp(`(?:[${QUOTES}]${escapeRegex(key)}[${QUOTES}]|\\b${escapeRegex(key)})\\s*:\\s*([${QUOTES}])((?:(?!\\1)[^\\\\]|\\\\[\\s\\S])*)\\1`, 'g');
+  const pattern = new RegExp(`(?:[${QUOTES}]${escapeRegex(key)}[${QUOTES}]|${bareName(key)})\\s*:\\s*([${QUOTES}])((?:(?!\\1)[^\\\\]|\\\\[\\s\\S])*)\\1`, 'g');
   return [...text.matchAll(pattern)].map((match) => decodeJsString(match[2]));
 }
 

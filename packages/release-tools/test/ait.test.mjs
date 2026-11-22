@@ -9,11 +9,12 @@ const roots = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 const config = { API_URL: 'https://release.invalid', AD_ID: 'issued-ad', DEBUG: 'false' };
 const policy = { appName: 'test-app', expectedBundles: ['bundle.ios.0_84_0.js', 'bundle.android.0_84_0.js', 'bundle.ios.0_72_6.js', 'bundle.android.0_72_6.js'], config, settingKeys: Object.keys(config) };
-async function bundle({ appName = policy.appName, missing, noMap, replace = {}, extra = '' } = {}) {
+async function bundle({ appName = policy.appName, missing, noMap, replace = {}, omit, extra = '' } = {}) {
   const writer = AppsInTossBundle.writer({ appName }); writer.setMetadata({ runtimeVersion: '0.84.0' });
+  const env = Object.fromEntries(Object.entries({ ...config, ...replace }).filter(([key]) => key !== omit));
   for (const name of policy.expectedBundles) {
     if (name === missing) continue;
-    writer.addFile(name, new TextEncoder().encode(`const env=${JSON.stringify({ ...config, ...replace })};${extra}`));
+    writer.addFile(name, new TextEncoder().encode(`const env=${JSON.stringify(env)};${extra}`));
     if (name !== noMap) writer.addFile(`${name}.map`, new TextEncoder().encode('{}'));
   }
   return writer.toBuffer();
@@ -39,6 +40,8 @@ test('artifact inspection checks both runtimes, actual settings, maps, and expan
   const result = await inspectAitArtifact(await bundle(), policy);
   expect(result.bundles).toHaveLength(4); expect(result.sha256).toMatch(/^[a-f0-9]{64}$/);
   for (const options of [{ appName: 'other-app' }, { missing: policy.expectedBundles[2] }, { noMap: policy.expectedBundles[0] }, { replace: { DEBUG: 'true' } }, { extra: 'const ad="ait-ad-test-banner";' }]) await expect(inspectAitArtifact(await bundle(options), policy)).rejects.toThrow();
+  // Another identifier ending in the key is not the setting.
+  await expect(inspectAitArtifact(await bundle({ omit: 'API_URL', extra: 'const x={$API_URL:"https://release.invalid"};' }), policy)).rejects.toThrow('Packaged setting differs: API_URL');
   await expect(inspectAitArtifact(await bundle(), { ...policy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
 });
 
@@ -69,6 +72,8 @@ test('WebView inspection finds settings in any chunk and any quote style', async
     // A second, different value for the same key anywhere in the scripts.
     { extra: `const stale={API_URL:'https://stale.invalid'};` },
   ]) await expect(inspectAitArtifact(await webBundle(options), webPolicy)).rejects.toThrow();
+  // Another identifier ending in the key is not the setting.
+  await expect(inspectAitArtifact(await webBundle({ omit: 'API_URL', extra: 'const x={$API_URL:"https://release.invalid"};' }), webPolicy)).rejects.toThrow('Missing packaged setting: API_URL');
   await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, webview: { requireSourceMaps: true } })).rejects.toThrow('source map');
   await expect(inspectAitArtifact(await webBundle({ map: true }), { ...webPolicy, webview: { requireSourceMaps: true } })).resolves.toBeDefined();
   await expect(inspectAitArtifact(await webBundle(), { ...webPolicy, maxUnpackedBytes: 10 })).rejects.toThrow('size limit');
