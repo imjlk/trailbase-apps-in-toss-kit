@@ -16,10 +16,10 @@ toolchain 변경은 업스트림 호환성 입력값으로 추적합니다.
 아래 값은 이 kit의 정책 값입니다.
 
 - Kit minimum supported TrailBase server: `TBD`
-- Last verified TrailBase server: `0.35.9`
-- Last verified TrailBase release date: `2026-11-03`
-- Upstream latest TrailBase server: `0.35.12`
-- Upstream latest TrailBase release date: `2026-11-10`
+- Last verified TrailBase server: `0.36.1`
+- Last verified TrailBase release date: `2026-11-18`
+- Upstream latest TrailBase server: `0.36.1`
+- Upstream latest TrailBase release date: `2026-11-18`
 - Upstream Rust MSRV/MVRV from release notes: `1.93`
 - Upstream Rust toolchain from release notes: `1.95`
 
@@ -29,7 +29,7 @@ test가 통과한 뒤에만 사람이 올립니다.
 수동 서버 호환성 값은 `data/trailbase-compat-policy.json`에도 기록합니다. 이 파일은
 업스트림 최신 릴리스에서 자동 생성하지 않습니다. 업스트림 최신 버전과 이 kit가 지원한다고
 선언한 버전은 서로 다른 신호이기 때문입니다.
-TrailBase `0.35.9`는 일회용 kit WASM/auth/Record API/SSE fixture와 analytics 다중 DB
+TrailBase `0.36.1`은 일회용 kit WASM/auth/Record API/SSE fixture와 analytics 다중 DB
 smoke를 통과한 마지막 검증 버전입니다. Docker와 `bun run trailbase:wasm:smoke`,
 `bun scripts/smoke-trailbase-analytics-multidb.mjs`로 재현할 수 있습니다.
 Smoke는 명시적인 proxy stub mode를 쓰며 컨슈머 checkout이나 배포를 변경하지 않습니다.
@@ -49,7 +49,7 @@ rustup, editor, CI가 표준 Rust 프로젝트 방식으로 동작하도록 유�
 ## Renovate가 추적하는 업스트림 버전
 
 <!-- renovate: datasource=github-releases depName=trailbaseio/trailbase extractVersion=^v(?<version>.*)$ versioning=semver -->
-- `trailbase-server-github-release`: `0.35.12`
+- `trailbase-server-github-release`: `0.36.1`
 
 <!-- renovate: datasource=crate depName=trailbase-wasm versioning=cargo -->
 - `trailbase-wasm`: `0.6.1`
@@ -119,10 +119,10 @@ node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mj
   --compose docker-compose.yml
 
 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --image trailbase/trailbase:0.35.9
+  --image trailbase/trailbase:0.36.1
 
 CI_STRICT=1 node vendor/trailbase-apps-in-toss-kit/scripts/check-trailbase-version-policy.mjs \
-  --version 0.35.9
+  --version 0.36.1
 ```
 
 일반 모드에서는 경고를 출력하되 성공으로 종료합니다. Strict 모드에서는 선언된 kit minimum보다
@@ -158,7 +158,7 @@ principal은 정리 대상이 아닙니다. 아직 `0.33.14`를 쓰는 컨슈머
 
 TrailBase `0.34.0`부터 비동기 WASM SQL host의 `ATTACH DATABASE` 상대 경로 기준은
 프로세스 작업 디렉터리에서 `<depot>/data`로 바뀌며 상위 디렉터리 참조를 허용하지 않습니다.
-`Transaction::execute`는 `0.35.12`에서도 SQLite를 직접 사용하므로 상대 경로의 기준이
+`Transaction::execute`는 `0.36.1`까지도 SQLite를 직접 사용하므로 상대 경로의 기준이
 프로세스 작업 디렉터리입니다. fallback에 bind할 경로를 바꾸기 전에 SQL API를 확인하세요.
 API 차이와 upstream 소스는 [analytics fallback initializer](analytics.md)에 설명합니다.
 Kit smoke는 WASM에서 DB를 연결하지 않으므로 컨슈머는 업그레이드 전후 쓰기가 같은 기존
@@ -174,7 +174,8 @@ guest panic에 즉시 응답하고 실패한 instance를 공유 pool에서 제�
 `--runtime-extra-components`를 추가합니다. 인증·보조 DB와 함께 custom job,
 batch 오류 처리, component 경로를 검토하세요.
 
-`0.35.0`은 transaction과 batch 작업 안에서 파일 쓰기를 허용하며, API 충돌 정책에
+`0.35.0`은 transaction과 batch 작업 안에서 파일 쓰기를 허용하며(`0.36.0`에서 이 파일
+지원은 다시 제거됩니다. 아래 참고), API 충돌 정책에
 따라 무시된 batch insertion을 응답에서 빼지 않고 "skipped" 자리표시 id로 반환합니다.
 batch insert 결과를 요청 순서와 짝지어 처리하거나 반환된 id를 모두 생성된 레코드로
 취급하는 컨슈머는 응답 파싱을 수정해야 합니다. kit 패키지는 batch insertion을 보내지
@@ -185,7 +186,7 @@ Wasmtime을 갱신했습니다. fresh-start·migration runbook은 컨슈머가 �
 
 TrailBase 0.32는 component interface를 변경했습니다. 이 checkout은
 `trailbase-wasm` 0.6.1로 빌드하므로 호환 서버와 함께 배포해야 하며 검증한 조합은
-0.35.9입니다. 컨슈머 Rust component를 모두 다시 빌드하고 upstream 안내에 따라
+0.36.1입니다. 컨슈머 Rust component를 모두 다시 빌드하고 upstream 안내에 따라
 first-party auth-ui component도 갱신하세요. 조합 migration을 준비하기 전에는 기존
 kit/server pair를 유지하세요. 최소 버전 정책을 TBD로 유지한다는 것이 새 component가
 0.32 이전 서버에서 실행된다는 뜻은 아닙니다.
@@ -200,7 +201,7 @@ service identity 중 하나를 임의로 선택하지 않습니다. Token 발급
 
 검토 범위에는 0.31.3의 중첩 JSON 구독 수정, 0.32의 Rust guest 재사용·auth-ui metadata,
 0.33의 refresh token 엔트로피·OAuth cookie 수정, 0.33.14까지의 admin UI·SQL 도구 변경,
-위에 정리한 0.33.15–0.35.9 변경이 포함됩니다. Postgres 호환성은 선언하지 않으며
+이 절에 정리한 0.33.15–0.36.1 변경이 포함됩니다. Postgres 호환성은 선언하지 않으며
 kit SQL·통합 smoke는 SQLite 기준입니다.
 Guest instance가 여러 요청에 재사용될 수 있으므로 사용자·요청 상태를 Rust 전역 cache에
 보관하지 마세요.
@@ -214,4 +215,10 @@ loopback host port에서 일회용 컨테이너를 실행합니다. 기능성 �
 
 `0.35.8`은 주로 Wasmtime 보안 권고에 대응하며, 다중 DB SQLite 연결을 in-memory `main`으로 열고 기본값이 아닌 `main` DB에도 base·user migration을 적용합니다. `0.35.9`는 로그인하지 않은 `/api/auth/v1/logout` 요청에 401을 반환하고 JSON 요청을 리다이렉트하지 않으며, 보안 권고에 대응해 의존성을 갱신합니다. 두 버전 모두 `0.35.9` 검증 기준에 포함됩니다.
 
-`0.35.10`은 읽기 전용 파일의 내부 id를 list API로 알아낸 뒤 그 파일을 삭제할 수 있던 문제를 고치고, 공백을 무시하도록 UUID 파싱을 더 일관되게 바꿉니다. `0.35.11`은 롤백된 트랜잭션의 변경 이벤트를 더 이상 보내지 않습니다. `0.35.12`는 hook/subscription 수명 주기를 단순화하고, 레코드 단위 subscription과 레코드 삭제가 경쟁해 subscription이 고아로 남을 수 있던 문제를 고칩니다. 세 릴리스 노트 모두 Rust MSRV/MVRV, toolchain, WASM component interface 변경은 언급하지 않습니다. 아직 `0.35.9` 검증 기준에는 포함되지 않습니다. 레코드 컬럼에 파일을 저장하는 컨슈머는 자체 smoke test를 거친 뒤 `0.35.10` 수정을 반영할 계획을 세우세요.
+`0.35.10`은 읽기 전용 파일의 내부 id를 list API로 알아낸 뒤 그 파일을 삭제할 수 있던 문제를 고치고, 공백을 무시하도록 UUID 파싱을 더 일관되게 바꿉니다. `0.35.11`은 롤백된 트랜잭션의 변경 이벤트를 더 이상 보내지 않습니다. `0.35.12`는 hook/subscription 수명 주기를 단순화하고, 레코드 단위 subscription과 레코드 삭제가 경쟁해 subscription이 고아로 남을 수 있던 문제를 고칩니다. 세 릴리스 노트 모두 Rust MSRV/MVRV, toolchain, WASM component interface 변경은 언급하지 않습니다. 세 버전 모두 `0.36.1` 검증 기준에 포함됩니다. 레코드 컬럼에 파일을 저장하는 컨슈머는 자체 smoke test를 거친 뒤 `0.35.10` 수정을 반영하세요.
+
+`0.36.0`은 불투명한(암호화된) 파일 token을 추가해 부분 업데이트에서 `std.FileUploads` 컬럼의 파일을 하나씩 추가·삭제할 수 있게 합니다. Token은 특정 레코드와 컬럼에 묶이므로 파일을 다른 컬럼으로 옮길 수 없습니다. 파일 쓰기 일관성도 강화되어 create·update는 파일 내용이 기록되고 모든 참조가 유효한 파일을 가리킬 때만 성공합니다. 이 보장을 위해 `0.36.0`은 batch 작업과 transaction의 파일 지원을 제거해 `0.35.0`의 허용을 되돌리고, 파일 업로드의 요청·응답·저장 표현을 분리합니다. Kit template과 패키지는 파일 업로드 컬럼을 선언하지 않고 batch·transaction Record API 요청도 보내지 않으므로 kit 자체는 영향을 받지 않습니다. batch나 transaction으로 파일을 쓰는 컨슈머는 해당 쓰기를 레코드 단위 create/update 호출로 옮겨야 하며, 파일 컬럼을 쓰는 컨슈머는 업그레이드 전에 파일 읽기·쓰기·부분 업데이트를 다시 검증하세요.
+
+`0.36.1`은 알려진 신뢰 리버스 프록시 구성을 지정하는 `ProxyConfig`(`config.textproto`의 `server.proxy`)를 추가합니다. `client_ip_header`는 로깅과 rate limiting(`auth_ip_rate_limit` 포함)에 쓸 클라이언트 IP를 어느 헤더에서 꺼낼지 정하고, `trusted_proxies`는 `X-Forwarded-For`를 오른쪽부터 읽을 때 건너뛸 프록시 주소 목록입니다. `0.36.1`은 이 항목을 CIDR 범위가 아닌 정확한 IP 주소로 파싱합니다. `proxy`를 지정하지 않으면 여러 프록시 헤더 중 먼저 찾은 값을 쓰는 기존의 느슨한 fallback이 유지되며, 해당 헤더를 설정하는 프록시를 거치지 않은 요청에서는 클라이언트가 값을 위조할 수 있습니다. Kit template은 `server.proxy`를 설정하지 않습니다. Coolify 같은 리버스 프록시 뒤에 배포하는 컨슈머는 명시적인 설정을 검토하세요. 값을 덧붙이는 프록시 하나가 TrailBase 앞에 있으면 `X_FORWARDED_FOR`, 추가 hop이 있으면 hop마다 `trusted_proxies`, CDN이 유일한 진입 경로일 때만 `CF_CONNECTING_IP` 같은 CDN 헤더를 쓰는 식입니다. `0.36.1`은 Admin UI ERD 노드 위치도 유지하며 보안 권고에 대응해 Rust·JavaScript 의존성을 갱신합니다. `0.35.9`와 `0.36.1` 사이에는 Wasmtime `48.0.9`와 `jsonwebtoken` 12가 포함됩니다.
+
+두 `0.36` 릴리스 모두 Rust MSRV/MVRV(`1.93`)와 toolchain(`1.95`)을 바꾸지 않고, `bun run trailbase:rust-policy:check`도 동기화 상태를 유지합니다. Upstream WASM host 소스는 `0.35.9` 이후 바뀌지 않았고 `trailbase-wasm`은 계속 `0.6.1`입니다. 검증 기준은 2026-11-22에 `0.35.9`에서 `0.36.1`로 올라갔습니다. 일회용 WASM smoke(operations hold 유무 모두), analytics 다중 DB smoke, owned-currency SQL smoke가 `trailbase/trailbase:0.36.1`에서 통과했습니다. 컨슈머 실기기·production 검증은 아니며 kit minimum은 TBD로 유지합니다.
