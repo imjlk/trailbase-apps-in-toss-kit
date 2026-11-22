@@ -19,7 +19,9 @@ export function createDeviceTestScheme({ scheme, deploymentId, path, query = {},
   assert(url.protocol === 'intoss-private:' && url.hostname && !url.username && !url.password && !url.port && !url.hash, 'Expected an issued private test scheme');
   const ids = url.searchParams.getAll('_deploymentId');
   assert(ids.length === 1 && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(ids[0]) && ids[0] === deploymentId, 'Deployment ID differs from artifact evidence');
-  assert([...url.searchParams.keys()].every(key => key === '_deploymentId' || key === 'queryParams'), 'Unexpected test scheme parameter');
+  // The WebView SDK 3 CLI issues `host=appsInTossHost`; keep it, and nothing else unknown.
+  assert([...url.searchParams].every(([key, value]) => key === '_deploymentId' || key === 'queryParams' || (key === 'host' && value === 'appsInTossHost')), 'Unexpected test scheme parameter');
+  assert(url.searchParams.getAll('host').length <= 1, 'Unexpected test scheme parameter');
   assert(url.searchParams.getAll('queryParams').length <= 1, 'Duplicate test query');
   if (path !== undefined) {
     assert(typeof path === 'string' && /^\/(?!\/)/.test(path) && path.length <= 1024 && !/[?#\\\s]/.test(path), 'Invalid test path');

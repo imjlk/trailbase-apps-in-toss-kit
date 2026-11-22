@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AppsInTossBundle } from '@apps-in-toss/ait-format';
-import { buildConfigDigest, inspectAitArtifact, uploadVerifiedAit, validatePublicBuildConfig, validateReleaseEvidence, validateUploadRun } from '../src/ait.mjs';
+import { buildConfigDigest, inspectAitArtifact, readUploadedScheme, uploadVerifiedAit, validatePublicBuildConfig, validateReleaseEvidence, validateUploadRun } from '../src/ait.mjs';
 
 const roots = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -118,4 +118,29 @@ test('uploader uses the verified artifact and never exposes CLI credentials or o
   const scheme = `intoss-private://test-app?_deploymentId=${artifact.deploymentId}`;
   fake(`import assert from 'node:assert/strict'; assert.deepEqual(process.argv.slice(2, 7), ['deploy', '--location', ${JSON.stringify(artifactPath)}, '--api-key', ${JSON.stringify(apiKey)}]); console.log(${JSON.stringify(scheme)});`);
   expect((await uploadVerifiedAit(args)).testScheme).toBe(scheme);
+  // The WebView SDK 3 CLI (3.10) appends its host marker; that line is the issued scheme.
+  const webScheme = `${scheme}&host=appsInTossHost`;
+  fake(`console.log(${JSON.stringify(webScheme)});`);
+  expect((await uploadVerifiedAit(args)).testScheme).toBe(webScheme);
+});
+
+test('an uploaded scheme names this app and deployment, with only the CLI host marker', () => {
+  const id = '0198c000-68c3-7d2b-0000-2c00000005ec';
+  const base = `intoss-private://test-app?_deploymentId=${id}`;
+  for (const issued of [base, `${base}&host=appsInTossHost`, `${base}&host=appsInTossHost\n`]) {
+    expect(readUploadedScheme(issued, { appName: 'test-app', deploymentId: id })).toBe(issued.trim());
+  }
+  for (const other of [
+    `${base}&host=evil.invalid`,
+    `${base}&host=appsInTossHost&host=appsInTossHost`,
+    `${base}&extra=1`,
+    `${base}&_deploymentId=${id}`,
+    `intoss-private://other-app?_deploymentId=${id}`,
+    `intoss-private://test-app?_deploymentId=0198c000-68c3-7d2b-0000-2c00000005ed`,
+    `intoss://test-app?_deploymentId=${id}`,
+    `intoss-private://test-app/furnace?_deploymentId=${id}`,
+    `${base}#fragment`,
+    `${base} trailing`,
+    'not a scheme',
+  ]) expect(() => readUploadedScheme(other, { appName: 'test-app', deploymentId: id })).toThrow('unexpected deployment scheme');
 });

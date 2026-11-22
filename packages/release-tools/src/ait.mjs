@@ -159,11 +159,34 @@ export function uploadFailureMessage(error) {
   return `AIT upload failed (CLI exit ${Number.isInteger(error.status) ? error.status : 'unknown'}). Check the console before retrying.`;
 }
 
+// Only the WebView SDK 3 CLI's own host marker may accompany the deployment ID.
+const ISSUED_SCHEME_PARAMS = { host: 'appsInTossHost' };
+
+/**
+ * The test scheme `ait deploy --scheme-only` printed for this upload:
+ * `intoss-private://<app>?_deploymentId=<id>`. The WebView SDK 3 CLI appends
+ * `&host=appsInTossHost`; any other host, path or parameter is rejected.
+ */
+export function readUploadedScheme(output, { appName, deploymentId }) {
+  const scheme = String(output).trim();
+  let url = null;
+  try { url = new URL(scheme); } catch { /* rejected below */ }
+  const params = url ? [...url.searchParams] : [];
+  assert(
+    url && !/[\s\\]/.test(scheme) && url.protocol === 'intoss-private:' && url.hostname === appName && url.pathname === '' &&
+      !url.username && !url.password && !url.port && !url.hash &&
+      url.searchParams.getAll('_deploymentId').length === 1 && url.searchParams.get('_deploymentId') === deploymentId &&
+      params.every(([key, value]) => key === '_deploymentId' || (Object.hasOwn(ISSUED_SCHEME_PARAMS, key) && ISSUED_SCHEME_PARAMS[key] === value)) &&
+      Object.keys(ISSUED_SCHEME_PARAMS).every((key) => url.searchParams.getAll(key).length <= 1),
+    'Uploader returned an unexpected deployment scheme',
+  );
+  return scheme;
+}
+
 export async function uploadVerifiedAit({ artifactPath, report, context, policy, cliPath, appRoot, apiKey, env = process.env }) {
   assert(typeof apiKey === 'string' && apiKey.trim(), 'AIT_API_KEY is missing');
   const artifact = await inspectAitArtifact(readFileSync(artifactPath), policy);
   validateReleaseEvidence(report, context, artifact, buildConfigDigest(policy.config));
-  const expected = `intoss-private://${context.appName}?_deploymentId=${artifact.deploymentId}`;
   let result;
   try {
     const script = /\.(?:mjs|cjs|js)$/i.test(cliPath);
@@ -174,6 +197,6 @@ export async function uploadVerifiedAit({ artifactPath, report, context, policy,
     // Child errors can include secret argv and CLI output. Return static diagnostics only.
     throw new Error(uploadFailureMessage(error));
   }
-  assert(result.trim() === expected, 'Uploader returned an unexpected deployment scheme');
-  return { ...report, uploaded: true, testScheme: expected };
+  const testScheme = readUploadedScheme(result, { appName: context.appName, deploymentId: artifact.deploymentId });
+  return { ...report, uploaded: true, testScheme };
 }
