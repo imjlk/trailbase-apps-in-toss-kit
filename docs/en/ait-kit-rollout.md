@@ -16,7 +16,7 @@ the same release train.
 | Component | Version | Notes |
 |---|---|---|
 | Proxy image | Exact published version matching `services/toss-mtls-client-proxy/package.json` | Require the three promotion v2 capabilities below, plus `anonymous-key.exchange-auth-code` before adopting code authentication |
-| Proxy internal `@ait-kit/api-core` / `api-client` | `0.7.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence, typed transport failures, first-class anonymous auth-code exchange |
+| Proxy internal `@ait-kit/api-core` / `api-client` | `0.8.0` (exact pins) | Message UNKNOWN taxonomy, strict IAP evidence with purchaser check, typed transport failures, first-class anonymous auth-code exchange |
 | RN/Web `@ait-kit/sdk` | `0.8.0` (exact pins) | `ait-rn` / `ait-web` (private, Sampo-versioned) |
 | RN minimum `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.8.0 peer floor (unchanged since 0.3.0); minimum fixture compiles against the same reviewed pin |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | Existing methods unchanged; code authentication requires 3.6+ and runtime support |

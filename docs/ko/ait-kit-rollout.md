@@ -14,7 +14,7 @@
 | 구성 요소 | 버전 | 비고 |
 |---|---|---|
 | 프록시 이미지 | `services/toss-mtls-client-proxy/package.json`과 일치하는 게시된 정확한 버전 | 아래 프로모션 v2 capability 세 가지와 코드 인증 도입 전 `anonymous-key.exchange-auth-code` 필수 |
-| 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.7.0` (정확한 고정) | 메시지 UNKNOWN 분류, IAP 엄격 근거, typed 전송 실패, 익명 auth code 교환 정식 연산 |
+| 프록시 내부 `@ait-kit/api-core` / `api-client` | `0.8.0` (정확한 고정) | 메시지 UNKNOWN 분류, 구매자 확인을 포함한 IAP 엄격 근거, typed 전송 실패, 익명 auth code 교환 정식 연산 |
 | RN/Web `@ait-kit/sdk` | `0.8.0` (정확한 고정) | `ait-rn` / `ait-web` (비공개, Sampo 버전 관리) |
 | RN 최소 `@apps-in-toss/framework` | `>=2.10.10` | SDK 0.8.0 peer 하한(0.3.0 이후 변경 없음). 최소 fixture도 같은 검토 pin으로 컴파일 |
 | WebView `@apps-in-toss/web-framework` | `>=3.4.0 <4` | 기존 메서드는 유지. 코드 인증은 3.6+와 runtime 지원 필요 |

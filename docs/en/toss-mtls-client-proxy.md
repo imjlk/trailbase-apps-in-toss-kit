@@ -2,7 +2,7 @@
 
 The private `POST /internal/apps-in-toss/anonymous-key/exchange` route accepts
 `{ "code": "..." }` from the backend and delegates single-use code exchange to
-`@ait-kit/api-core` 0.7.0. It requires forward mode and the internal bearer token;
+`@ait-kit/api-core` 0.8.0. It requires forward mode and the internal bearer token;
 stub mode cannot fabricate an authenticated identity. Capability:
 `anonymous-key.exchange-auth-code`. A successful response contains a backend-only
 raw `anonKey`; never expose it publicly or log it. Failed exchanges return fixed
@@ -377,7 +377,7 @@ normalization or multi-step flow handling.
 
 ## API Core 0.4 Contracts
 
-The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.7.0` and
+The proxy pins `@ait-kit/api-core` and `@ait-kit/api-client` to `0.8.0` and
 explicitly opts into the generic mTLS relay. `/internal/mtls/request` remains
 behind the same internal bearer authentication; forward mode still requires a
 token. Bun is pinned to `1.4.5` across local tooling, CI, and the container.
@@ -452,7 +452,8 @@ request-based products for local tests.
 Authenticated health responses preserve `ok` and `mode` and add
 `kit: { contractVersion: 1, proxyVersion, capabilities }`. The version comes from
 the running package, and capabilities list implemented adapter contracts such as
-`anonymous-key.verify`, `iap.provider-sku-required`, `promotion.prepare.v2`,
+`anonymous-key.verify`, `iap.provider-sku-required`, `iap.purchaser-check`,
+`promotion.prepare.v2`,
 `promotion.execute.v2`, `promotion.status.v2`,
 `promotion.anonymous-recipient`, and `smart-message.channel-results`; the
 promotion capabilities are versioned (`.v2`) with the persisted three-step

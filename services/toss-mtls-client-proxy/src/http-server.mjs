@@ -165,6 +165,10 @@ function legacyIapResponse(result, mode) {
   if (!result.ok) return result;
   const payable = PAYABLE_IAP_STATUSES.has(String(result.providerStatus).trim().toUpperCase());
   const skuMismatch = result.skuCheck?.status === "MISMATCHED";
+  // api-core reports purchaserCheck only when the caller named a purchaser
+  // (tossUserKey or anonKey). A provider-stated mismatch means someone else
+  // bought this order, so it is never payable for this caller.
+  const purchaserMismatch = result.purchaserCheck?.status === "MISMATCHED";
   // The provider-SKU evidence requirement guards real upstream responses.
   // Stub mode fabricates payable results without provider evidence, and
   // the documented stub request shape does not require a SKU, so local
@@ -173,7 +177,7 @@ function legacyIapResponse(result, mode) {
   if (
     enforceProviderEvidence &&
     payable &&
-    (!result.sku || skuMismatch || result.verificationCode === "ORDER_ID_MISMATCH")
+    (!result.sku || skuMismatch || purchaserMismatch || result.verificationCode === "ORDER_ID_MISMATCH")
   ) {
     return {
       ok: false,
@@ -181,11 +185,14 @@ function legacyIapResponse(result, mode) {
       ...(result.sku !== undefined ? { sku: result.sku } : {}),
       providerStatus: "ERROR",
       error: "UNVERIFIED_IAP_ORDER",
+      ...(result.purchaserCheck !== undefined ? { purchaserCheck: { status: result.purchaserCheck.status } } : {}),
       failureReason: result.verificationCode === "ORDER_ID_MISMATCH"
         ? "Toss order response named a different order ID"
-        : skuMismatch
-          ? "Toss order was paid for a different product than requested"
-          : "Toss order response omitted the product SKU",
+        : purchaserMismatch
+          ? "Toss order was bought by a different user"
+          : skuMismatch
+            ? "Toss order was paid for a different product than requested"
+            : "Toss order response omitted the product SKU",
     };
   }
   const legacy = {
@@ -197,6 +204,8 @@ function legacyIapResponse(result, mode) {
   if (result.statusDeterminedAt !== undefined) legacy.statusDeterminedAt = result.statusDeterminedAt;
   if (result.reason !== undefined) legacy.reason = result.reason;
   if (result.attempts !== undefined) legacy.attempts = result.attempts;
+  // The verdict only; the purchaser identifier is never echoed back.
+  if (result.purchaserCheck !== undefined) legacy.purchaserCheck = { status: result.purchaserCheck.status };
   return legacy;
 }
 

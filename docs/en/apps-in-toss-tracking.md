@@ -75,7 +75,7 @@ WebView adapters from `@ait-kit/sdk/webview`; `/web` and the `createWeb*` names
 remain deprecated aliases. SDK 0.7.0 added fresh WebView anonymous
 authentication codes. Only that opt-in method requires official WebView SDK
 3.6+ and runtime support; the existing adapter peer floor remains 3.4.0. The
-private proxy uses api-core and api-client 0.7.0 for single-use server exchange,
+private proxy uses api-core and api-client 0.8.0 for single-use server exchange,
 with the route pinned to `PROXY_ENDPOINTS.anonAuthCodeExchange`. See
 [anonymous identity](anonymous-identity.md) before changing public bootstrap.
 
