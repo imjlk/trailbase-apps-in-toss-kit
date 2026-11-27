@@ -1,166 +1,166 @@
 {
-  "fetchedAt": "2026-11-20T08:29:47.950Z",
+  "fetchedAt": "2026-11-27T09:38:46.705Z",
   "documents": [
     {
       "key": "release-notes",
       "title": "Apps in Toss release notes",
       "url": "https://developers-apps-in-toss.toss.im/release-note/release-note.md",
-      "sha256": "615df05ca4fe66e6be3e67a9f559df7b454daa6f9254b0ec1f6d429750010a1d",
-      "bytes": 25808
+      "sha256": "edaa098e21d78c5f33de20b8c3076275ba7aad857bb002a5f1e1576b4fc683d4",
+      "bytes": 26747
     },
     {
       "key": "llms",
       "title": "Apps in Toss llms.txt",
       "url": "https://developers-apps-in-toss.toss.im/llms.txt",
-      "sha256": "843c1b8472b9eef8d639858b0e05089dea43b57a3200529f9e35b58bb1e4d8f8",
-      "bytes": 34363
+      "sha256": "92851001ae5463bc54b9b8595b73ee732c4987f14baf40ca14cf9fc5ee4bf118",
+      "bytes": 35117
     },
     {
       "key": "react-native-tutorial",
       "title": "React Native tutorial",
       "url": "https://developers-apps-in-toss.toss.im/ai-vibe-coding/tutorials/react-native.md",
-      "sha256": "ed571fac993434b300759d7c52f2cc6dec8dfd08f04741268d9d23ad50c7c6bd",
-      "bytes": 15144
+      "sha256": "e57e476ac51affb5d02f157f31c505e86b8df0bb2884f61db741823b5ffbe510",
+      "bytes": 15275
     },
     {
       "key": "react-native-reference",
       "title": "React Native reference",
       "url": "https://developers-apps-in-toss.toss.im/documentation/react-native.md",
-      "sha256": "10ef3f046c5c5e7d974cf55af6cf7c5c4779c07bb2124b548556413c9eaa876f",
-      "bytes": 2641
+      "sha256": "17f33256630b76a167827e3197f2518f41a756de8f955aac87abe0d3c348366f",
+      "bytes": 2772
     },
     {
       "key": "client-sdk-overview",
       "title": "WebView Client SDK overview",
       "url": "https://developers-apps-in-toss.toss.im/documentation/sdk.md",
-      "sha256": "5d1ef2d578325b12f1b310654dd702fa5d1a5255eb69269cb0271c66281aea86",
-      "bytes": 2661
+      "sha256": "3c07f2d3e6facc0e196bea3e172eeb6d1ca8e16613bc151f262f609a25780901",
+      "bytes": 2792
     },
     {
       "key": "webview-sdk-3-migration",
       "title": "WebView SDK 3.x migration",
       "url": "https://developers-apps-in-toss.toss.im/documentation/integration/sdk-3.x.md",
-      "sha256": "fd9387f7454349645bb5f521c808db4c5a7424d38e6b628e9ef8666831507417",
-      "bytes": 12283
+      "sha256": "ad4ba56e709e822eabe60131b615453241012f8606cb2b03126ad8a5460b9017",
+      "bytes": 12414
     },
     {
       "key": "api-overview",
       "title": "API overview",
       "url": "https://developers-apps-in-toss.toss.im/documentation/overview.md",
-      "sha256": "ee4b0251da84007363859babe7a41d66af05bcf3d62fff1b849f928c0203f0b4",
-      "bytes": 9125
+      "sha256": "6a3d289f0a05d4b17f55d38c1c7c4b294c2d744f183a3201d5ce976ba8f88ef0",
+      "bytes": 9256
     },
     {
       "key": "integration-getting-started",
       "title": "Apps in Toss integration getting started",
       "url": "https://developers-apps-in-toss.toss.im/documentation/integration/getting-started.md",
-      "sha256": "6ac34b69056d3438e0a5213765f304acf0bf21f32720b68980969c908c79dc4d",
-      "bytes": 9300
+      "sha256": "9d2b940e22c39ddb194c19c464e768d77992218c888964303e38683d40644570",
+      "bytes": 9431
     },
     {
       "key": "server-api-integration",
       "title": "Server API integration",
       "url": "https://developers-apps-in-toss.toss.im/documentation/integration/server-api.md",
-      "sha256": "0f6da5cb97545d05ba39260eb3871875f73ba6b65c88f419e38b92331fb2f9bc",
-      "bytes": 8919
+      "sha256": "97e97d801efdc6e1886c5fc392ee864e109d9292b2331cbbce1a337511d730dc",
+      "bytes": 9050
     },
     {
       "key": "api-auth",
       "title": "API authentication and mTLS",
       "url": "https://developers-apps-in-toss.toss.im/api/auth.md",
-      "sha256": "0e694f09b3d68db0ca1ad9ce646d950ab58d06ba6ca70cbfac7021a46bffcd32",
-      "bytes": 2851
+      "sha256": "1f941f13d74dd555430a03923a8906f33e8189eb049431a166c69666defdc66b",
+      "bytes": 2982
     },
     {
       "key": "toss-login-api",
       "title": "Toss Login API",
       "url": "https://developers-apps-in-toss.toss.im/api/toss-login.md",
-      "sha256": "b369e9b7576a80094a4e9c1263a67dbd14133f9391c3700fbccc56b71b6fc363",
-      "bytes": 42253
+      "sha256": "05ad98c9d1b8930e75c319040eb309c4e5b19aff33285cdcfa21302b69d77ccf",
+      "bytes": 42384
     },
     {
       "key": "iap-api",
       "title": "In-app purchase API",
       "url": "https://developers-apps-in-toss.toss.im/api/iap.md",
-      "sha256": "b608697d75b5b8f9a2a34d2e59c5038f571ed17a0baddae985c9d6aa9f9c1145",
-      "bytes": 11370
+      "sha256": "14e802d1d6247229be154a4c4177c8a7e8084ae9614c13b7b66fa45ca0f1eaf3",
+      "bytes": 11501
     },
     {
       "key": "promotion-api",
       "title": "Promotion API",
       "url": "https://developers-apps-in-toss.toss.im/api/promotion.md",
-      "sha256": "1482a0536a58f58df4c0adda9e922c56e5c8f3f9e7b4f11c1b5962d4c5410864",
-      "bytes": 25560
+      "sha256": "87574ba27717802757767c027907ff15a99da239e8ada9df809a8270e822d40d",
+      "bytes": 25691
     },
     {
       "key": "push-api",
       "title": "Push and Smart Message API",
       "url": "https://developers-apps-in-toss.toss.im/api/push.md",
-      "sha256": "e9723bfc2e88637b50c1f425de5d57de77b1bf9cda81182c4ec61ef9da05b750",
-      "bytes": 36570
+      "sha256": "9dc366a3903c7f2bcc33e82432562f95253237a6e06299f95be9a229d877103c",
+      "bytes": 36701
     },
     {
       "key": "smart-message-guide",
       "title": "Smart Message overview and notification agreement policy",
       "url": "https://developers-apps-in-toss.toss.im/documentation/common/growth/smart-message.md",
-      "sha256": "8014f8de8a5bcd751ce4258cae990fb30eaa2c42f0fba59710622fab0d9b476e",
-      "bytes": 28491
+      "sha256": "192175547cb890fed5293e9e9aad0bc0cc057ce16a28b5c6d0ab5089a17e070c",
+      "bytes": 28622
     },
     {
       "key": "review-guide",
       "title": "Review request guide",
       "url": "https://developers-apps-in-toss.toss.im/documentation/common/growth/review.md",
-      "sha256": "99a208dd8452d88e3fc7eb5f422d1979ec7a3c06f63346fb95b5c32a9997a1ee",
-      "bytes": 7354
+      "sha256": "5771ecb37b2df7b46b2baff7832bc4a4d94bddc5e24129b8e58a4f11a06253e8",
+      "bytes": 7485
     },
     {
       "key": "review-request-sdk",
       "title": "Review.request SDK",
       "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/review/review.request.md",
-      "sha256": "a05d3fdaf96bb2609573c8aaeeb4359ef8b691838f51d7bf251e38ee218a11df",
-      "bytes": 3160
+      "sha256": "b5b87cd50ac047d727237c271089c3e571ce64c55d6b02f574380058756d4622",
+      "bytes": 3291
     },
     {
       "key": "promotion-grant-reward-sdk",
       "title": "Promotion.grantReward SDK",
       "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/promotion/promotion.grantreward.md",
-      "sha256": "fcc38d96c558f8aed58d2aefb7299c53f397035f501c418d7f1b95b71e5b6c5e",
-      "bytes": 6530
+      "sha256": "b49117ad461ff236680eaf7191c61d70d698c83eb18adf8c2ca37ff1b321febf",
+      "bytes": 6661
     },
     {
       "key": "promotion-guide",
       "title": "Promotion operations guide",
       "url": "https://developers-apps-in-toss.toss.im/guide/marketing/promotion.md",
-      "sha256": "a5cf5859c16a64928c3819a9aef7703a38f20d395a7b5e37b0847f726d769ec3",
-      "bytes": 32138
+      "sha256": "a0e85d2293162244241ea89ea0a520da1823994347010653bbc5b826ea6f5842",
+      "bytes": 32269
     },
     {
       "key": "notification-agreement-sdk",
       "title": "Notification agreement SDK requestNotificationAgreement",
       "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/notification/notification.requestagreement.md",
-      "sha256": "7148c6e8b1e763f4aedc9b5388376f5568c5e3534403d0fcf5e0c2144cf6f9b7",
-      "bytes": 4480
+      "sha256": "fd9a9dff7a0855224c1c6be7f59331e13c284e67f6adaaef16e401ff0cc3fccc",
+      "bytes": 4611
     },
     {
       "key": "anonymous-user-key-sdk",
       "title": "Anonymous user key SDK getAnonymousKey",
       "url": "https://developers-apps-in-toss.toss.im/documentation/sdk/domains-api/user/user.getanonymouskey.md",
-      "sha256": "d45d858e1ca0d4e2efae7bf9e0522d452c492d6b254dbc9536c203e3399ab622",
-      "bytes": 2670
+      "sha256": "02842884bbb0a6d8ee9f682d6a60482d01343a2880ce0035fe0fef4d1b0d1711",
+      "bytes": 2801
     },
     {
       "key": "anonymous-user-key-api",
       "title": "Anonymous user key verification API",
       "url": "https://developers-apps-in-toss.toss.im/api/user-key.md",
-      "sha256": "83aa38c2e33405368cf8d091bc41295c663888209ff04808c8aeb24d6d3746d4",
-      "bytes": 16549
+      "sha256": "cdfc216c9cafae073006f6d1968fbec768b3568c4a80058ee4ab95a6ae31ee9e",
+      "bytes": 16680
     },
     {
       "key": "iap-subscription-guide",
       "title": "In-app subscription guide",
       "url": "https://developers-apps-in-toss.toss.im/documentation/common/monetization/iap/in-app-subscription.md",
-      "sha256": "01d303810f3c2fe0a57ebb3310ab5b7f7f18ae3a50dac9ecfe34e9271048340c",
-      "bytes": 20593
+      "sha256": "e3ffbee8cea0930834134a0a49064feeacacf0f3034d7f082b16a1db6a96877f",
+      "bytes": 20724
     },
     {
       "key": "tds-react-native",
