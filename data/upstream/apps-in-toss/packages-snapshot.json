@@ -1,5 +1,5 @@
 {
-  "fetchedAt": "2026-11-11T07:43:13.711Z",
+  "fetchedAt": "2026-11-27T09:38:40.388Z",
   "packages": [
     {
       "packageName": "@ait-kit/sdk",
@@ -10,7 +10,7 @@
     },
     {
       "packageName": "@apps-in-toss/web-framework",
-      "version": "3.10.0",
+      "version": "3.11.0",
       "unavailable": false,
       "status": null,
       "registryUrl": "https://registry.npmjs.org/@apps-in-toss%2Fweb-framework/latest"
